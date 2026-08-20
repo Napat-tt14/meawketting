@@ -1,0 +1,64 @@
+# Private project material
+/workfiledesign/
+/.claude/
+/.agents/
+/.codex/
+
+# Local-only project manual; keep detailed HTML manual out of Git
+/docs/.htmlmanual/
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+.evn
+.evn.*
+
+# Dependencies and generated output
+/node_modules/
+/.next/
+/.vinext/
+/dist/
+/.wrangler/
+/coverage/
+/outputs/
+/work/
+/tmp/
+
+# Logs and local editor files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.DS_Store
+Thumbs.db
+/.vscode/
+/.idea/
+
+# Local certificates and package-manager caches
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+/.pnp
+.pnp.*
+/.yarn/*
+!/.yarn/patches
+!/.yarn/plugins
+!/.yarn/releases
+!/.yarn/versions
+/.vercel/
+
+# Local tool caches
+.eslintcache
+*.tsbuildinfo
+/.cache/
+/.vite/
+/.turbo/
+
+# Unrelated local media kept outside the web app
+/Cat_November_2010-1a.jpg.webp
+/public/images/cats/

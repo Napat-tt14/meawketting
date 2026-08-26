@@ -8,6 +8,7 @@ import type {
   DemoBusinessContext,
   PrototypeBooking,
   PrototypeBookingDraft,
+  PrototypeCustomer,
 } from "../../_prototype/businessState";
 import {
   BOOKING_DEMO_DATE,
@@ -16,17 +17,23 @@ import {
   getBookingResources,
   getBookingServices,
   getDemoBookingContacts,
+  readPrototypeCustomer,
   savePrototypeBooking,
 } from "../../_prototype/businessState";
-import { CheckCircle, CircleAlert, Save, X } from "../../_components/icons";
+import { CheckCircle, CircleAlert, MessageCircle, Plus, Save, X } from "../../_components/icons";
+import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
+import { CustomerEditor } from "../customers/CustomerEditor";
+import { PetRelationshipEditor } from "../customers/PetRelationshipEditor";
 import { AvailabilityStatus } from "./AvailabilityStatus";
 import { DaycareBookingFields } from "./DaycareBookingFields";
 import { GroomingBookingFields } from "./GroomingBookingFields";
 import { HotelBookingFields } from "./HotelBookingFields";
 import { addCalendarDays, bookingEstimateLabel, calendarDateLabel } from "./calendarPresentation";
 import { resourceSummary, withAppointmentStart } from "./bookingEditorUtils";
+import { bookingDraftFromPrototype } from "./bookingMutation";
 
 type BookingEditorStep = "details" | "review";
+type RelationshipEditorState = { kind: "customer" } | { kind: "pet"; customer: PrototypeCustomer } | null;
 
 function defaultAssignments(service: DemoBookingService, resources: readonly DemoBookingResource[]) {
   return service.requiredResourceKinds.flatMap((kind) => {
@@ -36,16 +43,28 @@ function defaultAssignments(service: DemoBookingService, resources: readonly Dem
   });
 }
 
-function newDraft(context: DemoBusinessContext, service: DemoBookingService, selectedDate: string): PrototypeBookingDraft {
+function newDraft(
+  context: DemoBusinessContext,
+  service: DemoBookingService,
+  selectedDate: string,
+  preselectedCustomerId?: string | null,
+  preselectedPetId?: string | null,
+): PrototypeBookingDraft {
   const resources = getBookingResources(context, service.id);
+  const selectedContact = preselectedCustomerId
+    ? getDemoBookingContacts(context).find((contact) => contact.id === preselectedCustomerId) ?? null
+    : null;
+  const selectedPet = selectedContact && preselectedPetId
+    ? selectedContact.pets.find((pet) => pet.id === preselectedPetId) ?? null
+    : null;
   const draft: PrototypeBookingDraft = {
     businessId: context.businessId,
     branchId: context.branchId,
     serviceModule: service.module,
     serviceId: service.id,
     timeModel: service.timeModel,
-    customer: null,
-    pets: [],
+    customer: selectedContact ? { id: selectedContact.id, name: selectedContact.name } : null,
+    pets: selectedPet ? [{ ...selectedPet }] : [],
     start: service.timeModel === "appointment" ? `${selectedDate}T13:00` : selectedDate,
     end: service.timeModel === "date-range" ? addCalendarDays(selectedDate, 1) : "",
     assignedResourceIds: defaultAssignments(service, resources),
@@ -54,25 +73,6 @@ function newDraft(context: DemoBusinessContext, service: DemoBookingService, sel
     status: "pending",
   };
   return service.timeModel === "appointment" ? withAppointmentStart(draft, service, selectedDate, "13:00") : draft;
-}
-
-function draftFromBooking(booking: PrototypeBooking): PrototypeBookingDraft {
-  return {
-    bookingId: booking.bookingId,
-    businessId: booking.businessId,
-    branchId: booking.branchId,
-    serviceModule: booking.serviceModule,
-    serviceId: booking.service.id,
-    timeModel: booking.timeModel,
-    customer: { ...booking.customer },
-    pets: booking.pets.map((pet) => ({ ...pet })),
-    start: booking.start,
-    end: booking.end ?? "",
-    assignedResourceIds: [...booking.assignedResources],
-    notes: booking.notes,
-    estimate: booking.estimate,
-    status: booking.status,
-  };
 }
 
 function draftDate(draft: PrototypeBookingDraft, fallback: string) {
@@ -97,18 +97,22 @@ export function BookingEditor({
   context,
   initialBooking,
   selectedDate,
+  preselectedCustomerId = null,
+  preselectedPetId = null,
   onClose,
   onSaved,
 }: {
   context: DemoBusinessContext;
   initialBooking: PrototypeBooking | null;
   selectedDate: string;
+  preselectedCustomerId?: string | null;
+  preselectedPetId?: string | null;
   onClose: () => void;
   onSaved: (booking: PrototypeBooking, created: boolean) => void;
 }) {
   const services = getBookingServices(context);
   const fallbackService = services[0] ?? null;
-  const [draft, setDraft] = useState<PrototypeBookingDraft>(() => initialBooking ? draftFromBooking(initialBooking) : fallbackService ? newDraft(context, fallbackService, selectedDate) : {
+  const [draft, setDraft] = useState<PrototypeBookingDraft>(() => initialBooking ? bookingDraftFromPrototype(initialBooking) : fallbackService ? newDraft(context, fallbackService, selectedDate, preselectedCustomerId, preselectedPetId) : {
     businessId: context.businessId,
     branchId: context.branchId,
     serviceModule: null,
@@ -128,15 +132,19 @@ export function BookingEditor({
   const [saving, setSaving] = useState(false);
   const [cancelConfirmation, setCancelConfirmation] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [relationshipEditor, setRelationshipEditor] = useState<RelationshipEditorState>(null);
+  const [relationshipRevision, setRelationshipRevision] = useState(0);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const onCloseRef = useRef(onClose);
+  const relationshipEditorOpenRef = useRef(false);
 
   const contextMatches = draft.businessId === context.businessId && draft.branchId === context.branchId;
   const service = services.find((item) => item.id === draft.serviceId) ?? null;
   const resources = service ? getBookingResources(context, service.id) : [];
+  void relationshipRevision;
   const contacts = getDemoBookingContacts(context);
   const selectedContact = draft.customer ? contacts.find((contact) => contact.id === draft.customer?.id) ?? null : null;
   const availability = useMemo(() => evaluatePrototypeBookingAvailability(draft, context), [context, draft]);
@@ -147,6 +155,10 @@ export function BookingEditor({
   }, [onClose]);
 
   useEffect(() => {
+    relationshipEditorOpenRef.current = Boolean(relationshipEditor);
+  }, [relationshipEditor]);
+
+  useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -154,7 +166,8 @@ export function BookingEditor({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (cancelConfirmation) setCancelConfirmation(false);
+        if (relationshipEditorOpenRef.current) setRelationshipEditor(null);
+        else if (cancelConfirmation) setCancelConfirmation(false);
         else onCloseRef.current();
         return;
       }
@@ -238,6 +251,31 @@ export function BookingEditor({
     updateDraft({ ...draft, pets: pet ? [{ ...pet }] : [] });
   }
 
+  function beginPetCreation() {
+    if (!selectedContact) return;
+    const customer = readPrototypeCustomer(selectedContact.id);
+    if (customer) setRelationshipEditor({ kind: "pet", customer });
+  }
+
+  function customerCreated(customer: PrototypeCustomer) {
+    setRelationshipRevision((current) => current + 1);
+    updateDraft({ ...draft, customer: { id: customer.id, name: customer.name }, pets: [] });
+    setRelationshipEditor({ kind: "pet", customer });
+    setNotice(`เพิ่ม ${customer.name} แล้ว · เพิ่มน้องเพื่อจบข้อมูลการจอง`);
+  }
+
+  function petCreated(customer: PrototypeCustomer) {
+    const pet = customer.pets.at(-1) ?? null;
+    setRelationshipRevision((current) => current + 1);
+    updateDraft({
+      ...draft,
+      customer: { id: customer.id, name: customer.name },
+      pets: pet ? [{ id: pet.id, name: pet.name, species: pet.species }] : [],
+    });
+    setRelationshipEditor(null);
+    setNotice(pet ? `เพิ่ม ${pet.name} และเลือกให้การจองนี้แล้ว` : "เพิ่มลูกค้าแล้ว");
+  }
+
   function handleRecovery(recovery: BookingConflictRecovery) {
     setStep("details");
     const targets: Record<BookingConflictRecovery, string> = {
@@ -289,23 +327,24 @@ export function BookingEditor({
 
   return (
     <>
-      <button className="booking-editor__backdrop" type="button" tabIndex={-1} aria-label="ปิดการแก้ไขการจอง" onClick={onClose} />
-      <section className="booking-editor" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="booking-editor-title">
+      <button className="booking-editor__backdrop" type="button" tabIndex={-1} inert={relationshipEditor ? true : undefined} aria-label="ปิดการแก้ไขการจอง" onClick={onClose} />
+      <section className={`booking-editor${relationshipEditor ? " booking-editor--relationship" : ""}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="booking-editor-title">
         <header className="booking-editor__header">
-          <div>
-            <p>{initialBooking ? "แก้ไขข้อมูลตัวอย่าง" : "เพิ่มข้อมูลตัวอย่าง"}</p>
-            <h2 id="booking-editor-title">{initialBooking ? "แก้ไขการจอง" : "เพิ่มการจอง"}</h2>
+          <h2 id="booking-editor-title">{initialBooking ? "แก้ไขการจอง" : "เพิ่มการจอง"}</h2>
+          <div className="booking-editor__header-actions">
+            {initialBooking ? <a href={`/business/inbox?customerId=${encodeURIComponent(initialBooking.customer.id)}&petId=${encodeURIComponent(initialBooking.pets[0]?.id ?? "")}&bookingId=${encodeURIComponent(initialBooking.bookingId)}`}><MessageCircle size={18} />ส่งข้อความ</a> : null}
+            <button ref={closeButtonRef} type="button" aria-label="ปิดการแก้ไขการจอง" onClick={onClose}><X size={20} /></button>
           </div>
-          <button ref={closeButtonRef} type="button" aria-label="ปิดการแก้ไขการจอง" onClick={onClose}><X size={20} /></button>
         </header>
 
-        {existingCancelled ? (
-          <div className="booking-editor__cancelled-state">
-            <CircleAlert size={24} />
-            <div><strong>การจองนี้ยกเลิกแล้ว</strong><p>ระบบเก็บประวัติการยกเลิกไว้ในต้นแบบ และปล่อยวันเวลา/พื้นที่ให้ใช้งานต่อได้</p></div>
-          </div>
-        ) : step === "details" ? (
-          <form className="booking-editor__form" onSubmit={showReview} aria-describedby={availabilityId}>
+        <div className="booking-editor__body" inert={relationshipEditor ? true : undefined}>
+          {existingCancelled ? (
+            <div className="booking-editor__cancelled-state">
+              <CircleAlert size={24} />
+              <div><strong>การจองนี้ยกเลิกแล้ว</strong><p>วัน เวลา และพื้นที่กลับมาใช้งานได้ ส่วนประวัติยังถูกเก็บไว้</p></div>
+            </div>
+          ) : step === "details" ? (
+            <form className="booking-editor__form" onSubmit={showReview} aria-describedby={availabilityId}>
             {!contextMatches ? (
               <section className="booking-branch-blocker" role="alert">
                 <CircleAlert size={20} />
@@ -317,35 +356,46 @@ export function BookingEditor({
               </section>
             ) : null}
 
-            <section className="booking-fields booking-fields--shared" aria-labelledby="booking-shared-fields-title">
-              <div className="booking-section-heading">
-                <p>เริ่มจากข้อมูลหลัก</p>
-                <h3 id="booking-shared-fields-title">บริการ ลูกค้า และน้อง</h3>
-              </div>
-              <label className="booking-field">
-                <span>บริการ</span>
-                <select id="booking-service" value={draft.serviceId} onChange={(event) => chooseService(event.target.value)} aria-describedby={availabilityId} required>
-                  {!service && draft.serviceId ? <option value={draft.serviceId}>บริการของสาขาเดิม</option> : null}
-                  {services.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                </select>
-                <small>แสดงเฉพาะบริการที่สาขานี้เปิดใช้</small>
-              </label>
-              <div className="booking-form-grid">
-                <label className="booking-field">
-                  <span>ลูกค้า (ข้อมูลตัวอย่าง)</span>
-                  <select value={draft.customer?.id ?? ""} onChange={(event) => chooseContact(event.target.value)} aria-describedby={availabilityId} required>
-                    <option value="">เลือกลูกค้า</option>
-                    {contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
-                  </select>
-                </label>
-                <label className="booking-field">
-                  <span>น้องที่เข้ารับบริการ</span>
-                  <select value={draft.pets[0]?.id ?? ""} onChange={(event) => choosePet(event.target.value)} aria-describedby={availabilityId} required disabled={!selectedContact}>
-                    <option value="">เลือกน้อง</option>
-                    {selectedContact?.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-                  </select>
-                  <small>ต้นแบบนี้เริ่มจากการจอง 1 ตัวต่อครั้ง</small>
-                </label>
+            <section className="booking-fields booking-fields--shared" aria-label="บริการ ลูกค้า และสัตว์เลี้ยง">
+              <fieldset className="booking-service-selector">
+                <legend>บริการ</legend>
+                <div>
+                  {services.map((item, index) => (
+                    <button
+                      id={draft.serviceId === item.id || (!service && index === 0) ? "booking-service" : undefined}
+                      className={`booking-service-option booking-service-option--${item.module}`}
+                      key={item.id}
+                      type="button"
+                      aria-pressed={draft.serviceId === item.id}
+                      onClick={() => chooseService(item.id)}
+                    >
+                      <BusinessServiceIcon module={item.module} size={20} />
+                      <span><strong>{item.label}</strong><small>{item.timeModel === "appointment" ? "นัดตามเวลา" : item.timeModel === "date-range" ? "ช่วงวันที่" : "เต็มวัน"}</small></span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="booking-form-grid booking-relationship-fields">
+                <div className="booking-field-with-action">
+                  <label className="booking-field">
+                    <span>ลูกค้า</span>
+                    <select value={draft.customer?.id ?? ""} onChange={(event) => chooseContact(event.target.value)} aria-describedby={availabilityId} required>
+                      <option value="">เลือกลูกค้า</option>
+                      {contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => setRelationshipEditor({ kind: "customer" })}><Plus size={16} />เพิ่มลูกค้าใหม่</button>
+                </div>
+                <div className="booking-field-with-action">
+                  <label className="booking-field">
+                    <span>สัตว์เลี้ยง</span>
+                    <select value={draft.pets[0]?.id ?? ""} onChange={(event) => choosePet(event.target.value)} aria-describedby={availabilityId} required disabled={!selectedContact}>
+                      <option value="">เลือกน้อง</option>
+                      {selectedContact?.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
+                    </select>
+                  </label>
+                  {selectedContact ? <button type="button" onClick={beginPetCreation}><Plus size={16} />เพิ่มสัตว์เลี้ยง</button> : null}
+                </div>
               </div>
             </section>
 
@@ -353,16 +403,14 @@ export function BookingEditor({
             {service?.timeModel === "date-range" ? <HotelBookingFields draft={draft} service={service} resources={resources} describedBy={availabilityId} onDraftChange={updateDraft} /> : null}
             {service?.timeModel === "day" ? <DaycareBookingFields draft={draft} service={service} resources={resources} describedBy={availabilityId} onDraftChange={updateDraft} /> : null}
 
-            <section className="booking-fields booking-fields--notes" aria-labelledby="booking-notes-title">
-              <div className="booking-section-heading"><p>ข้อมูลเพิ่มเติม</p><h3 id="booking-notes-title">หมายเหตุและราคาประมาณ</h3></div>
-              <div className="booking-form-grid">
-                <label className="booking-field">
-                  <span>ราคาประมาณ</span>
+            <section className="booking-fields booking-fields--notes" aria-label="ราคาและหมายเหตุ">
+              <div className="booking-form-grid booking-financial-fields">
+                <label className="booking-field booking-estimate-field">
+                  <span>ราคาโดยประมาณ</span>
                   <input type="number" min="0" inputMode="decimal" value={draft.estimate ?? ""} onInput={(event) => updateDraft({ ...draft, estimate: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) })} aria-describedby={availabilityId} />
-                  <small>DEMO · ยังไม่มีนโยบายปรับราคา</small>
                 </label>
-                <label className="booking-field booking-field--wide">
-                  <span>หมายเหตุ</span>
+                <label className="booking-field booking-notes-field">
+                  <span>หมายเหตุของร้าน</span>
                   <textarea value={draft.notes} onInput={(event) => updateDraft({ ...draft, notes: event.currentTarget.value })} aria-describedby={availabilityId} placeholder="เช่น สิ่งที่ต้องเตรียม หรือข้อมูลที่ช่วยวางแผน" rows={3} />
                 </label>
               </div>
@@ -374,12 +422,11 @@ export function BookingEditor({
               {initialBooking ? <button className="button button--business-ghost booking-editor__cancel-action" type="button" onClick={() => setCancelConfirmation(true)}>ยกเลิกการจอง</button> : <span />}
               <button className="button button--business" type="submit"><Save size={18} />ตรวจเวลาว่างและทบทวน</button>
             </footer>
-          </form>
-        ) : (
-          <section className="booking-review" aria-labelledby="booking-review-title">
+            </form>
+          ) : (
+            <section className="booking-review" aria-labelledby="booking-review-title">
             <div className="booking-review__heading">
-              <p>ตรวจทานก่อนยืนยัน</p>
-              <h3 id="booking-review-title" ref={reviewHeadingRef} tabIndex={-1}>การจองนี้พร้อมบันทึกหรือไม่</h3>
+              <h3 id="booking-review-title" ref={reviewHeadingRef} tabIndex={-1}>ตรวจทานการจอง</h3>
             </div>
             <dl>
               <div><dt>บริการ</dt><dd>{service?.label ?? "ยังไม่ได้เลือก"}</dd></div>
@@ -397,14 +444,30 @@ export function BookingEditor({
                 <CheckCircle size={18} />{saving ? "กำลังบันทึก" : initialBooking ? "บันทึกการเปลี่ยนแปลง" : "ยืนยันการจอง"}
               </button>
             </footer>
-          </section>
-        )}
+            </section>
+          )}
 
-        {cancelConfirmation ? (
-          <section className="booking-cancel-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="booking-cancel-title">
-            <div><CircleAlert size={20} /><h3 id="booking-cancel-title">ยกเลิกการจองนี้หรือไม่</h3></div>
-            <p>รายการจะไม่ถูกลบ แต่เปลี่ยนเป็นสถานะยกเลิกและไม่กินวัน เวลา หรือพื้นที่อีกต่อไป ต้นแบบนี้ยังไม่มีค่าธรรมเนียมหรือการชำระเงิน</p>
-            <div><button type="button" onClick={() => setCancelConfirmation(false)}>กลับไปดูข้อมูล</button><button type="button" onClick={cancelBooking}>ยืนยันยกเลิกการจอง</button></div>
+          {cancelConfirmation ? (
+            <section className="booking-cancel-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="booking-cancel-title">
+              <div><CircleAlert size={20} /><h3 id="booking-cancel-title">ยกเลิกการจองนี้หรือไม่</h3></div>
+              <p>รายการจะยังอยู่ในประวัติ แต่จะไม่ใช้วัน เวลา หรือพื้นที่อีกต่อไป</p>
+              <div><button type="button" onClick={() => setCancelConfirmation(false)}>กลับไปดูข้อมูล</button><button type="button" onClick={cancelBooking}>ยืนยันยกเลิกการจอง</button></div>
+            </section>
+          ) : null}
+        </div>
+
+        {relationshipEditor ? (
+          <section className="booking-editor__relationship-panel" aria-label={relationshipEditor.kind === "customer" ? "เพิ่มลูกค้าในรายการจอง" : "เพิ่มสัตว์เลี้ยงในรายการจอง"}>
+            <div className="booking-editor__relationship-intro">
+              <span>ข้อมูลที่ใช้กับการจองนี้</span>
+              <strong>{relationshipEditor.kind === "customer" ? "เพิ่มลูกค้าใหม่" : `เพิ่มสัตว์เลี้ยงให้ ${relationshipEditor.customer.name}`}</strong>
+              <p>กรอกข้อมูลแล้วกดบันทึก รายการจะถูกเลือกกลับไปในฟอร์มให้อัตโนมัติ</p>
+            </div>
+            {relationshipEditor.kind === "customer" ? (
+              <CustomerEditor embedded context={context} customer={null} onClose={() => setRelationshipEditor(null)} onSaved={customerCreated} />
+            ) : (
+              <PetRelationshipEditor embedded customer={relationshipEditor.customer} onClose={() => setRelationshipEditor(null)} onSaved={petCreated} />
+            )}
           </section>
         ) : null}
       </section>

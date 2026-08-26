@@ -1,5 +1,5 @@
 import type { BookingAvailabilityResult, BookingConflictRecovery } from "../../_prototype/businessState";
-import { CheckCircle, CircleAlert, Info } from "../../_components/icons";
+import { CheckCircle, CircleAlert } from "../../_components/icons";
 
 const recoveryLabels: Record<BookingConflictRecovery, string> = {
   "change-time": "เปลี่ยนเวลา",
@@ -20,19 +20,14 @@ export function AvailabilityStatus({
   onRecovery: (recovery: BookingConflictRecovery) => void;
 }) {
   if (!show) {
-    return (
-      <div className="availability-status availability-status--idle" id={id}>
-        <Info size={18} />
-        <span>กรอกข้อมูลแล้วตรวจเวลาว่างก่อนยืนยันการจอง</span>
-      </div>
-    );
+    return <div className="sr-only" id={id}>ระบบจะตรวจเวลาว่างก่อนทบทวน</div>;
   }
 
   if (result.available) {
     return (
       <div className="availability-status availability-status--ready" id={id} role="status" tabIndex={-1}>
         <CheckCircle size={19} />
-        <div><strong>พร้อมให้บริการ</strong><span>วัน เวลา และตัวเลือกที่เลือกยังไม่ชนกับข้อมูลตัวอย่าง</span></div>
+        <strong>เวลานี้ว่าง</strong>
       </div>
     );
   }

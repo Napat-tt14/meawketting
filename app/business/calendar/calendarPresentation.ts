@@ -62,8 +62,36 @@ export function addCalendarDays(value: string, offset: number) {
 
 export function daysForCalendarWeek(value: string) {
   const date = localDate(value);
-  const mondayOffset = date.getDay() === 0 ? -6 : 1 - date.getDay();
-  return Array.from({ length: 7 }, (_, index) => addCalendarDays(value, mondayOffset + index));
+  const sundayOffset = -date.getDay();
+  return Array.from({ length: 7 }, (_, index) => addCalendarDays(value, sundayOffset + index));
+}
+
+export function daysForCalendarMonth(value: string) {
+  const firstOfMonth = `${value.slice(0, 7)}-01`;
+  const firstVisibleDay = daysForCalendarWeek(firstOfMonth)[0];
+  return Array.from({ length: 42 }, (_, index) => addCalendarDays(firstVisibleDay, index));
+}
+
+export function daysForCustomRange(value: string, numberOfDays: 28 | 35 | 42) {
+  const firstVisibleDay = daysForCalendarWeek(value)[0];
+  return Array.from({ length: numberOfDays }, (_, index) => addCalendarDays(firstVisibleDay, index));
+}
+
+export function addCalendarMonths(value: string, offset: number) {
+  const date = localDate(value);
+  const intendedDay = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + offset);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate();
+  date.setDate(Math.min(intendedDay, lastDay));
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function calendarRangeLabel(days: readonly string[]) {
+  const first = days[0];
+  const last = days.at(-1);
+  if (!first || !last) return "ยังไม่ได้เลือกช่วงวัน";
+  return `${calendarDateLabel(first, { day: "numeric", month: "short" })} – ${calendarDateLabel(last, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
 export function bookingOccursOnDate(booking: PrototypeBooking, date: string) {
@@ -102,7 +130,7 @@ export function bookingModuleLabel(booking: PrototypeBooking) {
 }
 
 export function bookingPetLabel(booking: PrototypeBooking) {
-  if (booking.pets.length <= 1) return booking.pets[0]?.name ?? "น้องตัวอย่าง";
+  if (booking.pets.length <= 1) return booking.pets[0]?.name ?? "น้อง";
   return `${booking.pets[0]?.name ?? "น้อง"} + อีก ${booking.pets.length - 1} ตัว`;
 }
 

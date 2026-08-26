@@ -62,6 +62,34 @@ export type DemoBookingPet = {
   species: "cat" | "dog";
 };
 
+// BF-3 keeps the Business relationship distinct from the Guardian-controlled
+// Passport. A local Pet relationship may exist with no Passport connection at
+// all, and a connection never grants permanent access to Passport data.
+export type PetPassportConnectionState = "linked-active" | "linked-no-access" | "unlinked" | "access-expired";
+export type BusinessPetDataSource = "customer-reported" | "business-local";
+
+export type BusinessLocalPetRelationship = DemoBookingPet & {
+  passportConnection: PetPassportConnectionState;
+  dataSource: BusinessPetDataSource;
+  businessNote: string;
+  // This opaque fixture-only reference can reconnect an already-known local
+  // relationship after a valid Temporary Business QR. It is never Passport data.
+  passportSlug: string | null;
+};
+
+export type PrototypeCustomer = {
+  id: string;
+  businessId: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  businessNote: string;
+  tags: readonly string[];
+  pets: readonly BusinessLocalPetRelationship[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type DemoBookingContact = {
   id: string;
   name: string;
@@ -190,7 +218,6 @@ export type BusinessHomeDemo = {
     waitingIntake: number;
     inService: number;
     readyForPickup: number;
-    newMessages: number;
   };
   attention: readonly {
     id: string;
@@ -209,22 +236,22 @@ export const DEMO_BUSINESS_CONTEXTS: readonly DemoBusinessContext[] = [
     key: "whisker-ari-frontdesk",
     businessId: "business-whisker-rest",
     branchId: "whisker-ari",
-    role: "พนักงานรับเข้า (ตัวอย่าง)",
-    memberLabel: "พนักงานรับเข้า (ตัวอย่าง)",
+    role: "พนักงานรับเข้า",
+    memberLabel: "พนักงานรับเข้า",
   },
   {
     key: "whisker-thonglor-frontdesk",
     businessId: "business-whisker-rest",
     branchId: "whisker-thonglor",
-    role: "พนักงานหน้าร้าน (ตัวอย่าง)",
-    memberLabel: "พนักงานหน้าร้าน (ตัวอย่าง)",
+    role: "พนักงานหน้าร้าน",
+    memberLabel: "พนักงานหน้าร้าน",
   },
   {
     key: "paw-partner-onnut",
     businessId: "business-paw-partner",
     branchId: "partner-onnut",
-    role: "ผู้ประสานงานดูแล (ตัวอย่าง)",
-    memberLabel: "ผู้ประสานงานดูแล (ตัวอย่าง)",
+    role: "ผู้ประสานงานดูแล",
+    memberLabel: "ผู้ประสานงานดูแล",
   },
 ] as const;
 
@@ -234,46 +261,138 @@ const DEMO_ENABLED_MODULES: Record<string, readonly BusinessServiceModule[]> = {
   "paw-partner-onnut": ["hotel", "daycare"],
 };
 
-// These are intentionally small relationship references for the Booking
-// prototype. They are not a Customer CRM and do not read Consumer Passport
-// fixtures or guardian-only fields.
-export const DEMO_BOOKING_CONTACTS: readonly DemoBookingContact[] = [
+// BF-3 fixture relationships are Business-level and stay shared across the
+// Whisker Rest branches. They are local operational records, not Guardian
+// authority, ownership, or a mirror of Consumer Passport data.
+const CUSTOMER_FIXTURE_CREATED_AT = "2026-08-17T03:00:00.000Z";
+
+export const DEMO_CUSTOMER_FIXTURES: readonly PrototypeCustomer[] = [
   {
     id: "booking-contact-nalin",
-    name: "คุณนลิน (ตัวอย่าง)",
-    businessIds: ["business-whisker-rest"],
+    name: "คุณนลิน",
+    businessId: "business-whisker-rest",
+    phone: "081-555-0142",
+    email: "nalin.demo@example.test",
+    businessNote: "ลูกค้าชอบนัดช่วงเช้า",
+    tags: ["ลูกค้าประจำ", "Hotel"],
     pets: [
-      { id: "booking-pet-mochi", name: "Mochi", species: "cat" },
-      { id: "booking-pet-milo", name: "Milo", species: "dog" },
+      {
+        id: "booking-pet-mochi",
+        name: "Mochi",
+        species: "cat",
+        passportConnection: "linked-no-access",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
+      {
+        id: "booking-pet-milo",
+        name: "Milo",
+        species: "dog",
+        passportConnection: "unlinked",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
     ],
+    createdAt: CUSTOMER_FIXTURE_CREATED_AT,
+    updatedAt: CUSTOMER_FIXTURE_CREATED_AT,
   },
   {
     id: "booking-contact-pim",
-    name: "คุณพิม (ตัวอย่าง)",
-    businessIds: ["business-whisker-rest"],
+    name: "คุณพิม",
+    businessId: "business-whisker-rest",
+    phone: "089-444-2088",
+    email: null,
+    businessNote: "กรุณาโทรก่อนรับกลับ",
+    tags: ["Grooming"],
     pets: [
-      { id: "booking-pet-luna", name: "Luna", species: "cat" },
-      { id: "booking-pet-tofu", name: "Tofu", species: "dog" },
+      {
+        id: "booking-pet-luna",
+        name: "Luna",
+        species: "cat",
+        passportConnection: "linked-active",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: "demo-luna",
+      },
+      {
+        id: "booking-pet-tofu",
+        name: "Tofu",
+        species: "dog",
+        passportConnection: "access-expired",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
     ],
+    createdAt: CUSTOMER_FIXTURE_CREATED_AT,
+    updatedAt: CUSTOMER_FIXTURE_CREATED_AT,
   },
   {
     id: "booking-contact-onnut-aom",
-    name: "คุณอ้อม (ตัวอย่าง)",
-    businessIds: ["business-paw-partner"],
+    name: "คุณอ้อม",
+    businessId: "business-paw-partner",
+    phone: "086-333-1199",
+    email: null,
+    businessNote: "",
+    tags: ["Daycare"],
     pets: [
-      { id: "booking-pet-pudding", name: "Pudding", species: "dog" },
-      { id: "booking-pet-maple", name: "Maple", species: "dog" },
+      {
+        id: "booking-pet-pudding",
+        name: "Pudding",
+        species: "dog",
+        passportConnection: "unlinked",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
+      {
+        id: "booking-pet-maple",
+        name: "Maple",
+        species: "dog",
+        passportConnection: "unlinked",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
     ],
+    createdAt: CUSTOMER_FIXTURE_CREATED_AT,
+    updatedAt: CUSTOMER_FIXTURE_CREATED_AT,
   },
   {
     id: "booking-contact-onnut-lee",
-    name: "คุณลี (ตัวอย่าง)",
-    businessIds: ["business-paw-partner"],
+    name: "คุณลี",
+    businessId: "business-paw-partner",
+    phone: null,
+    email: "lee.demo@example.test",
+    businessNote: "",
+    tags: ["Hotel"],
     pets: [
-      { id: "booking-pet-leo", name: "Leo", species: "cat" },
+      {
+        id: "booking-pet-leo",
+        name: "Leo",
+        species: "cat",
+        passportConnection: "linked-no-access",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
     ],
+    createdAt: CUSTOMER_FIXTURE_CREATED_AT,
+    updatedAt: CUSTOMER_FIXTURE_CREATED_AT,
   },
 ] as const;
+
+// BF-2 Booking keeps this compatibility projection so its controlled editor
+// can reuse the new shared Customer/Pet identity source without a risky model
+// rewrite. Bookings still preserve their display snapshots for old fixtures.
+export const DEMO_BOOKING_CONTACTS: readonly DemoBookingContact[] = DEMO_CUSTOMER_FIXTURES.map((customer) => ({
+  id: customer.id,
+  name: customer.name,
+  businessIds: [customer.businessId],
+  pets: customer.pets.map(({ id, name, species }) => ({ id, name, species })),
+}));
 
 export const DEMO_BOOKING_SERVICES: readonly DemoBookingService[] = [
   {
@@ -357,7 +476,7 @@ const BOOKING_FIXTURE_CREATED_AT = "2026-08-17T03:00:00.000Z";
 export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
   {
     bookingId: "booking-fixture-ari-grooming-1030",
-    customer: { id: "booking-contact-nalin", name: "คุณนลิน (ตัวอย่าง)" },
+    customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
     pets: [{ id: "booking-pet-mochi", name: "Mochi", species: "cat" }],
     businessId: "business-whisker-rest",
     branchId: "whisker-ari",
@@ -370,14 +489,14 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     assignedResources: ["ari-groomer-pim", "ari-station-a", "ari-dryer-1"],
     status: "confirmed",
     estimate: 850,
-    notes: "ข้อมูลตัวอย่างสำหรับทดสอบเวลาชน",
+    notes: "ใช้ตรวจสอบเวลาชน",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
   },
   {
     bookingId: "booking-fixture-ari-hotel-luna",
-    customer: { id: "booking-contact-pim", name: "คุณพิม (ตัวอย่าง)" },
+    customer: { id: "booking-contact-pim", name: "คุณพิม" },
     pets: [{ id: "booking-pet-luna", name: "Luna", species: "cat" }],
     businessId: "business-whisker-rest",
     branchId: "whisker-ari",
@@ -390,14 +509,14 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     assignedResources: ["ari-hotel-capacity"],
     status: "confirmed",
     estimate: 3600,
-    notes: "เข้าพัก 3 คืน (ตัวอย่าง)",
+    notes: "เข้าพัก 3 คืน",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
   },
   {
     bookingId: "booking-fixture-ari-hotel-milo",
-    customer: { id: "booking-contact-nalin", name: "คุณนลิน (ตัวอย่าง)" },
+    customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
     pets: [{ id: "booking-pet-milo", name: "Milo", species: "dog" }],
     businessId: "business-whisker-rest",
     branchId: "whisker-ari",
@@ -410,14 +529,14 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     assignedResources: ["ari-hotel-capacity"],
     status: "confirmed",
     estimate: 1200,
-    notes: "ทำให้พื้นที่พักเต็มในวันที่ 19 สิงหาคม (ตัวอย่าง)",
+    notes: "พื้นที่พักเต็มในวันที่ 19 สิงหาคม",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
   },
   {
     bookingId: "booking-fixture-ari-cancelled",
-    customer: { id: "booking-contact-pim", name: "คุณพิม (ตัวอย่าง)" },
+    customer: { id: "booking-contact-pim", name: "คุณพิม" },
     pets: [{ id: "booking-pet-tofu", name: "Tofu", species: "dog" }],
     businessId: "business-whisker-rest",
     branchId: "whisker-ari",
@@ -437,7 +556,7 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
   },
   {
     bookingId: "booking-fixture-thonglor-grooming",
-    customer: { id: "booking-contact-pim", name: "คุณพิม (ตัวอย่าง)" },
+    customer: { id: "booking-contact-pim", name: "คุณพิม" },
     pets: [{ id: "booking-pet-tofu", name: "Tofu", species: "dog" }],
     businessId: "business-whisker-rest",
     branchId: "whisker-thonglor",
@@ -450,14 +569,14 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     assignedResources: ["thonglor-groomer-nok", "thonglor-station-a", "thonglor-dryer-1"],
     status: "confirmed",
     estimate: 650,
-    notes: "ข้อมูลตัวอย่าง",
+    notes: "ตรวจสอบรายการก่อนเริ่มงาน",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
   },
   {
     bookingId: "booking-fixture-onnut-daycare-full",
-    customer: { id: "booking-contact-onnut-aom", name: "คุณอ้อม (ตัวอย่าง)" },
+    customer: { id: "booking-contact-onnut-aom", name: "คุณอ้อม" },
     pets: [
       { id: "booking-pet-pudding", name: "Pudding", species: "dog" },
       { id: "booking-pet-maple", name: "Maple", species: "dog" },
@@ -473,14 +592,14 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     assignedResources: ["onnut-daycare-social"],
     status: "confirmed",
     estimate: 900,
-    notes: "สองตัวอย่างทำให้โซนสังคมเต็มในวันที่ 18 สิงหาคม",
+    notes: "สองรายการทำให้โซนสังคมเต็มในวันที่ 18 สิงหาคม",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
   },
   {
     bookingId: "booking-fixture-onnut-hotel-leo",
-    customer: { id: "booking-contact-onnut-lee", name: "คุณลี (ตัวอย่าง)" },
+    customer: { id: "booking-contact-onnut-lee", name: "คุณลี" },
     pets: [{ id: "booking-pet-leo", name: "Leo", species: "cat" }],
     businessId: "business-paw-partner",
     branchId: "partner-onnut",
@@ -493,7 +612,7 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     assignedResources: ["onnut-hotel-capacity"],
     status: "pending",
     estimate: 2000,
-    notes: "ข้อมูลตัวอย่าง",
+    notes: "ตรวจสอบรายการก่อนเริ่มงาน",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
@@ -502,40 +621,37 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
 
 const DEMO_BUSINESS_HOME: Record<string, BusinessHomeDemo> = {
   "whisker-ari-frontdesk": {
-    today: { waitingIntake: 3, inService: 5, readyForPickup: 2, newMessages: 4 },
+    today: { waitingIntake: 3, inService: 5, readyForPickup: 2 },
     attention: [
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 2 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
       { id: "pickup", tone: "ready", title: "มีน้องพร้อมรับกลับ 2 ตัว", detail: "ตรวจของที่นำมาด้วยก่อนส่งมอบ" },
-      { id: "messages", tone: "info", title: "มีข้อความใหม่ 4 รายการ", detail: "ข้อมูลตัวอย่าง · ระบบข้อความยังไม่เปิดใช้" },
     ],
     moduleSummaries: {
-      grooming: { value: "8 งานวันนี้", detail: "ข้อมูลคิวตัวอย่างของสาขา" },
-      hotel: { value: "12 / 18 ห้องมีผู้เข้าพัก", detail: "ข้อมูลการเข้าพักตัวอย่าง" },
+      grooming: { value: "8 งานวันนี้", detail: "ภาพรวมคิวของสาขา" },
+      hotel: { value: "12 / 18 ห้องมีผู้เข้าพัก", detail: "ภาพรวมการเข้าพัก" },
     },
     revenueToday: 12450,
   },
   "whisker-thonglor-frontdesk": {
-    today: { waitingIntake: 2, inService: 3, readyForPickup: 1, newMessages: 1 },
+    today: { waitingIntake: 2, inService: 3, readyForPickup: 1 },
     attention: [
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 1 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
       { id: "pickup", tone: "ready", title: "มีน้องพร้อมรับกลับ 1 ตัว", detail: "ตรวจของที่นำมาด้วยก่อนส่งมอบ" },
-      { id: "messages", tone: "info", title: "มีข้อความใหม่ 1 รายการ", detail: "ข้อมูลตัวอย่าง · ระบบข้อความยังไม่เปิดใช้" },
     ],
     moduleSummaries: {
-      grooming: { value: "5 งานวันนี้", detail: "ข้อมูลคิวตัวอย่างของสาขา" },
+      grooming: { value: "5 งานวันนี้", detail: "ภาพรวมคิวของสาขา" },
     },
     revenueToday: 7200,
   },
   "paw-partner-onnut": {
-    today: { waitingIntake: 1, inService: 7, readyForPickup: 3, newMessages: 2 },
+    today: { waitingIntake: 1, inService: 7, readyForPickup: 3 },
     attention: [
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 1 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
       { id: "pickup", tone: "ready", title: "มีน้องพร้อมรับกลับ 3 ตัว", detail: "ตรวจของที่นำมาด้วยก่อนส่งมอบ" },
-      { id: "messages", tone: "info", title: "มีข้อความใหม่ 2 รายการ", detail: "ข้อมูลตัวอย่าง · ระบบข้อความยังไม่เปิดใช้" },
     ],
     moduleSummaries: {
-      hotel: { value: "9 / 14 ห้องมีผู้เข้าพัก", detail: "ข้อมูลการเข้าพักตัวอย่าง" },
-      daycare: { value: "7 / 12 ตัวในพื้นที่ดูแล", detail: "ข้อมูลความจุตัวอย่าง" },
+      hotel: { value: "9 / 14 ห้องมีผู้เข้าพัก", detail: "ภาพรวมการเข้าพัก" },
+      daycare: { value: "7 / 12 ตัวในพื้นที่ดูแล", detail: "ภาพรวมความจุ" },
     },
     revenueToday: 9800,
   },
@@ -545,13 +661,13 @@ export const DEFAULT_BUSINESS_CONTEXT_KEY = DEMO_BUSINESS_CONTEXTS[0].key;
 export const BUSINESS_STORAGE_KEY = "meawketting:business-intake:prototype-v1";
 
 export function businessRoleLabel(role: string) {
-  if (role === "Front desk staff (Demo)") return "พนักงานรับเข้า (ตัวอย่าง)";
-  if (role === "Care coordinator (Demo)") return "ผู้ประสานงานดูแล (ตัวอย่าง)";
+  if (role === "Front desk staff (Demo)") return "พนักงานรับเข้า";
+  if (role === "Care coordinator (Demo)") return "ผู้ประสานงานดูแล";
   return role;
 }
 
 export function businessStaffLabel(label: string) {
-  return label.replace(" · Prototype", " (ตัวอย่าง)");
+  return label.replace(" · Prototype", "");
 }
 
 export type IntakeTaskState = "allowed-data" | "intake" | "review" | "complete";
@@ -573,6 +689,8 @@ export type BusinessIntakeRecord = {
   accessId: string;
   businessId: string;
   branchId: string;
+  customerId: string | null;
+  petRelationshipId: string | null;
   role: string;
   staffLabel: string;
   servicePurpose: string;
@@ -592,6 +710,7 @@ type BusinessStore = {
   activeContextKey: string;
   intakes: Record<string, BusinessIntakeRecord>;
   bookings: Record<string, PrototypeBooking>;
+  customers: Record<string, PrototypeCustomer>;
 };
 
 export type QrContractType = "quick-passport" | "public-safety" | "temporary-business" | "unknown";
@@ -604,6 +723,7 @@ const emptyStore = (): BusinessStore => ({
   activeContextKey: DEFAULT_BUSINESS_CONTEXT_KEY,
   intakes: {},
   bookings: {},
+  customers: {},
 });
 
 function readStore(): BusinessStore {
@@ -618,6 +738,9 @@ function readStore(): BusinessStore {
       // BF-1 stores only activeContextKey/intakes. Defaulting this field keeps
       // existing same-tab Intake state intact while BF-2 data is introduced.
       bookings: parsed.bookings && typeof parsed.bookings === "object" && !Array.isArray(parsed.bookings) ? parsed.bookings : {},
+      // BF-3 preserves the same storage envelope so a Customer/Pet relationship
+      // can be shared with Bookings without introducing a disconnected store.
+      customers: parsed.customers && typeof parsed.customers === "object" && !Array.isArray(parsed.customers) ? parsed.customers : {},
     };
   } catch {
     return emptyStore();
@@ -647,16 +770,262 @@ export function getDemoBusinessContextForBranch(businessId: string | null | unde
 export function getDemoBusinessContextDetails(context: DemoBusinessContext) {
   const business = getBusinessFixture(context.businessId);
   const branch = getBusinessBranch(business, context.branchId);
-  return { context, business, branch };
+  const withoutDemoSuffix = (value: string) => value.replace(/\s*(?:\(Demo\)|Demo)$/i, "").trim();
+  return {
+    context,
+    business: business ? { ...business, name: withoutDemoSuffix(business.name) } : null,
+    branch: branch ? { ...branch, name: withoutDemoSuffix(branch.name) } : null,
+  };
 }
 
 export function getEnabledBusinessModules(context: DemoBusinessContext) {
   return DEMO_ENABLED_MODULES[context.key] ?? [];
 }
 
+function cloneCustomerPet(pet: BusinessLocalPetRelationship): BusinessLocalPetRelationship {
+  return { ...pet };
+}
+
+function cloneCustomer(customer: PrototypeCustomer): PrototypeCustomer {
+  return {
+    ...customer,
+    tags: [...customer.tags],
+    pets: customer.pets.map(cloneCustomerPet),
+  };
+}
+
+function isPetPassportConnectionState(value: unknown): value is PetPassportConnectionState {
+  return value === "linked-active" || value === "linked-no-access" || value === "unlinked" || value === "access-expired";
+}
+
+function isBusinessPetDataSource(value: unknown): value is BusinessPetDataSource {
+  return value === "customer-reported" || value === "business-local";
+}
+
+function isBusinessLocalPetRelationship(value: unknown): value is BusinessLocalPetRelationship {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const pet = value as Partial<BusinessLocalPetRelationship>;
+  return typeof pet.id === "string"
+    && typeof pet.name === "string"
+    && (pet.species === "cat" || pet.species === "dog")
+    && isPetPassportConnectionState(pet.passportConnection)
+    && isBusinessPetDataSource(pet.dataSource)
+    && typeof pet.businessNote === "string"
+    && (typeof pet.passportSlug === "string" || pet.passportSlug === null);
+}
+
+function isPrototypeCustomer(value: unknown): value is PrototypeCustomer {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const customer = value as Partial<PrototypeCustomer>;
+  return typeof customer.id === "string"
+    && typeof customer.businessId === "string"
+    && typeof customer.name === "string"
+    && (typeof customer.phone === "string" || customer.phone === null)
+    && (typeof customer.email === "string" || customer.email === null)
+    && typeof customer.businessNote === "string"
+    && Array.isArray(customer.tags)
+    && customer.tags.every((tag) => typeof tag === "string")
+    && Array.isArray(customer.pets)
+    && customer.pets.every(isBusinessLocalPetRelationship)
+    && typeof customer.createdAt === "string"
+    && typeof customer.updatedAt === "string";
+}
+
+function mergedPrototypeCustomers(store: BusinessStore) {
+  const customers = new Map<string, PrototypeCustomer>();
+  for (const fixture of DEMO_CUSTOMER_FIXTURES) customers.set(fixture.id, cloneCustomer(fixture));
+  for (const stored of Object.values(store.customers)) {
+    if (isPrototypeCustomer(stored)) customers.set(stored.id, cloneCustomer(stored));
+  }
+  return [...customers.values()];
+}
+
+function sortPrototypeCustomers(customers: readonly PrototypeCustomer[], context?: DemoBusinessContext | null) {
+  return customers
+    .filter((customer) => !context || customer.businessId === context.businessId)
+    .sort((first, second) => first.name.localeCompare(second.name, "th") || first.id.localeCompare(second.id));
+}
+
+export function listPrototypeCustomerFixtures(context?: DemoBusinessContext | null) {
+  return sortPrototypeCustomers(DEMO_CUSTOMER_FIXTURES.map(cloneCustomer), context);
+}
+
+export function listPrototypeCustomers(context?: DemoBusinessContext | null) {
+  return sortPrototypeCustomers(mergedPrototypeCustomers(readStore()), context);
+}
+
+export function readPrototypeCustomerFixture(customerId: string) {
+  return listPrototypeCustomerFixtures(null).find((customer) => customer.id === customerId) ?? null;
+}
+
+export function readPrototypeCustomer(customerId: string) {
+  return listPrototypeCustomers(null).find((customer) => customer.id === customerId) ?? null;
+}
+
+function normalizedContactValue(value: string | null | undefined) {
+  return (value ?? "").replace(/[^0-9]/g, "");
+}
+
+export function findPotentialPrototypeCustomerDuplicate(
+  businessId: string,
+  phone: string | null | undefined,
+  excludeCustomerId?: string,
+) {
+  const normalizedPhone = normalizedContactValue(phone);
+  if (!normalizedPhone) return null;
+  return listPrototypeCustomers(null).find((customer) => (
+    customer.businessId === businessId
+    && customer.id !== excludeCustomerId
+    && normalizedContactValue(customer.phone) === normalizedPhone
+  )) ?? null;
+}
+
+export type PrototypeCustomerDraft = {
+  customerId?: string;
+  businessId: string;
+  name: string;
+  phone: string;
+  email: string;
+  businessNote: string;
+  tags?: readonly string[];
+};
+
+export type SavePrototypeCustomerResult =
+  | { ok: true; customer: PrototypeCustomer; created: boolean; potentialDuplicate: PrototypeCustomer | null }
+  | { ok: false; reason: "missing" | "invalid" | "duplicate" | "storage"; duplicate?: PrototypeCustomer };
+
+function generatedCustomerId() {
+  return `prototype-customer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function normalizedTags(tags: readonly string[] | undefined) {
+  return [...new Set((tags ?? []).map((tag) => tag.trim()).filter(Boolean))].slice(0, 8);
+}
+
+export function savePrototypeCustomer(
+  draft: PrototypeCustomerDraft,
+  options: { allowPotentialDuplicate?: boolean } = {},
+): SavePrototypeCustomerResult {
+  const name = draft.name.trim();
+  if (!name || !draft.businessId) return { ok: false, reason: "invalid" };
+
+  const store = readStore();
+  const existing = draft.customerId
+    ? mergedPrototypeCustomers(store).find((customer) => customer.id === draft.customerId) ?? null
+    : null;
+  if (draft.customerId && (!existing || existing.businessId !== draft.businessId)) return { ok: false, reason: "missing" };
+
+  const duplicate = findPotentialPrototypeCustomerDuplicate(draft.businessId, draft.phone, draft.customerId);
+  if (!existing && duplicate && !options.allowPotentialDuplicate) {
+    return { ok: false, reason: "duplicate", duplicate };
+  }
+
+  const now = new Date().toISOString();
+  const customer: PrototypeCustomer = {
+    id: existing?.id ?? generatedCustomerId(),
+    businessId: draft.businessId,
+    name,
+    phone: draft.phone.trim() || null,
+    email: draft.email.trim() || null,
+    businessNote: draft.businessNote.trim(),
+    tags: normalizedTags(draft.tags ?? existing?.tags),
+    pets: existing?.pets.map(cloneCustomerPet) ?? [],
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  store.customers[customer.id] = customer;
+  if (!writeStore(store)) return { ok: false, reason: "storage" };
+  return { ok: true, customer: cloneCustomer(customer), created: !existing, potentialDuplicate: duplicate };
+}
+
+export type PrototypePetRelationshipDraft = {
+  customerId: string;
+  name: string;
+  species: "cat" | "dog";
+  businessNote: string;
+};
+
+export type AddPrototypePetRelationshipResult =
+  | { ok: true; customer: PrototypeCustomer; pet: BusinessLocalPetRelationship }
+  | { ok: false; reason: "missing" | "invalid" | "storage" };
+
+function generatedPetRelationshipId() {
+  return `prototype-pet-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function addPrototypePetRelationship(draft: PrototypePetRelationshipDraft): AddPrototypePetRelationshipResult {
+  const name = draft.name.trim();
+  if (!name) return { ok: false, reason: "invalid" };
+  const store = readStore();
+  const customer = mergedPrototypeCustomers(store).find((item) => item.id === draft.customerId) ?? null;
+  if (!customer) return { ok: false, reason: "missing" };
+
+  const pet: BusinessLocalPetRelationship = {
+    id: generatedPetRelationshipId(),
+    name,
+    species: draft.species,
+    passportConnection: "unlinked",
+    dataSource: "business-local",
+    businessNote: draft.businessNote.trim(),
+    passportSlug: null,
+  };
+  const updated: PrototypeCustomer = {
+    ...customer,
+    pets: [...customer.pets.map(cloneCustomerPet), pet],
+    updatedAt: new Date().toISOString(),
+  };
+  store.customers[updated.id] = updated;
+  if (!writeStore(store)) return { ok: false, reason: "storage" };
+  return { ok: true, customer: cloneCustomer(updated), pet: cloneCustomerPet(pet) };
+}
+
+export function updatePrototypeCustomerTags(customerId: string, tags: readonly string[]) {
+  const customer = readPrototypeCustomer(customerId);
+  if (!customer) return null;
+  const result = savePrototypeCustomer({
+    customerId: customer.id,
+    businessId: customer.businessId,
+    name: customer.name,
+    phone: customer.phone ?? "",
+    email: customer.email ?? "",
+    businessNote: customer.businessNote,
+    tags,
+  });
+  return result.ok ? result.customer : null;
+}
+
+export function resolvePrototypeBookingRelationship(booking: PrototypeBooking) {
+  const customer = readPrototypeCustomer(booking.customer.id);
+  if (!customer || customer.businessId !== booking.businessId) {
+    return { customer: { ...booking.customer }, pets: booking.pets.map((pet) => ({ ...pet })) };
+  }
+  return {
+    customer: { id: customer.id, name: customer.name },
+    pets: booking.pets.map((bookingPet) => {
+      const current = customer.pets.find((pet) => pet.id === bookingPet.id);
+      return current ? { id: current.id, name: current.name, species: current.species } : { ...bookingPet };
+    }),
+  };
+}
+
+export function findKnownBusinessCustomerPetByPassportSlug(businessId: string, passportSlug: string) {
+  const normalizedSlug = passportSlug.trim();
+  if (!normalizedSlug) return null;
+  for (const customer of listPrototypeCustomers(null)) {
+    if (customer.businessId !== businessId) continue;
+    const pet = customer.pets.find((item) => item.passportSlug === normalizedSlug) ?? null;
+    if (pet) return { customer, pet };
+  }
+  return null;
+}
+
 export function getDemoBookingContacts(context?: DemoBusinessContext | null) {
-  if (!context) return DEMO_BOOKING_CONTACTS;
-  return DEMO_BOOKING_CONTACTS.filter((contact) => contact.businessIds.includes(context.businessId));
+  return listPrototypeCustomers(context).map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+    businessIds: [customer.businessId],
+    pets: customer.pets.map(({ id, name, species }) => ({ id, name, species })),
+  }));
 }
 
 export function getBookingServices(context: DemoBusinessContext) {
@@ -933,7 +1302,7 @@ export function evaluateBookingAvailability(
     conflicts.push(conflict("time-model-mismatch", "รูปแบบวันและเวลาไม่ตรงกับบริการที่เลือก", "return-to-edit"));
   }
   if (!draft.customer?.id || !draft.customer.name.trim()) {
-    conflicts.push(conflict("missing-customer", "กรุณาเลือกลูกค้าตัวอย่าง", "return-to-edit"));
+    conflicts.push(conflict("missing-customer", "กรุณาเลือกลูกค้า", "return-to-edit"));
   }
   if (draft.pets.length === 0) {
     conflicts.push(conflict("missing-pet", "กรุณาเลือกน้องที่เข้ารับบริการ", "return-to-edit"));
@@ -941,7 +1310,7 @@ export function evaluateBookingAvailability(
 
   const contact = draft.customer ? getDemoBookingContacts(context).find((item) => item.id === draft.customer?.id) : null;
   if (draft.customer && (!contact || draft.pets.some((pet) => !contact.pets.some((candidate) => candidate.id === pet.id)))) {
-    conflicts.push(conflict("invalid-pet-selection", "น้องที่เลือกไม่อยู่ในข้อมูลลูกค้าตัวอย่างนี้", "return-to-edit"));
+    conflicts.push(conflict("invalid-pet-selection", "สัตว์เลี้ยงที่เลือกไม่อยู่ในข้อมูลของลูกค้ารายนี้", "return-to-edit"));
   }
   if (draft.estimate !== null && (!Number.isFinite(draft.estimate) || draft.estimate < 0)) {
     conflicts.push(conflict("invalid-estimate", "ราคาประมาณต้องเป็นจำนวนเงินที่ถูกต้อง", "return-to-edit"));
@@ -1014,7 +1383,7 @@ export function evaluateBookingAvailability(
     if (resource.capacityMode === "exclusive" && bookingsUsingResource.length > 0) {
       conflicts.push(conflict(
         "resource-conflict",
-        `${resource.label}มีงานในช่วงเวลานี้`,
+        `${resource.label}มีงานในช่วงเวลาเดียวกัน`,
         "change-resource",
         { resourceId: resource.id, resourceKind: resource.kind, bookingIds: bookingsUsingResource.map((booking) => booking.bookingId) },
       ));
@@ -1170,6 +1539,11 @@ export function createOrResumeBusinessIntake(access: TemporaryAccess, context: D
   const existing = Object.values(store.intakes).find((record) => record.accessId === access.id);
   if (existing) return existing;
 
+  // The scanner has already passed recipient, Branch, scope, expiry, and
+  // consent checks before this function runs. Reuse an explicit local match
+  // only; an unknown QR never creates a permanent Customer relationship.
+  const knownRelationship = findKnownBusinessCustomerPetByPassportSlug(context.businessId, access.petSlug);
+
   const now = new Date().toISOString();
   const suffix = access.id.replace(/^prototype-access-/, "").replace(/[^a-z0-9-]/gi, "").slice(-32) || Date.now().toString(36);
   const record: BusinessIntakeRecord = {
@@ -1177,6 +1551,8 @@ export function createOrResumeBusinessIntake(access: TemporaryAccess, context: D
     accessId: access.id,
     businessId: context.businessId,
     branchId: context.branchId,
+    customerId: knownRelationship?.customer.id ?? null,
+    petRelationshipId: knownRelationship?.pet.id ?? null,
     role: context.role,
     staffLabel: context.memberLabel,
     servicePurpose: access.purpose,
@@ -1320,14 +1696,14 @@ function fixtureAccess(
     expiresAt,
     status,
     consentStatus,
-    requester: status === "awaiting-owner" ? "ผู้ประสานงานดูแล (ตัวอย่าง)" : null,
+    requester: status === "awaiting-owner" ? "ผู้ประสานงานดูแล" : null,
     decisionAt: null,
     revokedAt: status === "revoked" ? new Date(Date.now() - 2 * 60_000).toISOString() : null,
     events: [{
       id: `created-${id}`,
       type: "created",
       occurredAt: new Date(Date.now() - 10 * 60_000).toISOString(),
-      actor: "เจ้าของหลัก (ตัวอย่าง)",
+      actor: "เจ้าของหลัก",
       summary: "สร้าง QR ชั่วคราวสำหรับร้านเพื่อทดสอบขั้นตอนรับเข้า",
     }],
   };

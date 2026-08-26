@@ -9,7 +9,19 @@ Meawketting is a **Pet Business Operating Platform with Pet Passport & Guardian 
 
 - **Meawketting Business is the main product and primary commercial experience.** The business platform drives commercial value, revenue, and day-to-day operations for pet businesses across Grooming, Hotel/Boarding, Daycare, and future multi-service verticals.
 - **Pet Passport & Guardian Network is the strategic trust advantage and privacy moat.** Pet owners (Guardians) control and maintain their pet's portable identity, medical context, and bounded consent, while businesses receive verified, purpose-bound data without taking ownership of the Pet Passport.
-- **Consumer feature development is PAUSED.** The existing consumer features (Create/claim Passport, My Pets, Public Safety, Lost flow, Temporary Business Sharing) remain active, tested, and preserved as a foundational trust layer, but independent consumer expansion is paused.
+- **Guardian experience target is LINE-first.** The intended final consumer channel is a lightweight LINE Mini App reached through Meawketting LINE, with LINE as the entry/authentication channel and Pet Passport as the Guardian-facing trust layer.
+- **Consumer feature development is PAUSED.** The existing standalone Consumer web prototype (Create/claim Passport, My Pets, Public Safety, Lost flow, Temporary Business Sharing) remains retained and regression-tested, but is frozen and is no longer the target final product channel.
+
+## Guardian direction status
+
+| Label | Current truth |
+|---|---|
+| **CURRENT** | Standalone Consumer web prototype remains in the repository and is retained/frozen. |
+| **TARGET** | LINE-first Guardian experience through a LINE Mini App: LINE → Login → My Pets → Add Pet → Pet Profile / Pet Passport. |
+| **PAUSED** | Consumer development and independent Guardian expansion. |
+| **NOT IMPLEMENTED** | LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking. |
+
+The LINE flow is a future product direction, not an implemented integration. A standalone Consumer website is retained for current prototype continuity but is not the primary future Guardian journey.
 
 Core value:
 
@@ -24,7 +36,7 @@ Core value:
 |---|---|---|
 | Public | Business prospects, pet owners, finders | Discover the business platform, log in to business portal, access owner portal or safety gateway |
 | Business (Main) | Owner, Admin, Manager, Staff, Frontdesk | Run multi-service operations, manage calendar, schedule bookings, scan QR, intake pets, track capacity |
-| Consumer (Preserved) | Primary Guardian, Co-guardian | Manage Passport, configure Public Safety, generate Temporary Business QR, review service history |
+| Guardian (LINE-first target; current web prototype retained) | Primary Guardian, Co-guardian | Manage Passport, configure Public Safety, generate Temporary Business QR, review service history |
 | Platform Admin | Trust, Support, Privacy, Verification, Ops | Reason-bound audits, branch verification, safety escalations |
 
 One Person may hold several roles and Business memberships. Consumer and Business remain separate authorization and navigation contexts.
@@ -32,11 +44,11 @@ One Person may hold several roles and Business memberships. Consumer and Busines
 ## Root homepage and portal separation
 
 - **Root Homepage (`/`)**: Canonical Business-first commercial homepage. Its first viewport explains the operating value for bookings, schedules, customers and pets, services, team/branches, intake, communication, and revenue direction. The primary CTA is **เข้าสู่ระบบสำหรับธุรกิจ** → `/business/login`.
-- **Guardian entry is secondary**: Pet owners enter through the lower-page ecosystem bridge to `/my-pets`; `/create-passport` remains a supporting owner action and never the Hero CTA.
-- **Product honesty**: Business Home, Calendar, Scan / Intake, and Branch-aware shell are named as local prototype capabilities. Customers & Pets, Messaging, Finance, Reports, wider team management, and CareProof are labeled as product direction rather than shipped production features.
+- **Guardian entry is currently secondary**: The retained web prototype is reachable through the lower-page ecosystem bridge to `/my-pets`; `/create-passport` remains a supporting owner action and never the Hero CTA. This standalone web entry is not the target primary Guardian journey.
+- **Product honesty**: Business Home, Calendar, Customers & Pets, Inbox, Scan / Intake, and Branch-aware shell are named as local prototype capabilities. Real messaging/delivery, Finance, Reports, wider team management, and CareProof remain product direction rather than production features.
 - **`/business` Route**: Compatibility redirect to root homepage (`/`).
-- **Business App Frame**: Dedicated workspace frame with Warm Golden Yellow operational visual system, branch switcher, and capability-aware navigation.
-- **Consumer Navigation**: Preserved in `/my-pets`, `/activity`, `/create-passport`, `/passports`, and `/qr-preview`. Signed-in consumer navigation remains isolated from internal business operations.
+- **Business App Frame**: Dedicated workspace frame with Warm White / Pastel Yellow operational visual system, branch switcher, and capability-aware navigation.
+- **Consumer Navigation**: **CURRENT WEB PROTOTYPE / SUPERSEDED AS FINAL CONSUMER DIRECTION**. The preserved web prototype uses `/my-pets`, `/activity`, `/create-passport`, `/passports`, and `/qr-preview`; it remains isolated from internal Business operations. The final LINE Mini App navigation is intentionally undecided until the future Consumer phase.
 
 ## Hybrid Business model
 
@@ -67,7 +79,7 @@ Business capabilities have two operational layers:
    - Priority-first Business Home (`/business/home`)
    - Shared Calendar & Booking Engine (BF-2 live at `/business/calendar`)
    - Shared Business Intake & Scanner (`/business/scan`, `/business/intake/[intakeId]`)
-   - Planned Core: Customers & Pets (BF-3), Inbox/Messaging (BF-4), CareProof & Checkout (BF-5)
+   - Customers & Pets (BF-3 live local prototype), Inbox & Customer Communication (BF-4 live local prototype), CareProof & Checkout (future/planned)
 2. **Service Modules**:
    - Grooming (M-GROOM): Station queues, pet handling notes, styling preferences
    - Hotel / Boarding (M-HOTEL): Nightly stays, room inventory, feeding & medication routines
@@ -90,7 +102,7 @@ Customer + Pet → Booking / Calendar
 → Cross-service CareProof, checkout & history return
 ```
 
-### Guardian and trust loop (Preserved)
+### Guardian and trust loop (Current web prototype / Frozen)
 
 ```text
 Create Passport → preview value → claim → manage Pet
@@ -98,6 +110,21 @@ Create Passport → preview value → claim → manage Pet
 → business scans and verifies consent
 → receive permitted CareProof and Service History
 ```
+
+### Guardian loop (Target / Future / Paused)
+
+```text
+Add Meawketting LINE
+→ open LINE Mini App
+→ LINE Login
+→ My Pets
+→ + Add Pet
+→ Cat / Dog
+→ Pet Profile / Pet Passport
+→ future Business-connected actions when required
+```
+
+This is conceptual only. Future capabilities may include Business-connected booking, store messages, add-service approval, Consent / Sharing, Temporary Business access, CareProof, Service History, Safety / Lost, and Notifications. None of these LINE surfaces are implemented in this task.
 
 ## QR contracts
 
@@ -117,6 +144,7 @@ The three contracts never inherit each other's permissions.
 4. Business-authored intake notes, belongings, and service logs preserve source and audience; they do not overwrite Guardian source data.
 5. Internal business notes are not Guardian-visible unless explicitly made customer-facing under policy.
 6. UI hiding is not authorization; production enforcement must be server-side.
+7. **LINE identity is not Pet ownership authority.** LINE is an authentication/entry channel only; the production relationship remains `Person → Guardian relationship → Pet`, with identity linking and consent policy still a future architecture decision.
 
 ## Current implementation vs. planned scope
 
@@ -125,14 +153,15 @@ The three contracts never inherit each other's permissions.
 - **Homepage (`/`)**: Business-first, photo-led landing with a labeled demo product preview, multi-service story, Business Core status labels, connected Hotel + Grooming scenario, Guardian-controlled trust explanation, a photo-backed designed workflow, compact Guardian bridge, and compact footer.
 - **Compatibility Redirect**: `/business` redirects to `/`.
 - **Business Authentication**: `/business/login` with Google prototype provider.
-- **Business App Shell & Navigation (BF-1)**: Branch switcher, capability-aware desktop/mobile navigation, priority-first Business Home (`/business/home`).
-- **Shared Booking & Calendar Foundation (BF-2)**: Multi-service calendar (`/business/calendar`), appointment/stay/day time models, capacity checks, conflict recovery, booking editor.
+- **Business App Shell & Navigation (BF-1)**: Branch switcher, aligned desktop/mobile controls, capability-aware navigation, and priority-first Business Home with an auto-rotating banner/desktop quick-action split (`/business/home`).
+- **Shared Booking & Calendar Foundation (BF-2)**: Sunday-first multi-service calendar (`/business/calendar`) with remembered view, appointment/stay/day time models, leading/trailing resize, touch handlers, copy shortcuts, capacity checks, conflict recovery, and date-normalized booking editor.
+- **Customers & Pets Foundation (BF-3)**: Business-level Customer relationship, readable desktop table/mobile cards, responsive detail hierarchy, booking-only filters, one-boundary search, multi-Pet local relationships, lightweight tags/notes, Passport connection/access presentation, and Booking context at `/business/customers` and `/business/customers/[customerId]`.
+- **Inbox & Customer Communication Foundation (BF-4)**: Business-wide Customer conversation reuse, readable desktop split/mobile task layouts, compact search/filters, Pet/Booking/Branch context, unread state, browser-local text, three default quick replies with remembered visibility, and one structured add-service request prototype at `/business/inbox`. Real delivery/read state, attachments, notifications, full Consumer Inbox, and Booking/Charge effects are not implemented.
 - **Shared Intake & Scanner (Phase E)**: Camera scan, manual code entry, QR type validation, consent checks, belongings logging, check-in completion.
-- **Consumer Foundation (Preserved)**: Anonymous create flow, 6 passport themes, My Pets, Public Safety, Lost flow, Temporary Business Sharing.
+- **Consumer web prototype (CURRENT / FROZEN)**: Anonymous create flow, 6 passport themes, My Pets, Public Safety, Lost flow, Temporary Business Sharing. Existing routes remain implemented and tested; no Consumer expansion is authorized.
+- **LINE-first Guardian experience (TARGET / NOT IMPLEMENTED)**: LINE entry, LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking are not implemented.
 
-### Planned next Business foundations
+### Planned future Business foundations
 
-- **BF-3**: Customers & Pets CRM + Guardian Links (Planned, NOT started).
-- **BF-4**: Business Inbox & Customer Communication (Planned).
 - **BF-5**: Multi-Service Checkout, Billing & Payments (Planned).
 - **Service Operation Boards**: Dedicated Grooming Queue, Hotel Room Board, Daycare Attendance (Planned).

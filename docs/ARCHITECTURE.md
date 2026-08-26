@@ -5,11 +5,20 @@ Owner: Product Architecture
 
 This document owns shared objects, authority and boundaries. Capability detail is in [MODULE_MAP](./MODULE_MAP.md); unresolved policy is in [DECISIONS](./DECISIONS.md).
 
+## Guardian channel status
+
+| Label | Architecture truth |
+|---|---|
+| **CURRENT** | Standalone Consumer web prototype is retained/frozen in the repository. |
+| **TARGET** | LINE-first Guardian experience through a LINE Mini App. |
+| **PAUSED** | Consumer development and independent Guardian expansion. |
+| **NOT IMPLEMENTED** | LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking. |
+
 ## Product architecture hierarchy
 
 ```text
 Person (Human identity)
-├─ Guardian Context (Preserved consumer trust layer: Passport, Public Safety, Sharing)
+├─ Guardian Context (LINE-first target; current Consumer web prototype retained/frozen)
 └─ Business Context (Main commercial product)
    └─ Business Organization
       ├─ enabled Service Modules (Grooming, Hotel, Daycare, etc.)
@@ -24,6 +33,7 @@ Person (Human identity)
 - One Business may enable many Service Modules; there is no fixed Business Type enum.
 - A Branch is operational, not cosmetic. It scopes services, staff, rooms/stations/zones, execution and local attribution.
 - **Workspace is not a user-facing product concept.** Engineering may later introduce an internal tenant abstraction without changing this hierarchy.
+- **LINE identity is not a Guardian or Pet ownership object.** LINE is an entry/authentication channel only. The ownership and consent model remains `Person → Guardian relationship → Pet`; production identity linking is a future architecture decision.
 
 ## Shared object model
 
@@ -55,8 +65,8 @@ CareProof / Service Record ── records permitted evidence across Service Jobs
 | **Person** | Human identity that can hold Guardian and Business memberships | One identity direction; contexts authorize separately |
 | **Business** | Organization-level customer relationship, module enablement and policy context | Not one service category |
 | **Branch** | Physical/operational location and execution scope | Owns local capability, people, resources, hours and attribution |
-| **Customer** | Business relationship/person arranging services | One record can use many services and manage several Pets; contact authority remains open |
-| **Pet** | Shared Pet identity across services | Never duplicated as Grooming/Hotel/Daycare Pet; Passport authority remains with Guardian |
+| **Customer** | Business relationship/person arranging services | One Business-level record can use many services and manage several local Pet relationships; a Customer is not automatically a Guardian, owner, or Passport authority |
+| **Pet** | Shared Pet identity across services | Never duplicated as Grooming/Hotel/Daycare Pet; the Business-local relationship can exist without a Passport link, while Passport authority remains with Guardian |
 | **Visit / Order** | Parent for related service work, operational timeline and combined checkout | Working term; may contain several Pets/jobs subject to open policy |
 | **Booking** | Planned activity for one or more Pets and Service Jobs | Supports appointment, date-range and day models; Branch, estimate, status and required/assigned resources—not always a one-hour appointment |
 | **Service Job** | Unit of work inside a Booking/Visit | Shared foundation with module extensions: Grooming Job, Hotel Stay, Daycare Visit, Training Session |
@@ -84,7 +94,29 @@ Root Homepage (/) [Business Landing] ───> Business Login (/business/login)
 - **Root Homepage (`/`)** is the primary Business Landing page.
 - **`/business`** is a compatibility redirect to `/`.
 - Separate portal composition does not mean separate Person accounts.
+- The current Consumer portal links are retained for the web prototype only; they are not the target final Guardian entry channel.
 - Unauthorized deep links reveal neither protected Pet values nor sensitive entity existence.
+
+## Guardian channel architecture (Target / Future / Paused)
+
+```text
+Add Meawketting LINE
+→ LINE Login
+→ open LINE Mini App
+→ My Pets
+→ + Add Pet
+→ Cat / Dog
+→ Pet Profile / Pet Passport
+```
+
+This flow is conceptual and has no repository route contract yet. Do not invent LINE Mini App routes, imply that LINE integration exists, or treat LINE identity as proof of Pet ownership or consent. Future production linking must establish the Person ↔ Guardian relationship and consent authority separately.
+
+## BF-4 local Conversation architecture
+
+- The implemented prototype uses one ongoing Conversation per `Business + Customer` relationship. It stores IDs for Customer and optional Pet/Booking/Branch/future Service Job context; display identity is resolved from the shared Business Customer/Booking source.
+- `/business/inbox?conversation=<id>` is the local recovery contract. Customer/Pet/Booking launch parameters reuse or create the relationship and then normalize to this query; no dynamic Conversation route is required for the current split/mobile task model.
+- Conversation is Business-wide so switching Branch does not duplicate it. A linked Booking retains Branch attribution, and the active Branch does not gain another Branch's Passport consent or protected data.
+- Structured add-service approval is a message/request state only. BF-4 intentionally has no safe Booking add-on, Charge, or Payment mutation and no production Guardian identity/delivery proof.
 
 ## Shared Business Intake Engine
 
@@ -104,14 +136,24 @@ After receive, the next object may be a Grooming Job, Hotel Stay, Daycare Visit 
 
 | Data | Authority/source | Business rule |
 |---|---|---|
+| LINE identity / LINE Login | LINE as future entry/authentication channel | Does not automatically establish Person, Guardian relationship, Pet ownership, or consent; production linking is not implemented |
 | Pet identity and Guardian-managed profile | Guardian according to relationship permission | Read only within active consent; correction is a suggestion |
 | Guardian private notes | Authorized Guardian | Never shared by default |
 | Business intake and operational notes | Business author under role/Branch | Do not overwrite Pet source; audience is explicit |
 | CareProof evidence | Service actor and source context | Actor/time/source/audience retained; visibility policy applied |
-| Customer contact/authority | Customer relationship plus policy | Booking authority and Pet consent authority are not assumed identical |
+| Customer contact/authority | Customer relationship plus policy | Booking authority and Pet consent authority are not assumed identical; "ผู้ติดต่อหลัก" is not an ownership claim |
 | Public Safety fields | Guardian | Anonymous sees selected public-safe fields only |
 | Charge/Payment data | Business operational record | Role, Branch and customer visibility rules apply |
 | Platform Admin case/audit | Restricted platform role | Reason-bound and audited; no routine Business/Consumer access |
+
+## Production platform direction
+
+```text
+TARGET PLATFORM: Cloudflare
+PRODUCTION: NOT DEPLOYED / NOT VERIFIED
+```
+
+Cloudflare replaces Vercel as the target production platform direction. The repository currently contains Cloudflare-compatible local build tooling, but BF-4 makes no production architecture decision for Cloudflare Pages, Workers, Durable Objects, D1, R2, KV, runtime bindings, storage, domains, or deployment workflow. Those remain Backend / Production phase work.
 
 ## Production intent, not implementation
 

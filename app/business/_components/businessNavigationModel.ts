@@ -9,12 +9,13 @@ export type BusinessDestinationKey =
   | "team"
   | "settings";
 
-export type BusinessPlannedDestinationKey = Exclude<BusinessDestinationKey, "calendar">;
+export type BusinessLiveDestinationKey = "calendar" | "customers" | "messages";
+export type BusinessPlannedDestinationKey = Exclude<BusinessDestinationKey, BusinessLiveDestinationKey>;
 
 export type BusinessLiveDestination = {
-  key: "calendar";
+  key: BusinessLiveDestinationKey;
   label: string;
-  href: "/business/calendar";
+  href: "/business/calendar" | "/business/customers" | "/business/inbox";
 };
 
 export type BusinessPlannedDestination = {
@@ -30,10 +31,22 @@ export const BUSINESS_CALENDAR_DESTINATION = {
   href: "/business/calendar",
 } as const satisfies BusinessLiveDestination;
 
+export const BUSINESS_CUSTOMERS_DESTINATION = {
+  key: "customers",
+  label: "ลูกค้าและสัตว์เลี้ยง",
+  href: "/business/customers",
+} as const satisfies BusinessLiveDestination;
+
+export const BUSINESS_MESSAGES_DESTINATION = {
+  key: "messages",
+  label: "ข้อความ",
+  href: "/business/inbox",
+} as const satisfies BusinessLiveDestination;
+
 export const BUSINESS_TOP_DESTINATIONS = [
   BUSINESS_CALENDAR_DESTINATION,
-  { key: "customers", label: "ลูกค้าและสัตว์เลี้ยง" },
-  { key: "messages", label: "ข้อความ" },
+  BUSINESS_CUSTOMERS_DESTINATION,
+  BUSINESS_MESSAGES_DESTINATION,
 ] as const satisfies readonly BusinessTopDestination[];
 
 export const BUSINESS_MANAGEMENT_DESTINATIONS = [

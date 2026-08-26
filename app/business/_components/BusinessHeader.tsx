@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, Scan, Storefront } from "../../_components/icons";
 import { BrandMark } from "../../_components/BrandMark";
 import { BusinessContextSwitcher } from "./BusinessContextSwitcher";
+import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import { BusinessUserMenu } from "./BusinessUserMenu";
 
 type BusinessHeaderProps = {
@@ -20,7 +21,12 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
       <div className="business-header__inner shell">
         <div className="business-brand">
           <BrandMark href="/" ariaLabel="Meawketting Business หน้าแรก" />
-          <span>Business</span>
+          {variant === "app" ? (
+            <Link className="business-brand__compact" href="/business/home" aria-label="Meawketting หน้าหลักธุรกิจ">
+              <Image src="/favicon.svg" alt="" width={36} height={36} priority />
+            </Link>
+          ) : null}
+          {variant !== "app" ? <span>Business</span> : null}
         </div>
         {variant === "landing" ? (
           <nav className="business-header__nav" aria-label="เมนูหลักสำหรับธุรกิจ">
@@ -33,7 +39,7 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
           <div className="business-header__context"><BusinessContextSwitcher /></div>
         ) : null}
         {variant === "auth" ? (
-          <span className="business-header__descriptor"><Storefront size={18} weight="bold" /> ระบบสำหรับร้านและทีมดูแลสัตว์</span>
+          <span className="business-header__descriptor"><Storefront size={18} weight="bold" /> สำหรับร้านและทีมดูแลสัตว์</span>
         ) : null}
         <div className="business-header__actions">
           {variant === "landing" ? (

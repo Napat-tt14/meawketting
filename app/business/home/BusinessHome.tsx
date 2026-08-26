@@ -1,8 +1,5 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import Link from "next/link";
-import type { BusinessServiceModule } from "../../_prototype/businessState";
 import {
   BUSINESS_SERVICE_MODULES,
   BOOKING_DEMO_DATE,
@@ -11,26 +8,24 @@ import {
   getEnabledBusinessModules,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
+  resolvePrototypeBookingRelationship,
 } from "../../_prototype/businessState";
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
 import {
-  ArrowRight,
-  BedDouble,
+  CalendarDays,
   CheckCircle,
   Clock,
-  Info,
   MessageCircle,
-  PawPrint,
+  Plus,
   Scan,
-  Scissors,
+  Search,
   ShieldCheck,
 } from "../../_components/icons";
-import { useBusinessContext } from "../_components/useBusinessContext";
-
-const moduleIcons = {
-  grooming: Scissors,
-  hotel: BedDouble,
-  daycare: PawPrint,
-} satisfies Record<BusinessServiceModule, typeof PawPrint>;
+import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
+import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
+import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { BusinessHomeSpotlight } from "./BusinessHomeSpotlight";
 
 const todayItems = [
   { key: "waitingIntake", label: "รอรับเข้า" },
@@ -50,25 +45,31 @@ function bookingWorkLabel(booking: ReturnType<typeof listPrototypeBookings>[numb
 }
 
 function bookingPetName(booking: ReturnType<typeof listPrototypeBookings>[number]) {
-  if (booking.pets.length <= 1) return booking.pets[0]?.name ?? "น้องตัวอย่าง";
-  return `${booking.pets[0]?.name ?? "น้อง"} +${booking.pets.length - 1}`;
-}
-
-const emptySubscribe = () => () => {};
-function useIsClient() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+  const relationship = resolvePrototypeBookingRelationship(booking);
+  if (relationship.pets.length <= 1) return relationship.pets[0]?.name ?? "น้อง";
+  return `${relationship.pets[0]?.name ?? "น้อง"} +${relationship.pets.length - 1}`;
 }
 
 export function BusinessHome() {
   const { context, revision } = useBusinessContext();
-  const bookingStateReady = useIsClient();
+  const businessStateReady = useBusinessStateReady();
   const details = getDemoBusinessContextDetails(context);
   const demo = getBusinessHomeDemo(context);
   const enabledModules = getEnabledBusinessModules(context);
   void revision;
-  const branchBookings = bookingStateReady
+  const branchBookings = businessStateReady
     ? listPrototypeBookings(context, { includeCancelled: false })
     : listPrototypeBookingFixtures(context, { includeCancelled: false });
+  const unreadMessageCount = getPrototypeInboxUnreadCount(context, !businessStateReady);
+  const attentionItems = [
+    ...demo.attention,
+    ...(unreadMessageCount > 0 ? [{
+      id: "messages",
+      tone: "info" as const,
+      title: `มีข้อความใหม่ ${unreadMessageCount} รายการ`,
+      detail: "เปิดดูบทสนทนาและบริบทการจอง",
+    }] : []),
+  ];
   const nextWork = branchBookings.slice(0, 3).map((booking) => ({
     time: bookingWorkLabel(booking),
     petName: bookingPetName(booking),
@@ -79,43 +80,47 @@ export function BusinessHome() {
     waitingIntake: demo.today.waitingIntake,
     bookingsToday: branchBookings.filter(bookingIsOnDemoDay).length,
     readyForPickup: demo.today.readyForPickup,
-    newMessages: demo.today.newMessages,
+    newMessages: unreadMessageCount,
   };
   const revenue = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(demo.revenueToday);
-
   return (
     <div className="business-home shell" key={context.key}>
-      <header className="business-home__heading">
-        <div>
-          <span className="business-demo-label"><Info size={16} /> ข้อมูลตัวอย่าง</span>
-          <p>สวัสดี</p>
-          <h1>{details.business?.name ?? "ร้านตัวอย่าง"}</h1>
-          <strong>{details.branch?.name ?? "สาขาตัวอย่าง"}</strong>
-        </div>
-        <Link className="button button--business business-home__scan" href="/business/scan">
-          <Scan size={19} weight="bold" />
-          สแกนรับเข้า
-        </Link>
-      </header>
+      <BusinessPageHeader title="หน้าหลัก" context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"}`} />
+
+      <div className="business-home-hero">
+        <BusinessHomeSpotlight />
+
+        <nav className="business-quick-actions" aria-label="งานด่วน">
+          <div className="business-quick-actions__heading"><strong>งานด่วน</strong><small>เริ่มงานที่ใช้บ่อย</small></div>
+          <Link className="business-quick-action business-quick-action--primary" href="/business/calendar?new=1"><Plus size={20} /><span><strong>เพิ่มการจอง</strong><small>เริ่มรายการใหม่</small></span></Link>
+          <Link className="business-quick-action" href="/business/scan"><Scan size={20} /><span><strong>สแกนรับเข้า</strong><small>ตรวจสิทธิ์ก่อนเปิดข้อมูล</small></span></Link>
+          <Link className="business-quick-action" href="/business/customers?focus=search"><Search size={20} /><span><strong>ค้นหาลูกค้า</strong><small>ชื่อ น้อง หรือเบอร์โทร</small></span></Link>
+        </nav>
+      </div>
 
       <div className="business-home__layout">
         <div className="business-home__main">
           <section className="business-home-section business-attention" aria-labelledby="business-attention-title">
             <div className="business-home-section__heading">
-              <div>
-                <p className="business-section-kicker">ต้องดูก่อน</p>
-                <h2 id="business-attention-title">สิ่งที่ต้องจัดการ</h2>
-              </div>
-              <span>{demo.attention.length} รายการ</span>
+              <h2 id="business-attention-title">สิ่งที่ต้องจัดการ</h2>
+              <span>{attentionItems.length} รายการ</span>
             </div>
             <ul className="business-attention__list">
-              {demo.attention.map((item) => (
+              {attentionItems.map((item) => (
                 <li key={item.id} className={`business-attention__item business-attention__item--${item.tone}`}>
-                  <span className="business-attention__cue">
-                    {item.tone === "waiting" ? <Clock size={20} /> : item.tone === "ready" ? <CheckCircle size={20} /> : <MessageCircle size={20} />}
-                  </span>
-                  <span><strong>{item.title}</strong><small>{item.detail}</small></span>
-                  <span className="business-planned-tag">Demo</span>
+                  {item.id === "messages" ? (
+                    <a href="/business/inbox">
+                      <span className="business-attention__cue"><MessageCircle size={20} /></span>
+                      <span><strong>{item.title}</strong><small>{item.detail}</small></span>
+                    </a>
+                  ) : (
+                    <>
+                      <span className="business-attention__cue">
+                        {item.tone === "waiting" ? <Clock size={20} /> : <CheckCircle size={20} />}
+                      </span>
+                      <span><strong>{item.title}</strong><small>{item.detail}</small></span>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -123,20 +128,15 @@ export function BusinessHome() {
 
           <section className="business-home-section business-next-work" aria-labelledby="business-next-title">
             <div className="business-home-section__heading">
-              <div>
-                <p className="business-section-kicker">ตามลำดับเวลา</p>
-                <h2 id="business-next-title">งานถัดไป</h2>
-              </div>
-              <span>ข้อมูลตัวอย่าง</span>
+              <h2 id="business-next-title">งานถัดไป</h2>
             </div>
             <ol className="business-next-work__list">
               {nextWork.map((item) => {
-                const Icon = moduleIcons[item.module];
                 return (
                   <li key={`${item.time}-${item.petName}`}>
                     <time>{item.time}</time>
                     <span className="business-next-work__line" aria-hidden="true" />
-                    <span className="business-next-work__icon"><Icon size={19} /></span>
+                    <BusinessServiceIcon module={item.module} size={19} className="business-next-work__icon" />
                     <span className="business-next-work__copy"><strong>{item.petName}</strong><small>{item.task}</small></span>
                   </li>
                 );
@@ -148,7 +148,7 @@ export function BusinessHome() {
         <aside className="business-home__summary" aria-label="สรุปวันนี้และงานบริการ">
           <section className="business-home-section business-today" aria-labelledby="business-today-title">
             <div className="business-home-section__heading">
-              <div><p className="business-section-kicker">ภาพรวมสั้น ๆ</p><h2 id="business-today-title">วันนี้</h2></div>
+              <h2 id="business-today-title">วันนี้</h2>
             </div>
             <dl>
               {todayItems.map((item) => (
@@ -159,18 +159,16 @@ export function BusinessHome() {
 
           <section className="business-home-section business-module-summary" aria-labelledby="business-modules-title">
             <div className="business-home-section__heading">
-              <div><p className="business-section-kicker">เฉพาะบริการของสาขานี้</p><h2 id="business-modules-title">งานบริการ</h2></div>
+              <h2 id="business-modules-title">งานบริการ</h2>
             </div>
             <ul>
               {enabledModules.map((module) => {
-                const Icon = moduleIcons[module];
                 const summary = demo.moduleSummaries[module];
                 if (!summary) return null;
                 return (
                   <li key={module}>
-                    <span><Icon size={20} /></span>
-                    <div><strong>{BUSINESS_SERVICE_MODULES[module].label}</strong><b>{summary.value}</b><small>{summary.detail}</small></div>
-                    <span className="business-planned-tag">Demo</span>
+                    <BusinessServiceIcon module={module} size={20} />
+                    <div><strong>{BUSINESS_SERVICE_MODULES[module].label}</strong><b>{summary.value}</b></div>
                   </li>
                 );
               })}
@@ -179,13 +177,12 @@ export function BusinessHome() {
 
           <section className="business-home-section business-revenue" aria-labelledby="business-revenue-title">
             <span><ShieldCheck size={20} /></span>
-            <div><p id="business-revenue-title">รายรับวันนี้</p><strong>{revenue}</strong><small>DEMO / MOCK · ยังไม่มีระบบการเงินจริง</small></div>
+            <div><p id="business-revenue-title">รายรับวันนี้</p><strong>{revenue}</strong><small>ยังไม่เชื่อมระบบการเงินจริง</small></div>
+            <CalendarDays size={18} />
           </section>
         </aside>
       </div>
 
-      <p className="business-home__boundary">Home นี้เป็นข้อมูลตัวอย่างเพื่อทดสอบบริบทหลายบริการ งานถัดไปและจำนวนการจองวันนี้ใช้ข้อมูลจากปฏิทิน ส่วนข้อความ งานบริการ และการเงินยังไม่เปิดใช้งาน</p>
-      <Link className="business-home__quiet-scan" href="/business/scan">ไปที่สแกนรับเข้า <ArrowRight size={18} /></Link>
     </div>
   );
 }

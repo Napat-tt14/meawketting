@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { IconType } from "react-icons";
 import type { BusinessServiceModule } from "../../_prototype/businessState";
 import { getEnabledBusinessModules } from "../../_prototype/businessState";
+import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
+import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import {
   BedDouble,
   CalendarDays,
@@ -18,6 +19,7 @@ import {
   UsersRound,
   Wallet,
 } from "../../_components/icons";
+import { BrandMark } from "../../_components/BrandMark";
 import {
   BUSINESS_MANAGEMENT_DESTINATIONS,
   BUSINESS_MODULE_LABELS,
@@ -26,7 +28,8 @@ import {
   type BusinessLiveDestination,
   type BusinessPlannedDestinationKey,
 } from "./businessNavigationModel";
-import { useBusinessContext } from "./useBusinessContext";
+import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
+import { BusinessContextSwitcher } from "./BusinessContextSwitcher";
 
 const DESTINATION_ICONS: Record<BusinessDestinationKey, IconType> = {
   calendar: CalendarDays,
@@ -58,7 +61,7 @@ export function PlannedBusinessDestination({
     <button className={`business-nav-item business-nav-item--planned ${className}`.trim()} type="button" disabled aria-disabled="true">
       <Icon size={19} />
       <span>{label}</span>
-      <small>เร็ว ๆ นี้</small>
+      <small>ยังไม่เปิดใช้</small>
     </button>
   );
 }
@@ -66,19 +69,38 @@ export function PlannedBusinessDestination({
 export function LiveBusinessDestination({
   destination,
   active,
+  badge = 0,
 }: {
   destination: BusinessLiveDestination;
   active: boolean;
+  badge?: number;
 }) {
   const Icon = DESTINATION_ICONS[destination.key];
+  const content = (
+    <>
+      <Icon size={19} />
+      <span>{destination.label}</span>
+      {badge > 0 ? <span className="business-nav-unread-badge" aria-label={`ข้อความใหม่ ${badge} ข้อความ`}>{badge}</span> : null}
+    </>
+  );
+  if (destination.key === "messages") {
+    return (
+      <a
+        className={`business-nav-item${active ? " is-active" : ""}`}
+        href={destination.href}
+        aria-current={active ? "page" : undefined}
+      >
+        {content}
+      </a>
+    );
+  }
   return (
     <Link
       className={`business-nav-item${active ? " is-active" : ""}`}
       href={destination.href}
       aria-current={active ? "page" : undefined}
     >
-      <Icon size={19} />
-      <span>{destination.label}</span>
+      {content}
     </Link>
   );
 }
@@ -89,18 +111,25 @@ export function PlannedBusinessModule({ module, className = "" }: { module: Busi
     <button className={`business-nav-item business-nav-item--planned ${className}`.trim()} type="button" disabled aria-disabled="true">
       <Icon size={19} />
       <span>{BUSINESS_MODULE_LABELS[module]}</span>
-      <small>เร็ว ๆ นี้</small>
+      <small>ยังไม่เปิดใช้</small>
     </button>
   );
 }
 
 export function BusinessNavigation() {
   const pathname = usePathname();
-  const { context } = useBusinessContext();
+  const { context, revision } = useBusinessContext();
+  const stateReady = useBusinessStateReady();
   const enabledModules = getEnabledBusinessModules(context);
+  const unreadCount = getPrototypeInboxUnreadCount(context, !stateReady);
+  void revision;
 
   return (
     <aside className="business-desktop-navigation" aria-label="เมนูหลักสำหรับธุรกิจ">
+      <div className="business-navigation__identity">
+        <BrandMark href="/business/home" ariaLabel="Meawketting หน้าหลักธุรกิจ" />
+        <BusinessContextSwitcher />
+      </div>
       <nav>
         <Link className={`business-nav-item${pathname === "/business/home" ? " is-active" : ""}`} href="/business/home" aria-current={pathname === "/business/home" ? "page" : undefined}>
           <House size={19} />
@@ -108,22 +137,27 @@ export function BusinessNavigation() {
         </Link>
         {BUSINESS_TOP_DESTINATIONS.map((item) => (
           "href" in item
-            ? <LiveBusinessDestination key={item.key} destination={item} active={pathname === item.href} />
+            ? <LiveBusinessDestination
+              key={item.key}
+              destination={item}
+              active={pathname === item.href || (item.key === "customers" && pathname.startsWith("/business/customers/")) || (item.key === "messages" && pathname.startsWith("/business/inbox"))}
+              badge={item.key === "messages" ? unreadCount : 0}
+            />
             : <PlannedBusinessDestination key={item.key} destinationKey={item.key} label={item.label} />
         ))}
 
-        <div className="business-nav-group" aria-label="งานบริการที่สาขาเปิดใช้">
-          <p>งานบริการ</p>
+        <div className="business-nav-group business-nav-group--services" aria-label="งานบริการที่ยังไม่เปิดใช้">
+          <p>งานบริการ · ยังไม่เปิดใช้</p>
           {enabledModules.map((module) => <PlannedBusinessModule key={module} module={module} />)}
         </div>
 
-        <div className="business-nav-group business-nav-group--management" aria-label="จัดการธุรกิจ">
+        <div className="business-nav-group business-nav-group--management" aria-label="เมนูธุรกิจที่ยังไม่เปิดใช้">
+          <p>ยังไม่เปิดใช้</p>
           {BUSINESS_MANAGEMENT_DESTINATIONS.map((item) => (
             <PlannedBusinessDestination key={item.key} destinationKey={item.key} label={item.label} />
           ))}
         </div>
       </nav>
-      <p className="business-navigation__prototype-note">ต้นแบบในเบราว์เซอร์ · ไม่มีสิทธิ์สมาชิกจริง</p>
     </aside>
   );
 }

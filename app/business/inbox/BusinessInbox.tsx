@@ -1,0 +1,200 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ensurePrototypeConversation,
+  listPrototypeConversationFixtures,
+  listPrototypeConversations,
+  markPrototypeConversationRead,
+} from "../../_prototype/inboxState";
+import { MessageCircle } from "../../_components/icons";
+import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
+import {
+  ConversationList,
+  type InboxConversationListItem,
+  type InboxFilter,
+} from "./ConversationList";
+import { ConversationPane } from "./ConversationPane";
+import {
+  conversationIsInService,
+  conversationMatchesPrototypeSearch,
+  resolvePrototypeConversationContext,
+} from "./inboxPresentation";
+
+export type InboxLaunchRequest = {
+  key: string;
+  conversationId: string | null;
+  customerId: string | null;
+  petId: string | null;
+  bookingId: string | null;
+};
+
+export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxLaunchRequest | null }) {
+  const { context, revision } = useBusinessContext();
+  const stateReady = useBusinessStateReady();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<InboxFilter>("all");
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(launchRequest?.conversationId ?? null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const handledLaunchRef = useRef<string | null>(launchRequest?.conversationId ? launchRequest.key : null);
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  void revision;
+
+  const conversations = stateReady
+    ? listPrototypeConversations(context)
+    : listPrototypeConversationFixtures(context);
+  const items = useMemo<InboxConversationListItem[]>(() => conversations.map((conversation) => ({
+    conversation,
+    context: resolvePrototypeConversationContext(conversation, !stateReady),
+  })), [conversations, stateReady]);
+
+  useEffect(() => {
+    if (!stateReady || !launchRequest || handledLaunchRef.current === launchRequest.key) return;
+    handledLaunchRef.current = launchRequest.key;
+    if (launchRequest.customerId) {
+      const result = ensurePrototypeConversation({
+        businessId: context.businessId,
+        branchId: context.branchId,
+        customerId: launchRequest.customerId,
+        petId: launchRequest.petId,
+        bookingId: launchRequest.bookingId,
+      });
+      if (!result.ok) {
+        const frame = window.requestAnimationFrame(() => setNotice("เปิดบทสนทนาจากความสัมพันธ์นี้ไม่ได้ โปรดกลับไปเลือกลูกค้าอีกครั้ง"));
+        return () => window.cancelAnimationFrame(frame);
+      }
+      const params = new URLSearchParams(window.location.search);
+      params.set("conversation", result.conversation.conversationId);
+      params.delete("customerId");
+      params.delete("petId");
+      params.delete("bookingId");
+      window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+      const frame = window.requestAnimationFrame(() => {
+        setSelectedConversationId(result.conversation.conversationId);
+        setNotice(result.reused ? "เปิดบทสนทนาเดิมแล้ว" : "สร้างบทสนทนาในเบราว์เซอร์นี้แล้ว");
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+    if (launchRequest.conversationId && conversations.some((conversation) => conversation.conversationId === launchRequest.conversationId)) {
+      const frame = window.requestAnimationFrame(() => setSelectedConversationId(launchRequest.conversationId));
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [context.branchId, context.businessId, conversations, launchRequest, stateReady]);
+
+  useEffect(() => {
+    if (!stateReady || launchRequest?.customerId || selectedConversationId) return;
+    if (!window.matchMedia("(min-width: 768px)").matches) return;
+    const frame = window.requestAnimationFrame(() => setSelectedConversationId(conversations[0]?.conversationId ?? null));
+    return () => window.cancelAnimationFrame(frame);
+  }, [conversations, launchRequest?.customerId, selectedConversationId, stateReady]);
+
+  useEffect(() => {
+    if (!stateReady || !selectedConversationId) return;
+    markPrototypeConversationRead(selectedConversationId, context.businessId);
+  }, [context.businessId, selectedConversationId, stateReady]);
+
+  useEffect(() => {
+    if (!selectedConversationId) return;
+    if (conversations.some((conversation) => conversation.conversationId === selectedConversationId)) return;
+    const frame = window.requestAnimationFrame(() => setSelectedConversationId(null));
+    return () => window.cancelAnimationFrame(frame);
+  }, [conversations, selectedConversationId]);
+
+  const filterCounts: Record<InboxFilter, number> = {
+    all: items.length,
+    unread: items.filter(({ conversation }) => conversation.unreadCount > 0).length,
+    "in-service": items.filter(({ context: itemContext }) => conversationIsInService(itemContext)).length,
+  };
+  const visibleItems = items.filter((item) => (
+    conversationMatchesPrototypeSearch(item.conversation, item.context, query)
+    && (filter === "all"
+      || (filter === "unread" && item.conversation.unreadCount > 0)
+      || (filter === "in-service" && conversationIsInService(item.context)))
+  ));
+  const selectedItem = items.find(({ conversation }) => conversation.conversationId === selectedConversationId) ?? null;
+  const unreadCount = conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
+
+  function updateConversationQuery(conversationId: string | null) {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("customerId");
+    params.delete("petId");
+    params.delete("bookingId");
+    if (conversationId) params.set("conversation", conversationId);
+    else params.delete("conversation");
+    window.history.replaceState(null, "", `${window.location.pathname}${params.size > 0 ? `?${params.toString()}` : ""}`);
+  }
+
+  function selectConversation(conversationId: string) {
+    setSelectedConversationId(conversationId);
+    setNotice(null);
+    updateConversationQuery(conversationId);
+  }
+
+  function backToList() {
+    const previousId = selectedConversationId;
+    setSelectedConversationId(null);
+    updateConversationQuery(null);
+    if (previousId) window.requestAnimationFrame(() => rowRefs.current.get(previousId)?.focus());
+  }
+
+  function registerRow(conversationId: string) {
+    return (node: HTMLButtonElement | null) => {
+      if (node) rowRefs.current.set(conversationId, node);
+      else rowRefs.current.delete(conversationId);
+    };
+  }
+
+  return (
+    <div className={`business-inbox shell${selectedItem ? " has-selection" : ""}`}>
+      <BusinessPageHeader
+        title="ข้อความ"
+        context={unreadCount > 0 ? `${unreadCount} ข้อความใหม่` : "ไม่มีข้อความใหม่"}
+        actions={<span className="inbox-local-state"><MessageCircle size={17} />บันทึกในอุปกรณ์นี้</span>}
+      />
+      <section className="inbox-overview" aria-label="ภาพรวมข้อความ">
+        <div className="inbox-overview__lead">
+          <span>ศูนย์ข้อความ</span>
+          <strong>คุยกับลูกค้าให้จบในที่เดียว</strong>
+          <small>เห็นน้อง การจอง และสถานะบริการก่อนตอบกลับ</small>
+        </div>
+        <div className="inbox-overview__stats">
+          <div><strong>{items.length}</strong><span>บทสนทนา</span></div>
+          <div><strong>{filterCounts.unread}</strong><span>ยังไม่ได้อ่าน</span></div>
+          <div><strong>{filterCounts["in-service"]}</strong><span>กำลังใช้บริการ</span></div>
+        </div>
+      </section>
+      {notice ? <p className="business-inbox__notice" role="status">{notice}</p> : null}
+      <div className="inbox-layout">
+        <ConversationList
+          items={visibleItems}
+          totalCount={items.length}
+          query={query}
+          filter={filter}
+          filterCounts={filterCounts}
+          selectedConversationId={selectedConversationId}
+          onQueryChange={setQuery}
+          onFilterChange={setFilter}
+          onSelect={selectConversation}
+          registerRow={registerRow}
+        />
+        {selectedItem ? (
+          <ConversationPane
+            conversation={selectedItem.conversation}
+            context={selectedItem.context}
+            businessId={context.businessId}
+            currentBranchId={context.branchId}
+            onBack={backToList}
+            onStateChange={setNotice}
+          />
+        ) : (
+          <section className="inbox-conversation-placeholder" aria-label="ยังไม่ได้เลือกบทสนทนา">
+            <MessageCircle size={32} />
+            <strong>เลือกบทสนทนาเพื่อเริ่มงาน</strong>
+            <p>ดูข้อความและบริบทการจองได้ในพื้นที่เดียวกัน</p>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}

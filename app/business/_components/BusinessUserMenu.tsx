@@ -7,7 +7,7 @@ import {
   getDemoBusinessContextDetails,
   readActiveBusinessContext,
 } from "../../_prototype/businessState";
-import { ChevronDown, LogOut, Storefront, UserRoundCheck, X } from "../../_components/icons";
+import { LogOut, Storefront, UserRoundCheck, X } from "../../_components/icons";
 
 export function BusinessUserMenu() {
   const [open, setOpen] = useState(false);
@@ -73,26 +73,22 @@ export function BusinessUserMenu() {
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-controls="business-user-menu-panel"
         aria-label="เปิดเมนูบัญชีร้าน"
         onClick={() => setOpen((current) => !current)}
       >
         <span className="business-user-menu__icon"><UserRoundCheck size={20} weight="bold" /></span>
-        <span className="business-user-menu__summary">
-          <strong>{context.role}</strong>
-          <small>บัญชีทีมร้าน · ตัวอย่าง</small>
-        </span>
-        <ChevronDown size={17} weight="bold" />
       </button>
       {open ? (
         <>
           <button className="business-user-menu__backdrop" type="button" aria-label="ปิดเมนูบัญชีร้าน" onClick={closeMenu} />
-          <div ref={panelRef} className="business-user-menu__panel" role="dialog" aria-modal="true" aria-label="บัญชีร้าน">
+          <div id="business-user-menu-panel" ref={panelRef} className="business-user-menu__panel" role="dialog" aria-modal="true" aria-label="บัญชีร้าน">
             <header><strong>บัญชีร้าน</strong><button type="button" aria-label="ปิดเมนูบัญชีร้าน" onClick={closeMenu}><X size={20} weight="bold" /></button></header>
             <section className="business-user-menu__context" aria-label="ร้านและสิทธิ์ปัจจุบัน">
               <span><Storefront size={20} weight="bold" /><span><small>ร้านและสาขา</small><strong>{details.business?.name}<br />{details.branch?.name}</strong></span></span>
               <span><UserRoundCheck size={20} weight="bold" /><span><small>หน้าที่ปัจจุบัน</small><strong>{context.role}</strong></span></span>
             </section>
-            <button className="business-user-menu__signout" type="button" onClick={() => window.location.assign("/business/login")}><LogOut size={18} weight="bold" /> ออกจากระบบตัวอย่าง</button>
+            <button className="business-user-menu__signout" type="button" onClick={() => window.location.assign("/business/login")}><LogOut size={18} weight="bold" /> ออกจากระบบ</button>
           </div>
         </>
       ) : null}

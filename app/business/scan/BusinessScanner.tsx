@@ -17,7 +17,6 @@ import {
   CheckCircle,
   CircleAlert,
   Clock,
-  Info,
   LockKey,
   QrCode,
   Scan,
@@ -25,6 +24,7 @@ import {
   Video,
   WifiOff,
 } from "../../_components/icons";
+import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 
 type ScannerState =
   | "ready"
@@ -172,7 +172,7 @@ export function BusinessScanner() {
       setManualError("");
       setDetectedType(null);
       setValidAccessId(null);
-      setAnnouncement("เปลี่ยนร้านหรือสาขาตัวอย่างแล้ว");
+      setAnnouncement("เปลี่ยนร้านหรือสาขาแล้ว");
     };
     window.addEventListener("meawketting:business-state", syncContext);
     return () => window.removeEventListener("meawketting:business-state", syncContext);
@@ -274,24 +274,22 @@ export function BusinessScanner() {
 
   return (
     <div className="business-shell shell">
-      <header className="business-task-heading">
-        <p className="business-kicker"><Scan size={16} weight="bold" /> สแกนรับเข้า</p>
-        <h1>สแกน QR เพื่อรับน้องเข้าร้าน</h1>
-        <p>ใช้เฉพาะ QR ชั่วคราวสำหรับร้านที่ออกให้ {details.business?.name} · {details.branch?.name}</p>
-      </header>
+      <BusinessPageHeader
+        title="สแกนรับเข้า"
+        context={`ใช้ QR ชั่วคราวสำหรับ ${details.business?.name} · ${details.branch?.name}`}
+      />
       <p className="sr-live" role="status" aria-live="polite">{announcement}</p>
 
       {scannerState === "ready" ? (
         <section className="scanner-workspace business-state-enter" aria-labelledby="scanner-ready-heading">
           <div className="scanner-camera scanner-camera--idle">
             <span className="scanner-frame" aria-hidden="true"><Scan size={64} weight="bold" /></span>
-            <div><h2 id="scanner-ready-heading">พร้อมสแกน QR สำหรับรับเข้า</h2><p>วาง QR ให้อยู่ในกรอบ หรือใช้รหัสที่แสดงใต้ QR</p></div>
+            <div><h2 id="scanner-ready-heading">สแกน QR</h2><p>วาง QR ให้อยู่ในกรอบ หรือกรอกรหัสใต้ QR</p></div>
           </div>
           <div className="scanner-actions">
             <button className="button button--business button--large" type="button" onClick={() => void startCamera()}><Camera size={20} weight="bold" /> เปิดกล้องสแกน</button>
             <button className="button button--ghost button--large" type="button" onClick={() => setScannerState("manual-code")}><QrCode size={20} weight="bold" /> กรอกรหัสใต้ QR</button>
           </div>
-          <p className="scanner-implementation-note"><Info size={18} weight="bold" /> ถ้ากล้องอ่าน QR ไม่ได้ คุณยังใช้รหัสใต้ QR เพื่อทำงานต่อได้</p>
         </section>
       ) : null}
 
@@ -314,7 +312,6 @@ export function BusinessScanner() {
         <section className="scanner-manual" aria-labelledby="manual-heading">
           <span className="scanner-state-icon"><QrCode size={32} weight="bold" /></span>
           <h2 id="manual-heading">กรอกรหัสใต้ QR</h2>
-          <p>ใช้รหัสที่แสดงใต้ QR ชั่วคราวสำหรับร้านเท่านั้น</p>
           <form onSubmit={submitManualCode} noValidate>
             <label htmlFor="temporary-code">รหัสใต้ QR สำหรับร้าน</label>
             <input ref={manualInputRef} id="temporary-code" value={manualCode} aria-invalid={Boolean(manualError)} aria-describedby={manualError ? "temporary-code-error" : "temporary-code-help"} autoComplete="off" placeholder="เช่น DEMO-TEMP-ACTIVE" onChange={(event) => { setManualCode(event.target.value); setManualError(""); }} />
@@ -346,8 +343,7 @@ export function BusinessScanner() {
       {scannerState === "valid" ? (
         <section className="scanner-result scanner-result--valid business-state-enter" aria-labelledby="scanner-result-heading">
           <span className="scanner-state-icon"><CheckCircle size={32} weight="bold" /></span>
-          <p className="business-kicker">QR ใช้งานได้</p>
-          <h2 ref={resultHeadingRef} id="scanner-result-heading" tabIndex={-1}>QR ตรงกับร้านและสาขานี้</h2>
+          <h2 ref={resultHeadingRef} id="scanner-result-heading" tabIndex={-1}>QR พร้อมใช้งาน</h2>
           <p>ประเภท QR ถูกต้องและตรงกับ {details.business?.name} · {details.branch?.name}</p>
           <div className="scanner-safe-result"><ShieldCheck size={22} weight="bold" /><span><strong>พร้อมตรวจข้อมูลก่อนรับน้อง</strong><small>หน้าถัดไปจะแสดงเฉพาะข้อมูลที่เจ้าของเปิดให้ร้านนี้</small></span></div>
           <div className="scanner-actions"><button className="button button--business button--large" type="button" onClick={enterIntake}>ตรวจข้อมูลก่อนรับน้อง</button><button className="button button--ghost" type="button" onClick={() => resetScanner()}>สแกนใหม่</button></div>

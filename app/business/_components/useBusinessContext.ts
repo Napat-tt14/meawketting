@@ -1,11 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import {
   DEMO_BUSINESS_CONTEXTS,
   readActiveBusinessContext,
   writeActiveBusinessContext,
 } from "../../_prototype/businessState";
+
+const emptySubscribe = () => () => {};
+
+// Browser-local Business slices render deterministic fixtures on the server,
+// then opt into session state after hydration through this shared gate.
+export function useBusinessStateReady() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
 
 export function useBusinessContext() {
   const [context, setContext] = useState(DEMO_BUSINESS_CONTEXTS[0]);

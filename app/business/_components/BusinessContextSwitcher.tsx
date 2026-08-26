@@ -15,13 +15,13 @@ export function BusinessContextSwitcher() {
     <label className="business-context-switcher">
       <span className="business-context-switcher__icon"><MapPin size={18} weight="bold" /></span>
       <span className="business-context-switcher__copy">
-        <small>{details.business?.name ?? "ร้านตัวอย่าง"}</small>
-        <strong>{details.branch?.name ?? "สาขาตัวอย่าง"}</strong>
+        <strong>{details.business?.name ?? "ร้าน"}</strong>
+        <small>{details.branch?.name ?? "สาขา"}</small>
       </span>
       <ChevronDown className="business-context-switcher__chevron" size={16} />
-      <span className="sr-only">เปลี่ยนร้านและสาขาตัวอย่าง</span>
+      <span className="sr-only">เปลี่ยนร้านและสาขา</span>
       <select
-        aria-label="เปลี่ยนร้านและสาขาตัวอย่าง"
+        aria-label="เปลี่ยนร้านและสาขา"
         value={context.key}
         onChange={(event) => selectContext(event.target.value)}
       >

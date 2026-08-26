@@ -1,6 +1,6 @@
 # Design System
 
-Status: **CANONICAL VISUAL/UI DIRECTION (BUSINESS-FIRST REBASE)**  
+Status: **CANONICAL VISUAL/UI DIRECTION (BUSINESS UI REFINEMENT 2026-08-26)**
 Owner: Product Design
 
 ## Context direction
@@ -9,13 +9,47 @@ Meawketting is warm, modern, and trustworthy. Visual treatment adapts to operati
 
 | Context | Direction |
 |---|---|
-| Business Operations (Main) | **WARM OPERATIONAL CLARITY** — Warm Golden Yellow primary operational brand color, accessible dark ink text (`#281417`), warm cream surfaces, clear information hierarchy |
-| Public / Business Landing (`/`) | **WARM OPERATIONAL CLARITY** applied to a commercial page: direct first-viewport value, product-inspired preview, restrained service lists, one dark trust band, and a secondary Guardian bridge |
-| Consumer records (Preserved) | Calm warm neutral, rounded paper/sticker language, clear sections, restrained pastel accents |
+| Business Operations (Main) | **WARM OPERATIONAL CLARITY** — LINE Seed Sans TH, Warm White, Pastel Yellow action color, refined curvature, calm motion and clear information hierarchy |
+| Public / Business Landing (`/`) | The same Business visual foundation applied to a commercial page: floating glass Header, direct first-viewport value, product-inspired preview, selective Bento/card composition, real product navigation and a rounded public Footer |
+| Guardian LINE Mini App (Target / Paused) | **MINIMAL LINE MINI APP** — minimal, fast, lightweight, mobile-first, familiar inside LINE, low text, low friction, large clear actions, simple Pet profiles, and no marketing-heavy UI |
+| Consumer web prototype (Current / Frozen) | Existing standalone web visual system remains retained for prototype continuity; no Consumer redesign is authorized now |
 | Consent / Lost / High-risk | Direct copy, high contrast, restrained color and motion |
 | Platform Admin | Neutral, evidence/reason/audit-first dense surfaces |
 
 Business surfaces must feel readable, calm, efficient, warm, fluid, modern, and human—never a cold grey corporate dashboard or a playful toy.
+
+## Scope, source and exclusions
+
+- `workfiledesign/htmlpack/index.html` and `workfiledesign/htmlpack/design-system.css` are the **visual source of truth for Business and Business-first public surfaces** from this rebase onward.
+- They are reference inputs, not runtime dependencies. Extract and map their tokens and patterns into the existing semantic token and shared-component architecture; do not copy either file wholesale.
+- `/workfiledesign` remains read-only and untouched.
+- This rebase is scoped to Business and Business-first public surfaces. **CONSUMER VISUAL REDESIGN: PAUSED UNTIL PRODUCT OWNER REOPENS.** The current Consumer web prototype remains unchanged. The future Guardian direction is a separate LINE Mini App phase, not an implementation task in this rebase.
+- Business supports **Light / Warm White only**. Do not implement `[data-theme='dark']`, `[data-portal-theme='dark']`, dark Business tokens, a theme toggle or a dark portal mode.
+- Emoji and Dingbat glyphs are not UI icons. Use the existing Lucide wrapper and accessible labels; decorative artwork uses SVG, illustration or image assets.
+- AI Rainbow, AI Gradient and AI Progress may be retained only as **RESERVED / EXPERIMENTAL / UNUSED** reference concepts. They are not rendered by active Business Product surfaces, and the reference AI Marketing/Agency copy is not Product content.
+
+## Typography ownership
+
+| Context | Font status |
+|---|---|
+| **Business / public Business** | **LINE Seed Sans TH** from official local WOFF2 webfonts; actual faces 400 / 700 |
+| **Consumer / Guardian** | **Unchanged / paused** — current Noto Sans Thai and bounded Sriracha rules remain outside this Business font replacement |
+
+- Business webfonts live in `public/fonts/line-seed-th/` and are loaded with `@font-face` plus `font-display: swap`.
+- Source files come from the official LINE Seed Sans TH package at [seed.line.me](https://seed.line.me/index_th.html); the downloaded package is not a runtime dependency and no `/workfiledesign` source was modified.
+- The selected production faces map to Regular 400 and Bold 700. Business UI never requests or computes a weight above 700; semantic 500/600 roles remain available through the token layer and `font-synthesis: none` prevents synthetic heavier faces.
+- FC Minimal and Anuphan are no longer part of Business font loading. They remain only as historical documentation where older directions are explicitly marked superseded.
+
+## Guardian visual direction (Target / Future / Paused)
+
+The future Guardian experience should feel like a **minimal LINE Mini App**, not a smaller Business dashboard and not a marketing-heavy standalone site:
+
+- Keep the interaction mobile-first, fast, lightweight, familiar inside LINE, and low-text.
+- Prefer large clear actions, low friction, simple Pet profiles, and concise Pet Passport surfaces.
+- Keep Guardian interaction/UI simpler than Business while allowing both contexts to use the Master Brand.
+- Business Design System tokens and operational navigation remain separate; this direction does not authorize Consumer restyling or detailed Mini App navigation.
+- [petjod.com](https://petjod.com/) is UX/reference inspiration only. Do not copy its branding, copywriting, assets, or layout 1:1.
+- LINE is an entry/authentication channel, not Pet ownership authority. LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking are not implemented.
 
 ## Token architecture
 
@@ -25,56 +59,127 @@ Primitive value → Semantic token → Component styling
 
 - Components use semantic tokens, not raw hex values.
 - Implemented tokens live in `@theme static` in `app/globals.css`.
-- One semantic App Background spans the platform (`--color-meaw-app-background: var(--color-meaw-cream-100)`).
+- Business/public tokens are scoped so they do not visually migrate Consumer surfaces. The current Consumer web prototype retains its current semantic canvas and type rules; the future LINE Mini App system is not yet defined.
 - Gradients and motifs are decorative tokens, never status or operational meaning.
+- Prefer one canonical Business token implementation; do not keep the prior Business palette active in parallel.
 
 ### Color palette & semantic roles
 
-| Role | Token / Value | Direction |
-|---|---|---|
-| App background | `--color-meaw-cream-100` (`#fff8ef`) | Cream / warm neutral platform base |
-| Surface | `var(--surface)` (`#ffffff`) | Primary white card/sheet surface |
-| Text primary | `var(--color-meaw-ink-950)` (`#281417`) | Deep dark ink text for maximum readability |
-| Text soft / muted | `var(--ink-soft)` / `var(--ink-muted)` | Supporting and metadata copy |
-| **Business Primary / Action** | `--color-meaw-business-primary` / `--color-meaw-business-action` (`#f2bc26`), hover `#e0a30b` | **Warm Golden Yellow** with `#281417` dark ink text |
-| Ready / Success | `--color-meaw-mint-900` / `100` | Mint cue with explicit text/icon |
-| Information | `--color-meaw-sky-900` / `100` | Sky cue with explicit text/icon |
-| Waiting / Pending | `--color-meaw-cream-900` / `200` (or `--color-meaw-peach-600`) | Amber/Orange cue, visually distinct from Golden Yellow |
-| Error / Cancelled | `--color-meaw-rose-800` / `rose-50` | Red/Rose cue with explicit wording |
+| Role | Canonical value | Direction |
+|---|---:|---|
+| Business background | `#FFFDF9` | Warm White page canvas |
+| Business foreground | `#2B2B2B` | Primary text |
+| Card / popover | `#FFFFFF` | Primary raised surface |
+| Border / input | `#ECE8DF` | Warm low-contrast structure |
+| Muted surface | `#F4F4F5` | Restrained supporting surface |
+| Muted foreground | `#707070` | Supporting copy after contrast validation |
+| **Business primary / action** | `#F4C95D` | Pastel Yellow brand and action |
+| Primary hover / focus ring | `#D7B152` | Interaction and visible focus |
+| Primary foreground | `#3D2B00` | Accessible dark text on Yellow |
+| Soft Yellow | `#FFD86B` | Selected/soft emphasis, not status |
+| Accent background | `#FFF7EB` | Warm section/sidebar/accent surface |
+| Accent foreground | `#4D3700` | Text on warm accent surfaces |
+
+### Semantic status palette
+
+| Status | Foreground | Soft surface | Dot / supporting cue |
+|---|---:|---:|---:|
+| Success / Good | `#4F7D51` | `#EBF6EC` | `#7BC47F` |
+| Warning | `#936F28` | `#FEF5E3` | `#F5B942` |
+| Critical / Destructive | `#AC5B53` | `#FDECEA` | `#EF7F73` |
+| Information | `#507893` | `#ECF5FB` | `#7DBBE6` |
+
+### Feature accent palette
+
+| Accent | Base | Soft | Current meaning |
+|---|---:|---:|---|
+| Coral | `#FF9B85` | `#FFE8E2` | Grooming |
+| Mint | `#5FCFA8` | `#DCF7EC` | Daycare |
+| Sky | `#6FB1E0` | `#E0EEFA` | Hotel / Boarding |
+| Grape | `#B79BDB` | `#EDE6FA` | Future/special classification where approved |
 
 ### Color distinction rule
 
-- **Warm Golden Yellow (`yellow-400` / `yellow-500`)** represents **Brand & Action** (buttons, active navigation items, scanner frames, active highlights).
-- **Amber / Orange (`cream-900` / `peach-600`)** is strictly reserved for **Waiting / Pending** operational states.
-- **Mint (`mint-900`)** is strictly reserved for **Ready / Success / Arrived** states.
+- **Pastel Yellow (`#F4C95D`)** represents **Brand & Action**: primary buttons, active navigation, selected controls, scanner frames and focus/key highlights.
+- Status uses the semantic Success, Warning, Critical and Information palette above. Brand Yellow and feature accents never substitute for status.
+- Feature color classifies a service; it does not communicate progress, availability, approval or risk.
+
+### Service visual identity
+
+Service identity is a secondary classification system and never replaces status:
+
+| Service | Icon | Surface family | Meaning |
+|---|---|---|---|
+| Grooming / อาบน้ำตัดขน | Scissors | Soft Coral | Appointment-oriented service work |
+| Hotel | Bed | Soft sky | Date-range stay work |
+| Daycare | Paw | Soft mint | Day-based care work |
+
+- Every service cue uses **icon + visible label + restrained tint**. Color alone is insufficient.
+- Pastel Yellow remains reserved for primary actions, active selection, and focus/key highlights.
+- Status retains its own text/icon semantic treatment; a mint Daycare surface does not mean success and a Coral Grooming surface does not mean warning.
 
 ## Typography
 
-Noto Sans Thai is the active product typeface across all operational and consumer surfaces. Sriracha is limited to short decorative consumer accents and is strictly prohibited in operational content.
+**LINE Seed Sans TH** is the primary Thai/Latin UI typeface for Business and Business-first public surfaces. The current Consumer web prototype retains its existing Noto Sans Thai visual system; Sriracha remains limited to short decorative Consumer accents and is prohibited in operational content. Future LINE Mini App typography is intentionally undecided until that phase. JetBrains Mono is reserved for justified technical/code presentation only.
 
 | Role | Size / Line-height | Typical weight |
 |---|---|---:|
-| Display | 40–64 / 1.06 | 800 |
-| H1 | 32–44 / 1.10 | 800 |
-| H2 | 28–32 / 1.16 | 800 |
-| H3 | 24 / 1.24 | 800 |
-| H4 | 20 / 1.30 | 800 |
-| Body large | 18 / 1.75 | 500–700 |
-| Operational body / input / button / label | **16 minimum** | 500–800 |
-| Metadata / caption / mobile nav | **14** | 600–800 |
-| Micro | 12 / 1.40 | 700–800; exceptional support text only |
+| Display | 48px | 700 |
+| H1 | 36px | 700 |
+| H2 | 30px | 600 |
+| H3 | 24px | 600 |
+| H4 | 20px | 600 |
+| Large | 18px | 500 |
+| Body | 14px | 400 |
+| Small | 12px | 400–500 |
+| Caption | 12px | 500 |
+| Micro / Tag | 10px | 600; exceptional compact tag only |
 
 - Persistent labels; placeholders never replace labels.
+- Business operational page titles normally use the H3/H2 range (24–30px); Display/H1 scale is not forced into dense app workflows.
+- Business content defaults to 14px with a 1.55 line-height. Mobile form controls remain at least 16px to avoid input zoom; important working information never drops to Caption or Micro.
+- No Business component uses a weight above 700. Use 400 for body, 600 for controls/labels and 700 only for the strongest heading or value in a group.
+- Numeric operational columns, amounts, times and counts use tabular numerals.
+- Do not bold label, value, helper and status at the same time; weight establishes one reading priority per block.
 - Thai text wrapping, mixed Thai/Latin terms, and 200% text zoom must not clip text or touch targets.
 
 ## Spacing, shape and surface hierarchy
 
 - 4px spacing base: `0, 4, 8, 12, 16, 20, 24, 32, 48, 64, 80`.
-- Page gutters: 16px mobile, 24px tablet, 32px desktop. The public landing shell is capped at approximately 1200px at the 1440px QA baseline; product preview art may expand independently only when needed.
+- Page gutters: 16px mobile, 24px tablet, 32px desktop. Public marketing, floating Header and rounded Footer use a centered shell capped at approximately 1280px; product preview art may expand independently only when needed.
 - Touch target: minimum 44×44px; primary CTAs 48–56px.
-- Business operational controls use moderate radius; large 24–32px radii are reserved for a small number of major marketing compositions, never repeated across every content block.
-- Prefer borders and subtle surface tinting over heavy box shadows in operational surfaces.
+- Base curvature is approximately 20px, applied through hierarchy: buttons 8–12px, inputs/selects 8px, cards 17–20px and large marketing/footer/banner surfaces 20–28px.
+- Pills are reserved for badges, segmented tabs, filters and explicitly compact semantic CTAs; normal Business buttons do not become pills.
+- Prefer warm thin borders, subtle surface tinting and restrained shadows over heavy elevation in operational surfaces. Glass is reserved for suitable shell/public surfaces and must keep text contrast.
+- Cards may lift subtly on capable pointing devices, but touch users receive an equally clear pressed/selected state and no action depends on hover.
 - The homepage avoids a feature-card wall: Services and Business Core use divided lists; Yellow is reserved for actions and anchors rather than section-wide repetition.
+
+## Business content density
+
+- **One idea = one label.** An operational page normally has one H1, optional short context, and its primary action before work begins.
+- Operational UI avoids marketing-style hierarchy. Eyebrow, title, subtitle, section title and helper must not repeat the same idea.
+- Helper copy is exception-based: use it for a consequential rule, availability, conflict, permission, recovery or constraint—not to restate a field label.
+- Use progressive disclosure for detail. Customer rows show the relationship, Pets, next Booking and lightweight status; access/source/expiry detail belongs in the relevant Customer/Pet detail.
+- Prefer lists before tables when relational information reads better as rows. Use the surface that matches the information: schedule, agenda, row, timeline, status strip, grouped fields or compact stat.
+- Chips are reserved for status, filter and tag. Names, phone numbers, services and long Passport sentences remain normal text.
+- Demo context appears once in the Business shell/page context rather than being repeated on records.
+- Avoid card-inside-card composition. A card exists only when a real boundary is needed.
+
+## Business navigation architecture
+
+- Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, and `ข้อความ`; the Inbox uses the same unread source as Home and mobile navigation.
+- The Sidebar shows `งานบริการ · ยังไม่เปิดใช้` for services enabled by the active Branch, followed by `การเงิน`, `รายงาน`, `ทีม`, and `ตั้งค่า` under `ยังไม่เปิดใช้`.
+- Planned rows are native disabled buttons with `aria-disabled`, reduced emphasis, and no `href` or fake route. Mobile More mirrors the live Customers link and the same Branch-enabled service/management groups.
+
+## Operational focal points and schedules
+
+- Business Home begins with a three-variant 16:9 Spotlight using local Business imagery. It advances every six seconds, pauses while hovered or focused, stops under reduced-motion, and always exposes 44px previous/next arrow controls.
+- On desktop the Spotlight is the left focal column and add Booking / scan intake / find Customer form a dedicated right-hand action rail. Tablet/mobile stacks the same content without changing task order.
+- Calendar uses service-tinted schedule surfaces instead of border color alone. Grooming appointments are time-positioned blocks; Hotel stays are continuous bars with distinct start, continuation, and end edges; Daycare uses the day-based service treatment.
+- A Hotel stay label appears once per visible week segment, not once per day column. The domain keeps an exclusive check-out date even though the visual bar communicates the complete arrival-to-check-out span.
+- Calendar weeks begin on Sunday. Both Hotel edges and both appointment time edges can shrink or extend; touch uses a deliberate long-press drag while pointer users can move, Alt-drag to duplicate, or copy/paste the focused Booking with Ctrl/Cmd+C and Ctrl/Cmd+V.
+- Calendar view/range choices are browser-local preferences (cookie), never database state. Interaction guidance and shortcut keys are a quiet legend after the schedule; transient success feedback must not insert content above the grid or shift its position.
+- Calendar density is limited to Pet, service, time/date, and critical status. Customer, Branch, notes, and resources belong in selection/detail UI.
 
 ## Business landing imagery
 
@@ -83,24 +188,106 @@ Noto Sans Thai is the active product typeface across all operational and consume
 - CI artwork remains a product/brand asset outside the public landing scope; `/workfiledesign` remains read-only and outside implementation scope.
 - Product imagery must remain a labeled demo preview and must not imply live customer data. Photo assets are editorial mood/supporting visuals, not live customer data.
 
+## Public Header and Footer
+
+- The public Business Header is fixed near the top and centered in the approximately 1280px shell. It uses a translucent Warm White glass surface, subtle blur, thin warm border, soft shadow and rounded container.
+- It contains the real Meawketting brand, compact navigation to implemented anchors/routes and one primary Business CTA. It contains no theme toggle, Design System badge, Emoji or dead/planned link.
+- The logged-in Business Header inherits Warm White, brand Yellow, refined radius and subtle interaction while remaining compact. Active Business/Branch context, Branch switcher, Scanner action, User Menu and mobile navigation preserve the current operational architecture; the top-right icon controls share a 44px alignment grid and opening the account menu does not blur the work behind it.
+- The public Footer is a centered, rounded Warm White/white surface with a thin warm border, controlled spacing, optional SVG/art decoration and only real destinations/actions. Privacy, Terms, Pricing and Support are not invented as links.
+- Marketing Footer rendering is restricted to public/marketing surfaces. It is absent from `/business/home`, `/business/calendar`, `/business/customers`, `/business/inbox`, `/business/scan`, `/business/intake/*` and every other logged-in operational route.
+
+## Cards and Bento
+
+- Cards use Warm White/white surfaces, a thin warm border, restrained shadow and an optional subtle hover lift. Feature icon surfaces may use Coral, Mint, Sky or Grape soft accents without turning classification into status.
+- Bento composition is appropriate for Home summaries, feature overviews and the public Business Landing. Calendar, Customers, Inbox, Scanner, Intake and forms retain the workflow-first schedule/row/conversation/action structure.
+- Do not card everything, nest cards without a real boundary or convert normal metadata into pills.
+
 ## Business buttons
 
-- **Primary Business Action (`.button--business`)**: Warm Golden Yellow background, `#281417` dark ink text, bold weight, subtle border.
-- **Secondary Ghost Action (`.button--business-ghost`)**: Surface background, Golden Yellow border, `#281417` text.
-- **Destructive Action**: Separated, explicit red border/text only where consequence warrants it.
+- Shared variants are **Primary, Secondary, Outline, Destructive, Ghost and Link**; reuse/refactor existing primitives before creating a new one.
+- **Primary** uses `#F4C95D` with `#3D2B00`, a subtle shadow and a strong visible focus ring. Hover uses `#D7B152` plus `translateY(-1px)`; pressed returns to `translateY(0)` with `scale(0.98)`.
+- Disabled buttons have reduced opacity, no pointer interaction and no hover/pressed transform. Icon-only controls have an accessible name and major controls preserve a 44px target.
+- **Secondary / Outline / Ghost / Link** maintain a calm hierarchy and never compete with the page's primary action. **Destructive** uses the Critical palette only where consequence warrants it.
+- The Light Sweep treatment is selective: it may support an important marketing CTA or exceptional high-value CTA when readability remains intact. Calendar Save, Add Customer and Send Message remain calm and immediate.
+- AI Rainbow buttons are reserved/experimental and are not active Product buttons.
+
+## Forms and controls
+
+- Input, textarea, search, select, checkbox and switch share the 8px input curvature, `#ECE8DF` border, Warm White surface, clear hover and a strong Yellow semantic focus ring.
+- Invalid fields use Critical border/text plus explicit wording; focus and error may coexist without hiding either state. Labels remain visible and placeholders never replace them.
+- Business forms remain low-text. Helper copy exists only for a rule, conflict, permission or consequence, and fields are not individually wrapped in decorative cards.
+- Mobile form text is at least 16px. Checkbox/switch labels remain tappable, and custom select/search controls preserve keyboard and assistive-technology behavior.
+
+## Badges, dots and micro tags
+
+- Shared badge roles are Default, Secondary, Outline, Destructive, Good, Warning, Critical and Info.
+- Status uses visible text plus icon or dot plus semantic color; it is never color-only. Micro/Tag 10px is allowed only for compact, non-critical tagging.
+- Badges are reserved for status, filter, tag and small category. Important operational data and ordinary metadata remain readable text.
+
+## Data tables
+
+- Tables use LINE Seed Sans TH, tabular numerals where needed, warm borders, restrained headers, readable row spacing and a clear hover/focus treatment.
+- Use tables only for genuinely tabular Billing, Reports, Team, inventory-like or financial data. Customers & Pets remains a scan-friendly row hierarchy rather than an awkward CRM spreadsheet.
+- Every responsive table has an explicit mobile strategy: priority-column reduction, stacked labeled rows or controlled horizontal scrolling with the primary action/identity retained.
+
+## Modal, alert, toast and feedback surfaces
+
+- Task dialogs use a restrained overlay with backdrop blur, rounded Warm White surface, clear action hierarchy and a subtle scale/translate entry using premium easing. Mobile may use a focus-managed bottom sheet. The compact Header account popover is the exception: its click-away layer is transparent and never blurs the page.
+- Dialog focus is trapped and restored; Escape/close behavior is predictable; destructive confirmation clearly names the consequence.
+- Success, Warning, Critical and Information alerts use the semantic palettes with a Lucide icon and text. Toasts use safe-area-aware placement and restrained slide/fade motion; trivial actions do not create decorative noise.
+- Empty states explain what happened and offer a real next action when one exists. No Emoji is used as empty/alert art.
+
+## Motion and loading
+
+- Canonical easing is `--ease-premium: cubic-bezier(0.22, 1, 0.36, 1)`. Typical interactive duration is 180–300ms.
+- Approved patterns include button hover/press, subtle card lift, modal fade/scale, toast slide/fade, accordion/tabs, normal progress and structural skeleton shimmer.
+- Calendar, Booking, Customer records, Scanner and Intake remain responsive and restrained. Bounce, wobble and confetti are not used.
+- Shared skeletons match content structure: Customer rows, Calendar, Home metrics and Inbox list. Prefer structural skeletons over a giant generic spinner.
+- Normal progress uses Brand/Semantic colors. AI Rainbow progress remains reserved/unused.
+- `prefers-reduced-motion: reduce` removes non-essential animation, shimmer travel and transforms without hiding state or feedback.
+
+## Customers & Pets (BF-3) visual language
+
+- The Customer list is a fast operational row list on desktop and a stacked readable row on mobile. It is not a spreadsheet table, a consumer Passport gallery or a card wall.
+- Desktop/tablet rows keep stable identity, Pet, next-Booking and activity columns with short visible labels; long authority/access explanations move to detail disclosure instead of stretching the list.
+- List filters describe actionable relationship states only. Passport connection/non-connection filters are intentionally absent; Passport status remains record context, not a primary browse mode.
+- Yellow remains for primary actions, selected filters, and navigation. Customer rows remain white/warm-neutral with borders and concise hierarchy.
+- Customer rows use name/contact, plain Pet lines, next Booking and optional tags. Pet names, phone numbers and services are not chips.
+- Customer initials and neutral Cat/Dog placeholders establish scan anchors. A real Pet photo may replace the placeholder only when the Business is allowed to use it; Consumer Passport cards are never reused as Business list rows.
+- The list carries only a compact Passport connection state. Source, expiry, allowed-data and no-additional-access detail is disclosed inside Customer/Pet detail when relevant.
+- Connection/access states use visible text and an icon, not color alone. A connected state never implies permanent access.
+- `ข้อมูลที่ลูกค้าแจ้ง`, `ข้อมูลของร้าน`, and `ข้อมูลจาก Pet Passport` are reserved source labels where a boundary matters. Business notes and lightweight tags remain visually separate from Guardian-controlled information.
+- At 390px the order is search → filters → results for the list, and identity → contact actions → Pets → upcoming/recent Bookings → notes/tags for detail. The detail overview explains the relationship once, then divides contact, Pet care, Booking history and Business notes into clear sections. Dialogs become bottom sheets while retaining focus trap and restoration.
+
+## Inbox & communication (BF-4) visual language
+
+- The Inbox is a row list plus message timeline, not a card wall or a generic messenger clone. Desktop uses a readable split view; 320–430px uses list → full conversation task.
+- Rows prioritize Customer/Pet identity, current service, latest message, time, and an accessible unread marker. Search has one visible boundary and the three honest filters (`ทั้งหมด`, `ยังไม่ได้อ่าน`, `กำลังใช้บริการ`) use compact 14px labels.
+- Customer messages use neutral/white surfaces. Business messages use a restrained warm surface; Pastel Yellow is reserved for active navigation, selected rows/filters, focus, and send/request actions rather than every bubble.
+- Consecutive messages group by sender/time. Moderate-radius bubbles, separators, plain timestamps, and explicit local delivery copy keep the interface operational rather than playful.
+- Structured requests are distinct semantic blocks with service, demo amount, added time, visible status, and Guardian-response boundary. Status never relies on color alone.
+- The composer and quick replies retain 44px targets, a persistent label for assistive technology, safe-area spacing, and no document-level horizontal overflow. Mobile focus moves to the selected conversation heading.
+- Quick replies show three defaults, omit decorative numbering, and use a dashed circular add control. Staff can collapse the section; that choice is stored in a browser cookie and can be restored without a database write.
 
 ## Responsive architecture
 
 | Viewport | Range | Behavior |
 |---|---|---|
-| Mobile | 320–767px | Landing copy and full-width CTAs first, product preview below, stacked service/core/flow sections; Business App keeps bottom navigation and sheet tasks |
+| Mobile | 320–767px | Landing copy and full-width CTAs first, product preview below, stacked service/core/flow sections; Business App keeps bottom navigation and sheet tasks; Calendar defaults to Agenda instead of compressing a seven-day grid |
 | Tablet | 768–1023px | Landing uses a wide single-column Hero until the preview has enough room; Business App uses adaptive grids |
-| Desktop | 1024px+ | Balanced two-column Landing Hero within the 1200px shell; Business App keeps its persistent navigation and multi-column calendar |
+| Desktop | 1024px+ | Balanced Landing Hero within the approximately 1280px marketing shell; Business App keeps persistent navigation and may use workflow-appropriate width for Calendar/boards |
+
+- Required QA widths are 320, 375, 390, 430, 768, 1024, 1200 and 1440px. The final acceptance sweep records at least 390, 768, 1200 and 1440px.
+- Desktop hover enhancement always has a usable focus, pressed and touch equivalent. No mobile path depends on hover.
+- The public shell may cap around 1280px; operational Calendar/board workflows are not artificially constrained when wider space materially improves planning.
+- The responsive rules above describe current Business/public surfaces. The future LINE Mini App is mobile-first by direction, but its detailed navigation and component specification are deferred to the Consumer LINE Mini App phase.
 
 ## Accessibility
 
 - Normal text contrast >= 4.5:1; large text >= 3:1.
-- Visible focus rings use the high-contrast semantic focus treatment; Yellow buttons retain dark ink foreground.
-- One semantic H1 per page; modal focus trap and restore.
-- Status and validation are never conveyed by color alone.
-- `prefers-reduced-motion: reduce` disables non-essential animations.
+- Visible focus rings use the high-contrast semantic Yellow ring; Yellow buttons retain `#3D2B00` foreground.
+- One semantic H1 per page; semantic HTML, keyboard navigation, dialog focus trap/restore and ARIA are required where native semantics are insufficient.
+- Major controls retain at least 44×44px targets; icon-only controls have screen-reader labels; mobile form controls remain at least 16px.
+- Status and validation are never conveyed by color alone; Light Sweep and glass never reduce text readability.
+- Thai wrapping and 200% text zoom must not clip content or controls.
+- `prefers-reduced-motion: reduce` disables non-essential animations while preserving understandable state transitions.

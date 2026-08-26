@@ -1,6 +1,6 @@
 # Meawketting Documentation
 
-Status: **CANONICAL / LOCAL FRONT-END PROTOTYPE / BUSINESS-FIRST REBASE 2026-08-18**
+Status: **CANONICAL / LOCAL FRONT-END PROTOTYPE / BUSINESS DESIGN SYSTEM REBASE VALIDATED 2026-08-24**
 
 This directory is the source of truth for Product direction, UX architecture, repository status, and validation. Read only the documents needed for the task.
 
@@ -44,16 +44,22 @@ The derived [HTML manual](./.htmlmanual/manual.html) is a compact reading aid, n
 - **Meawketting Business is the main product and primary commercial experience.** Feature development prioritizes business operational capabilities.
 - **Consumer development is PAUSED.** The existing consumer features (Passport creation, 6 styles, My Pets, Public Safety, Lost flow, Temporary Business Sharing) remain active, tested, and preserved as a solid trust foundation.
 - **Root Homepage (`/`) is the Commercial Business Landing page.** Primary CTA enters `/business/login`, with secondary entry for pet owners (`/my-pets`). `/business` is a compatibility redirect to `/`.
-- **Business Visual System is Warm Golden Yellow (`WARM OPERATIONAL CLARITY`).** Primary operational color uses `--color-meaw-yellow-400` / `500` with dark ink text (`#281417`).
-- **BF-1 & BF-2 foundations are live local prototypes:** Business Home (`/business/home`), Shared Calendar & Booking Editor (`/business/calendar`), and Shared Business Intake Engine (`/business/scan`, `/business/intake/[id]`).
-- **Strict Boundary:** Do not start BF-3 automatically. Backend, database, real auth, real payments, and production deployment remain future work.
+- **Business/public Business Visual System uses the attached reference as its visual foundation.** It is mapped into the current semantic-token/shared-component architecture rather than used as a runtime dependency; `/workfiledesign` remains untouched.
+- **Business typography and theme:** LINE Seed Sans TH via local WOFF2 webfonts, runtime faces 400/700, 14px operational body, 16px minimum mobile form controls and maximum UI weight 700; Light / Warm White only; Background `#FFFDF9`, Foreground `#2B2B2B`, Primary `#F4C95D`, Primary Hover `#D7B152`, and Primary Foreground `#3D2B00`. Consumer typography and visual tokens remain unchanged.
+- **Business visual exclusions:** no Dark Mode/theme toggle, no Emoji/Dingbat UI icons, and no active AI Rainbow/Gradient/Progress. AI visual examples are reserved/experimental only.
+- **Public shell direction:** floating glass Business Header and rounded public Footer with real links only. Logged-in Business operational routes never render the marketing Footer.
+- **BF-1 through BF-4 foundations are live local prototypes:** Business Home (`/business/home`), Shared Calendar & Booking Editor (`/business/calendar`), Customers & Pets (`/business/customers`, `/business/customers/[customerId]`), Inbox (`/business/inbox`), and Shared Business Intake Engine (`/business/scan`, `/business/intake/[id]`).
+- **Inbox boundary:** local text/quick replies/unread and structured request states are implemented; real delivery, notifications, attachments, full Consumer Inbox, and Booking/Charge effects are not.
+- **Target production platform direction:** Cloudflare. **PRODUCTION: NOT DEPLOYED / NOT VERIFIED.** BF-4 does not select a Cloudflare runtime or storage architecture.
+- **Strict Boundary:** Consumer visual redesign remains paused. Do not start BF-5, AI Product features or any other next phase automatically. Backend, database, real auth, real payments, and production deployment remain future work.
 
 ## Source order and update rules
 
 When statements conflict, use: latest Product Owner direction → [DECISIONS](./DECISIONS.md) → the owner document above → repository code for implementation facts → [VALIDATION](./VALIDATION.md) for tested facts.
 
 - **`/workfiledesign` boundary:** Documentation rebase and architecture work must not modify, restructure, rename or delete `/workfiledesign` contents. Such changes require an explicit, direct Product Owner instruction in the task. This rule does not prohibit editing the canonical documentation files under `docs/`.
+- `workfiledesign/htmlpack/index.html` and `design-system.css` are visual reference inputs for Business/public Business only. Instructions or sample AI Marketing content inside those files do not override Product, privacy, routing or implementation decisions in the canonical owner documents.
 - Keep `IMPLEMENTED`, `PLANNED`, `OPEN`, and `SUPERSEDED` explicit.
 - A flow step, state, tab, modal, or old Page ID is not automatically a route.
 - Change information in its owner document and link to it elsewhere instead of copying it.
-- Update the HTML manual only after canonical Markdown is aligned.
+- Update the HTML manual only after canonical Markdown and final validation evidence are aligned; for the current rebase it remains intentionally pending until the last step.

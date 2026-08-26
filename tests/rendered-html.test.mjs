@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
 
 const appRoot = new URL("../app/", import.meta.url);
+const projectRoot = fileURLToPath(new URL("../", import.meta.url));
+const businessCssUrl = new URL("../app/business-design-system.css", import.meta.url);
 const manualUrl = new URL("../docs/.htmlmanual/manual.html", import.meta.url);
 const validationUrl = new URL("../docs/VALIDATION.md", import.meta.url);
+const architectureUrl = new URL("../docs/ARCHITECTURE.md", import.meta.url);
+const decisionsUrl = new URL("../docs/DECISIONS.md", import.meta.url);
 const businessImageRoot = new URL("../public/images/business/", import.meta.url);
 
 async function render(pathname = "/") {
@@ -65,10 +72,11 @@ test("renders the Index as the Business Operating Platform landing page", async 
   assert.doesNotMatch(hero, /href="\/create-passport"|สร้าง Pet Passport/);
 });
 
-test("keeps the Business-first homepage honest, linked, responsive, and Yellow-primary", async () => {
-  const [html, css, pageSource, headerSource, heroSource, coreSource, workflowSource, closingSource] = await Promise.all([
+test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Yellow-primary", async () => {
+  const [html, css, businessCss, pageSource, headerSource, heroSource, coreSource, workflowSource, closingSource] = await Promise.all([
     htmlFor("/"),
     readFile(new URL("globals.css", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
     readFile(new URL("page.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessHeader.tsx", appRoot), "utf8"),
     readFile(new URL("_components/business-landing/BusinessLandingHero.tsx", appRoot), "utf8"),
@@ -97,9 +105,11 @@ test("keeps the Business-first homepage honest, linked, responsive, and Yellow-p
   assert.match(headerSource, /href="\/business\/login"/);
   for (const id of ["business-core", "services", "guardian"]) assert.match(html, new RegExp(`id="${id}"`));
 
-  assert.match(css, /--color-meaw-business-primary:\s*var\(--color-meaw-yellow-400\)/);
-  assert.match(css, /--color-meaw-business-primary-foreground:\s*var\(--color-meaw-ink-950\)/);
-  assert.match(css, /\.business-portal \.button--business,[\s\S]*?background:\s*var\(--color-meaw-business-action\)[\s\S]*?color:\s*var\(--color-meaw-business-action-foreground\)/);
+  assert.match(css, /--color-meaw-business-primary:\s*#f4c95d/i);
+  assert.match(css, /--color-meaw-business-primary-foreground:\s*#3d2b00/i);
+  const businessPrimaryButton = businessCss.match(/\.button--business\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(businessPrimaryButton, /background:\s*var\(--primary\)/);
+  assert.match(businessPrimaryButton, /color:\s*var\(--primary-foreground\)/);
   assert.doesNotMatch(homepageCss, /teal/i);
   assert.match(homepageCss, /\.business-homepage\s*\{[\s\S]*?overflow-x:\s*clip/);
   assert.match(homepageCss, /grid-template-columns:\s*minmax\(0, \.98fr\) minmax\(0, 1\.02fr\)/);
@@ -122,7 +132,15 @@ test("keeps landing imagery photographic and compact at desktop", async () => {
   const assets = (await readdir(businessImageRoot)).sort();
   const landingSources = heroSource + servicesSource + hybridSource + workflowSource + closingSource;
 
-  assert.deepEqual(assets, ["pet-business-hero-photo.png", "pet-business-hero-wide.png", "pet-business-services-photo.png", "pet-business-workflow-photo.png"]);
+  assert.deepEqual(assets, [
+    "business-banner-care-lounge.png",
+    "business-banner-grooming.png",
+    "business-banner-hotel.png",
+    "pet-business-hero-photo.png",
+    "pet-business-hero-wide.png",
+    "pet-business-services-photo.png",
+    "pet-business-workflow-photo.png",
+  ]);
   assert.match(heroSource, /pet-business-hero-wide\.png/);
   assert.match(servicesSource, /pet-business-services-photo\.png/);
   assert.doesNotMatch(landingSources + css, /images\/cats|stickers|business-hero-scene|business-services-scene|cali-laptop-hero/);
@@ -793,11 +811,12 @@ test("keeps Business Login visually separate while reusing the Google behavior p
     readFile(new URL("_components/GoogleAuthButton.tsx", appRoot), "utf8"),
   ]);
 
-  assert.match(html, /เข้าสู่ระบบสำหรับร้าน/);
-  assert.match(html, /ดำเนินการต่อด้วยบัญชีของคุณ/);
+  assert.match(html, /พื้นที่ทำงานสำหรับร้านและทีมดูแลสัตว์/);
+  assert.match(html, /เข้าสู่ระบบ/);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
   assert.match(businessLogin, /requested\?\.startsWith\("\/business\/"\)/);
   assert.match(businessLogin, /: "\/business\/home"/);
-  assert.match(businessLogin, /บัญชีบุคคลเดียวสามารถเป็นทั้งผู้ดูแลสัตว์และสมาชิกของร้านได้/);
+  assert.doesNotMatch(businessLogin, /eyebrow|ดำเนินการต่อด้วยบัญชีของคุณ|บัญชีบุคคลเดียวสามารถเป็นทั้งผู้ดูแลสัตว์และสมาชิกของร้านได้/);
   assert.match(businessLogin, /<GoogleAuthButton/);
   assert.match(consumerLogin, /<GoogleAuthButton/);
   assert.match(googleButton, /ดำเนินการต่อด้วย Google/);
@@ -805,35 +824,62 @@ test("keeps Business Login visually separate while reusing the Google behavior p
 });
 
 test("renders Business Home as a priority-first local prototype with booking-derived work", async () => {
-  const [html, source, state] = await Promise.all([
+  const [html, source, spotlight, serviceVisual, state] = await Promise.all([
     htmlFor("/business/home"),
     readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
+    readFile(new URL("business/home/BusinessHomeSpotlight.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessServiceVisual.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
   ]);
 
-  assert.match(html, /Whisker Rest Demo/);
+  assert.match(html, /<h1[^>]*>หน้าหลัก<\/h1>/);
+  assert.match(html, /Whisker Rest/);
   assert.match(html, /สาขาอารีย์/);
   assert.match(html, /สิ่งที่ต้องจัดการ/);
   assert.match(html, /งานถัดไป/);
   assert.match(html, /อาบน้ำ \/ ตัดขน/);
   assert.match(html, /โรงแรม/);
   assert.match(html, /รายรับวันนี้/);
-  assert.match(html, /ข้อมูลตัวอย่าง/);
+  assert.doesNotMatch(html, /เริ่มจาก 3 เรื่องที่ต้องจัดการ|ภาพรวมงานสำคัญของร้าน|ข้อมูลตัวอย่าง/);
   assert.match(html, /href="\/business\/scan"/);
+  assert.match(html, /href="\/business\/calendar\?new=1"/);
+  assert.match(html, /href="\/business\/customers\?focus=search"/);
+  assert.match(html, /href="\/business\/inbox"/);
   assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
   assert.match(source, /getEnabledBusinessModules\(context\)/);
   assert.match(source, /enabledModules\.map/);
   assert.match(source, /listPrototypeBookings\(context/);
+  assert.match(source, /getPrototypeInboxUnreadCount\(context/);
+  assert.match(source, /\.\.\.demo\.attention/);
+  assert.doesNotMatch(state, /newMessages|ระบบข้อความยังไม่เปิดใช้/);
   assert.match(source, /bookingsToday/);
   assert.match(state, /"whisker-ari-frontdesk": \["grooming", "hotel"\]/);
   assert.match(state, /"whisker-thonglor-frontdesk": \["grooming"\]/);
   assert.match(state, /"paw-partner-onnut": \["hotel", "daycare"\]/);
-  assert.match(source, /DEMO \/ MOCK · ยังไม่มีระบบการเงินจริง/);
+  assert.match(source, /ยังไม่เชื่อมระบบการเงินจริง/);
+  assert.match(source, /BusinessHomeSpotlight/);
+  assert.match(source, /BusinessServiceIcon/);
+  assert.equal((spotlight.match(/\/images\/business\/business-banner-[^"']+\.png/g) ?? []).length, 3);
+  assert.match(spotlight, /business-banner-care-lounge\.png/);
+  assert.match(spotlight, /business-banner-grooming\.png/);
+  assert.match(spotlight, /business-banner-hotel\.png/);
+  assert.match(spotlight, /business-home-banner__arrow--previous/);
+  assert.match(spotlight, /business-home-banner__arrow--next/);
+  assert.match(spotlight, /BANNER_ROTATION_MS = 6_000/);
+  assert.match(spotlight, /window\.setInterval/);
+  assert.match(spotlight, /prefers-reduced-motion/);
+  assert.doesNotMatch(spotlight, /role="tablist"|aria-selected=/);
+  assert.doesNotMatch(spotlight, /วันนี้|ตารางงาน|หลายบริการ|ความไว้ใจ/);
+  assert.doesNotMatch(spotlight, /autoPlay|autoplay/);
+  assert.match(serviceVisual, /Scissors/);
+  assert.match(serviceVisual, /Bed/);
+  assert.match(serviceVisual, /PawPrint/);
+  assert.doesNotMatch(source, /business-demo-label|business-section-kicker|Whisker Rest Demo/);
   assert.doesNotMatch(state, /nextWork:\s*\[/);
 });
 
-test("builds one Branch-aware Business shell with a live Calendar and no fake module routes", async () => {
-  const [layout, frame, desktopNav, mobileNav, model, header, menu, state] = await Promise.all([
+test("builds one Branch-aware Business shell with live Calendar, Customers, and Inbox routes", async () => {
+  const [layout, frame, desktopNav, mobileNav, model, header, menu, documentLink, state] = await Promise.all([
     readFile(new URL("business/layout.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessPortalFrame.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
@@ -841,6 +887,7 @@ test("builds one Branch-aware Business shell with a live Calendar and no fake mo
     readFile(new URL("business/_components/businessNavigationModel.ts", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessHeader.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessUserMenu.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessDocumentLink.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
   ]);
 
@@ -852,12 +899,27 @@ test("builds one Branch-aware Business shell with a live Calendar and no fake mo
   assert.match(desktopNav, /href=\{destination\.href\}/);
   assert.match(mobileNav, /BUSINESS_CALENDAR_DESTINATION\.href/);
   assert.match(header + mobileNav, /href="\/business\/scan"/);
+  assert.match(documentLink, /return <a href=\{href\}/);
+  assert.doesNotMatch(desktopNav + mobileNav + header, /from "next\/link"/);
   assert.match(desktopNav + mobileNav, /aria-disabled="true"/);
   assert.match(desktopNav + mobileNav, /disabled/);
+  assert.match(desktopNav, /PlannedBusinessModule/);
+  assert.match(desktopNav, /BUSINESS_MANAGEMENT_DESTINATIONS/);
+  assert.match(mobileNav, /PlannedBusinessModule/);
+  assert.match(mobileNav, /BUSINESS_MANAGEMENT_DESTINATIONS/);
+  assert.match(desktopNav + mobileNav, /งานบริการ · ยังไม่เปิดใช้/);
+  assert.match(desktopNav + mobileNav, /ยังไม่เปิดใช้/);
+  assert.match(desktopNav + mobileNav, /disabled aria-disabled="true"/);
   assert.match(model, /BUSINESS_CALENDAR_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/calendar"/);
-  assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/(?:customers|inbox|grooming|hotel|daycare|finance|reports|team|settings)/);
-  for (const label of ["ปฏิทิน", "ลูกค้าและสัตว์เลี้ยง", "ข้อความ", "การเงิน", "รายงาน", "ทีม", "ตั้งค่า"]) {
+  assert.match(model, /BUSINESS_CUSTOMERS_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/customers"/);
+  assert.match(model, /BUSINESS_MESSAGES_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/inbox"/);
+  assert.match(mobileNav, /BUSINESS_CUSTOMERS_DESTINATION\.href/);
+  assert.match(mobileNav, /BUSINESS_MESSAGES_DESTINATION\.href/);
+  assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/(?:grooming|hotel|daycare|finance|reports|team|settings)/);
+  for (const label of ["ปฏิทิน", "ลูกค้าและสัตว์เลี้ยง", "ข้อความ", "อาบน้ำ / ตัดขน", "โรงแรม", "Daycare", "การเงิน", "รายงาน", "ทีม", "ตั้งค่า"]) {
     assert.match(model, new RegExp(label));
   }
   assert.match(desktopNav, /getEnabledBusinessModules\(context\)/);
@@ -876,8 +938,12 @@ test("keeps the five-item Business mobile navigation and accessible More sheet",
     assert.match(source, new RegExp(label));
   }
   assert.match(source, /BUSINESS_CALENDAR_DESTINATION/);
+  assert.match(source, /BUSINESS_CUSTOMERS_DESTINATION/);
+  assert.match(source, /BUSINESS_MESSAGES_DESTINATION/);
   assert.equal((source.match(/business-mobile-navigation__item(?!-)/g) ?? []).length, 5);
   assert.match(source, /<Link[\s\S]*?BUSINESS_CALENDAR_DESTINATION\.href/);
+  assert.match(source, /<Link[\s\S]*?BUSINESS_MESSAGES_DESTINATION\.href/);
+  assert.doesNotMatch(source, /is-disabled[\s\S]{0,180}ข้อความ/);
   assert.match(source, /role="dialog"/);
   assert.match(source, /aria-modal="true"/);
   assert.match(source, /event\.key === "Escape"/);
@@ -899,7 +965,7 @@ test("switches the shared Business and Branch context through one keyboard-usabl
   ]);
 
   assert.match(switcher, /<select/);
-  assert.match(switcher, /aria-label="เปลี่ยนร้านและสาขาตัวอย่าง"/);
+  assert.match(switcher, /aria-label="เปลี่ยนร้านและสาขา"/);
   assert.match(switcher, /DEMO_BUSINESS_CONTEXTS\.map/);
   assert.match(hook, /meawketting:business-state/);
   assert.match(hook, /writeActiveBusinessContext/);
@@ -911,12 +977,18 @@ test("switches the shared Business and Branch context through one keyboard-usabl
 });
 
 test("renders BF-2 Business Calendar as a live local planning route", async () => {
-  const [html, page, calendar, editor, state] = await Promise.all([
+  const [html, page, calendar, planningBoard, staySpan, dayTimeline, mutation, presentation, editor, state, agenda] = await Promise.all([
     htmlFor("/business/calendar"),
     readFile(new URL("business/calendar/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/calendar/BusinessCalendar.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/CalendarPlanningBoard.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/CalendarStaySpan.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/CalendarDayTimeline.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/bookingMutation.ts", appRoot), "utf8"),
+    readFile(new URL("business/calendar/calendarPresentation.ts", appRoot), "utf8"),
     readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/calendar/CalendarAgenda.tsx", appRoot), "utf8"),
   ]);
 
   assert.match(html, /<h1[^>]*>ปฏิทิน<\/h1>/);
@@ -924,17 +996,105 @@ test("renders BF-2 Business Calendar as a live local planning route", async () =
   assert.match(html, /เพิ่มการจอง/);
   assert.match(html, /Mochi/);
   assert.match(html, /เข้าพักโรงแรม/);
+  assert.equal((html.match(/class="calendar-stay-span(?:\s|")/g) ?? []).length, 2);
   assert.match(html, /href="\/business\/calendar"/);
   assert.match(page, /BusinessCalendar/);
-  assert.match(calendar, /CalendarWeekView/);
+  assert.match(page, /searchParams/);
+  assert.match(page, /launchRequest/);
+  assert.match(calendar, /CalendarPlanningBoard/);
+  assert.match(calendar, /CalendarDayTimeline/);
   assert.match(calendar, /CalendarAgenda/);
+  assert.match(calendar, /business-calendar__mobile-view/);
+  assert.match(calendar, /กดค้างแล้วลากบนจอสัมผัส/);
+  assert.match(calendar, /onPointerDragStart/);
+  assert.match(calendar, /CalendarView = "day" \| "week" \| "month" \| "custom"/);
+  assert.match(calendar, /CUSTOM_CALENDAR_RANGE_OPTIONS = \[28, 35, 42\]/);
   assert.match(calendar, /listPrototypeBookings/);
   assert.match(calendar, /includeCancelled: true/);
+  assert.match(agenda, /calendar-agenda__days/);
+  assert.match(agenda, /onDateChange/);
+  assert.match(planningBoard, /booking\.timeModel === "date-range"/);
+  assert.match(planningBoard, /booking\.timeModel !== "date-range"/);
+  assert.match(planningBoard, /CalendarStaySpan/);
+  assert.match(staySpan, /BusinessServiceIcon module="hotel"/);
+  assert.match(staySpan, /aria-label=/);
+  assert.match(staySpan, /columnEnd - columnStart === 1/);
+  assert.match(staySpan, /is-compact/);
+  assert.match(staySpan, /onResizeStart/);
+  assert.match(planningBoard, /"resize-end"/);
+  assert.match(dayTimeline, /SNAP_MINUTES = 30/);
+  assert.match(dayTimeline, /resize-start/);
+  assert.match(dayTimeline, /resize-end/);
+  assert.match(mutation, /appointmentDuration/);
+  assert.match(mutation, /calendarDayDistance/);
+  assert.match(presentation, /daysForCalendarMonth/);
+  assert.match(presentation, /daysForCustomRange/);
   assert.match(editor, /role="dialog"/);
   assert.match(editor, /aria-modal="true"/);
   assert.match(editor, /event\.key === "Escape"/);
   assert.match(editor, /event\.key !== "Tab"/);
+  assert.match(calendar, /evaluatePrototypeBookingAvailability\(draft, context\)/);
+  assert.match(calendar, /if \(!availability\.available\)[\s\S]*?setInteractionConflict[\s\S]*?return;[\s\S]*?savePrototypeBooking\(draft, context\)/);
+  assert.match(calendar, /เลือกวัน\/เวลาใหม่/);
+  assert.match(calendar, /เลือกตัวเลือกอื่น/);
+  assert.doesNotMatch(calendar, /Move failed/i);
   assert.match(state, /BOOKING_DEMO_DATE = "2026-08-18"/);
+});
+
+test("moves and resizes supported Calendar bookings through one pure mutation adapter", async () => {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-calendar-test-"));
+  const vite = await createServer({
+    root: projectRoot,
+    configFile: false,
+    cacheDir: cacheDirectory,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "silent",
+  });
+
+  try {
+    const mutation = await vite.ssrLoadModule("/app/business/calendar/bookingMutation.ts");
+    const state = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    const context = state.getDemoBusinessContext();
+    const fixtures = state.listPrototypeBookingFixtures(context, { includeCancelled: true });
+    const grooming = fixtures.find((booking) => booking.serviceModule === "grooming" && booking.status !== "cancelled");
+    const hotel = fixtures.find((booking) => booking.serviceModule === "hotel" && booking.pets.some((pet) => pet.name === "Luna"));
+    assert.ok(grooming);
+    assert.ok(hotel);
+
+    const movedAppointment = mutation.buildBookingMutationDraft(grooming, "move", { date: "2026-08-19", time: "13:00" });
+    assert.equal(movedAppointment.start, "2026-08-19T13:00");
+    assert.equal(movedAppointment.end, "2026-08-19T14:30");
+    assert.equal(state.evaluatePrototypeBookingAvailability(movedAppointment, context).available, true);
+
+    const resizedAppointment = mutation.buildBookingMutationDraft(grooming, "resize-end", { date: "2026-08-18", time: "12:30" });
+    assert.equal(resizedAppointment.start, "2026-08-18T10:30");
+    assert.equal(resizedAppointment.end, "2026-08-18T12:30");
+
+    const movedStay = mutation.buildBookingMutationDraft(hotel, "move", { date: "2026-08-24" });
+    assert.equal(movedStay.start, "2026-08-24");
+    assert.equal(movedStay.end, "2026-08-27");
+    const extendedStay = mutation.buildBookingMutationDraft(hotel, "resize-end", { date: "2026-08-22" });
+    assert.equal(extendedStay.end, "2026-08-23");
+    const shortenedStay = mutation.buildBookingMutationDraft(hotel, "resize-start", { date: "2026-08-20" });
+    assert.equal(shortenedStay.start, "2026-08-20");
+    assert.equal(shortenedStay.end, "2026-08-21");
+
+    const conflictCandidate = {
+      ...grooming,
+      bookingId: "calendar-conflict-candidate",
+      customer: hotel.customer,
+      pets: hotel.pets,
+    };
+    const conflictingMove = mutation.buildBookingMutationDraft(conflictCandidate, "move", { date: "2026-08-18", time: "10:30" });
+    const conflict = state.evaluatePrototypeBookingAvailability(conflictingMove, context);
+    assert.equal(conflict.available, false);
+    assert.equal(conflict.conflicts.some((item) => item.code === "resource-conflict"), true);
+    assert.equal(conflict.conflicts.every((item) => item.message !== "Move failed"), true);
+  } finally {
+    await vite.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+  }
 });
 
 test("keeps one shared Booking foundation for appointment, stay, and day work", async () => {
@@ -961,6 +1121,35 @@ test("keeps one shared Booking foundation for appointment, stay, and day work", 
   assert.match(hotel, /พื้นที่พักที่ต้องใช้/);
   assert.match(daycare, /วันที่ใช้บริการ/);
   assert.match(daycare, /โซนดูแล/);
+});
+
+test("uses one accessible service identity and keeps quick relationship creation inside Booking", async () => {
+  const [editor, serviceVisual, bookingItem, css] = await Promise.all([
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessServiceVisual.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingItem.tsx", appRoot), "utf8"),
+    readFile(new URL("globals.css", appRoot), "utf8"),
+  ]);
+
+  assert.match(editor, /booking-service-selector/);
+  assert.match(editor, /services\.map/);
+  assert.match(editor, /BusinessServiceIcon/);
+  assert.match(editor, /เพิ่มลูกค้าใหม่/);
+  assert.match(editor, /เพิ่มสัตว์เลี้ยง/);
+  assert.match(editor, /CustomerEditor/);
+  assert.match(editor, /PetRelationshipEditor/);
+  assert.match(editor, /inert=\{relationshipEditor \? true : undefined\}/);
+  assert.doesNotMatch(editor, /window\.location|href="\/business\/customers"/);
+  assert.match(serviceVisual, /grooming: Scissors/);
+  assert.match(serviceVisual, /hotel: BedDouble/);
+  assert.match(serviceVisual, /daycare: PawPrint/);
+  assert.match(bookingItem, /BusinessServiceIcon/);
+  assert.match(bookingItem, /booking\.service\.label/);
+  assert.match(bookingItem, /BookingStatusBadge/);
+  for (const serviceModule of ["grooming", "hotel", "daycare"]) {
+    assert.match(css, new RegExp(`--color-meaw-service-${serviceModule}-surface`));
+    assert.match(css, new RegExp(`business-service-icon--${serviceModule}`));
+  }
 });
 
 test("checks Branch services, resources, capacity, and duplicate confirmation before Booking save", async () => {
@@ -1006,21 +1195,387 @@ test("supports local Booking create, edit, cancellation history, and safe recove
   assert.match(editor, /ยกเลิกการจอง/);
   assert.match(editor, /ยืนยันยกเลิกการจอง/);
   assert.match(editor, /การจองนี้ยกเลิกแล้ว/);
-  assert.match(editor, /ต้นแบบนี้เริ่มจากการจอง 1 ตัวต่อครั้ง/);
+  assert.match(editor, /initialBooking \? "แก้ไขการจอง" : "เพิ่มการจอง"/);
+  assert.doesNotMatch(editor, /แก้ไขข้อมูลตัวอย่าง|เริ่มจากข้อมูลหลัก|บริการ ลูกค้า และน้อง|ต้นแบบนี้เริ่มจากการจอง 1 ตัวต่อครั้ง/);
   assert.match(css, /booking-editor__backdrop/);
   assert.match(css, /booking-editor-enter 220ms/);
   assert.match(css, /booking-editor-mobile-enter/);
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?booking-editor/);
 });
 
-test("adds only the shared Calendar route and keeps module operations absent", async () => {
+test("keeps shared Business Core routes live and module operations absent", async () => {
   const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
   const routePaths = routes
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
     .map((entry) => entry.parentPath.replaceAll("\\", "/"));
 
   assert.equal(routePaths.some((path) => /business\/calendar$/.test(path)), true);
-  assert.equal(routePaths.some((path) => /business\/(?:bookings|grooming|hotel|daycare|customers|inbox|finance|reports|team|settings)(?:\/|$)/.test(path)), false);
+  assert.equal(routePaths.some((path) => /business\/customers$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/customers\/\[customerId\]$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/inbox$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/(?:bookings|grooming|hotel|daycare|finance|reports|team|settings)(?:\/|$)/.test(path)), false);
+  assert.equal(routePaths.some((path) => /business\/pets(?:\/|$)/.test(path)), false);
+});
+
+test("renders a searchable Customers & Pets route for Business frontdesk work", async () => {
+  const [html, page, screen, avatars, state, desktopNav, mobileNav, css] = await Promise.all([
+    htmlFor("/business/customers"),
+    readFile(new URL("business/customers/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomersScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessIdentityAvatar.tsx", appRoot), "utf8"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("globals.css", appRoot), "utf8"),
+  ]);
+
+  assert.match(html, /<h1[^>]*>ลูกค้าและสัตว์เลี้ยง<\/h1>/);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+  assert.match(html, /ค้นหาชื่อลูกค้า ชื่อน้อง หรือเบอร์โทร/);
+  assert.match(html, /เพิ่มลูกค้า/);
+  assert.match(html, /Mochi/);
+  assert.match(html, /Luna/);
+  assert.match(html, /href="\/business\/customers\/booking-contact-nalin"/);
+  assert.match(html, /นัดถัดไป/);
+  assert.match(page, /CustomersScreen/);
+  assert.match(screen, /CUSTOMER_LIST_FILTERS/);
+  assert.match(screen, /matchesCustomerSearch/);
+  assert.match(screen, /customerMatchesFilter/);
+  assert.match(screen, /customer-list-item__identity/);
+  assert.match(screen, /customer-list-item__pets/);
+  assert.match(screen, /BusinessCustomerAvatar/);
+  assert.match(screen, /BusinessPetAvatar/);
+  assert.match(screen, /customer-results__heading/);
+  assert.match(screen, /customers\.filter\(\(customer\) => customerMatchesFilter\(customer, option\.value, bookings\)\)\.length/);
+  assert.doesNotMatch(screen, /customer-list__header|<table|<th/);
+  assert.match(screen, /CustomerEditor/);
+  assert.match(avatars, /aria-hidden="true"/);
+  assert.match(avatars, /role="img"/);
+  assert.match(avatars, /pet\.species === "cat" \? Cat : Dog/);
+  assert.match(state, /DEMO_CUSTOMER_FIXTURES/);
+  assert.match(state, /listPrototypeCustomers/);
+  assert.match(state, /phone: "081-555-0142"/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_CUSTOMERS_DESTINATION/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.customer-list-item \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 24px/);
+});
+
+test("renders stable Customer detail with Pets, Bookings, local notes, and Passport boundaries", async () => {
+  const [html, page, detail, badges, petEditor] = await Promise.all([
+    htmlFor("/business/customers/booking-contact-pim"),
+    readFile(new URL("business/customers/[customerId]/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerBadges.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/PetRelationshipEditor.tsx", appRoot), "utf8"),
+  ]);
+
+  assert.match(html, /<h1[^>]*>[\s\S]*?คุณพิม[\s\S]*?<\/h1>/);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+  assert.match(html, /ผู้ติดต่อหลัก/);
+  assert.match(html, /Luna/);
+  assert.match(html, /Tofu/);
+  assert.match(html, /หมายเหตุของร้าน/);
+  assert.match(html, /Passport และสิทธิ์เข้าถึง/);
+  assert.match(html, /การใช้บริการล่าสุด/);
+  assert.match(html, /href="\/business\/calendar\?customerId=booking-contact-pim"/);
+  assert.match(html, /href="\/business\/inbox\?customerId=booking-contact-pim"/);
+  assert.match(page, /CustomerDetailScreen/);
+  assert.match(detail, /ผู้ติดต่อหลักไม่เท่ากับ Guardian/);
+  assert.match(detail, /ข้อมูลจาก Pet Passport/);
+  assert.match(detail, /ข้อมูลของร้าน/);
+  assert.match(detail, /สิทธิ์ที่ร้านมีตอนนี้/);
+  assert.match(detail, /<details className="customer-authority-note">/);
+  assert.doesNotMatch(detail, /<details className="customer-authority-note"\s+open/);
+  assert.match(detail, /updatePrototypeCustomerTags/);
+  assert.match(detail, /PetRelationshipEditor/);
+  assert.match(badges, /ข้อมูลที่ลูกค้าแจ้ง|petDataSourceLabel/);
+  assert.match(petEditor, /addPrototypePetRelationship/);
+  assert.doesNotMatch(petEditor, /บังคับ.*Pet Passport|ต้องเชื่อม Pet Passport/);
+  assert.match(petEditor, /role="dialog"/);
+  assert.match(petEditor, /aria-modal="true"/);
+});
+
+test("keeps Customer, Guardian, Passport, and Business-local state boundaries explicit", async () => {
+  const [state, editor, detail, intake] = await Promise.all([
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
+  ]);
+
+  assert.match(state, /PetPassportConnectionState/);
+  assert.match(state, /"linked-active" \| "linked-no-access" \| "unlinked" \| "access-expired"/);
+  assert.match(state, /customers: Record<string, PrototypeCustomer>/);
+  assert.match(state, /savePrototypeCustomer/);
+  assert.match(state, /findPotentialPrototypeCustomerDuplicate/);
+  assert.match(state, /addPrototypePetRelationship/);
+  assert.match(state, /allowPotentialDuplicate/);
+  assert.match(state, /findKnownBusinessCustomerPetByPassportSlug/);
+  assert.match(state, /unknown QR never creates a permanent Customer relationship/);
+  assert.match(editor, /อาจมีลูกค้ารายนี้อยู่แล้ว/);
+  assert.match(editor, /ดูข้อมูลเดิม/);
+  assert.match(editor, /สร้างต่อ/);
+  assert.match(detail, /DataSourceLabel/);
+  assert.match(detail, /pet\.businessNote/);
+  assert.match(detail, /การเชื่อมต่อไม่ใช่สิทธิ์ถาวร/);
+  assert.match(intake, /knownCustomer/);
+  assert.match(intake, /ไม่สร้างลูกค้าใหม่ และไม่แก้ Pet Passport/);
+  assert.doesNotMatch(state + detail, /writeClaimedPrototypePet|owner of the pet|เจ้าของสัตว์เลี้ยง/);
+});
+
+test("reuses the Customer relationship source for Booking context and responsive Business UI", async () => {
+  const [calendar, editor, bookingItem, state, css] = await Promise.all([
+    readFile(new URL("business/calendar/BusinessCalendar.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingItem.tsx", appRoot), "utf8"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("globals.css", appRoot), "utf8"),
+  ]);
+
+  assert.match(calendar, /customerId/);
+  assert.match(calendar, /petId/);
+  assert.match(calendar, /preselectedCustomerId/);
+  assert.match(calendar, /handledLaunchRef/);
+  assert.match(calendar, /useState<EditorState>\(\(\) => \([\s\S]*?launchKey[\s\S]*?customerId: launchCustomerId, petId: launchPetId/);
+  assert.match(calendar, /useRef<string \| null>\(launchBookingId \? null : launchKey\)/);
+  assert.match(calendar, /requestAnimationFrame\(\(\) => \{[\s\S]*?setEditor\(\{ kind: "new", customerId: launchCustomerId, petId: launchPetId \}\)/);
+  assert.match(editor, /preselectedCustomerId/);
+  assert.match(editor, /preselectedPetId/);
+  assert.match(editor, /getDemoBookingContacts\(context\)/);
+  assert.match(bookingItem, /resolvePrototypeBookingRelationship/);
+  assert.match(state, /getDemoBookingContacts\(context/);
+  assert.match(css, /BF-3 — Customers & Pets foundation/);
+  assert.match(css, /Business BF1–BF3 UX\/UI correction — operational density/);
+  assert.match(css, /customer-list-item__identity/);
+  assert.doesNotMatch(css, /customer-list__header/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?business-customers/);
+  assert.match(css, /@media \(max-width: 430px\)[\s\S]*?business-customers/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?customer-editor/);
+  assert.match(css, /customer-editor__backdrop/);
+  assert.match(css, /min-height: 44px/);
+});
+
+test("renders BF-4 Inbox as a contextual Business communication route", async () => {
+  const [html, page, inbox, list, pane, timeline, composer, presentation, state] = await Promise.all([
+    htmlFor("/business/inbox?conversation=conversation-fixture-pim"),
+    readFile(new URL("business/inbox/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/BusinessInbox.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationList.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationPane.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageTimeline.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageComposer.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/inboxPresentation.ts", appRoot), "utf8"),
+    readFile(new URL("_prototype/inboxState.ts", appRoot), "utf8"),
+  ]);
+
+  assert.match(html, /<h1[^>]*>ข้อความ<\/h1>/);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+  assert.match(html, /ค้นหาลูกค้า น้อง หรือข้อความ/);
+  assert.match(html, /ทั้งหมด/);
+  assert.match(html, /ยังไม่ได้อ่าน/);
+  assert.match(html, /กำลังใช้บริการ/);
+  assert.doesNotMatch(html, /จบงานแล้ว/);
+  assert.match(html, /คุณพิม/);
+  assert.match(html, /Luna/);
+  assert.match(html, /เข้าพักโรงแรม/);
+  assert.match(html, /ได้รับข้อมูลแล้วค่ะ ขอบคุณค่ะ/);
+  assert.match(html, /ร้านขอเพิ่มบริการ/);
+  assert.match(html, /แกะสางขน/);
+  assert.match(html, /รอเจ้าของตอบ/);
+  assert.match(html, /พิมพ์ข้อความ/);
+  assert.match(page, /conversationId/);
+  assert.match(page, /customerId/);
+  assert.match(page, /bookingId/);
+  assert.doesNotMatch(page, /\[conversationId\]/);
+  assert.match(inbox, /ConversationList/);
+  assert.match(inbox, /ConversationPane/);
+  assert.match(list, /conversationMatchesPrototypeSearch|prototypeMessagePreview/);
+  assert.match(pane, /MessageTimeline/);
+  assert.match(pane, /MessageComposer/);
+  assert.match(timeline, /StructuredRequestCard/);
+  assert.match(composer, /PROTOTYPE_QUICK_REPLIES/);
+  assert.match(presentation, /conversationIsInService/);
+  assert.match(state, /DEMO_CONVERSATION_FIXTURES/);
+});
+
+test("keeps BF-4 local conversation reducers reusable, idempotent, and Business-wide across Branches", async () => {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-inbox-test-"));
+  const vite = await createServer({
+    root: projectRoot,
+    configFile: false,
+    cacheDir: cacheDirectory,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "silent",
+  });
+
+  try {
+    const state = await vite.ssrLoadModule("/app/_prototype/inboxState.ts");
+    const business = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    const presentation = await vite.ssrLoadModule("/app/business/inbox/inboxPresentation.ts");
+    const ari = business.DEMO_BUSINESS_CONTEXTS[0];
+    const thonglor = business.DEMO_BUSINESS_CONTEXTS[1];
+    const ariThreads = state.listPrototypeConversationFixtures(ari);
+    const thonglorThreads = state.listPrototypeConversationFixtures(thonglor);
+    assert.deepEqual(ariThreads.map((item) => item.conversationId), thonglorThreads.map((item) => item.conversationId));
+
+    const conversation = state.findReusablePrototypeConversation(ariThreads, ari.businessId, "booking-contact-pim");
+    assert.ok(conversation);
+    assert.equal(conversation.conversationId, "conversation-fixture-pim");
+    const read = state.markPrototypeConversationReadValue(conversation, "2026-08-18T05:00:00.000Z");
+    assert.equal(read.unreadCount, 0);
+    assert.equal(conversation.unreadCount, 2);
+
+    const appended = state.appendPrototypeTextMessageValue(read, " พร้อมรับกลับแล้วค่ะ ", "message-test", "2026-08-18T05:01:00.000Z");
+    assert.equal(appended.message.text, "พร้อมรับกลับแล้วค่ะ");
+    assert.equal(appended.conversation.messages.length, read.messages.length + 1);
+    const request = conversation.messages.find((message) => message.kind === "add-service-request");
+    assert.ok(request);
+    const approved = state.applyPrototypeGuardianDecision(request, "approved", "2026-08-18T05:02:00.000Z");
+    assert.equal(approved.duplicate, false);
+    assert.equal(approved.message.requestStatus, "approved");
+    assert.equal(approved.message.responseSource, "guardian-local-preview");
+    const duplicate = state.applyPrototypeGuardianDecision(approved.message, "declined", "2026-08-18T05:03:00.000Z");
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(duplicate.message.requestStatus, "approved");
+
+    const context = presentation.resolvePrototypeConversationContext(conversation, true);
+    assert.equal(presentation.conversationMatchesPrototypeSearch(conversation, context, "Luna"), true);
+    assert.equal(presentation.conversationMatchesPrototypeSearch(conversation, context, "ได้รับข้อมูลแล้ว"), true);
+    assert.equal(presentation.conversationMatchesPrototypeSearch(conversation, context, "คำที่ไม่มี"), false);
+    assert.equal(presentation.conversationIsInService(context), true);
+  } finally {
+    await vite.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+  }
+});
+
+test("integrates Inbox with Customer, Booking, Home, unread navigation, and stable query recovery", async () => {
+  const [customer, bookingEditor, calendarPage, calendar, home, desktopNav, mobileNav, model, inbox] = await Promise.all([
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BusinessCalendar.tsx", appRoot), "utf8"),
+    readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/businessNavigationModel.ts", appRoot), "utf8"),
+    readFile(new URL("business/inbox/BusinessInbox.tsx", appRoot), "utf8"),
+  ]);
+
+  assert.match(customer, /\/business\/inbox\?customerId=/);
+  assert.match(customer, /ส่งข้อความ/);
+  assert.match(bookingEditor, /\/business\/inbox\?customerId=/);
+  assert.match(bookingEditor, /bookingId=/);
+  assert.match(calendarPage, /bookingId/);
+  assert.match(calendar, /readPrototypeBooking\(launchBookingId\)/);
+  assert.match(inbox, /ensurePrototypeConversation/);
+  assert.match(inbox, /params\.set\("conversation"/);
+  assert.match(home, /getPrototypeInboxUnreadCount/);
+  assert.match(home, /href="\/business\/inbox"/);
+  assert.match(desktopNav + mobileNav, /getPrototypeInboxUnreadCount/);
+  assert.match(desktopNav, /business-nav-unread-badge/);
+  assert.match(mobileNav, /business-mobile-unread-badge/);
+  assert.match(model, /BUSINESS_MESSAGES_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/inbox"/);
+  for (const planned of ["อาบน้ำ / ตัดขน", "โรงแรม", "Daycare", "การเงิน", "รายงาน", "ทีม", "ตั้งค่า"]) {
+    assert.match(model, new RegExp(planned));
+  }
+});
+
+test("keeps structured approval Guardian-owned and leaves Booking and payment effects planned", async () => {
+  const [state, timeline, dialog, pane] = await Promise.all([
+    readFile(new URL("_prototype/inboxState.ts", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageTimeline.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/AddServiceRequestDialog.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationPane.tsx", appRoot), "utf8"),
+  ]);
+
+  assert.match(state, /requestStatus:\s*"waiting"/);
+  assert.match(state, /simulatePrototypeGuardianResponse/);
+  assert.match(state, /guardian-local-preview/);
+  assert.match(state, /if \(message\.requestStatus !== "waiting"\)[\s\S]*duplicate: true/);
+  assert.doesNotMatch(state, /savePrototypeBooking|Charge|Payment|settled/i);
+  assert.match(timeline, /โหมดทดสอบในเบราว์เซอร์ ไม่ใช่สิทธิ์อนุมัติของร้าน/);
+  assert.match(timeline, /อนุมัติ \(จำลองเจ้าของ\)/);
+  assert.match(timeline, /ไม่อนุมัติ \(จำลองเจ้าของ\)/);
+  assert.match(timeline, /ยังไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ/);
+  assert.match(dialog, /บริการเพิ่มเติม/);
+  assert.match(dialog, /ราคาเพิ่ม/);
+  assert.match(dialog, /เวลาเพิ่ม \(นาที\)/);
+  assert.match(dialog, /รอเจ้าของตอบ/);
+  assert.match(pane, /AddServiceRequestDialog/);
+});
+
+test("keeps Inbox privacy-safe, accessible, and responsive without a full Consumer Inbox", async () => {
+  const [state, inbox, list, pane, timeline, composer, dialog, presentation, css, routes] = await Promise.all([
+    readFile(new URL("_prototype/inboxState.ts", appRoot), "utf8"),
+    readFile(new URL("business/inbox/BusinessInbox.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationList.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationPane.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageTimeline.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageComposer.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/AddServiceRequestDialog.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/inboxPresentation.ts", appRoot), "utf8"),
+    readFile(new URL("globals.css", appRoot), "utf8"),
+    readdir(appRoot, { recursive: true, withFileTypes: true }),
+  ]);
+  const conversationType = state.match(/export type PrototypeConversation = \{[\s\S]*?\n\};/)?.[0] ?? "";
+  const inboxSources = inbox + list + pane + timeline + composer + dialog + presentation;
+  const routePaths = routes.filter((entry) => entry.isFile() && entry.name === "page.tsx").map((entry) => entry.parentPath.replaceAll("\\", "/"));
+
+  assert.match(conversationType, /customerId: string/);
+  assert.match(conversationType, /petId: string \| null/);
+  assert.match(conversationType, /bookingId: string \| null/);
+  assert.doesNotMatch(conversationType, /customerName|petName|passport|health|allerg/i);
+  assert.doesNotMatch(state, /sharingState|TemporaryAccess|sharedScope|allowedScope|passportSlug/);
+  assert.doesNotMatch(inboxSources, /passportSlug|businessNote|sharedScope|allowedScope|allerg|medication/i);
+  assert.equal(routePaths.some((path) => /business\/inbox\/\[conversationId\]$/.test(path)), false);
+  assert.equal(routePaths.some((path) => /(?:^|\/)messages(?:\/|$)/.test(path) && !/business\/inbox/.test(path)), false);
+  assert.match(list, /<button[\s\S]*?aria-current=/);
+  assert.match(list, /aria-label=\{`\$\{identityLabel\}/);
+  assert.match(pane, /headingRef\.current\?\.focus/);
+  assert.match(composer, /<label className="sr-only"/);
+  assert.match(composer, /aria-label="ส่งข้อความ"/);
+  assert.match(timeline, /role="log"/);
+  assert.match(dialog, /role="dialog"/);
+  assert.match(dialog, /aria-modal="true"/);
+  assert.match(dialog, /event\.key === "Escape"/);
+  assert.match(dialog, /event\.key !== "Tab"/);
+  assert.match(css, /BF-4 — Inbox & Customer Communication foundation/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?business-inbox\.has-selection \.inbox-list-pane[\s\S]*?display: none/);
+  assert.match(css, /@media \(max-width: 430px\)[\s\S]*?\.message-composer/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?\.structured-request-card/);
+  assert.match(css, /min-height: 44px/);
+});
+
+test("enforces the BF1–BF3 Business content-density contracts without changing workflow logic", async () => {
+  const [pageHeader, home, calendar, booking, customers, detail, customerEditor, petEditor, css] = await Promise.all([
+    readFile(new URL("business/_components/BusinessPageHeader.tsx", appRoot), "utf8"),
+    readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BusinessCalendar.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomersScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/PetRelationshipEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("globals.css", appRoot), "utf8"),
+  ]);
+
+  assert.match(pageHeader, /context\?: ReactNode/);
+  assert.match(pageHeader, /actions\?: ReactNode/);
+  assert.match(pageHeader, /<h1>/);
+  assert.doesNotMatch(home + calendar + customers + detail, /business-demo-label|business-section-kicker|Whisker Rest Demo|\(ตัวอย่าง\)/);
+  assert.doesNotMatch(booking, /แก้ไขข้อมูลตัวอย่าง|เริ่มจากข้อมูลหลัก|บริการ ลูกค้า และน้อง/);
+  assert.doesNotMatch(customers + css, /customer-list__header|<table|<th/);
+  assert.doesNotMatch(css, /business-(?:home|calendar|customers)__heading|business-customer-detail__heading|customer-pet-summary/);
+  assert.match(customers, /customer-list-item__identity/);
+  assert.match(detail, /<details className="customer-pet-row__details">/);
+  assert.match(detail, /<details className="customer-authority-note">/);
+  assert.doesNotMatch(customerEditor + petEditor, /eyebrow|intro|ต้องเชื่อม Pet Passport/);
+  assert.match(css, /width: min\(100% - 64px, 1200px\)/);
+  assert.match(css, /@media \(max-width: 430px\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
 test("keeps Business out of authenticated Consumer navigation", async () => {
@@ -1113,7 +1668,7 @@ test("renders the Phase E Business Scanner as a reachable operational route", as
     readFile(new URL("_components/business-landing/BusinessLandingHero.tsx", appRoot), "utf8"),
   ]);
 
-  assert.match(html, /สแกน QR เพื่อรับน้องเข้าร้าน/);
+  assert.match(html, /<h1[^>]*>สแกนรับเข้า<\/h1>/);
   assert.match(html, /QR ชั่วคราวสำหรับร้าน/);
   assert.match(source, /navigator\.mediaDevices\?\.getUserMedia/);
   assert.match(source, /BarcodeDetector/);
@@ -1172,8 +1727,9 @@ test("reuses the Phase D access contract and Business fixtures for Phase E", asy
 
 test("shows only allowed Phase D scope and invents no health facts in Intake", async () => {
   const source = await readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8");
-  assert.match(source, /ข้อมูลที่ร้านนี้ได้รับ/);
-  assert.match(source, /ข้อมูลที่ร้านไม่ได้รับ/);
+  assert.match(source, /ข้อมูลที่ร้านได้รับ/);
+  assert.match(source, /เปิดให้ร้าน/);
+  assert.match(source, /ไม่ได้เปิดให้ร้าน/);
   assert.match(source, /access\.scope\.includes\("photo"\)/);
   assert.match(source, /access\.scope\.includes\("passportReference"\)/);
   assert.match(source, /ยา ภูมิแพ้ วัคซีน ประวัติสุขภาพ และเอกสาร — ไม่มีอยู่ในแบบจำลองการอนุญาตนี้/);
@@ -1189,7 +1745,7 @@ test("preserves Business Intake separately and Suggest Correction never mutates 
   ]);
   assert.match(source, /ของที่เจ้าของนำมาด้วย/);
   assert.match(source, /หมายเหตุการรับเข้า/);
-  assert.match(source, /ข้อมูลส่วนนี้เป็นบันทึกของร้าน และไม่แก้ Pet Passport ของน้อง/);
+  assert.match(source, /ข้อมูลส่วนนี้เป็นของร้าน และไม่แก้ Pet Passport/);
   assert.match(source, /เสนอแก้ไขข้อมูล/);
   assert.match(source, /ข้อมูลต้นฉบับของน้องยังไม่เปลี่ยน/);
   assert.match(businessState, /correctionSuggestion/);
@@ -1224,7 +1780,7 @@ test("revalidates and de-duplicates receiving then stops before Service Session 
   assert.match(source, /ยืนยันรับเข้า/);
   assert.match(source, /aria-busy=\{submitting\}/);
   assert.match(source, /รับเข้าเรียบร้อย/);
-  assert.match(source, /ขั้นตอนรับเข้าเสร็จสมบูรณ์/);
+  assert.match(source, /รับเข้าเรียบร้อย/);
   assert.match(source, /เป็นเลขในเครื่องนี้เท่านั้น ไม่ใช่เลขงานบริการจริง/);
   assert.match(businessState, /record\.checkInState === "checked-in"/);
   assert.match(businessState, /evaluateTemporaryAccess\(access, record\.businessId, record\.branchId\)/);
@@ -1256,9 +1812,11 @@ test("keeps Phase E responsive, accessible, and free of Marketing Footer", async
 });
 
 test("keeps the derived manual aligned with the canonical hybrid Business architecture", async () => {
-  const [html, validation] = await Promise.all([
+  const [html, validation, architecture, decisions] = await Promise.all([
     readFile(manualUrl, "utf8"),
     readFile(validationUrl, "utf8"),
+    readFile(architectureUrl, "utf8"),
+    readFile(decisionsUrl, "utf8"),
   ]);
   const modelPanel = html.match(/<section class="panel" id="model"[\s\S]*?<\/section>/)?.[0] ?? "";
   const corePanel = html.match(/<section class="panel" id="core"[\s\S]*?<\/section>/)?.[0] ?? "";
@@ -1276,9 +1834,9 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   }
 
   assert.match(html, /Person → Business → Branch → Enabled Service Modules/);
-  assert.match(overviewPanel, /Business-first homepage/);
-  assert.match(overviewPanel, /\/business\/login/);
-  assert.match(overviewPanel, /Guardian.*secondary|secondary.*Guardian/i);
+  assert.match(overviewPanel, /BF1–BF4 Operational Foundation/);
+  assert.match(overviewPanel, /\/business\/customers/);
+  assert.match(overviewPanel, /Cloudflare/);
   assert.match(modelPanel, /Customer/);
   assert.match(modelPanel, /Visit \/ Order/);
   assert.match(modelPanel, /Service Job/);
@@ -1301,22 +1859,34 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(scenarioPanel, /Branch transfer/);
 
   assert.match(html, /Noto Sans Thai/);
+  assert.match(html, /LINE Seed Sans TH/);
   assert.match(designPanel, /WARM OPERATIONAL CLARITY/);
-  assert.match(designPanel, /Warm Golden Yellow/);
-  assert.match(designPanel, /Dark Ink/);
+  assert.match(designPanel, /Pastel Yellow/);
+  assert.match(designPanel, /#F4C95D/i);
+  assert.match(designPanel, /Light \/ Warm White/);
+  assert.match(designPanel, /CONSUMER VISUAL REDESIGN: PAUSED/);
   assert.match(designPanel, /ภาพถ่ายจริง/);
   assert.match(designPanel, /ไม่โหลด <code>public\/images\/cats<\/code>/);
   assert.doesNotMatch(designPanel, /Deep Teal/);
   assert.match(designPanel, /16px/);
   assert.match(designPanel, /180–300ms/);
+  assert.match(designPanel, /Grooming = Scissors \+ peach/);
+  assert.match(designPanel, /Custom ใช้ 28\/35\/42 วัน/);
   assert.match(roadmapPanel, /Shared Business Intake Engine/);
   assert.match(roadmapPanel, /BF-1/);
   assert.match(roadmapPanel, /BF-3/);
-  assert.match(roadmapPanel, /NOT started|not the automatic next step/);
+  assert.match(roadmapPanel, /BF-4/);
+  assert.match(roadmapPanel, /Cloudflare/);
+  assert.match(roadmapPanel, /BF-5|not the automatic next step/);
 
   assert.match(validation, /# Validation/);
-  assert.match(validation, /57 tests, 57 passed/);
-  assert.match(validation, /24 route entries|23 route entries/);
+  assert.match(validation, /69 tests, 69 passed/);
+  assert.match(validation, /27 route entries/);
+  assert.match(validation, /Cloudflare is the target platform direction/);
+  assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
+  assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
+  assert.match(decisions, /Cloudflare replaces Vercel as the target production platform direction/);
+  assert.match(decisions, /SUPERSEDED/);
   assert.match(validation, /Broken relative Markdown links/);
   assert.match(validation, /Stale legacy references/);
   assert.match(validation, /Shared Business Intake Engine/);
@@ -1324,10 +1894,11 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.equal(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(html), false);
 });
 
-test("keeps typography, reduced motion, logo, and icon rules visible in source", async () => {
-  const [layout, css, packageJson, icons, brandMark, catPaw, catPawPattern, guardianSource, previewSource] = await Promise.all([
+test("keeps typography, Business tokens, reduced motion, logo, and icon rules visible in source", async () => {
+  const [layout, css, businessCss, packageJson, icons, brandMark, catPaw, catPawPattern, guardianSource, previewSource] = await Promise.all([
     readFile(new URL("layout.tsx", appRoot), "utf8"),
     readFile(new URL("globals.css", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("_components/icons.tsx", appRoot), "utf8"),
     readFile(new URL("_components/BrandMark.tsx", appRoot), "utf8"),
@@ -1339,6 +1910,32 @@ test("keeps typography, reduced motion, logo, and icon rules visible in source",
 
   assert.match(css, /Noto Sans Thai/);
   assert.match(css, /--font-meaw:\s*"Noto Sans Thai"/);
+  assert.match(css, /font-family:\s*"LINE Seed Sans TH"/);
+  assert.match(css, /font-display:\s*swap/);
+  assert.match(css, /--font-meaw-business:\s*"LINE Seed Sans TH"/);
+  assert.doesNotMatch(css, /FC Minimal|Anuphan/);
+  assert.match(css, /--color-meaw-business-background:\s*#fffdf9/i);
+  assert.match(css, /--color-meaw-business-foreground:\s*#2b2b2b/i);
+  assert.match(css, /--color-meaw-business-border:\s*#ece8df/i);
+  assert.match(css, /--color-meaw-business-primary:\s*#f4c95d/i);
+  assert.match(css, /--color-meaw-business-primary-hover:\s*#d7b152/i);
+  assert.match(css, /--color-meaw-business-primary-foreground:\s*#3d2b00/i);
+  assert.match(css, /--color-meaw-business-coral:\s*#ff9b85/i);
+  assert.match(css, /--color-meaw-business-mint:\s*#5fcfa8/i);
+  assert.match(css, /--color-meaw-business-sky:\s*#6fb1e0/i);
+  assert.match(css, /--color-meaw-business-grape:\s*#b79bdb/i);
+  assert.match(css, /--ease-meaw-premium:\s*cubic-bezier\(0\.22, 1, 0\.36, 1\)/);
+  assert.match(layout, /import "\.\/business-design-system\.css"/);
+  assert.match(businessCss, /LIGHT \/ WARM WHITE ONLY/);
+  assert.match(businessCss, /font-synthesis:\s*none/);
+  assert.match(businessCss, /--radius-control:\s*0\.5rem/);
+  assert.match(businessCss, /--radius-button:\s*0\.625rem/);
+  assert.match(businessCss, /--radius-card:\s*1\.25rem/);
+  assert.match(businessCss, /business-skeleton-shimmer/);
+  assert.match(businessCss, /backdrop-filter:\s*blur/);
+  assert.match(businessCss, /prefers-reduced-motion:\s*reduce/);
+  assert.doesNotMatch(businessCss, /\[data-(?:portal-)?theme=['"]dark['"]\]/i);
+  assert.doesNotMatch(businessCss, /#[0-9a-fA-F]{3,8}|rgba?\(/);
   assert.match(css, /Sriracha/);
   assert.match(css, /@theme static/);
   assert.match(css, /--color-meaw-rose-500/);

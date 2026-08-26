@@ -33,11 +33,7 @@ export function GroomingBookingFields({ draft, service, resources, describedBy, 
   const updateTime = (event: FormEvent<HTMLInputElement>) => onDraftChange(withAppointmentStart(draft, service, date || "2026-08-18", event.currentTarget.value));
 
   return (
-    <section className="booking-fields booking-fields--grooming" aria-labelledby="grooming-fields-title">
-      <div className="booking-section-heading">
-        <p>สำหรับบริการนี้</p>
-        <h3 id="grooming-fields-title">วัน เวลา และทีมที่รับงาน</h3>
-      </div>
+    <section className="booking-fields booking-fields--grooming" aria-label="วัน เวลา และทีมที่รับงาน">
       <div className="booking-form-grid">
         <label className="booking-field">
           <span>วันที่ให้บริการ</span>

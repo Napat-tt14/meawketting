@@ -16,7 +16,7 @@ Read `docs/README.md` first and follow its task-specific reading route. The repo
 
 ## Current prototype
 
-The build contains 27 route entries: 23 active local routes, 3 compatibility redirects and 1 legacy QR demo. See `docs/ROUTES.md` for the mechanical classification.
+The build contains 29 route entries: 25 active local routes, 3 compatibility redirects and 1 legacy QR demo. See `docs/ROUTES.md` for the mechanical classification.
 
 Implemented Business scope is limited to:
 
@@ -26,9 +26,10 @@ Business Landing → mock Business Login → Business Home
 → Business Inbox & Customer Communication
 → Scanner → Temporary Business QR validation → allowed Pet data
 → Intake / consent states → receive/check-in complete
+→ Hotel Operations → occupancy / room assignment / daily care
 ```
 
-Business Home (BF-1), Shared Calendar & Booking Editor (BF-2), Customers & Pets (BF-3), Business Inbox (BF-4), and the reusable **Shared Business Intake Engine** (Phase E) are browser-local prototypes. BF-4 includes local text/quick replies/unread and a structured add-service approval test boundary; real messaging, notifications, attachments, and full Consumer Inbox are not implemented. Grooming Operations, Hotel Operations, Daycare Operations, Billing/Revenue, and cross-service CareProof remain planned.
+Business Home (BF-1), Shared Calendar & Booking Editor (BF-2), Customers & Pets (BF-3), Business Inbox (BF-4), the reusable **Shared Business Intake Engine** (Phase E), **Grooming Operations Foundation (BF-5)**, and **Hotel / Boarding Operations Foundation (BF-6)** are browser-local prototypes. BF-5 adds the capability-aware `/business/grooming` execution board: a Grooming Service Job is distinct from a Booking, while Calendar remains the planning surface. BF-6 adds the capability-aware `/business/hotel` execution surface: Hotel Stay is distinct from Booking and adds continuous occupancy, guarded room/capacity assignment, room-move history and per-Pet daily care. BF-4 includes local text/quick replies/unread and a structured add-service approval test boundary; Business never approves a Guardian request itself. Real messaging, notifications, attachments, and full Consumer Inbox are not implemented. Daycare Operations, Billing/Revenue, and cross-service CareProof remain planned.
 
 Consumer navigation is currently four slots: live `สัตว์เลี้ยง` (`/my-pets`) and `กิจกรรม` (`/activity`), plus disabled planned `หน้าหลัก` and `ข้อความ` placeholders. `สร้าง Pet Passport` remains a contextual action in My Pets at `/create-passport`; no Consumer Home or Inbox/Chat route has been created.
 
@@ -49,4 +50,4 @@ TARGET PLATFORM: Cloudflare
 PRODUCTION: NOT DEPLOYED / NOT VERIFIED
 ```
 
-Cloudflare is the selected production platform direction. No Cloudflare runtime/storage architecture or deployment has been chosen or verified. BF-5 and later phases do not start automatically; see `docs/ROADMAP.md`.
+Cloudflare is the selected production platform direction. No Cloudflare runtime/storage architecture or deployment has been chosen or verified. Grooming and Hotel are local foundations only; Daycare, Billing, CareProof, Backend, and later phases do not start automatically. See `docs/ROADMAP.md`.

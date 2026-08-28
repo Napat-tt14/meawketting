@@ -5839,3 +5839,1209 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
     transition: none !important;
   }
 }
+
+/* === BF-5 GROOMING OPERATIONS: EXECUTION BOARD === */
+.business-app-frame .business-grooming {
+  width: min(100% - 3rem, 1440px);
+  padding-block: 2rem 3.5rem;
+}
+
+.grooming-toolbar,
+.grooming-empty-state,
+.grooming-blocked {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.grooming-toolbar {
+  display: grid;
+  grid-template-columns: auto auto minmax(14rem, 1fr) minmax(9rem, auto);
+  align-items: end;
+  gap: 0.625rem;
+  padding: 0.75rem;
+}
+
+.grooming-toolbar :is(button, input, select) {
+  min-height: 44px;
+}
+
+.grooming-toolbar__date {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 9rem;
+}
+
+.grooming-toolbar__date>span {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.grooming-toolbar>button {
+  min-width: 6.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.grooming-toolbar__search,
+.grooming-toolbar__filter {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  background: var(--background);
+}
+
+.grooming-toolbar__search:focus-within,
+.grooming-toolbar__filter:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 23%, transparent);
+}
+
+.grooming-toolbar__search input,
+.grooming-toolbar__filter select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.grooming-toolbar__filter {
+  min-width: 10.5rem;
+}
+
+.business-grooming__notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.875rem 0 0;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 48%, var(--border));
+  border-radius: var(--radius-button);
+  color: color-mix(in srgb, var(--status-warning) 78%, var(--foreground));
+  background: var(--status-warning-soft);
+}
+
+.grooming-board-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1rem 0 0.625rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.grooming-board-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: 0.5rem;
+  scroll-snap-type: inline proximity;
+  scrollbar-color: color-mix(in srgb, var(--feature-coral) 54%, var(--border)) transparent;
+  scrollbar-width: thin;
+}
+
+.grooming-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-width: 60rem;
+  padding: 0.5rem;
+}
+
+.grooming-board-column {
+  min-height: 26rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface) 82%, var(--background));
+  scroll-snap-align: start;
+  transition: background-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium), transform var(--duration-fast) var(--ease-premium);
+}
+
+.grooming-board-column>header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.8125rem;
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 3px 0 var(--feature-coral);
+}
+
+.grooming-board-column>header h2 {
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.grooming-board-column>header span {
+  min-width: 1.625rem;
+  min-height: 1.625rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  color: var(--primary-foreground);
+  background: var(--accent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.grooming-board-column__cards {
+  min-height: 13rem;
+  display: grid;
+  align-content: start;
+  gap: 0.625rem;
+  padding: 0.625rem;
+}
+
+.grooming-board-column__empty,
+.grooming-mobile-list__empty {
+  margin: 0;
+  padding: 1rem 0.5rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.grooming-job-card {
+  width: 100%;
+  min-height: 11.25rem;
+  display: grid;
+  align-content: start;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--feature-coral) 48%, var(--border));
+  border-radius: var(--radius-panel);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+  transition: opacity var(--duration-fast) var(--ease-premium), transform var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium), border-color var(--duration-fast) var(--ease-premium), background-color var(--duration-fast) var(--ease-premium);
+}
+
+.grooming-job-card:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 26%, transparent), var(--shadow-card);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grooming-job-card:hover {
+    border-color: color-mix(in srgb, var(--feature-coral) 76%, var(--border));
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-2px);
+  }
+}
+
+.grooming-job-card.is-dragging {
+  opacity: 0.58;
+  box-shadow: var(--shadow-lift);
+  cursor: grabbing;
+  transform: scale(0.975) rotate(1deg);
+}
+
+.grooming-job-card.is-settled {
+  animation: grooming-job-settle 260ms var(--ease-premium);
+}
+
+@keyframes grooming-job-settle {
+  0% { box-shadow: var(--shadow-card); }
+  45% { border-color: color-mix(in srgb, var(--status-success) 72%, var(--feature-coral)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-success) 18%, transparent), var(--shadow-lift); }
+  100% { box-shadow: var(--shadow-card); }
+}
+
+.grooming-job-card__header,
+.grooming-job-card__facts,
+.grooming-job-card__facts span,
+.grooming-job-card__attention {
+  display: flex;
+  align-items: center;
+}
+
+.grooming-job-card__header {
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.grooming-job-card__header .business-identity-avatar {
+  flex: 0 0 auto;
+}
+
+.grooming-job-card__identity {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.grooming-job-card__identity strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.grooming-job-card__identity span,
+.grooming-job-card__facts,
+.grooming-job-card__facts time {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.grooming-job-card__facts {
+  flex-wrap: wrap;
+  gap: 0.35rem 0.625rem;
+}
+
+.grooming-job-card__facts span {
+  gap: 0.25rem;
+}
+
+.grooming-job-status {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.125rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.grooming-job-status--booked,
+.grooming-job-status--checked-in { color: var(--status-info); background: var(--status-info-soft); border-color: color-mix(in srgb, var(--status-info) 25%, var(--border)); }
+.grooming-job-status--waiting { color: var(--status-warning); background: var(--status-warning-soft); border-color: color-mix(in srgb, var(--status-warning) 25%, var(--border)); }
+.grooming-job-status--in-service { color: color-mix(in srgb, var(--status-info) 80%, var(--foreground)); background: var(--status-info-soft); border-color: color-mix(in srgb, var(--status-info) 25%, var(--border)); }
+.grooming-job-status--ready-for-pickup,
+.grooming-job-status--completed { color: var(--status-success); background: var(--status-success-soft); border-color: color-mix(in srgb, var(--status-success) 25%, var(--border)); }
+.grooming-job-status--cancelled { color: var(--status-critical); background: var(--status-critical-soft); border-color: color-mix(in srgb, var(--status-critical) 25%, var(--border)); }
+
+.grooming-job-card__attention {
+  gap: 0.3rem;
+  margin: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.grooming-job-card.is-delay .grooming-job-card__attention { color: var(--status-critical); }
+.grooming-job-card.is-approval .grooming-job-card__attention { color: var(--status-warning); }
+.grooming-job-card.is-assignment .grooming-job-card__attention { color: var(--status-info); }
+.grooming-job-card.is-pickup .grooming-job-card__attention { color: var(--status-success); }
+
+.business-grooming.is-dragging .grooming-board-column {
+  border-style: dashed;
+}
+
+.grooming-board-column.is-drop-valid {
+  background: color-mix(in srgb, var(--status-success-soft) 70%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--status-success), 0 0 0 4px color-mix(in srgb, var(--status-success) 12%, transparent);
+}
+
+.grooming-board-column.is-drop-invalid {
+  background: color-mix(in srgb, var(--status-critical-soft) 56%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--status-critical);
+}
+
+.grooming-empty-state,
+.grooming-blocked {
+  min-height: 15rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.875rem;
+  margin-top: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.grooming-empty-state>div,
+.grooming-blocked>div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.grooming-empty-state h2,
+.grooming-blocked h2 { font-size: 1.125rem; font-weight: 700; }
+.grooming-empty-state p,
+.grooming-blocked p { margin: 0; color: var(--muted-foreground); }
+
+.grooming-empty-state__icon,
+.grooming-blocked>svg {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--feature-coral);
+  background: var(--feature-coral-soft);
+}
+
+.grooming-mobile-list { display: none; }
+
+.grooming-job-detail__backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--foreground) 42%, transparent);
+  backdrop-filter: blur(4px);
+  animation: business-backdrop-in 220ms var(--ease-premium) both;
+}
+
+.grooming-job-detail {
+  position: fixed;
+  z-index: 81;
+  top: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: min(31rem, calc(100vw - 1.5rem));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  animation: grooming-drawer-in 260ms var(--ease-premium) both;
+}
+
+.grooming-job-detail__header {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 3px 0 var(--feature-coral);
+}
+
+.grooming-job-detail__header>button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.grooming-job-detail__identity,
+.grooming-detail-person,
+.grooming-detail-section__actions,
+.grooming-detail-facts dd,
+.grooming-addon-list li,
+.grooming-addon-requests li {
+  display: flex;
+  align-items: center;
+}
+
+.grooming-job-detail__identity { gap: 0.75rem; min-width: 0; }
+.grooming-job-detail__identity>div { min-width: 0; display: grid; gap: 0.1rem; }
+.grooming-job-detail__identity small { color: var(--muted-foreground); font-size: 0.75rem; }
+.grooming-job-detail__identity h2 { font-size: 1.25rem; font-weight: 700; }
+.grooming-job-detail__identity span { color: var(--feature-coral); font-size: 0.8125rem; font-weight: 700; }
+
+.grooming-job-detail__content {
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.grooming-job-detail__notice {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 42%, var(--border));
+  border-radius: var(--radius-button);
+  color: var(--status-warning);
+  background: var(--status-warning-soft);
+  font-size: 0.8125rem;
+}
+
+.grooming-detail-section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--background);
+}
+
+.grooming-detail-section>header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.grooming-detail-section h3 { font-size: 0.9375rem; font-weight: 700; }
+.grooming-detail-section>header>svg { color: var(--feature-coral); }
+.grooming-detail-section>header>button,
+.grooming-detail-section__actions :is(a, button) {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding-inline: 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: var(--surface);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.grooming-detail-person { gap: 0.625rem; }
+.grooming-detail-person>span { min-width: 0; display: grid; gap: 0.1rem; }
+.grooming-detail-person strong { font-size: 0.9375rem; }
+.grooming-detail-person small { color: var(--muted-foreground); font-size: 0.8125rem; }
+.grooming-detail-person>a { width: 38px; min-width: 38px; min-height: 38px; display: grid; place-items: center; margin-left: auto; border-radius: var(--radius-button); color: var(--foreground); background: var(--surface); }
+
+.grooming-detail-section__actions { flex-wrap: wrap; gap: 0.5rem; }
+.grooming-detail-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625rem; }
+.grooming-detail-facts>div { display: grid; gap: 0.15rem; }
+.grooming-detail-facts dt { color: var(--muted-foreground); font-size: 0.75rem; }
+.grooming-detail-facts dd { gap: 0.25rem; margin: 0; color: var(--foreground); font-size: 0.875rem; font-weight: 600; }
+
+.grooming-status-control,
+.grooming-resource-fields label { display: grid; gap: 0.3rem; }
+.grooming-status-control>span,
+.grooming-resource-fields label>span { color: var(--muted-foreground); font-size: 0.75rem; font-weight: 600; }
+.grooming-status-control select,
+.grooming-resource-fields select,
+.grooming-detail-section textarea { min-height: 44px; width: 100%; }
+.grooming-detail-section__hint { display: flex; align-items: flex-start; gap: 0.3rem; margin: 0; color: var(--muted-foreground); font-size: 0.75rem; line-height: 1.45; }
+.grooming-detail-section__hint svg { flex: 0 0 auto; margin-top: 0.05rem; color: var(--status-info); }
+
+.grooming-resource-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.grooming-resource-fields label:first-child { grid-column: 1 / -1; }
+.grooming-addon-list,
+.grooming-addon-requests,
+.grooming-history-list { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.grooming-addon-list li { justify-content: space-between; gap: 0.75rem; padding: 0.625rem; border-radius: var(--radius-button); background: var(--surface); }
+.grooming-addon-list li span { display: grid; gap: 0.1rem; }
+.grooming-addon-list small { color: var(--muted-foreground); font-size: 0.75rem; }
+.grooming-addon-list b { color: var(--foreground); font-size: 0.8125rem; white-space: nowrap; }
+.grooming-addon-requests li { justify-content: space-between; gap: 0.625rem; padding: 0.5rem 0; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.grooming-addon-requests li span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.grooming-addon-requests li strong { color: var(--status-warning); font-size: 0.75rem; }
+.grooming-detail-empty { margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
+.grooming-history-list li { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.grooming-history-list time { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+
+@keyframes grooming-drawer-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (min-width: 768px) {
+  .grooming-board-scroll { -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 1199px) {
+  .business-app-frame .business-grooming { width: min(100% - 2rem, 1440px); padding-block: 1.5rem calc(6.5rem + env(safe-area-inset-bottom)); }
+  .grooming-board-scroll { max-width: 100%; }
+}
+
+@media (max-width: 767px) {
+  .business-app-frame .business-grooming { width: min(100% - 1.5rem, 1440px); padding-block: 1.25rem calc(6.5rem + env(safe-area-inset-bottom)); }
+  .business-grooming .business-page-header { align-items: flex-start; gap: 0.75rem; }
+  .business-grooming .business-page-header__actions .button { min-height: 44px; padding-inline: 0.75rem; white-space: nowrap; }
+  .grooming-toolbar { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 0.5rem; }
+  .grooming-toolbar__date { min-width: 0; }
+  .grooming-toolbar__search { grid-column: 1 / -1; }
+  .grooming-toolbar__filter { grid-column: 1 / -1; min-width: 0; }
+  .grooming-board-scroll,
+  .grooming-board-hint { display: none; }
+  .grooming-mobile-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
+  .grooming-mobile-list__filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.375rem; padding: 0.375rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--muted); }
+  .grooming-mobile-list__filters button { min-width: 0; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.35rem; border: 0; border-radius: var(--radius-pill); color: var(--muted-foreground); background: transparent; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .grooming-mobile-list__filters button[aria-selected="true"] { color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-card); }
+  .grooming-mobile-list__filters button span { min-width: 1.125rem; display: grid; place-items: center; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--primary) 18%, transparent); font-size: 0.6875rem; }
+  .grooming-mobile-list__cards { display: grid; gap: 0.625rem; }
+  .grooming-job-card { min-height: 0; touch-action: auto; }
+  .grooming-job-detail { top: auto; right: 0; bottom: 0; left: 0; width: 100%; max-height: min(88vh, 48rem); border-bottom: 0; border-radius: var(--radius-card) var(--radius-card) 0 0; animation-name: grooming-sheet-in; }
+  .grooming-job-detail__header { min-height: 78px; }
+  .grooming-resource-fields { grid-template-columns: 1fr; }
+  .grooming-detail-facts { grid-template-columns: 1fr 1fr; }
+  .grooming-detail-section>header>button { min-height: 38px; }
+}
+
+@keyframes grooming-sheet-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 390px) {
+  .business-grooming .business-page-header__copy h1 { font-size: 1.375rem; }
+  .business-grooming .business-page-header__context { font-size: 0.8125rem; }
+  .grooming-toolbar { padding: 0.625rem; }
+  .grooming-toolbar>button { min-width: 44px; padding-inline: 0.5rem; }
+  .grooming-toolbar>button svg { margin: 0; }
+  .grooming-detail-section { padding: 0.75rem; }
+}
+
+@media (max-width: 320px) {
+  .business-app-frame .business-grooming { width: min(100% - 1rem, 1440px); }
+  .business-grooming .business-page-header { display: grid; }
+  .business-grooming .business-page-header__actions .button { width: 100%; }
+  .grooming-detail-facts { grid-template-columns: 1fr; }
+}
+
+/* At tablet widths the desktop sidebar is intentionally hidden. Keep a compact
+   brand and branch context in the header so the remaining header never reads
+   as an empty strip. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .business-header--app .business-header__inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    padding-inline: 1rem;
+  }
+
+  .business-header--app .business-brand,
+  .business-header--app .business-header__context {
+    display: flex;
+  }
+
+  .business-header--app .business-brand > .brand {
+    display: none;
+  }
+
+  .business-header--app .business-brand__compact {
+    display: inline-flex;
+  }
+
+  .business-header--app .business-header__context {
+    width: min(100%, 22rem);
+    min-width: 0;
+    justify-self: start;
+  }
+
+  .business-header--app .business-context-switcher {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 359px) {
+  .grooming-mobile-list__filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* A seven-day planning board needs its own canvas on tablet. Keep scrolling
+   contained to the surface instead of shrinking booking cards into unreadable
+   columns after the desktop sidebar has been removed. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .business-calendar__surface {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+  }
+
+  .business-calendar__desktop-view .calendar-planning-board {
+    min-width: 60rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grooming-job-card,
+  .grooming-board-column,
+  .grooming-job-detail,
+  .grooming-job-detail__backdrop {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* BF-6 Hotel / Boarding: execution, occupancy, and daily-care surfaces. */
+.business-app-frame .business-hotel {
+  width: min(100% - 3rem, 1440px);
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding-block: 2rem 3rem;
+}
+
+.hotel-today-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.hotel-today-summary article {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--feature-sky) 42%, var(--border));
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--feature-sky-soft) 58%, var(--surface));
+  box-shadow: var(--shadow-card);
+}
+
+.hotel-today-summary article>span,
+.hotel-today-summary article>small {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.hotel-today-summary article>span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: color-mix(in srgb, var(--status-info) 82%, var(--foreground));
+  font-weight: 700;
+}
+
+.hotel-today-summary article>strong {
+  color: var(--foreground);
+  font-size: 1.65rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.hotel-section-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.hotel-section-links a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.85rem;
+  border-radius: var(--radius-pill);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.hotel-section-links a:hover,
+.hotel-section-links a:focus-visible {
+  color: var(--foreground);
+  background: var(--feature-sky-soft);
+}
+
+.hotel-toolbar {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(14rem, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.hotel-toolbar__date,
+.hotel-toolbar__search,
+.hotel-toolbar__filter,
+.hotel-toolbar__range {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.hotel-toolbar__date>span,
+.hotel-toolbar__range legend {
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.hotel-toolbar input,
+.hotel-toolbar select {
+  min-height: 42px;
+}
+
+.hotel-toolbar>button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding-inline: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: var(--background);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.hotel-toolbar__range {
+  grid-auto-flow: column;
+  grid-template-columns: repeat(3, auto);
+  align-items: end;
+  padding: 0;
+  border: 0;
+}
+
+.hotel-toolbar__range legend { grid-column: 1 / -1; }
+
+.hotel-toolbar__range button {
+  min-width: 3.15rem;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  color: var(--muted-foreground);
+  background: var(--background);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.hotel-toolbar__range button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--feature-sky) 66%, var(--border));
+  color: color-mix(in srgb, var(--status-info) 82%, var(--foreground));
+  background: var(--feature-sky-soft);
+}
+
+.hotel-toolbar__search,
+.hotel-toolbar__filter {
+  position: relative;
+  align-items: center;
+}
+
+.hotel-toolbar__search svg,
+.hotel-toolbar__filter svg {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.hotel-toolbar__search input,
+.hotel-toolbar__filter select { padding-left: 2.25rem; }
+
+.business-hotel__notice,
+.hotel-stay-detail__notice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 42%, var(--border));
+  border-radius: var(--radius-button);
+  color: var(--status-warning);
+  background: var(--status-warning-soft);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.hotel-attention,
+.hotel-occupancy,
+.hotel-stays,
+.hotel-arrivals,
+.hotel-departures,
+.hotel-daily-care {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.hotel-attention {
+  border-color: color-mix(in srgb, var(--status-warning) 34%, var(--border));
+  background: color-mix(in srgb, var(--status-warning-soft) 42%, var(--surface));
+}
+
+.hotel-attention>header,
+.hotel-section-heading,
+.hotel-attention__list button,
+.hotel-compact-list article,
+.hotel-daily-care__list>button,
+.hotel-occupancy-mobile article>header,
+.hotel-occupancy-mobile article>button,
+.hotel-stay-detail__header,
+.hotel-stay-detail__identity,
+.hotel-detail-person,
+.hotel-detail-section__actions,
+.hotel-detail-lifecycle,
+.hotel-detail-lifecycle>span,
+.hotel-care-list li,
+.hotel-linked-jobs li,
+.hotel-detail-room__current {
+  display: flex;
+  align-items: center;
+}
+
+.hotel-attention>header,
+.hotel-section-heading {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hotel-attention>header>div,
+.hotel-section-heading>div { display: grid; gap: 0.12rem; }
+.hotel-attention>header span,
+.hotel-section-heading>div>span { color: var(--muted-foreground); font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.hotel-attention h2,
+.hotel-section-heading h2 { color: var(--foreground); font-size: 1.1rem; font-weight: 800; }
+.hotel-section-heading p { margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
+.hotel-attention>header>svg { color: var(--status-warning); }
+.hotel-section-heading>svg { color: var(--feature-sky); }
+
+.hotel-attention__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.5rem; }
+
+.hotel-attention__list button {
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, var(--border));
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: var(--surface);
+  font: inherit;
+  text-align: left;
+  transition: transform var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium), border-color var(--duration-fast) var(--ease-premium);
+}
+
+.hotel-attention__list button>span:not(.business-identity-avatar) { min-width: 0; display: grid; gap: 0.05rem; }
+.hotel-attention__list strong { font-size: 0.8125rem; }
+.hotel-attention__list small { color: var(--muted-foreground); font-size: 0.75rem; line-height: 1.35; }
+.hotel-attention__list button>svg { flex: 0 0 auto; margin-left: auto; color: var(--status-warning); }
+.hotel-attention__empty { margin: 0; color: var(--muted-foreground); font-size: 0.875rem; }
+
+.hotel-occupancy { scroll-margin-top: 1rem; }
+.hotel-occupancy__hint { display: flex; align-items: flex-start; gap: 0.35rem; margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
+.hotel-occupancy__hint svg { flex: 0 0 auto; color: var(--status-info); }
+.hotel-occupancy-board-wrap { overflow-x: auto; overscroll-behavior-inline: contain; border: 1px solid var(--border); border-radius: var(--radius-panel); }
+.hotel-occupancy-board { min-width: calc(13rem + var(--hotel-days) * 5.75rem); }
+.hotel-occupancy-board__header,
+.hotel-occupancy-row { display: grid; grid-template-columns: 13rem minmax(0, 1fr); }
+.hotel-occupancy-board__header { position: sticky; top: 0; z-index: 4; min-height: 54px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); background: var(--surface); }
+.hotel-occupancy-board__header>span { display: flex; align-items: center; padding: 0.65rem 0.8rem; border-right: 1px solid var(--border); font-size: 0.75rem; font-weight: 800; }
+.hotel-occupancy-board__header>div,
+.hotel-occupancy-row__track { display: grid; grid-template-columns: repeat(var(--hotel-days), minmax(5.75rem, 1fr)); }
+.hotel-occupancy-board__header time { min-width: 0; display: grid; place-content: center; gap: 0.05rem; border-right: 1px solid var(--border); text-align: center; }
+.hotel-occupancy-board__header time b { color: var(--foreground); font-size: 0.75rem; }
+.hotel-occupancy-board__header time small { color: var(--muted-foreground); font-size: 0.6875rem; }
+
+.hotel-occupancy-row { min-height: 72px; border-bottom: 1px solid var(--border); background: var(--surface); transition: background-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium); }
+.hotel-occupancy-row:last-child { border-bottom: 0; }
+.hotel-occupancy-row>header { min-width: 0; display: grid; align-content: center; gap: 0.08rem; padding: 0.7rem 0.8rem; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--feature-sky-soft) 28%, var(--surface)); }
+.hotel-occupancy-row>header strong { color: var(--foreground); font-size: 0.875rem; }
+.hotel-occupancy-row>header small { color: var(--muted-foreground); font-size: 0.6875rem; }
+.hotel-occupancy-row__track { position: relative; min-height: 72px; }
+.hotel-occupancy-row__track>span { grid-row: 1; min-width: 0; border-right: 1px solid color-mix(in srgb, var(--border) 72%, transparent); background: color-mix(in srgb, var(--feature-sky-soft) 13%, var(--surface)); }
+
+.hotel-occupancy-span {
+  grid-row: 1;
+  z-index: 1;
+  min-width: 0;
+  min-height: 44px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.4rem;
+  padding: 0.3rem 0.45rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--feature-sky) 62%, var(--border));
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--feature-sky) 30%, var(--surface));
+  box-shadow: var(--shadow-card);
+  cursor: grab;
+  font: inherit;
+  text-align: left;
+  transition: opacity var(--duration-fast) var(--ease-premium), transform var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium), border-color var(--duration-fast) var(--ease-premium);
+}
+
+.hotel-occupancy-span>span:not(.business-identity-avatar) { min-width: 0; display: grid; gap: 0.03rem; }
+.hotel-occupancy-span strong { overflow: hidden; font-size: 0.75rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-occupancy-span small { color: color-mix(in srgb, var(--foreground) 70%, var(--surface)); font-size: 0.65625rem; white-space: nowrap; }
+.hotel-occupancy-span.is-dragging { opacity: 0.52; cursor: grabbing; transform: scale(0.975); }
+.business-hotel.is-dragging .hotel-occupancy-row { border-style: dashed; }
+.hotel-occupancy-row.is-drop-valid { background: color-mix(in srgb, var(--status-success-soft) 62%, var(--surface)); box-shadow: inset 0 0 0 2px var(--status-success); }
+.hotel-occupancy-row.is-drop-invalid { background: color-mix(in srgb, var(--status-critical-soft) 58%, var(--surface)); box-shadow: inset 0 0 0 2px var(--status-critical); }
+.hotel-occupancy-mobile { display: none; }
+
+.hotel-stays { scroll-margin-top: 1rem; }
+.hotel-stays__filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.hotel-stays__filters button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.7rem; border: 1px solid var(--border); border-radius: var(--radius-pill); color: var(--muted-foreground); background: var(--background); font: inherit; font-size: 0.75rem; font-weight: 700; }
+.hotel-stays__filters button[aria-selected="true"] { border-color: color-mix(in srgb, var(--feature-sky) 62%, var(--border)); color: color-mix(in srgb, var(--status-info) 82%, var(--foreground)); background: var(--feature-sky-soft); }
+.hotel-stays__filters button span { min-width: 1.15rem; display: grid; place-items: center; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--primary) 18%, transparent); font-size: 0.6875rem; }
+.hotel-stay-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr)); gap: 0.65rem; }
+.hotel-stay-card { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0.55rem; padding: 0.8rem; border: 1px solid color-mix(in srgb, var(--feature-sky) 40%, var(--border)); border-radius: var(--radius-panel); color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-card); font: inherit; text-align: left; transition: transform var(--duration-fast) var(--ease-premium), border-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium); }
+.hotel-stay-card.has-attention { border-color: color-mix(in srgb, var(--status-warning) 54%, var(--border)); }
+.hotel-stay-card__identity { min-width: 0; display: grid; gap: 0.08rem; }
+.hotel-stay-card__identity strong { overflow: hidden; font-size: 1rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-stay-card__identity small { overflow: hidden; color: var(--muted-foreground); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-stay-card__facts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.4rem 0.65rem; color: var(--muted-foreground); font-size: 0.75rem; }
+.hotel-stay-card__facts>span { display: inline-flex; align-items: center; gap: 0.25rem; }
+.hotel-stay-card__attention { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 0.3rem; padding-top: 0.45rem; border-top: 1px solid var(--border); color: var(--status-warning); font-size: 0.75rem; font-weight: 700; }
+
+.hotel-stay-status { min-height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0.125rem 0.45rem; border: 1px solid transparent; border-radius: var(--radius-pill); font-size: 0.6875rem; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.hotel-stay-status--booked,
+.hotel-stay-status--expected-today { color: var(--status-info); border-color: color-mix(in srgb, var(--status-info) 25%, var(--border)); background: var(--status-info-soft); }
+.hotel-stay-status--checked-in,
+.hotel-stay-status--in-stay { color: color-mix(in srgb, var(--status-info) 84%, var(--foreground)); border-color: color-mix(in srgb, var(--feature-sky) 42%, var(--border)); background: var(--feature-sky-soft); }
+.hotel-stay-status--ready-for-checkout,
+.hotel-stay-status--checked-out { color: var(--status-success); border-color: color-mix(in srgb, var(--status-success) 25%, var(--border)); background: var(--status-success-soft); }
+.hotel-stay-status--cancelled,
+.hotel-stay-status--no-show { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 25%, var(--border)); background: var(--status-critical-soft); }
+
+.hotel-daily-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.hotel-compact-list { display: grid; gap: 0.5rem; }
+.hotel-compact-list article { min-width: 0; gap: 0.55rem; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--background); }
+.hotel-compact-list article>span:not(.business-identity-avatar) { min-width: 0; display: grid; gap: 0.06rem; }
+.hotel-compact-list strong { overflow: hidden; font-size: 0.875rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-compact-list small { overflow: hidden; color: var(--muted-foreground); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-compact-list :is(a, button) { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; margin-left: auto; padding-inline: 0.6rem; border: 1px solid color-mix(in srgb, var(--feature-sky) 44%, var(--border)); border-radius: var(--radius-button); color: color-mix(in srgb, var(--status-info) 82%, var(--foreground)); background: var(--surface); font: inherit; font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
+.hotel-empty-inline { display: flex; align-items: center; gap: 0.45rem; margin: 0; padding: 0.7rem; border-radius: var(--radius-button); color: var(--muted-foreground); background: var(--background); font-size: 0.8125rem; }
+
+.hotel-daily-care { scroll-margin-top: 1rem; }
+.hotel-daily-care__list { display: grid; gap: 0.5rem; }
+.hotel-daily-care__list>button { min-width: 0; display: grid; grid-template-columns: auto minmax(6rem, 1fr) auto minmax(8rem, 1.3fr) auto; gap: 0.6rem; padding: 0.65rem; border: 1px solid var(--border); border-radius: var(--radius-button); color: var(--foreground); background: var(--background); font: inherit; text-align: left; transition: border-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium), transform var(--duration-fast) var(--ease-premium); }
+.hotel-daily-care__pet,
+.hotel-daily-care__task { min-width: 0; display: grid; gap: 0.06rem; }
+.hotel-daily-care__pet strong,
+.hotel-daily-care__task strong { overflow: hidden; font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-daily-care__pet small,
+.hotel-daily-care__task small { overflow: hidden; color: var(--muted-foreground); font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-daily-care__list time { align-self: center; color: var(--foreground); font-size: 0.8125rem; font-variant-numeric: tabular-nums; font-weight: 800; }
+.hotel-daily-care__state { align-self: center; color: var(--status-warning); font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
+
+.hotel-empty-state { min-height: 15rem; display: grid; place-items: center; align-content: center; gap: 0.875rem; margin-top: 1rem; padding: 2rem; text-align: center; }
+.hotel-empty-state>svg { width: 3rem; height: 3rem; padding: 0.75rem; border-radius: 50%; color: var(--feature-sky); background: var(--feature-sky-soft); }
+.hotel-empty-state>div { display: grid; gap: 0.3rem; }
+.hotel-empty-state h2 { font-size: 1.125rem; font-weight: 800; }
+.hotel-empty-state p { margin: 0; color: var(--muted-foreground); }
+
+.hotel-stay-detail__backdrop { position: fixed; z-index: 80; inset: 0; border: 0; background: color-mix(in srgb, var(--foreground) 42%, transparent); backdrop-filter: blur(4px); animation: business-backdrop-in 220ms var(--ease-premium) both; }
+.hotel-stay-detail { position: fixed; z-index: 81; top: 0.75rem; right: 0.75rem; bottom: 0.75rem; width: min(32rem, calc(100vw - 1.5rem)); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-card); color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-overlay); animation: hotel-drawer-in 260ms var(--ease-premium) both; }
+.hotel-stay-detail__header { min-height: 86px; justify-content: space-between; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--border); box-shadow: inset 0 3px 0 var(--feature-sky); }
+.hotel-stay-detail__header>button { width: 44px; min-width: 44px; min-height: 44px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: var(--radius-button); color: var(--foreground); background: var(--background); }
+.hotel-stay-detail__identity { min-width: 0; gap: 0.75rem; }
+.hotel-stay-detail__identity>div { min-width: 0; display: grid; gap: 0.1rem; }
+.hotel-stay-detail__identity small { color: var(--muted-foreground); font-size: 0.75rem; }
+.hotel-stay-detail__identity h2 { font-size: 1.25rem; font-weight: 800; }
+.hotel-stay-detail__content { overflow-y: auto; display: grid; align-content: start; gap: 0.75rem; padding: 1rem; }
+
+.hotel-detail-section { display: grid; gap: 0.75rem; padding: 0.875rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--background); }
+.hotel-detail-section>header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.hotel-detail-section h3 { font-size: 0.9375rem; font-weight: 800; }
+.hotel-detail-section>header>svg { color: var(--feature-sky); }
+.hotel-detail-section>header>button,
+.hotel-detail-section__actions :is(a, button),
+.hotel-detail-section>.button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.625rem; border: 1px solid var(--border); border-radius: var(--radius-button); color: var(--foreground); background: var(--surface); font-size: 0.8125rem; font-weight: 700; }
+.hotel-detail-person { gap: 0.625rem; }
+.hotel-detail-person>span { min-width: 0; display: grid; gap: 0.1rem; }
+.hotel-detail-person strong { font-size: 0.9375rem; }
+.hotel-detail-person small { color: var(--muted-foreground); font-size: 0.8125rem; }
+.hotel-detail-section__actions { flex-wrap: wrap; gap: 0.5rem; }
+.hotel-detail-dates__label { margin: 0; color: var(--foreground); font-size: 0.9rem; font-weight: 800; }
+.hotel-detail-date-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.hotel-detail-date-fields label,
+.hotel-detail-field { display: grid; gap: 0.3rem; }
+.hotel-detail-date-fields label>span,
+.hotel-detail-field>span { color: var(--muted-foreground); font-size: 0.75rem; font-weight: 700; }
+.hotel-detail-field small { font-weight: 500; }
+.hotel-detail-date-fields input,
+.hotel-detail-field :is(input, select, textarea) { width: 100%; min-height: 44px; }
+.hotel-detail-room__current { flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0.65rem; border-radius: var(--radius-button); color: var(--foreground); background: color-mix(in srgb, var(--feature-sky-soft) 50%, var(--surface)); font-size: 0.875rem; }
+.hotel-detail-room__current span { color: var(--muted-foreground); font-size: 0.75rem; }
+.hotel-detail-section__hint { display: flex; align-items: flex-start; gap: 0.3rem; margin: 0; color: var(--muted-foreground); font-size: 0.75rem; line-height: 1.45; }
+.hotel-detail-section__hint svg { flex: 0 0 auto; margin-top: 0.05rem; color: var(--status-info); }
+.hotel-detail-lifecycle { flex-wrap: wrap; gap: 0.5rem; }
+.hotel-detail-lifecycle>span,
+.hotel-detail-lifecycle :is(a, button) { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.65rem; border: 1px solid var(--border); border-radius: var(--radius-button); color: var(--foreground); background: var(--surface); font: inherit; font-size: 0.8125rem; font-weight: 700; }
+.hotel-detail-lifecycle>button { border-color: color-mix(in srgb, var(--feature-sky) 52%, var(--border)); color: color-mix(in srgb, var(--status-info) 82%, var(--foreground)); background: var(--feature-sky-soft); }
+.hotel-care-list,
+.hotel-history-list,
+.hotel-linked-jobs { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.hotel-care-list li { min-width: 0; gap: 0.55rem; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--surface); }
+.hotel-care-list li.is-complete { border-color: color-mix(in srgb, var(--status-success) 35%, var(--border)); background: color-mix(in srgb, var(--status-success-soft) 45%, var(--surface)); }
+.hotel-care-list__time { width: 3.15rem; flex: 0 0 auto; display: grid; gap: 0.05rem; }
+.hotel-care-list__time time { color: var(--foreground); font-size: 0.8125rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hotel-care-list__time small { color: var(--muted-foreground); font-size: 0.65rem; }
+.hotel-care-list__task { min-width: 0; display: grid; gap: 0.05rem; }
+.hotel-care-list__task strong { overflow: hidden; font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-care-list__task small { color: var(--muted-foreground); font-size: 0.7rem; }
+.hotel-care-list button { min-width: 44px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; margin-left: auto; border: 1px solid color-mix(in srgb, var(--status-success) 35%, var(--border)); border-radius: var(--radius-button); color: var(--status-success); background: var(--status-success-soft); font: inherit; font-size: 0.75rem; font-weight: 800; }
+.hotel-care-list button:disabled { opacity: 0.8; }
+.hotel-detail-instructions { display: grid; gap: 0.3rem; padding: 0.65rem; border-radius: var(--radius-button); background: color-mix(in srgb, var(--feature-sky-soft) 38%, var(--surface)); }
+.hotel-detail-instructions>span { color: var(--muted-foreground); font-size: 0.7rem; font-weight: 800; }
+.hotel-detail-instructions p { margin: 0; color: var(--foreground); font-size: 0.8125rem; line-height: 1.5; }
+.hotel-linked-jobs li { justify-content: space-between; gap: 0.65rem; padding: 0.65rem; border-radius: var(--radius-button); background: var(--surface); }
+.hotel-linked-jobs li>span { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 0.35rem; align-items: center; }
+.hotel-linked-jobs svg { grid-row: 1 / 3; color: var(--feature-coral); }
+.hotel-linked-jobs strong { overflow: hidden; font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+.hotel-linked-jobs small { color: var(--muted-foreground); font-size: 0.7rem; }
+.hotel-linked-jobs a { min-height: 34px; display: inline-flex; align-items: center; padding-inline: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-button); color: var(--foreground); font-size: 0.75rem; font-weight: 700; }
+.hotel-detail-empty { margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
+.hotel-history-list li { display: grid; grid-template-columns: minmax(5rem, auto) minmax(0, 1fr); gap: 0.55rem; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.hotel-history-list time { color: var(--muted-foreground); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.hotel-history-list span { min-width: 0; display: grid; gap: 0.08rem; }
+.hotel-history-list strong { color: var(--foreground); font-size: 0.8125rem; }
+.hotel-history-list small { color: var(--muted-foreground); font-size: 0.7rem; }
+
+@keyframes hotel-drawer-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hotel-attention__list button:hover,
+  .hotel-stay-card:hover,
+  .hotel-daily-care__list>button:hover,
+  .hotel-occupancy-span:hover {
+    border-color: color-mix(in srgb, var(--feature-sky) 76%, var(--border));
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-2px);
+  }
+}
+
+.business-hotel :is(button, a, input, select, textarea):focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 28%, transparent), var(--shadow-card);
+}
+
+@media (max-width: 1199px) {
+  .business-app-frame .business-hotel { width: min(100% - 2rem, 1440px); padding-block: 1.5rem calc(6.5rem + env(safe-area-inset-bottom)); }
+  .hotel-today-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hotel-toolbar { grid-template-columns: auto auto minmax(11rem, 1fr) auto; }
+  .hotel-toolbar__range { grid-column: 1 / 3; }
+}
+
+@media (max-width: 767px) {
+  .business-app-frame .business-hotel { width: min(100% - 1.5rem, 1440px); gap: 0.75rem; padding-block: 1.25rem calc(6.5rem + env(safe-area-inset-bottom)); }
+  .business-hotel .business-page-header { align-items: flex-start; gap: 0.75rem; }
+  .business-hotel .business-page-header__actions .button { min-height: 44px; padding-inline: 0.75rem; white-space: nowrap; }
+  .hotel-today-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .hotel-today-summary article:last-child { grid-column: 1 / -1; }
+  .hotel-toolbar { grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding: 0.625rem; }
+  .hotel-toolbar__date { min-width: 0; }
+  .hotel-toolbar__range { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hotel-toolbar__range button { width: 100%; }
+  .hotel-toolbar__search,
+  .hotel-toolbar__filter { grid-column: 1 / -1; }
+  .hotel-attention,
+  .hotel-occupancy,
+  .hotel-stays,
+  .hotel-arrivals,
+  .hotel-departures,
+  .hotel-daily-care { padding: 0.8rem; }
+  .hotel-attention__list { grid-template-columns: 1fr; }
+  .hotel-occupancy-board-wrap,
+  .hotel-occupancy__hint { display: none; }
+  .hotel-occupancy-mobile { display: grid; gap: 0.5rem; }
+  .hotel-occupancy-mobile article { display: grid; gap: 0.4rem; padding: 0.65rem; border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--background); }
+  .hotel-occupancy-mobile article>header { justify-content: space-between; gap: 0.5rem; }
+  .hotel-occupancy-mobile article>header>span { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--foreground); font-size: 0.875rem; }
+  .hotel-occupancy-mobile article>header small,
+  .hotel-occupancy-mobile article>p { margin: 0; color: var(--muted-foreground); font-size: 0.75rem; }
+  .hotel-occupancy-mobile article>button { gap: 0.45rem; padding: 0.45rem; border: 1px solid color-mix(in srgb, var(--feature-sky) 32%, var(--border)); border-radius: var(--radius-button); color: var(--foreground); background: var(--surface); font: inherit; text-align: left; }
+  .hotel-occupancy-mobile article>button>span:not(.business-identity-avatar) { display: grid; gap: 0.05rem; }
+  .hotel-occupancy-mobile article>button strong { font-size: 0.8125rem; }
+  .hotel-occupancy-mobile article>button small { color: var(--muted-foreground); font-size: 0.7rem; }
+  .hotel-stays__filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.2rem; }
+  .hotel-stays__filters button { flex: 0 0 auto; }
+  .hotel-stay-cards { grid-template-columns: 1fr; }
+  .hotel-daily-columns { grid-template-columns: 1fr; gap: 0.75rem; }
+  .hotel-daily-care__list>button { grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.5rem; }
+  .hotel-daily-care__task { grid-column: 2 / 3; }
+  .hotel-daily-care__state { display: none; }
+  .hotel-stay-detail { top: auto; right: 0; bottom: 0; left: 0; width: 100%; max-height: min(88vh, 48rem); border-bottom: 0; border-radius: var(--radius-card) var(--radius-card) 0 0; animation-name: hotel-sheet-in; }
+  .hotel-stay-detail__header { min-height: 78px; }
+}
+
+@keyframes hotel-sheet-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 430px) {
+  .hotel-section-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hotel-section-links a { min-width: 0; padding-inline: 0.35rem; }
+  .hotel-today-summary article { padding: 0.75rem; }
+  .hotel-today-summary article>strong { font-size: 1.4rem; }
+  .hotel-compact-list article { align-items: flex-start; }
+  .hotel-compact-list :is(a, button) { min-width: 38px; padding-inline: 0.45rem; }
+  .hotel-detail-date-fields { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 390px) {
+  .business-hotel .business-page-header__copy h1 { font-size: 1.375rem; }
+  .business-hotel .business-page-header__context { font-size: 0.8125rem; }
+  .hotel-toolbar>button { min-width: 44px; padding-inline: 0.5rem; }
+  .hotel-toolbar>button svg { margin: 0; }
+  .hotel-detail-section { padding: 0.75rem; }
+  .hotel-daily-care__list>button { padding: 0.55rem; }
+}
+
+@media (max-width: 320px) {
+  .business-app-frame .business-hotel { width: min(100% - 1rem, 1440px); }
+  .business-hotel .business-page-header { display: grid; }
+  .business-hotel .business-page-header__actions .button { width: 100%; }
+  .hotel-today-summary { grid-template-columns: 1fr; }
+  .hotel-today-summary article:last-child { grid-column: auto; }
+  .hotel-section-links { grid-template-columns: 1fr; }
+  .hotel-daily-care__list>button { grid-template-columns: auto minmax(0, 1fr); }
+  .hotel-daily-care__list>button>time { grid-column: 2 / 3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotel-attention__list button,
+  .hotel-stay-card,
+  .hotel-daily-care__list>button,
+  .hotel-occupancy-row,
+  .hotel-occupancy-span,
+  .hotel-stay-detail,
+  .hotel-stay-detail__backdrop {
+    animation: none !important;
+    transition: none !important;
+  }
+}

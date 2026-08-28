@@ -57,6 +57,7 @@ import {
   LuShieldAlert,
   LuShieldOff,
   LuSmartphone,
+  LuSlidersHorizontal,
   LuSparkles,
   LuSticker,
   LuStore,
@@ -155,6 +156,7 @@ export const ShieldCheck = meawIcon(LuShieldCheck);
 export const ShieldAlert = meawIcon(LuShieldAlert);
 export const ShieldOff = meawIcon(LuShieldOff);
 export const Smartphone = meawIcon(LuSmartphone);
+export const SlidersHorizontal = meawIcon(LuSlidersHorizontal);
 export const Sparkle = meawIcon(LuSparkles);
 export const Sticker = meawIcon(LuSticker);
 export const Storefront = meawIcon(LuStore);

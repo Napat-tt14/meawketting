@@ -4,7 +4,10 @@ import { assignedResourceId, resourcesForKind, withAssignedResource } from "./bo
 import { addCalendarDays } from "./calendarPresentation";
 
 export function HotelBookingFields({ draft, resources, describedBy, onDraftChange }: BookingServiceFieldsProps) {
-  const roomOptions = resourcesForKind(resources, "hotel-room-type");
+  // Booking reserves aggregate Hotel capacity. A specific room or zone is an
+  // execution-time decision in Hotel Operations, so Calendar never forces a
+  // room lock before Intake/check-in.
+  const roomOptions = resourcesForKind(resources, "hotel-room-type").filter((resource) => resource.hotelRole !== "room" && resource.hotelRole !== "zone");
   const selectedRoomId = assignedResourceId(draft, resources, "hotel-room-type");
   const checkInDate = draft.start.slice(0, 10);
   const checkOutDate = draft.end.slice(0, 10);
@@ -30,7 +33,7 @@ export function HotelBookingFields({ draft, resources, describedBy, onDraftChang
         </label>
       </div>
       <label className="booking-field">
-        <span>พื้นที่พักที่ต้องใช้</span>
+        <span>พื้นที่พักตามเงื่อนไข</span>
         <select
           id="booking-primary-resource"
           value={selectedRoomId}
@@ -41,6 +44,7 @@ export function HotelBookingFields({ draft, resources, describedBy, onDraftChang
           <option value="">เลือกพื้นที่พัก</option>
           {roomOptions.map((resource) => <option key={resource.id} value={resource.id}>{resource.label}</option>)}
         </select>
+        <small>ระบุห้องหรือโซนจริงตอนรับเข้าในหน้าโรงแรม</small>
       </label>
     </section>
   );

@@ -65,7 +65,7 @@ const SCANNER_COPY: Record<Exclude<ScannerState, "ready" | "camera-permission" |
   "access-changed": { title: "สิทธิ์เปลี่ยนระหว่างตรวจ", message: "ระบบหยุดขั้นตอนเพื่อไม่ใช้สิทธิ์ที่ล้าสมัย", recovery: "สแกน QR ชั่วคราวสำหรับร้านอีกครั้ง" },
 };
 
-export function BusinessScanner() {
+export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string | null }) {
   const [scannerState, setScannerState] = useState<ScannerState>("ready");
   const [context, setContext] = useState<DemoBusinessContext>(DEMO_BUSINESS_CONTEXTS[0]);
   const [manualCode, setManualCode] = useState("");
@@ -261,7 +261,7 @@ export function BusinessScanner() {
       setScannerState(gate === "expired" || gate === "revoked" || gate === "wrong-business" ? gate : "access-changed");
       return;
     }
-    const intake = createOrResumeBusinessIntake(access, context);
+    const intake = createOrResumeBusinessIntake(access, context, { hotelStayId });
     if (!intake) {
       setScannerState("network-error");
       return;

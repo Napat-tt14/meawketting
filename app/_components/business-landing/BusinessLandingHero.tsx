@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
@@ -137,12 +136,12 @@ export function BusinessLandingHero() {
         </div>
 
         <div className="business-homepage-hero__actions">
-          <Link className="button button--business button--large" href="/business/login">
+          <a className="button button--business button--large" href="/business/login">
             เข้าสู่ระบบสำหรับธุรกิจ <ArrowRight size={18} />
-          </Link>
-          <Link className="button button--business-ghost button--large" href="#business-core">
+          </a>
+          <a className="button button--business-ghost button--large" href="#business-core">
             ดูว่าระบบช่วยอะไรได้บ้าง <ChevronDown size={18} />
-          </Link>
+          </a>
         </div>
 
         <div className="business-homepage-hero__note">
@@ -153,9 +152,9 @@ export function BusinessLandingHero() {
           </p>
         </div>
 
-        <Link className="business-homepage-hero__guardian-link" href="#guardian">
+        <a className="business-homepage-hero__guardian-link" href="#guardian">
           สำหรับเจ้าของสัตว์เลี้ยง <ArrowRight size={16} />
-        </Link>
+        </a>
       </div>
 
       <div className="business-homepage-hero__showcase">
@@ -199,5 +198,4 @@ export function BusinessLandingHero() {
     </section>
   );
 }
-
 

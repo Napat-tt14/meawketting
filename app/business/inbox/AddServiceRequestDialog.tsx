@@ -9,12 +9,14 @@ export function AddServiceRequestDialog({
   conversationId,
   businessId,
   booking,
+  serviceJobId = null,
   onClose,
   onCreated,
 }: {
   conversationId: string;
   businessId: string;
-  booking: ConversationBookingContext;
+  booking: Pick<ConversationBookingContext, "bookingId" | "serviceLabel">;
+  serviceJobId?: string | null;
   onClose: () => void;
   onCreated: (request: PrototypeAddServiceRequestMessage) => void;
 }) {
@@ -63,6 +65,7 @@ export function AddServiceRequestDialog({
       conversationId,
       businessId,
       bookingId: booking.bookingId,
+      serviceJobId,
       serviceName,
       additionalPrice: Number(price),
       additionalMinutes: Number(minutes),

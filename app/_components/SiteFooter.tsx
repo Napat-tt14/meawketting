@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ArrowUpRight, PawPrint, Storefront } from "./icons";
 import { BrandMark } from "./BrandMark";
 
@@ -13,16 +12,16 @@ export function SiteFooter() {
 
         <nav className="business-public-footer__nav" aria-label="ลิงก์สำหรับธุรกิจ">
           <strong><Storefront size={18} /> สำหรับธุรกิจ</strong>
-          <Link href="#business-core">ระบบช่วยอะไรได้บ้าง</Link>
-          <Link href="#services">บริการที่รองรับ</Link>
-          <Link href="/business/login">เข้าสู่ระบบสำหรับธุรกิจ</Link>
+          <a href="#business-core">ระบบช่วยอะไรได้บ้าง</a>
+          <a href="#services">บริการที่รองรับ</a>
+          <a href="/business/login">เข้าสู่ระบบสำหรับธุรกิจ</a>
         </nav>
 
         <nav className="business-public-footer__nav" aria-label="ลิงก์สำหรับเจ้าของสัตว์เลี้ยง">
           <strong><PawPrint size={18} /> สำหรับเจ้าของสัตว์เลี้ยง</strong>
-          <Link href="/my-pets">สัตว์เลี้ยงของฉัน</Link>
-          <Link href="/create-passport">สร้าง Pet Passport</Link>
-          <Link href="#main-content">กลับด้านบน <ArrowUpRight size={15} /></Link>
+          <a href="/my-pets">สัตว์เลี้ยงของฉัน</a>
+          <a href="/create-passport">สร้าง Pet Passport</a>
+          <a href="#main-content">กลับด้านบน <ArrowUpRight size={15} /></a>
         </nav>
 
         <div className="business-public-footer__bottom">

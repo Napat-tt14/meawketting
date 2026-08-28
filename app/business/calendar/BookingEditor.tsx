@@ -332,6 +332,7 @@ export function BookingEditor({
         <header className="booking-editor__header">
           <h2 id="booking-editor-title">{initialBooking ? "แก้ไขการจอง" : "เพิ่มการจอง"}</h2>
           <div className="booking-editor__header-actions">
+            {initialBooking?.serviceModule === "grooming" ? <a href={`/business/grooming?jobId=${encodeURIComponent(initialBooking.bookingId)}`}><BusinessServiceIcon module="grooming" size={18} />ดูงานบริการ</a> : null}
             {initialBooking ? <a href={`/business/inbox?customerId=${encodeURIComponent(initialBooking.customer.id)}&petId=${encodeURIComponent(initialBooking.pets[0]?.id ?? "")}&bookingId=${encodeURIComponent(initialBooking.bookingId)}`}><MessageCircle size={18} />ส่งข้อความ</a> : null}
             <button ref={closeButtonRef} type="button" aria-label="ปิดการแก้ไขการจอง" onClick={onClose}><X size={20} /></button>
           </div>

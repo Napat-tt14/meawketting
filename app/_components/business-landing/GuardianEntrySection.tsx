@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight, IdentificationCard, PawPrint, ShieldCheck } from "../icons";
 
 export function GuardianEntrySection() {
@@ -16,12 +15,12 @@ export function GuardianEntrySection() {
           เพื่อให้การดูแลน้องและประวัติบริการอยู่ในความควบคุมของคุณ
         </p>
         <div className="guardian-entry-section__actions">
-          <Link className="button button--paper" href="/my-pets">
+          <a className="button button--paper" href="/my-pets">
             <ShieldCheck size={18} /> ดูสัตว์เลี้ยงของฉัน <ArrowRight size={16} />
-          </Link>
-          <Link className="guardian-entry-section__create-link" href="/create-passport">
+          </a>
+          <a className="guardian-entry-section__create-link" href="/create-passport">
             <IdentificationCard size={18} /> ยังไม่มี Passport? เริ่มสร้าง
-          </Link>
+          </a>
         </div>
       </div>
     </section>

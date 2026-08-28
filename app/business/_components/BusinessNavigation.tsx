@@ -22,6 +22,8 @@ import {
 import { BrandMark } from "../../_components/BrandMark";
 import {
   BUSINESS_MANAGEMENT_DESTINATIONS,
+  BUSINESS_GROOMING_DESTINATION,
+  BUSINESS_HOTEL_DESTINATION,
   BUSINESS_MODULE_LABELS,
   BUSINESS_TOP_DESTINATIONS,
   type BusinessDestinationKey,
@@ -35,6 +37,8 @@ const DESTINATION_ICONS: Record<BusinessDestinationKey, IconType> = {
   calendar: CalendarDays,
   customers: UsersRound,
   messages: MessageCircle,
+  grooming: Scissors,
+  hotel: BedDouble,
   finance: Wallet,
   reports: Chart,
   team: UserRoundCheck,
@@ -136,19 +140,31 @@ export function BusinessNavigation() {
           <span>หน้าหลัก</span>
         </Link>
         {BUSINESS_TOP_DESTINATIONS.map((item) => (
-          "href" in item
-            ? <LiveBusinessDestination
-              key={item.key}
-              destination={item}
-              active={pathname === item.href || (item.key === "customers" && pathname.startsWith("/business/customers/")) || (item.key === "messages" && pathname.startsWith("/business/inbox"))}
-              badge={item.key === "messages" ? unreadCount : 0}
-            />
-            : <PlannedBusinessDestination key={item.key} destinationKey={item.key} label={item.label} />
+          <LiveBusinessDestination
+            key={item.key}
+            destination={item}
+            active={pathname === item.href || (item.key === "customers" && pathname.startsWith("/business/customers/")) || (item.key === "messages" && pathname.startsWith("/business/inbox"))}
+            badge={item.key === "messages" ? unreadCount : 0}
+          />
         ))}
 
-        <div className="business-nav-group business-nav-group--services" aria-label="งานบริการที่ยังไม่เปิดใช้">
-          <p>งานบริการ · ยังไม่เปิดใช้</p>
-          {enabledModules.map((module) => <PlannedBusinessModule key={module} module={module} />)}
+        <div className="business-nav-group business-nav-group--services" aria-label="งานบริการ">
+          <p>งานบริการ</p>
+          {enabledModules.map((module) => (
+            module === "grooming" ? (
+              <LiveBusinessDestination
+                key={module}
+                destination={BUSINESS_GROOMING_DESTINATION}
+                active={pathname === BUSINESS_GROOMING_DESTINATION.href}
+              />
+            ) : module === "hotel" ? (
+              <LiveBusinessDestination
+                key={module}
+                destination={BUSINESS_HOTEL_DESTINATION}
+                active={pathname === BUSINESS_HOTEL_DESTINATION.href}
+              />
+            ) : <PlannedBusinessModule key={module} module={module} />
+          ))}
         </div>
 
         <div className="business-nav-group business-nav-group--management" aria-label="เมนูธุรกิจที่ยังไม่เปิดใช้">

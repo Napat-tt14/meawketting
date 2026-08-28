@@ -29,6 +29,12 @@ export const BUSINESS_SERVICE_MODULES: Record<BusinessServiceModule, { label: st
 // are operational demo references only; they do not mirror Pet Passport data
 // or establish a Customer/Guardian authority relationship.
 export const BOOKING_DEMO_DATE = "2026-08-18" as const;
+// Fixed operational reference keeps prototype timing deterministic instead of
+// treating the wall clock as a delayed workday during visual QA.
+export const GROOMING_DEMO_NOW = "2026-08-18T12:20" as const;
+// Hotel uses the same fixed operational day as Calendar and Grooming so
+// browser-local fixture behaviour remains deterministic during visual QA.
+export const HOTEL_DEMO_NOW = "2026-08-18T12:20" as const;
 
 export type BookingTimeModel = "appointment" | "date-range" | "day";
 export type BookingStatus = "pending" | "confirmed" | "arrived" | "cancelled";
@@ -119,6 +125,9 @@ export type DemoBookingResource = {
   capacityMode: BookingResourceCapacityMode;
   capacity: number;
   serviceIds: readonly string[];
+  // Hotel keeps planning capacity separate from execution rooms. This is
+  // optional so the BF-2 Resource fixtures remain compatible.
+  hotelRole?: "planning-capacity" | "room" | "zone";
 };
 
 export type PrototypeBooking = {
@@ -163,6 +172,201 @@ export type PrototypeBookingDraft = {
   notes: string;
   estimate: number | null;
   status: BookingStatus;
+};
+
+// A Service Job is the unit of work being executed. It deliberately keeps
+// Booking planning/status separate from live Grooming operations. The first
+// local implementation is Grooming-only, while the shared shape stays ready
+// for future service modules without inventing their workflows.
+export type ServiceJobStatus =
+  | "booked"
+  | "checked-in"
+  | "waiting"
+  | "in-service"
+  | "ready-for-pickup"
+  | "completed"
+  | "cancelled";
+
+export const SERVICE_JOB_STATUS_LABELS: Record<ServiceJobStatus, string> = {
+  booked: "รอรับเข้า",
+  "checked-in": "รับเข้าแล้ว",
+  waiting: "รอเริ่ม",
+  "in-service": "กำลังทำ",
+  "ready-for-pickup": "พร้อมรับกลับ",
+  completed: "เสร็จแล้ว",
+  cancelled: "ยกเลิก",
+};
+
+export type PrototypeServiceJobAddOn = {
+  id: string;
+  sourceRequestId: string | null;
+  label: string;
+  additionalPrice: number;
+  additionalMinutes: number;
+  approvedAt: string;
+};
+
+export type PrototypeServiceJobHistoryItem = {
+  id: string;
+  at: string;
+  type: "created" | "status" | "assignment" | "add-on" | "note" | "intake";
+  summary: string;
+};
+
+export type PrototypeServiceJob = {
+  serviceJobId: string;
+  bookingId: string;
+  intakeId: string | null;
+  businessId: string;
+  branchId: string;
+  customerId: string;
+  petId: string;
+  serviceModule: "grooming";
+  baseServiceId: string;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  estimatedDurationMinutes: number;
+  actualStartedAt: string | null;
+  actualCompletedAt: string | null;
+  assignedResourceIds: string[];
+  status: ServiceJobStatus;
+  businessNote: string;
+  addOns: PrototypeServiceJobAddOn[];
+  history: PrototypeServiceJobHistoryItem[];
+  createdAt: string;
+  updatedAt: string;
+  cancelledAt: string | null;
+};
+
+// Hotel execution is deliberately not coerced into the Grooming Service Job
+// status machine. A Stay references the shared Booking but preserves its own
+// arrival, occupancy, room movement, and daily-care facts per Pet.
+export type HotelStayStatus =
+  | "booked"
+  | "expected-today"
+  | "checked-in"
+  | "in-stay"
+  | "ready-for-checkout"
+  | "checked-out"
+  | "cancelled"
+  | "no-show";
+
+export const HOTEL_STAY_STATUS_LABELS: Record<HotelStayStatus, string> = {
+  booked: "กำลังจะเข้าพัก",
+  "expected-today": "เข้าพักวันนี้",
+  "checked-in": "เข้าพักแล้ว",
+  "in-stay": "พักอยู่",
+  "ready-for-checkout": "พร้อมรับกลับ",
+  "checked-out": "เช็กเอาต์แล้ว",
+  cancelled: "ยกเลิก",
+  "no-show": "ไม่มาตามนัด",
+};
+
+export type PrototypeHotelRoomAssignment = {
+  id: string;
+  roomId: string;
+  startDate: string;
+  // Exclusive end date, aligned with the shared Calendar stay model.
+  endDate: string | null;
+  assignedAt: string;
+  assignedBy: string | null;
+  reason: string | null;
+};
+
+export type PrototypeHotelRoomMove = {
+  id: string;
+  movedAt: string;
+  fromRoomId: string | null;
+  toRoomId: string;
+  reason: string | null;
+};
+
+export type PrototypeHotelCareTaskKind = "meal" | "water" | "activity" | "cleaning" | "check" | "other";
+export type PrototypeHotelCareTaskState = "pending" | "completed";
+
+export type PrototypeHotelCareTask = {
+  id: string;
+  kind: PrototypeHotelCareTaskKind;
+  label: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  state: PrototypeHotelCareTaskState;
+  completedAt: string | null;
+  completedBy: string | null;
+};
+
+export type PrototypeHotelStayHistoryItem = {
+  id: string;
+  at: string;
+  type: "created" | "status" | "room-assignment" | "room-move" | "care" | "note" | "intake" | "dates";
+  summary: string;
+};
+
+export type PrototypeHotelStay = {
+  hotelStayId: string;
+  bookingId: string;
+  intakeId: string | null;
+  businessId: string;
+  branchId: string;
+  customerId: string;
+  petId: string;
+  scheduledCheckIn: string;
+  scheduledCheckOut: string;
+  actualCheckInAt: string | null;
+  actualCheckOutAt: string | null;
+  status: HotelStayStatus;
+  roomAssignments: PrototypeHotelRoomAssignment[];
+  roomMoveHistory: PrototypeHotelRoomMove[];
+  // This field is supplied into the Business booking/intake context. It is
+  // never a copy of a Guardian-controlled Passport field.
+  guardianCareInstruction: string | null;
+  businessNote: string;
+  dailyCareTasks: PrototypeHotelCareTask[];
+  history: PrototypeHotelStayHistoryItem[];
+  createdAt: string;
+  updatedAt: string;
+  cancelledAt: string | null;
+};
+
+export type HotelRoomAvailabilityConflict = {
+  roomId: string;
+  roomLabel: string;
+  message: string;
+  stayIds: string[];
+  dates: string[];
+};
+
+export type HotelRoomAvailability = {
+  available: boolean;
+  conflicts: HotelRoomAvailabilityConflict[];
+};
+
+export type HotelStayTransitionResult =
+  | { ok: true; stay: PrototypeHotelStay; duplicate: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "invalid-transition" | "room-required" | "intake-required" | "care-incomplete" | "storage"; stay?: PrototypeHotelStay };
+
+export type AssignPrototypeHotelStayRoomResult =
+  | { ok: true; stay: PrototypeHotelStay; availability: HotelRoomAvailability }
+  | { ok: false; reason: "missing" | "wrong-context" | "unavailable" | "storage"; availability?: HotelRoomAvailability };
+
+export type UpdatePrototypeHotelStayDatesResult =
+  | { ok: true; stay: PrototypeHotelStay }
+  | { ok: false; reason: "missing" | "wrong-context" | "invalid-dates" | "unavailable" | "storage"; availability?: HotelRoomAvailability };
+
+export type ServiceJobTransitionResult =
+  | { ok: true; job: PrototypeServiceJob; duplicate: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "invalid-transition" | "storage"; job?: PrototypeServiceJob };
+
+export type ServiceJobResourceConflict = {
+  resourceId: string;
+  resourceLabel: string;
+  message: string;
+  conflictingJobIds: string[];
+};
+
+export type ServiceJobResourceAvailability = {
+  available: boolean;
+  conflicts: ServiceJobResourceConflict[];
 };
 
 export type BookingConflictCode =
@@ -216,8 +420,7 @@ export type CancelPrototypeBookingResult =
 export type BusinessHomeDemo = {
   today: {
     waitingIntake: number;
-    inService: number;
-    readyForPickup: number;
+    readyForPickup?: number;
   };
   attention: readonly {
     id: string;
@@ -289,6 +492,15 @@ export const DEMO_CUSTOMER_FIXTURES: readonly PrototypeCustomer[] = [
         id: "booking-pet-milo",
         name: "Milo",
         species: "dog",
+        passportConnection: "unlinked",
+        dataSource: "customer-reported",
+        businessNote: "",
+        passportSlug: null,
+      },
+      {
+        id: "booking-pet-biscuit",
+        name: "Biscuit",
+        species: "cat",
         passportConnection: "unlinked",
         dataSource: "customer-reported",
         businessNote: "",
@@ -459,11 +671,20 @@ export const DEMO_BOOKING_RESOURCES: readonly DemoBookingResource[] = [
   { id: "ari-station-b", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "grooming", kind: "grooming-station", label: "จุดบริการ B", capacityMode: "exclusive", capacity: 1, serviceIds: ["ari-grooming-bath-groom"] },
   { id: "ari-dryer-1", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "grooming", kind: "dryer", label: "เครื่องเป่า 1", capacityMode: "exclusive", capacity: 1, serviceIds: ["ari-grooming-bath-groom"] },
   { id: "ari-dryer-2", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "grooming", kind: "dryer", label: "เครื่องเป่า 2", capacityMode: "exclusive", capacity: 1, serviceIds: ["ari-grooming-bath-groom"] },
-  { id: "ari-hotel-capacity", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "hotel", kind: "hotel-room-type", label: "พื้นที่พักตามเงื่อนไข", capacityMode: "capacity", capacity: 2, serviceIds: ["ari-hotel-stay"] },
+  // Calendar reserves the aggregate planning capacity. Room/zone selection
+  // stays an execution decision in Hotel Operations and is not locked by a
+  // Booking.
+  { id: "ari-hotel-capacity", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "hotel", kind: "hotel-room-type", label: "พื้นที่พักตามเงื่อนไข", capacityMode: "capacity", capacity: 2, serviceIds: ["ari-hotel-stay"], hotelRole: "planning-capacity" },
+  { id: "ari-hotel-room-a01", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "hotel", kind: "hotel-room-type", label: "ห้อง A01", capacityMode: "capacity", capacity: 1, serviceIds: ["ari-hotel-stay"], hotelRole: "room" },
+  { id: "ari-hotel-room-a02", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "hotel", kind: "hotel-room-type", label: "ห้อง A02", capacityMode: "capacity", capacity: 1, serviceIds: ["ari-hotel-stay"], hotelRole: "room" },
+  { id: "ari-hotel-room-b03", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "hotel", kind: "hotel-room-type", label: "ห้อง B03", capacityMode: "capacity", capacity: 1, serviceIds: ["ari-hotel-stay"], hotelRole: "room" },
+  { id: "ari-hotel-zone-quiet", businessId: "business-whisker-rest", branchId: "whisker-ari", module: "hotel", kind: "hotel-room-type", label: "โซนสงบ C01", capacityMode: "capacity", capacity: 1, serviceIds: ["ari-hotel-stay"], hotelRole: "zone" },
   { id: "thonglor-groomer-nok", businessId: "business-whisker-rest", branchId: "whisker-thonglor", module: "grooming", kind: "groomer", label: "ช่างนก", capacityMode: "exclusive", capacity: 1, serviceIds: ["thonglor-grooming-bath"] },
   { id: "thonglor-station-a", businessId: "business-whisker-rest", branchId: "whisker-thonglor", module: "grooming", kind: "grooming-station", label: "จุดบริการ A", capacityMode: "exclusive", capacity: 1, serviceIds: ["thonglor-grooming-bath"] },
   { id: "thonglor-dryer-1", businessId: "business-whisker-rest", branchId: "whisker-thonglor", module: "grooming", kind: "dryer", label: "เครื่องเป่า 1", capacityMode: "exclusive", capacity: 1, serviceIds: ["thonglor-grooming-bath"] },
-  { id: "onnut-hotel-capacity", businessId: "business-paw-partner", branchId: "partner-onnut", module: "hotel", kind: "hotel-room-type", label: "พื้นที่พักตามเงื่อนไข", capacityMode: "capacity", capacity: 2, serviceIds: ["onnut-hotel-stay"] },
+  { id: "onnut-hotel-capacity", businessId: "business-paw-partner", branchId: "partner-onnut", module: "hotel", kind: "hotel-room-type", label: "พื้นที่พักตามเงื่อนไข", capacityMode: "capacity", capacity: 2, serviceIds: ["onnut-hotel-stay"], hotelRole: "planning-capacity" },
+  { id: "onnut-hotel-room-r01", businessId: "business-paw-partner", branchId: "partner-onnut", module: "hotel", kind: "hotel-room-type", label: "ห้อง R01", capacityMode: "capacity", capacity: 1, serviceIds: ["onnut-hotel-stay"], hotelRole: "room" },
+  { id: "onnut-hotel-zone-quiet", businessId: "business-paw-partner", branchId: "partner-onnut", module: "hotel", kind: "hotel-room-type", label: "โซนสงบ R02", capacityMode: "capacity", capacity: 1, serviceIds: ["onnut-hotel-stay"], hotelRole: "zone" },
   { id: "onnut-daycare-social", businessId: "business-paw-partner", branchId: "partner-onnut", module: "daycare", kind: "daycare-zone", label: "โซนสังคม", capacityMode: "capacity", capacity: 2, serviceIds: ["onnut-daycare-full-day"] },
   { id: "onnut-daycare-quiet", businessId: "business-paw-partner", branchId: "partner-onnut", module: "daycare", kind: "daycare-zone", label: "โซนสงบ", capacityMode: "capacity", capacity: 6, serviceIds: ["onnut-daycare-full-day"] },
 ] as const;
@@ -495,6 +716,86 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     cancelledAt: null,
   },
   {
+    bookingId: "booking-fixture-ari-grooming-biscuit",
+    customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
+    pets: [{ id: "booking-pet-biscuit", name: "Biscuit", species: "cat" }],
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    serviceModule: "grooming",
+    service: { id: "ari-grooming-bath-groom", label: "อาบน้ำ / ตัดขน" },
+    timeModel: "appointment",
+    start: "2026-08-18T08:00",
+    end: "2026-08-18T09:00",
+    requiredResources: ["groomer", "grooming-station", "dryer"],
+    assignedResources: ["ari-groomer-pim", "ari-station-a", "ari-dryer-1"],
+    status: "arrived",
+    estimate: 850,
+    notes: "งานเช้าที่เสร็จแล้วสำหรับตรวจประวัติบริการ",
+    createdAt: BOOKING_FIXTURE_CREATED_AT,
+    updatedAt: BOOKING_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    bookingId: "booking-fixture-ari-grooming-tofu-active",
+    customer: { id: "booking-contact-pim", name: "คุณพิม" },
+    pets: [{ id: "booking-pet-tofu", name: "Tofu", species: "dog" }],
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    serviceModule: "grooming",
+    service: { id: "ari-grooming-bath-groom", label: "อาบน้ำ / ตัดขน" },
+    timeModel: "appointment",
+    start: "2026-08-18T09:15",
+    end: "2026-08-18T10:45",
+    requiredResources: ["groomer", "grooming-station", "dryer"],
+    assignedResources: ["ari-groomer-joy", "ari-station-b", "ari-dryer-2"],
+    status: "arrived",
+    estimate: 850,
+    notes: "ใช้แสดงงานที่กำลังรอช่างรับช่วง",
+    createdAt: BOOKING_FIXTURE_CREATED_AT,
+    updatedAt: BOOKING_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    bookingId: "booking-fixture-ari-grooming-milo",
+    customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
+    pets: [{ id: "booking-pet-milo", name: "Milo", species: "dog" }],
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    serviceModule: "grooming",
+    service: { id: "ari-grooming-bath-groom", label: "อาบน้ำ / ตัดขน" },
+    timeModel: "appointment",
+    start: "2026-08-18T12:15",
+    end: "2026-08-18T13:45",
+    requiredResources: ["groomer", "grooming-station", "dryer"],
+    assignedResources: ["ari-groomer-joy", "ari-station-b", "ari-dryer-2"],
+    status: "arrived",
+    estimate: 850,
+    notes: "รอเจ้าของมารับหลังเสร็จบริการ",
+    createdAt: BOOKING_FIXTURE_CREATED_AT,
+    updatedAt: BOOKING_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    bookingId: "booking-fixture-ari-grooming-luna",
+    customer: { id: "booking-contact-pim", name: "คุณพิม" },
+    pets: [{ id: "booking-pet-luna", name: "Luna", species: "cat" }],
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    serviceModule: "grooming",
+    service: { id: "ari-grooming-bath-groom", label: "อาบน้ำ / ตัดขน" },
+    timeModel: "appointment",
+    start: "2026-08-18T14:30",
+    end: "2026-08-18T16:00",
+    requiredResources: ["groomer", "grooming-station", "dryer"],
+    assignedResources: ["ari-groomer-pim", "ari-station-a", "ari-dryer-1"],
+    status: "confirmed",
+    estimate: 850,
+    notes: "มีสิทธิ์สแกนรับเข้าเพื่อเชื่อม Intake กับงานนี้",
+    createdAt: BOOKING_FIXTURE_CREATED_AT,
+    updatedAt: BOOKING_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
     bookingId: "booking-fixture-ari-hotel-luna",
     customer: { id: "booking-contact-pim", name: "คุณพิม" },
     pets: [{ id: "booking-pet-luna", name: "Luna", species: "cat" }],
@@ -515,6 +816,26 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     cancelledAt: null,
   },
   {
+    bookingId: "booking-fixture-ari-hotel-biscuit-checkout",
+    customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
+    pets: [{ id: "booking-pet-biscuit", name: "Biscuit", species: "cat" }],
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    serviceModule: "hotel",
+    service: { id: "ari-hotel-stay", label: "เข้าพักโรงแรม" },
+    timeModel: "date-range",
+    start: "2026-08-16",
+    end: "2026-08-18",
+    requiredResources: ["hotel-room-type"],
+    assignedResources: ["ari-hotel-capacity"],
+    status: "confirmed",
+    estimate: 2400,
+    notes: "เตรียมรับกลับวันนี้",
+    createdAt: BOOKING_FIXTURE_CREATED_AT,
+    updatedAt: BOOKING_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
     bookingId: "booking-fixture-ari-hotel-milo",
     customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
     pets: [{ id: "booking-pet-milo", name: "Milo", species: "dog" }],
@@ -530,6 +851,31 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
     status: "confirmed",
     estimate: 1200,
     notes: "พื้นที่พักเต็มในวันที่ 19 สิงหาคม",
+    createdAt: BOOKING_FIXTURE_CREATED_AT,
+    updatedAt: BOOKING_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    // A future grouped Booking proves that operational Stay and care state
+    // stays per Pet even when the Customer contacts the Business once.
+    bookingId: "booking-fixture-ari-hotel-nalin-pair",
+    customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
+    pets: [
+      { id: "booking-pet-mochi", name: "Mochi", species: "cat" },
+      { id: "booking-pet-biscuit", name: "Biscuit", species: "cat" },
+    ],
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    serviceModule: "hotel",
+    service: { id: "ari-hotel-stay", label: "เข้าพักโรงแรม" },
+    timeModel: "date-range",
+    start: "2026-08-24",
+    end: "2026-08-26",
+    requiredResources: ["hotel-room-type"],
+    assignedResources: ["ari-hotel-capacity"],
+    status: "confirmed",
+    estimate: 4800,
+    notes: "ลูกค้าเข้าพักพร้อมน้องสองตัว แต่ต้องจัดห้องและดูแลแยกกัน",
     createdAt: BOOKING_FIXTURE_CREATED_AT,
     updatedAt: BOOKING_FIXTURE_CREATED_AT,
     cancelledAt: null,
@@ -619,32 +965,347 @@ export const DEMO_BOOKING_FIXTURES: readonly PrototypeBooking[] = [
   },
 ] as const;
 
+const SERVICE_JOB_FIXTURE_CREATED_AT = "2026-08-18T01:00:00.000Z";
+
+// BF-5 execution fixtures reference the shared Booking, Customer/Pet, and
+// Resource fixtures above. They intentionally do not copy Customer/Pet data.
+// Each Grooming Job represents one Pet's work inside a Booking; grouped
+// Booking policy remains an open product question.
+export const DEMO_GROOMING_SERVICE_JOB_FIXTURES: readonly PrototypeServiceJob[] = [
+  {
+    serviceJobId: "grooming-job-fixture-biscuit",
+    bookingId: "booking-fixture-ari-grooming-biscuit",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-biscuit",
+    serviceModule: "grooming",
+    baseServiceId: "ari-grooming-bath-groom",
+    scheduledStart: "2026-08-18T08:00",
+    scheduledEnd: "2026-08-18T09:00",
+    estimatedDurationMinutes: 60,
+    actualStartedAt: "2026-08-18T08:04:00.000Z",
+    actualCompletedAt: "2026-08-18T09:08:00.000Z",
+    assignedResourceIds: ["ari-groomer-pim", "ari-station-a", "ari-dryer-1"],
+    status: "completed",
+    businessNote: "เช็กความเรียบร้อยก่อนส่งกลับแล้ว",
+    addOns: [],
+    history: [
+      { id: "history-biscuit-created", at: SERVICE_JOB_FIXTURE_CREATED_AT, type: "created", summary: "สร้างงานจากการจอง" },
+      { id: "history-biscuit-completed", at: "2026-08-18T09:08:00.000Z", type: "status", summary: "งานเสร็จแล้ว" },
+    ],
+    createdAt: SERVICE_JOB_FIXTURE_CREATED_AT,
+    updatedAt: "2026-08-18T09:08:00.000Z",
+    cancelledAt: null,
+  },
+  {
+    serviceJobId: "grooming-job-fixture-tofu",
+    bookingId: "booking-fixture-ari-grooming-tofu-active",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-pim",
+    petId: "booking-pet-tofu",
+    serviceModule: "grooming",
+    baseServiceId: "ari-grooming-bath-groom",
+    scheduledStart: "2026-08-18T09:15",
+    scheduledEnd: "2026-08-18T10:45",
+    estimatedDurationMinutes: 90,
+    actualStartedAt: null,
+    actualCompletedAt: null,
+    // Planned assignment stays on Booking. This execution Job intentionally
+    // awaits a groomer hand-off so the attention state remains actionable.
+    assignedResourceIds: ["ari-station-b", "ari-dryer-2"],
+    status: "waiting",
+    businessNote: "รอระบุช่างก่อนเริ่มงาน",
+    addOns: [],
+    history: [
+      { id: "history-tofu-created", at: SERVICE_JOB_FIXTURE_CREATED_AT, type: "created", summary: "สร้างงานจากการจอง" },
+      { id: "history-tofu-waiting", at: "2026-08-18T02:20:00.000Z", type: "status", summary: "รับเข้าแล้ว รอเริ่มบริการ" },
+    ],
+    createdAt: SERVICE_JOB_FIXTURE_CREATED_AT,
+    updatedAt: "2026-08-18T02:20:00.000Z",
+    cancelledAt: null,
+  },
+  {
+    serviceJobId: "grooming-job-fixture-mochi",
+    bookingId: "booking-fixture-ari-grooming-1030",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-mochi",
+    serviceModule: "grooming",
+    baseServiceId: "ari-grooming-bath-groom",
+    scheduledStart: "2026-08-18T10:30",
+    scheduledEnd: "2026-08-18T12:00",
+    estimatedDurationMinutes: 90,
+    actualStartedAt: "2026-08-18T10:42:00.000Z",
+    actualCompletedAt: null,
+    assignedResourceIds: ["ari-groomer-pim", "ari-station-a", "ari-dryer-1"],
+    status: "in-service",
+    businessNote: "ดูแลบริเวณขาหน้าตามที่ลูกค้าแจ้ง",
+    addOns: [],
+    history: [
+      { id: "history-mochi-created", at: SERVICE_JOB_FIXTURE_CREATED_AT, type: "created", summary: "สร้างงานจากการจอง" },
+      { id: "history-mochi-started", at: "2026-08-18T10:42:00.000Z", type: "status", summary: "เริ่มอาบน้ำ / ตัดขน" },
+    ],
+    createdAt: SERVICE_JOB_FIXTURE_CREATED_AT,
+    updatedAt: "2026-08-18T10:42:00.000Z",
+    cancelledAt: null,
+  },
+  {
+    serviceJobId: "grooming-job-fixture-milo",
+    bookingId: "booking-fixture-ari-grooming-milo",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-milo",
+    serviceModule: "grooming",
+    baseServiceId: "ari-grooming-bath-groom",
+    scheduledStart: "2026-08-18T12:15",
+    scheduledEnd: "2026-08-18T13:45",
+    estimatedDurationMinutes: 90,
+    actualStartedAt: "2026-08-18T12:17:00.000Z",
+    actualCompletedAt: null,
+    assignedResourceIds: ["ari-groomer-joy", "ari-station-b", "ari-dryer-2"],
+    status: "ready-for-pickup",
+    businessNote: "แจ้งลูกค้าก่อนรับกลับตามหมายเหตุของร้าน",
+    addOns: [],
+    history: [
+      { id: "history-milo-created", at: SERVICE_JOB_FIXTURE_CREATED_AT, type: "created", summary: "สร้างงานจากการจอง" },
+      { id: "history-milo-ready", at: "2026-08-18T13:38:00.000Z", type: "status", summary: "พร้อมรับกลับ" },
+    ],
+    createdAt: SERVICE_JOB_FIXTURE_CREATED_AT,
+    updatedAt: "2026-08-18T13:38:00.000Z",
+    cancelledAt: null,
+  },
+  {
+    serviceJobId: "grooming-job-fixture-luna",
+    bookingId: "booking-fixture-ari-grooming-luna",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-pim",
+    petId: "booking-pet-luna",
+    serviceModule: "grooming",
+    baseServiceId: "ari-grooming-bath-groom",
+    scheduledStart: "2026-08-18T14:30",
+    scheduledEnd: "2026-08-18T16:00",
+    estimatedDurationMinutes: 90,
+    actualStartedAt: null,
+    actualCompletedAt: null,
+    assignedResourceIds: ["ari-groomer-pim", "ari-station-a", "ari-dryer-1"],
+    status: "booked",
+    businessNote: "รอรับเข้า · เชื่อมได้จาก QR Intake fixture",
+    addOns: [],
+    history: [{ id: "history-luna-created", at: SERVICE_JOB_FIXTURE_CREATED_AT, type: "created", summary: "สร้างงานจากการจอง" }],
+    createdAt: SERVICE_JOB_FIXTURE_CREATED_AT,
+    updatedAt: SERVICE_JOB_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+] as const;
+
+const HOTEL_STAY_FIXTURE_CREATED_AT = "2026-08-18T01:00:00.000Z";
+
+// BF-6 execution fixtures intentionally reference Booking, Customer/Pet, and
+// shared Room/Zone resources by ID only. They are not a mirror of Passport
+// data, and a grouped Booking projects one independent Stay per Pet.
+export const DEMO_HOTEL_STAY_FIXTURES: readonly PrototypeHotelStay[] = [
+  {
+    hotelStayId: "hotel-stay-fixture-luna",
+    bookingId: "booking-fixture-ari-hotel-luna",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-pim",
+    petId: "booking-pet-luna",
+    scheduledCheckIn: "2026-08-18",
+    scheduledCheckOut: "2026-08-21",
+    actualCheckInAt: "2026-08-18T08:40:00.000Z",
+    actualCheckOutAt: null,
+    status: "in-stay",
+    roomAssignments: [{
+      id: "hotel-room-assignment-luna-a01",
+      roomId: "ari-hotel-room-a01",
+      startDate: "2026-08-18",
+      endDate: "2026-08-21",
+      assignedAt: "2026-08-18T08:40:00.000Z",
+      assignedBy: "พนักงานรับเข้า",
+      reason: null,
+    }],
+    roomMoveHistory: [],
+    guardianCareInstruction: "ให้อาหารตามตารางที่ลูกค้าแจ้ง และแยกชามน้ำไว้ในห้อง",
+    businessNote: "สังเกตน้ำดื่มช่วงบ่ายก่อนส่งอัปเดตให้เจ้าของ",
+    dailyCareTasks: [
+      { id: "hotel-care-luna-breakfast", kind: "meal", label: "อาหารเช้า", scheduledDate: BOOKING_DEMO_DATE, scheduledTime: "08:00", state: "completed", completedAt: "2026-08-18T08:06:00.000Z", completedBy: "พนักงานรับเข้า" },
+      { id: "hotel-care-luna-water", kind: "water", label: "ตรวจน้ำ", scheduledDate: BOOKING_DEMO_DATE, scheduledTime: "12:00", state: "pending", completedAt: null, completedBy: null },
+      { id: "hotel-care-luna-evening", kind: "meal", label: "อาหารเย็น", scheduledDate: BOOKING_DEMO_DATE, scheduledTime: "18:00", state: "pending", completedAt: null, completedBy: null },
+      { id: "hotel-care-luna-clean", kind: "cleaning", label: "ทำความสะอาดห้อง", scheduledDate: BOOKING_DEMO_DATE, scheduledTime: "16:00", state: "pending", completedAt: null, completedBy: null },
+    ],
+    history: [
+      { id: "hotel-history-luna-created", at: HOTEL_STAY_FIXTURE_CREATED_AT, type: "created", summary: "สร้างรายการเข้าพักจากการจอง" },
+      { id: "hotel-history-luna-check-in", at: "2026-08-18T08:40:00.000Z", type: "intake", summary: "รับเข้าจาก Intake และระบุห้อง A01" },
+      { id: "hotel-history-luna-in-stay", at: "2026-08-18T08:45:00.000Z", type: "status", summary: "เริ่มการเข้าพัก" },
+    ],
+    createdAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    updatedAt: "2026-08-18T08:45:00.000Z",
+    cancelledAt: null,
+  },
+  {
+    hotelStayId: "hotel-stay-fixture-biscuit-checkout",
+    bookingId: "booking-fixture-ari-hotel-biscuit-checkout",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-biscuit",
+    scheduledCheckIn: "2026-08-16",
+    scheduledCheckOut: "2026-08-18",
+    actualCheckInAt: "2026-08-16T10:20:00.000Z",
+    actualCheckOutAt: null,
+    status: "ready-for-checkout",
+    roomAssignments: [{
+      id: "hotel-room-assignment-biscuit-a02",
+      roomId: "ari-hotel-room-a02",
+      startDate: "2026-08-16",
+      endDate: "2026-08-18",
+      assignedAt: "2026-08-16T10:20:00.000Z",
+      assignedBy: "พนักงานรับเข้า",
+      reason: null,
+    }],
+    roomMoveHistory: [],
+    guardianCareInstruction: null,
+    businessNote: "ตรวจของที่นำมาด้วยก่อนส่งกลับ",
+    dailyCareTasks: [
+      { id: "hotel-care-biscuit-breakfast", kind: "meal", label: "อาหารเช้า", scheduledDate: BOOKING_DEMO_DATE, scheduledTime: "08:00", state: "completed", completedAt: "2026-08-18T08:05:00.000Z", completedBy: "พนักงานรับเข้า" },
+      { id: "hotel-care-biscuit-check", kind: "check", label: "ตรวจความพร้อมรับกลับ", scheduledDate: BOOKING_DEMO_DATE, scheduledTime: "11:30", state: "pending", completedAt: null, completedBy: null },
+    ],
+    history: [
+      { id: "hotel-history-biscuit-created", at: "2026-08-16T10:10:00.000Z", type: "created", summary: "สร้างรายการเข้าพักจากการจอง" },
+      { id: "hotel-history-biscuit-ready", at: "2026-08-18T09:10:00.000Z", type: "status", summary: "เตรียมพร้อมรับกลับ" },
+    ],
+    createdAt: "2026-08-16T10:10:00.000Z",
+    updatedAt: "2026-08-18T09:10:00.000Z",
+    cancelledAt: null,
+  },
+  {
+    hotelStayId: "hotel-stay-fixture-milo",
+    bookingId: "booking-fixture-ari-hotel-milo",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-milo",
+    scheduledCheckIn: "2026-08-19",
+    scheduledCheckOut: "2026-08-20",
+    actualCheckInAt: null,
+    actualCheckOutAt: null,
+    status: "booked",
+    roomAssignments: [],
+    roomMoveHistory: [],
+    guardianCareInstruction: null,
+    businessNote: "รอเลือกห้องในวันรับเข้า",
+    dailyCareTasks: [],
+    history: [{ id: "hotel-history-milo-created", at: HOTEL_STAY_FIXTURE_CREATED_AT, type: "created", summary: "สร้างรายการเข้าพักจากการจอง" }],
+    createdAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    updatedAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    hotelStayId: "hotel-stay-fixture-mochi-pair",
+    bookingId: "booking-fixture-ari-hotel-nalin-pair",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-mochi",
+    scheduledCheckIn: "2026-08-24",
+    scheduledCheckOut: "2026-08-26",
+    actualCheckInAt: null,
+    actualCheckOutAt: null,
+    status: "booked",
+    roomAssignments: [],
+    roomMoveHistory: [],
+    guardianCareInstruction: null,
+    businessNote: "รายการเข้าพักร่วมกับ Biscuit แต่ดูแลแยกตามน้อง",
+    dailyCareTasks: [],
+    history: [{ id: "hotel-history-mochi-pair-created", at: HOTEL_STAY_FIXTURE_CREATED_AT, type: "created", summary: "สร้างรายการเข้าพักจากการจองแบบหลายตัว" }],
+    createdAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    updatedAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    hotelStayId: "hotel-stay-fixture-biscuit-pair",
+    bookingId: "booking-fixture-ari-hotel-nalin-pair",
+    intakeId: null,
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-biscuit",
+    scheduledCheckIn: "2026-08-24",
+    scheduledCheckOut: "2026-08-26",
+    actualCheckInAt: null,
+    actualCheckOutAt: null,
+    status: "booked",
+    roomAssignments: [],
+    roomMoveHistory: [],
+    guardianCareInstruction: null,
+    businessNote: "รายการเข้าพักร่วมกับ Mochi แต่ดูแลแยกตามน้อง",
+    dailyCareTasks: [],
+    history: [{ id: "hotel-history-biscuit-pair-created", at: HOTEL_STAY_FIXTURE_CREATED_AT, type: "created", summary: "สร้างรายการเข้าพักจากการจองแบบหลายตัว" }],
+    createdAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    updatedAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+  {
+    hotelStayId: "hotel-stay-fixture-leo",
+    bookingId: "booking-fixture-onnut-hotel-leo",
+    intakeId: null,
+    businessId: "business-paw-partner",
+    branchId: "partner-onnut",
+    customerId: "booking-contact-onnut-lee",
+    petId: "booking-pet-leo",
+    scheduledCheckIn: "2026-08-18",
+    scheduledCheckOut: "2026-08-20",
+    actualCheckInAt: null,
+    actualCheckOutAt: null,
+    status: "expected-today",
+    roomAssignments: [],
+    roomMoveHistory: [],
+    guardianCareInstruction: null,
+    businessNote: "รอสแกน Intake และเลือกห้องก่อนรับเข้า",
+    dailyCareTasks: [],
+    history: [{ id: "hotel-history-leo-created", at: HOTEL_STAY_FIXTURE_CREATED_AT, type: "created", summary: "สร้างรายการเข้าพักจากการจอง" }],
+    createdAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    updatedAt: HOTEL_STAY_FIXTURE_CREATED_AT,
+    cancelledAt: null,
+  },
+] as const;
+
 const DEMO_BUSINESS_HOME: Record<string, BusinessHomeDemo> = {
   "whisker-ari-frontdesk": {
-    today: { waitingIntake: 3, inService: 5, readyForPickup: 2 },
+    today: { waitingIntake: 3 },
     attention: [
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 2 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
-      { id: "pickup", tone: "ready", title: "มีน้องพร้อมรับกลับ 2 ตัว", detail: "ตรวจของที่นำมาด้วยก่อนส่งมอบ" },
     ],
     moduleSummaries: {
-      grooming: { value: "8 งานวันนี้", detail: "ภาพรวมคิวของสาขา" },
       hotel: { value: "12 / 18 ห้องมีผู้เข้าพัก", detail: "ภาพรวมการเข้าพัก" },
     },
     revenueToday: 12450,
   },
   "whisker-thonglor-frontdesk": {
-    today: { waitingIntake: 2, inService: 3, readyForPickup: 1 },
+    today: { waitingIntake: 2 },
     attention: [
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 1 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
-      { id: "pickup", tone: "ready", title: "มีน้องพร้อมรับกลับ 1 ตัว", detail: "ตรวจของที่นำมาด้วยก่อนส่งมอบ" },
     ],
-    moduleSummaries: {
-      grooming: { value: "5 งานวันนี้", detail: "ภาพรวมคิวของสาขา" },
-    },
+    moduleSummaries: {},
     revenueToday: 7200,
   },
   "paw-partner-onnut": {
-    today: { waitingIntake: 1, inService: 7, readyForPickup: 3 },
+    today: { waitingIntake: 1, readyForPickup: 3 },
     attention: [
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 1 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
       { id: "pickup", tone: "ready", title: "มีน้องพร้อมรับกลับ 3 ตัว", detail: "ตรวจของที่นำมาด้วยก่อนส่งมอบ" },
@@ -691,6 +1352,10 @@ export type BusinessIntakeRecord = {
   branchId: string;
   customerId: string | null;
   petRelationshipId: string | null;
+  serviceJobId: string | null;
+  // Optional BF-6 execution handoff. This references a Stay rather than
+  // inventing a second intake subsystem for Hotel.
+  hotelStayId: string | null;
   role: string;
   staffLabel: string;
   servicePurpose: string;
@@ -710,6 +1375,8 @@ type BusinessStore = {
   activeContextKey: string;
   intakes: Record<string, BusinessIntakeRecord>;
   bookings: Record<string, PrototypeBooking>;
+  serviceJobs: Record<string, PrototypeServiceJob>;
+  hotelStays: Record<string, PrototypeHotelStay>;
   customers: Record<string, PrototypeCustomer>;
 };
 
@@ -723,6 +1390,8 @@ const emptyStore = (): BusinessStore => ({
   activeContextKey: DEFAULT_BUSINESS_CONTEXT_KEY,
   intakes: {},
   bookings: {},
+  serviceJobs: {},
+  hotelStays: {},
   customers: {},
 });
 
@@ -738,6 +1407,12 @@ function readStore(): BusinessStore {
       // BF-1 stores only activeContextKey/intakes. Defaulting this field keeps
       // existing same-tab Intake state intact while BF-2 data is introduced.
       bookings: parsed.bookings && typeof parsed.bookings === "object" && !Array.isArray(parsed.bookings) ? parsed.bookings : {},
+      // BF-5 extends the same local Business envelope. Existing BF-1–BF-4
+      // tabs keep their state when no Service Job slice exists yet.
+      serviceJobs: parsed.serviceJobs && typeof parsed.serviceJobs === "object" && !Array.isArray(parsed.serviceJobs) ? parsed.serviceJobs : {},
+      // BF-6 uses the same envelope for Hotel execution. Existing browser
+      // tabs remain compatible until their first Hotel mutation.
+      hotelStays: parsed.hotelStays && typeof parsed.hotelStays === "object" && !Array.isArray(parsed.hotelStays) ? parsed.hotelStays : {},
       // BF-3 preserves the same storage envelope so a Customer/Pet relationship
       // can be shared with Bookings without introducing a disconnected store.
       customers: parsed.customers && typeof parsed.customers === "object" && !Array.isArray(parsed.customers) ? parsed.customers : {},
@@ -1169,6 +1844,11 @@ function calendarDateFromTimestamp(timestamp: number) {
   return `${date.getUTCFullYear().toString().padStart(4, "0")}-${(date.getUTCMonth() + 1).toString().padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
 }
 
+function addBusinessCalendarDays(value: string, days: number) {
+  const timestamp = dateTimestamp(value);
+  return timestamp === null ? value : calendarDateFromTimestamp(timestamp + days * DAY_IN_MILLISECONDS);
+}
+
 function thaiBookingDate(value: string) {
   const match = value.match(DATE_PATTERN);
   if (!match) return value;
@@ -1465,7 +2145,34 @@ export function savePrototypeBooking(draft: PrototypeBookingDraft, context: Demo
     updatedAt: now,
     cancelledAt: draft.status === "cancelled" ? existing?.cancelledAt ?? now : null,
   };
+  // Calendar remains the planning source, but a direct date resize must not
+  // silently create a conflict for a room that has already been assigned to
+  // the related Hotel Stay.
+  if (booking.serviceModule === "hotel" && existing) {
+    const linkedStays = mergedPrototypeHotelStays(store).filter((stay) => stay.bookingId === booking.bookingId && hotelStayIsOpen(stay));
+    for (const linkedStay of linkedStays) {
+      const roomAvailability = dateChangeAvailability(store, linkedStay, booking.start, booking.end ?? addBusinessCalendarDays(booking.start, 1), context);
+      if (!roomAvailability.available) {
+        return {
+          ok: false,
+          reason: "unavailable",
+          availability: {
+            ...availability,
+            available: false,
+            conflicts: [...availability.conflicts, ...roomAvailability.conflicts.map((item) => conflict(
+              "resource-conflict",
+              item.message,
+              "change-date",
+              { resourceId: item.roomId, bookingIds: item.stayIds, dates: item.dates },
+            ))],
+          },
+        };
+      }
+    }
+  }
   store.bookings[booking.bookingId] = booking;
+  synchronizePrototypeGroomingJobsForBooking(store, booking, now);
+  synchronizePrototypeHotelStaysForBooking(store, booking, now);
   if (!writeStore(store)) return { ok: false, reason: "storage", availability };
   return { ok: true, booking: cloneBooking(booking), created: !existing, availability };
 }
@@ -1490,8 +2197,1167 @@ export function cancelPrototypeBooking(
     updatedAt: now,
   };
   store.bookings[cancelled.bookingId] = cancelled;
+  synchronizePrototypeGroomingJobsForBooking(store, cancelled, now);
+  synchronizePrototypeHotelStaysForBooking(store, cancelled, now);
   if (!writeStore(store)) return { ok: false, reason: "storage" };
   return { ok: true, booking: cloneBooking(cancelled), duplicate: false };
+}
+
+function clonePrototypeServiceJob(job: PrototypeServiceJob): PrototypeServiceJob {
+  return {
+    ...job,
+    assignedResourceIds: [...job.assignedResourceIds],
+    addOns: job.addOns.map((addOn) => ({ ...addOn })),
+    history: job.history.map((item) => ({ ...item })),
+  };
+}
+
+function isServiceJobStatus(value: unknown): value is ServiceJobStatus {
+  return value === "booked"
+    || value === "checked-in"
+    || value === "waiting"
+    || value === "in-service"
+    || value === "ready-for-pickup"
+    || value === "completed"
+    || value === "cancelled";
+}
+
+function isPrototypeServiceJob(value: unknown): value is PrototypeServiceJob {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const job = value as Partial<PrototypeServiceJob>;
+  return typeof job.serviceJobId === "string"
+    && typeof job.bookingId === "string"
+    && (typeof job.intakeId === "string" || job.intakeId === null)
+    && typeof job.businessId === "string"
+    && typeof job.branchId === "string"
+    && typeof job.customerId === "string"
+    && typeof job.petId === "string"
+    && job.serviceModule === "grooming"
+    && typeof job.baseServiceId === "string"
+    && typeof job.scheduledStart === "string"
+    && (typeof job.scheduledEnd === "string" || job.scheduledEnd === null)
+    && typeof job.estimatedDurationMinutes === "number"
+    && (typeof job.actualStartedAt === "string" || job.actualStartedAt === null)
+    && (typeof job.actualCompletedAt === "string" || job.actualCompletedAt === null)
+    && Array.isArray(job.assignedResourceIds)
+    && job.assignedResourceIds.every((id) => typeof id === "string")
+    && isServiceJobStatus(job.status)
+    && typeof job.businessNote === "string"
+    && Array.isArray(job.addOns)
+    && job.addOns.every((addOn) => addOn && typeof addOn === "object" && typeof addOn.id === "string" && (typeof addOn.sourceRequestId === "string" || addOn.sourceRequestId === null) && typeof addOn.label === "string" && typeof addOn.additionalPrice === "number" && typeof addOn.additionalMinutes === "number" && typeof addOn.approvedAt === "string")
+    && Array.isArray(job.history)
+    && job.history.every((item) => item && typeof item === "object" && typeof item.id === "string" && typeof item.at === "string" && typeof item.summary === "string" && (item.type === "created" || item.type === "status" || item.type === "assignment" || item.type === "add-on" || item.type === "note" || item.type === "intake"))
+    && typeof job.createdAt === "string"
+    && typeof job.updatedAt === "string"
+    && (typeof job.cancelledAt === "string" || job.cancelledAt === null);
+}
+
+function groomingJobDurationMinutes(start: string, end: string | null, fallback = 60) {
+  if (!end) return fallback;
+  const startAt = dateTimeTimestamp(start);
+  const endAt = dateTimeTimestamp(end);
+  if (startAt === null || endAt === null) return fallback;
+  const minutes = Math.round((endAt - startAt) / 60_000);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : fallback;
+}
+
+function serviceJobIdForBookingPet(bookingId: string, petId: string) {
+  return `grooming-job-${bookingId}-${petId}`;
+}
+
+function serviceJobHistoryId(type: PrototypeServiceJobHistoryItem["type"]) {
+  return `service-job-${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function buildGroomingServiceJobFromBooking(
+  booking: PrototypeBooking,
+  pet: DemoBookingPet,
+  now: string,
+): PrototypeServiceJob {
+  return {
+    serviceJobId: serviceJobIdForBookingPet(booking.bookingId, pet.id),
+    bookingId: booking.bookingId,
+    intakeId: null,
+    businessId: booking.businessId,
+    branchId: booking.branchId,
+    customerId: booking.customer.id,
+    petId: pet.id,
+    serviceModule: "grooming",
+    baseServiceId: booking.service.id,
+    scheduledStart: booking.start,
+    scheduledEnd: booking.end,
+    estimatedDurationMinutes: groomingJobDurationMinutes(booking.start, booking.end),
+    actualStartedAt: null,
+    actualCompletedAt: null,
+    assignedResourceIds: [...booking.assignedResources],
+    status: "booked",
+    businessNote: "",
+    addOns: [],
+    history: [{ id: serviceJobHistoryId("created"), at: now, type: "created", summary: "สร้างงานจากการจอง" }],
+    createdAt: now,
+    updatedAt: now,
+    cancelledAt: null,
+  };
+}
+
+function mergedPrototypeServiceJobs(store: BusinessStore) {
+  const jobs = new Map<string, PrototypeServiceJob>();
+  for (const fixture of DEMO_GROOMING_SERVICE_JOB_FIXTURES) jobs.set(fixture.serviceJobId, clonePrototypeServiceJob(fixture));
+  for (const stored of Object.values(store.serviceJobs)) {
+    if (isPrototypeServiceJob(stored)) jobs.set(stored.serviceJobId, clonePrototypeServiceJob(stored));
+  }
+
+  // A Grooming Booking always projects at least one Pet-specific operational
+  // job. Saving a Booking persists it; this projection also keeps old BF-2
+  // local bookings readable after the additive BF-5 migration.
+  for (const booking of mergedPrototypeBookings(store)) {
+    if (booking.serviceModule !== "grooming" || booking.status === "cancelled") continue;
+    for (const pet of booking.pets) {
+      const existing = [...jobs.values()].find((job) => job.bookingId === booking.bookingId && job.petId === pet.id) ?? null;
+      if (!existing) {
+        const createdAt = booking.createdAt || SERVICE_JOB_FIXTURE_CREATED_AT;
+        const job = buildGroomingServiceJobFromBooking(booking, pet, createdAt);
+        jobs.set(job.serviceJobId, job);
+      }
+    }
+  }
+  return [...jobs.values()];
+}
+
+function groomJobMatchesContext(job: PrototypeServiceJob, context?: DemoBusinessContext | null) {
+  return !context || (job.businessId === context.businessId && job.branchId === context.branchId);
+}
+
+export type ListPrototypeServiceJobsOptions = {
+  includeCancelled?: boolean;
+  date?: string;
+};
+
+function filterAndSortPrototypeServiceJobs(
+  jobs: readonly PrototypeServiceJob[],
+  context?: DemoBusinessContext | null,
+  options: ListPrototypeServiceJobsOptions = {},
+) {
+  const includeCancelled = options.includeCancelled ?? false;
+  return jobs
+    .filter((job) => groomJobMatchesContext(job, context))
+    .filter((job) => includeCancelled || job.status !== "cancelled")
+    .filter((job) => !options.date || job.scheduledStart.slice(0, 10) === options.date)
+    .map(clonePrototypeServiceJob)
+    .sort((first, second) => first.scheduledStart.localeCompare(second.scheduledStart) || first.serviceJobId.localeCompare(second.serviceJobId));
+}
+
+export function listPrototypeGroomingServiceJobFixtures(
+  context?: DemoBusinessContext | null,
+  options: ListPrototypeServiceJobsOptions = {},
+) {
+  return filterAndSortPrototypeServiceJobs(mergedPrototypeServiceJobs(emptyStore()), context, options);
+}
+
+export function listPrototypeGroomingServiceJobs(
+  context?: DemoBusinessContext | null,
+  options: ListPrototypeServiceJobsOptions = {},
+) {
+  return filterAndSortPrototypeServiceJobs(mergedPrototypeServiceJobs(readStore()), context, options);
+}
+
+export function readPrototypeGroomingServiceJob(serviceJobId: string) {
+  return listPrototypeGroomingServiceJobs(null, { includeCancelled: true }).find((job) => job.serviceJobId === serviceJobId) ?? null;
+}
+
+export function findPrototypeGroomingServiceJobForBooking(bookingId: string, petId?: string | null) {
+  return listPrototypeGroomingServiceJobs(null, { includeCancelled: true }).find((job) => (
+    job.bookingId === bookingId && (!petId || job.petId === petId)
+  )) ?? null;
+}
+
+export function groomingServiceJobOccursOnDate(job: PrototypeServiceJob, date: string) {
+  return job.scheduledStart.slice(0, 10) === date;
+}
+
+export type GroomingServiceJobSummary = {
+  total: number;
+  booked: number;
+  checkedIn: number;
+  waiting: number;
+  inService: number;
+  readyForPickup: number;
+  completed: number;
+  cancelled: number;
+};
+
+export function summarizeGroomingServiceJobs(jobs: readonly PrototypeServiceJob[], date = BOOKING_DEMO_DATE): GroomingServiceJobSummary {
+  const matching = jobs.filter((job) => groomingServiceJobOccursOnDate(job, date));
+  return matching.reduce<GroomingServiceJobSummary>((summary, job) => {
+    summary.total += 1;
+    if (job.status === "booked") summary.booked += 1;
+    if (job.status === "checked-in") summary.checkedIn += 1;
+    if (job.status === "waiting") summary.waiting += 1;
+    if (job.status === "in-service") summary.inService += 1;
+    if (job.status === "ready-for-pickup") summary.readyForPickup += 1;
+    if (job.status === "completed") summary.completed += 1;
+    if (job.status === "cancelled") summary.cancelled += 1;
+    return summary;
+  }, { total: 0, booked: 0, checkedIn: 0, waiting: 0, inService: 0, readyForPickup: 0, completed: 0, cancelled: 0 });
+}
+
+export function getGroomingServiceJobSummary(
+  context: DemoBusinessContext,
+  date = BOOKING_DEMO_DATE,
+  fixtureOnly = false,
+) {
+  const jobs = fixtureOnly
+    ? listPrototypeGroomingServiceJobFixtures(context, { includeCancelled: false })
+    : listPrototypeGroomingServiceJobs(context, { includeCancelled: false });
+  return summarizeGroomingServiceJobs(jobs, date);
+}
+
+export function listCompletedPrototypeGroomingServiceJobs(
+  customerId: string,
+  fixtureOnly = false,
+) {
+  const jobs = fixtureOnly
+    ? listPrototypeGroomingServiceJobFixtures(null, { includeCancelled: false })
+    : listPrototypeGroomingServiceJobs(null, { includeCancelled: false });
+  return jobs
+    .filter((job) => job.customerId === customerId && job.status === "completed")
+    .sort((first, second) => (second.actualCompletedAt ?? second.updatedAt).localeCompare(first.actualCompletedAt ?? first.updatedAt));
+}
+
+const SERVICE_JOB_TRANSITIONS: Record<ServiceJobStatus, readonly ServiceJobStatus[]> = {
+  booked: ["checked-in", "cancelled"],
+  "checked-in": ["waiting", "in-service", "cancelled"],
+  waiting: ["in-service", "cancelled"],
+  "in-service": ["ready-for-pickup", "cancelled"],
+  "ready-for-pickup": ["completed", "cancelled"],
+  completed: [],
+  cancelled: [],
+};
+
+export function serviceJobCanTransition(from: ServiceJobStatus, to: ServiceJobStatus) {
+  return SERVICE_JOB_TRANSITIONS[from].includes(to);
+}
+
+function transitionServiceJobValue(
+  job: PrototypeServiceJob,
+  nextStatus: ServiceJobStatus,
+  now: string,
+  source: "board" | "intake" = "board",
+) {
+  const actualStartedAt = nextStatus === "in-service" ? job.actualStartedAt ?? now : job.actualStartedAt;
+  const actualCompletedAt = nextStatus === "completed" ? job.actualCompletedAt ?? now : job.actualCompletedAt;
+  const cancelledAt = nextStatus === "cancelled" ? job.cancelledAt ?? now : job.cancelledAt;
+  const transitionLabel = nextStatus === "checked-in" && source === "intake"
+    ? "รับเข้าแล้วจาก Intake"
+    : `เปลี่ยนสถานะเป็น ${SERVICE_JOB_STATUS_LABELS[nextStatus]}`;
+  return {
+    ...clonePrototypeServiceJob(job),
+    status: nextStatus,
+    actualStartedAt,
+    actualCompletedAt,
+    cancelledAt,
+    updatedAt: now,
+    history: [...job.history.map((item) => ({ ...item })), { id: serviceJobHistoryId(source === "intake" ? "intake" : "status"), at: now, type: source === "intake" ? "intake" : "status", summary: transitionLabel }],
+  } satisfies PrototypeServiceJob;
+}
+
+// Pure lifecycle reducer used by the local interaction layer. Keeping it
+// separate from session persistence lets invalid drops leave the prior Job
+// untouched and makes the transition rules independently verifiable.
+export function buildPrototypeGroomingServiceJobTransition(
+  job: PrototypeServiceJob,
+  nextStatus: ServiceJobStatus,
+  now: string,
+  source: "board" | "intake" = "board",
+) {
+  if (job.status === nextStatus) return clonePrototypeServiceJob(job);
+  if (!serviceJobCanTransition(job.status, nextStatus)) return null;
+  return transitionServiceJobValue(job, nextStatus, now, source);
+}
+
+export function transitionPrototypeGroomingServiceJob(
+  serviceJobId: string,
+  nextStatus: ServiceJobStatus,
+  context?: DemoBusinessContext | null,
+): ServiceJobTransitionResult {
+  const store = readStore();
+  const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === serviceJobId) ?? null;
+  if (!job) return { ok: false, reason: "missing" };
+  if (!groomJobMatchesContext(job, context)) return { ok: false, reason: "wrong-context", job: clonePrototypeServiceJob(job) };
+  if (job.status === nextStatus) return { ok: true, job: clonePrototypeServiceJob(job), duplicate: true };
+  if (!serviceJobCanTransition(job.status, nextStatus)) return { ok: false, reason: "invalid-transition", job: clonePrototypeServiceJob(job) };
+
+  const next = buildPrototypeGroomingServiceJobTransition(job, nextStatus, new Date().toISOString());
+  if (!next) return { ok: false, reason: "invalid-transition", job: clonePrototypeServiceJob(job) };
+  store.serviceJobs[next.serviceJobId] = next;
+  if (!writeStore(store)) return { ok: false, reason: "storage", job: clonePrototypeServiceJob(job) };
+  return { ok: true, job: clonePrototypeServiceJob(next), duplicate: false };
+}
+
+export function evaluatePrototypeGroomingServiceJobResources(
+  job: PrototypeServiceJob,
+  assignedResourceIds: readonly string[],
+  context: DemoBusinessContext,
+  sourceJobs = listPrototypeGroomingServiceJobs(context, { includeCancelled: false }),
+): ServiceJobResourceAvailability {
+  const resources = getBookingResources(context, job.baseServiceId);
+  const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
+  const selectedIds = [...new Set(assignedResourceIds.filter(Boolean))];
+  const conflicts: ServiceJobResourceConflict[] = [];
+  const currentInterval = getBookingInterval("appointment", job.scheduledStart, job.scheduledEnd);
+  if (!currentInterval) return { available: false, conflicts: [{ resourceId: "", resourceLabel: "เวลา", message: "ช่วงเวลางานนี้ไม่พร้อมตรวจทรัพยากร", conflictingJobIds: [] }] };
+
+  for (const resourceId of selectedIds) {
+    const resource = resourceById.get(resourceId);
+    if (!resource) {
+      conflicts.push({ resourceId, resourceLabel: "ทรัพยากร", message: "ทรัพยากรนี้ไม่อยู่ในสาขาหรือบริการปัจจุบัน", conflictingJobIds: [] });
+      continue;
+    }
+    const overlapping = sourceJobs.filter((candidate) => {
+      if (candidate.serviceJobId === job.serviceJobId || candidate.status === "cancelled") return false;
+      if (!candidate.assignedResourceIds.includes(resourceId)) return false;
+      const candidateInterval = getBookingInterval("appointment", candidate.scheduledStart, candidate.scheduledEnd);
+      return Boolean(candidateInterval && bookingIntervalsOverlap(currentInterval, candidateInterval));
+    });
+    const exceedsCapacity = resource.capacityMode === "exclusive" ? overlapping.length > 0 : overlapping.length + 1 > resource.capacity;
+    if (exceedsCapacity) {
+      conflicts.push({
+        resourceId,
+        resourceLabel: resource.label,
+        message: `${resource.label} มีงานซ้อนในช่วงเวลานี้`,
+        conflictingJobIds: overlapping.map((candidate) => candidate.serviceJobId),
+      });
+    }
+  }
+  return { available: conflicts.length === 0, conflicts };
+}
+
+export type AssignPrototypeGroomingServiceJobResourcesResult =
+  | { ok: true; job: PrototypeServiceJob; availability: ServiceJobResourceAvailability }
+  | { ok: false; reason: "missing" | "wrong-context" | "unavailable" | "storage"; availability?: ServiceJobResourceAvailability };
+
+export function assignPrototypeGroomingServiceJobResources(
+  serviceJobId: string,
+  assignedResourceIds: readonly string[],
+  context: DemoBusinessContext,
+): AssignPrototypeGroomingServiceJobResourcesResult {
+  const store = readStore();
+  const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === serviceJobId) ?? null;
+  if (!job) return { ok: false, reason: "missing" };
+  if (!groomJobMatchesContext(job, context)) return { ok: false, reason: "wrong-context" };
+  const availability = evaluatePrototypeGroomingServiceJobResources(job, assignedResourceIds, context, filterAndSortPrototypeServiceJobs(mergedPrototypeServiceJobs(store), context, { includeCancelled: false }));
+  if (!availability.available) return { ok: false, reason: "unavailable", availability };
+  const normalizedIds = [...new Set(assignedResourceIds.filter(Boolean))];
+  const now = new Date().toISOString();
+  const next: PrototypeServiceJob = {
+    ...clonePrototypeServiceJob(job),
+    assignedResourceIds: normalizedIds,
+    updatedAt: now,
+    history: [...job.history.map((item) => ({ ...item })), { id: serviceJobHistoryId("assignment"), at: now, type: "assignment", summary: "อัปเดตทรัพยากรที่รับผิดชอบ" }],
+  };
+  store.serviceJobs[next.serviceJobId] = next;
+  if (!writeStore(store)) return { ok: false, reason: "storage", availability };
+  return { ok: true, job: clonePrototypeServiceJob(next), availability };
+}
+
+export function updatePrototypeGroomingServiceJobNote(
+  serviceJobId: string,
+  businessNote: string,
+  context: DemoBusinessContext,
+) {
+  const store = readStore();
+  const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === serviceJobId) ?? null;
+  if (!job || !groomJobMatchesContext(job, context)) return null;
+  const note = businessNote.trim();
+  if (note === job.businessNote) return clonePrototypeServiceJob(job);
+  const now = new Date().toISOString();
+  const next: PrototypeServiceJob = {
+    ...clonePrototypeServiceJob(job),
+    businessNote: note,
+    updatedAt: now,
+    history: [...job.history.map((item) => ({ ...item })), { id: serviceJobHistoryId("note"), at: now, type: "note", summary: "อัปเดตหมายเหตุของร้าน" }],
+  };
+  store.serviceJobs[next.serviceJobId] = next;
+  return writeStore(store) ? clonePrototypeServiceJob(next) : null;
+}
+
+export function applyPrototypeApprovedGroomingAddOn(input: {
+  serviceJobId?: string | null;
+  bookingId: string;
+  sourceRequestId: string;
+  serviceName: string;
+  additionalPrice: number;
+  additionalMinutes: number;
+  approvedAt: string;
+}) {
+  const store = readStore();
+  const job = (input.serviceJobId
+    ? mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === input.serviceJobId)
+    : null) ?? mergedPrototypeServiceJobs(store).find((item) => item.bookingId === input.bookingId) ?? null;
+  if (!job || job.status === "cancelled") return null;
+  const duplicate = job.addOns.some((addOn) => addOn.sourceRequestId === input.sourceRequestId);
+  if (duplicate) return { job: clonePrototypeServiceJob(job), duplicate: true };
+  const now = input.approvedAt;
+  const addOn: PrototypeServiceJobAddOn = {
+    id: `service-job-addon-${input.sourceRequestId}`,
+    sourceRequestId: input.sourceRequestId,
+    label: input.serviceName.trim(),
+    additionalPrice: Math.round(input.additionalPrice),
+    additionalMinutes: Math.round(input.additionalMinutes),
+    approvedAt: now,
+  };
+  const next: PrototypeServiceJob = {
+    ...clonePrototypeServiceJob(job),
+    addOns: [...job.addOns.map((item) => ({ ...item })), addOn],
+    estimatedDurationMinutes: job.estimatedDurationMinutes + addOn.additionalMinutes,
+    updatedAt: now,
+    history: [...job.history.map((item) => ({ ...item })), { id: serviceJobHistoryId("add-on"), at: now, type: "add-on", summary: `เจ้าของอนุมัติ ${addOn.label}` }],
+  };
+  store.serviceJobs[next.serviceJobId] = next;
+  return writeStore(store) ? { job: clonePrototypeServiceJob(next), duplicate: false } : null;
+}
+
+function synchronizePrototypeGroomingJobsForBooking(store: BusinessStore, booking: PrototypeBooking, now: string) {
+  const existingJobs = mergedPrototypeServiceJobs(store).filter((job) => job.bookingId === booking.bookingId);
+  if (booking.serviceModule !== "grooming" || booking.status === "cancelled") {
+    for (const job of existingJobs) {
+      if (job.status === "completed" || job.status === "cancelled") continue;
+      const cancelled = transitionServiceJobValue(job, "cancelled", now);
+      store.serviceJobs[cancelled.serviceJobId] = cancelled;
+    }
+    return;
+  }
+
+  for (const pet of booking.pets) {
+    const existing = existingJobs.find((job) => job.petId === pet.id) ?? null;
+    if (!existing) {
+      const job = buildGroomingServiceJobFromBooking(booking, pet, now);
+      store.serviceJobs[job.serviceJobId] = job;
+      continue;
+    }
+    const preserveActualAssignment = existing.status !== "booked";
+    const next: PrototypeServiceJob = {
+      ...clonePrototypeServiceJob(existing),
+      businessId: booking.businessId,
+      branchId: booking.branchId,
+      customerId: booking.customer.id,
+      baseServiceId: booking.service.id,
+      scheduledStart: booking.start,
+      scheduledEnd: booking.end,
+      estimatedDurationMinutes: groomingJobDurationMinutes(booking.start, booking.end) + existing.addOns.reduce((total, addOn) => total + addOn.additionalMinutes, 0),
+      assignedResourceIds: preserveActualAssignment ? [...existing.assignedResourceIds] : [...booking.assignedResources],
+      updatedAt: now,
+    };
+    store.serviceJobs[next.serviceJobId] = next;
+  }
+  for (const existing of existingJobs) {
+    if (booking.pets.some((pet) => pet.id === existing.petId) || existing.status === "completed" || existing.status === "cancelled") continue;
+    const cancelled = transitionServiceJobValue(existing, "cancelled", now);
+    store.serviceJobs[cancelled.serviceJobId] = cancelled;
+  }
+}
+
+function clonePrototypeHotelStay(stay: PrototypeHotelStay): PrototypeHotelStay {
+  return {
+    ...stay,
+    roomAssignments: stay.roomAssignments.map((assignment) => ({ ...assignment })),
+    roomMoveHistory: stay.roomMoveHistory.map((move) => ({ ...move })),
+    dailyCareTasks: stay.dailyCareTasks.map((task) => ({ ...task })),
+    history: stay.history.map((item) => ({ ...item })),
+  };
+}
+
+function isHotelStayStatus(value: unknown): value is HotelStayStatus {
+  return value === "booked"
+    || value === "expected-today"
+    || value === "checked-in"
+    || value === "in-stay"
+    || value === "ready-for-checkout"
+    || value === "checked-out"
+    || value === "cancelled"
+    || value === "no-show";
+}
+
+function isPrototypeHotelRoomAssignment(value: unknown): value is PrototypeHotelRoomAssignment {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const assignment = value as Partial<PrototypeHotelRoomAssignment>;
+  return typeof assignment.id === "string"
+    && typeof assignment.roomId === "string"
+    && typeof assignment.startDate === "string"
+    && (typeof assignment.endDate === "string" || assignment.endDate === null)
+    && typeof assignment.assignedAt === "string"
+    && (typeof assignment.assignedBy === "string" || assignment.assignedBy === null)
+    && (typeof assignment.reason === "string" || assignment.reason === null);
+}
+
+function isPrototypeHotelRoomMove(value: unknown): value is PrototypeHotelRoomMove {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const move = value as Partial<PrototypeHotelRoomMove>;
+  return typeof move.id === "string"
+    && typeof move.movedAt === "string"
+    && (typeof move.fromRoomId === "string" || move.fromRoomId === null)
+    && typeof move.toRoomId === "string"
+    && (typeof move.reason === "string" || move.reason === null);
+}
+
+function isPrototypeHotelCareTask(value: unknown): value is PrototypeHotelCareTask {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const task = value as Partial<PrototypeHotelCareTask>;
+  return typeof task.id === "string"
+    && (task.kind === "meal" || task.kind === "water" || task.kind === "activity" || task.kind === "cleaning" || task.kind === "check" || task.kind === "other")
+    && typeof task.label === "string"
+    && typeof task.scheduledDate === "string"
+    && typeof task.scheduledTime === "string"
+    && (task.state === "pending" || task.state === "completed")
+    && (typeof task.completedAt === "string" || task.completedAt === null)
+    && (typeof task.completedBy === "string" || task.completedBy === null);
+}
+
+function isPrototypeHotelStayHistoryItem(value: unknown): value is PrototypeHotelStayHistoryItem {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const item = value as Partial<PrototypeHotelStayHistoryItem>;
+  return typeof item.id === "string"
+    && typeof item.at === "string"
+    && (item.type === "created" || item.type === "status" || item.type === "room-assignment" || item.type === "room-move" || item.type === "care" || item.type === "note" || item.type === "intake" || item.type === "dates")
+    && typeof item.summary === "string";
+}
+
+function isPrototypeHotelStay(value: unknown): value is PrototypeHotelStay {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const stay = value as Partial<PrototypeHotelStay>;
+  return typeof stay.hotelStayId === "string"
+    && typeof stay.bookingId === "string"
+    && (typeof stay.intakeId === "string" || stay.intakeId === null)
+    && typeof stay.businessId === "string"
+    && typeof stay.branchId === "string"
+    && typeof stay.customerId === "string"
+    && typeof stay.petId === "string"
+    && typeof stay.scheduledCheckIn === "string"
+    && typeof stay.scheduledCheckOut === "string"
+    && (typeof stay.actualCheckInAt === "string" || stay.actualCheckInAt === null)
+    && (typeof stay.actualCheckOutAt === "string" || stay.actualCheckOutAt === null)
+    && isHotelStayStatus(stay.status)
+    && Array.isArray(stay.roomAssignments)
+    && stay.roomAssignments.every(isPrototypeHotelRoomAssignment)
+    && Array.isArray(stay.roomMoveHistory)
+    && stay.roomMoveHistory.every(isPrototypeHotelRoomMove)
+    && (typeof stay.guardianCareInstruction === "string" || stay.guardianCareInstruction === null)
+    && typeof stay.businessNote === "string"
+    && Array.isArray(stay.dailyCareTasks)
+    && stay.dailyCareTasks.every(isPrototypeHotelCareTask)
+    && Array.isArray(stay.history)
+    && stay.history.every(isPrototypeHotelStayHistoryItem)
+    && typeof stay.createdAt === "string"
+    && typeof stay.updatedAt === "string"
+    && (typeof stay.cancelledAt === "string" || stay.cancelledAt === null);
+}
+
+function hotelStayIdForBookingPet(bookingId: string, petId: string) {
+  return `hotel-stay-${bookingId}-${petId}`;
+}
+
+function hotelStayHistoryId(type: PrototypeHotelStayHistoryItem["type"]) {
+  return `hotel-stay-${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function hotelRoomAssignmentId() {
+  return `hotel-room-assignment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function hotelRoomMoveId() {
+  return `hotel-room-move-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function defaultHotelCareTasks(hotelStayId: string, date: string): PrototypeHotelCareTask[] {
+  return [
+    { id: `${hotelStayId}-care-breakfast-${date}`, kind: "meal", label: "อาหารเช้า", scheduledDate: date, scheduledTime: "08:00", state: "pending", completedAt: null, completedBy: null },
+    { id: `${hotelStayId}-care-water-${date}`, kind: "water", label: "ตรวจน้ำ", scheduledDate: date, scheduledTime: "12:00", state: "pending", completedAt: null, completedBy: null },
+    { id: `${hotelStayId}-care-evening-${date}`, kind: "meal", label: "อาหารเย็น", scheduledDate: date, scheduledTime: "18:00", state: "pending", completedAt: null, completedBy: null },
+  ];
+}
+
+function buildHotelStayFromBooking(booking: PrototypeBooking, pet: DemoBookingPet, now: string): PrototypeHotelStay {
+  const hotelStayId = hotelStayIdForBookingPet(booking.bookingId, pet.id);
+  const expectedToday = booking.start === BOOKING_DEMO_DATE;
+  return {
+    hotelStayId,
+    bookingId: booking.bookingId,
+    intakeId: null,
+    businessId: booking.businessId,
+    branchId: booking.branchId,
+    customerId: booking.customer.id,
+    petId: pet.id,
+    scheduledCheckIn: booking.start,
+    scheduledCheckOut: booking.end ?? addBusinessCalendarDays(booking.start, 1),
+    actualCheckInAt: null,
+    actualCheckOutAt: null,
+    status: expectedToday ? "expected-today" : "booked",
+    roomAssignments: [],
+    roomMoveHistory: [],
+    guardianCareInstruction: null,
+    businessNote: "",
+    dailyCareTasks: [],
+    history: [{ id: hotelStayHistoryId("created"), at: now, type: "created", summary: "สร้างรายการเข้าพักจากการจอง" }],
+    createdAt: now,
+    updatedAt: now,
+    cancelledAt: null,
+  };
+}
+
+function mergedPrototypeHotelStays(store: BusinessStore) {
+  const stays = new Map<string, PrototypeHotelStay>();
+  for (const fixture of DEMO_HOTEL_STAY_FIXTURES) stays.set(fixture.hotelStayId, clonePrototypeHotelStay(fixture));
+  for (const stored of Object.values(store.hotelStays)) {
+    if (isPrototypeHotelStay(stored)) stays.set(stored.hotelStayId, clonePrototypeHotelStay(stored));
+  }
+
+  // New or retained Hotel Bookings project a per-Pet execution record even
+  // before a room is chosen. This deliberately keeps the two lifecycles
+  // linked without turning them into one status field.
+  for (const booking of mergedPrototypeBookings(store)) {
+    if (booking.serviceModule !== "hotel" || booking.status === "cancelled") continue;
+    for (const pet of booking.pets) {
+      const existing = [...stays.values()].find((stay) => stay.bookingId === booking.bookingId && stay.petId === pet.id) ?? null;
+      if (!existing) stays.set(hotelStayIdForBookingPet(booking.bookingId, pet.id), buildHotelStayFromBooking(booking, pet, booking.createdAt || HOTEL_STAY_FIXTURE_CREATED_AT));
+    }
+  }
+  return [...stays.values()];
+}
+
+function hotelStayMatchesContext(stay: PrototypeHotelStay, context?: DemoBusinessContext | null) {
+  return !context || (stay.businessId === context.businessId && stay.branchId === context.branchId);
+}
+
+export type ListPrototypeHotelStaysOptions = {
+  includeClosed?: boolean;
+  date?: string;
+};
+
+function hotelStayIsOpen(stay: PrototypeHotelStay) {
+  return stay.status !== "cancelled" && stay.status !== "no-show" && stay.status !== "checked-out";
+}
+
+export function hotelStayOccursOnDate(stay: PrototypeHotelStay, date: string) {
+  return stay.scheduledCheckIn <= date && date < stay.scheduledCheckOut;
+}
+
+function filterAndSortPrototypeHotelStays(
+  stays: readonly PrototypeHotelStay[],
+  context?: DemoBusinessContext | null,
+  options: ListPrototypeHotelStaysOptions = {},
+) {
+  const includeClosed = options.includeClosed ?? false;
+  return stays
+    .filter((stay) => hotelStayMatchesContext(stay, context))
+    .filter((stay) => includeClosed || hotelStayIsOpen(stay))
+    .filter((stay) => !options.date || hotelStayOccursOnDate(stay, options.date) || (stay.scheduledCheckOut === options.date && stay.status === "ready-for-checkout"))
+    .map(clonePrototypeHotelStay)
+    .sort((first, second) => first.scheduledCheckIn.localeCompare(second.scheduledCheckIn) || first.hotelStayId.localeCompare(second.hotelStayId));
+}
+
+export function listPrototypeHotelStayFixtures(
+  context?: DemoBusinessContext | null,
+  options: ListPrototypeHotelStaysOptions = {},
+) {
+  return filterAndSortPrototypeHotelStays(mergedPrototypeHotelStays(emptyStore()), context, options);
+}
+
+export function listPrototypeHotelStays(
+  context?: DemoBusinessContext | null,
+  options: ListPrototypeHotelStaysOptions = {},
+) {
+  return filterAndSortPrototypeHotelStays(mergedPrototypeHotelStays(readStore()), context, options);
+}
+
+export function readPrototypeHotelStay(hotelStayId: string) {
+  return listPrototypeHotelStays(null, { includeClosed: true }).find((stay) => stay.hotelStayId === hotelStayId) ?? null;
+}
+
+export function findPrototypeHotelStayForBooking(bookingId: string, petId?: string | null) {
+  return listPrototypeHotelStays(null, { includeClosed: true }).find((stay) => (
+    stay.bookingId === bookingId && (!petId || stay.petId === petId)
+  )) ?? null;
+}
+
+export function getHotelRooms(context: DemoBusinessContext) {
+  return getBookingResources(context)
+    .filter((resource) => resource.module === "hotel" && (resource.hotelRole === "room" || resource.hotelRole === "zone"));
+}
+
+function roomAssignmentInterval(stay: PrototypeHotelStay, assignment: PrototypeHotelRoomAssignment) {
+  return getBookingInterval("date-range", assignment.startDate, assignment.endDate ?? stay.scheduledCheckOut);
+}
+
+export function getPrototypeHotelStayRoomAssignment(stay: PrototypeHotelStay, date: string = BOOKING_DEMO_DATE) {
+  const current = stay.roomAssignments
+    .filter((assignment) => assignment.startDate <= date && date < (assignment.endDate ?? stay.scheduledCheckOut))
+    .at(-1) ?? null;
+  if (current) return { ...current };
+  // A room remains operationally relevant through a same-day checkout even
+  // though its calendar span correctly ends at the exclusive checkout date.
+  if (stay.status === "ready-for-checkout" && stay.scheduledCheckOut === date) {
+    const last = stay.roomAssignments.at(-1) ?? null;
+    return last ? { ...last } : null;
+  }
+  return null;
+}
+
+export function getPrototypeHotelStayRoomId(stay: PrototypeHotelStay, date: string = BOOKING_DEMO_DATE) {
+  return getPrototypeHotelStayRoomAssignment(stay, date)?.roomId ?? null;
+}
+
+export function evaluatePrototypeHotelStayRoomAvailability(
+  stay: PrototypeHotelStay,
+  roomId: string,
+  startDate: string,
+  endDate: string,
+  context: DemoBusinessContext,
+  sourceStays = listPrototypeHotelStays(context, { includeClosed: true }),
+): HotelRoomAvailability {
+  const room = getHotelRooms(context).find((resource) => resource.id === roomId) ?? null;
+  const interval = getBookingInterval("date-range", startDate, endDate);
+  if (!room || !interval) {
+    return {
+      available: false,
+      conflicts: [{
+        roomId,
+        roomLabel: room?.label ?? "ห้องที่เลือก",
+        message: room ? "ช่วงวันเข้าพักไม่ถูกต้อง" : "ห้องหรือโซนนี้ใช้กับสาขาปัจจุบันไม่ได้",
+        stayIds: [],
+        dates: [],
+      }],
+    };
+  }
+
+  const overlapping = sourceStays.filter((candidate) => {
+    if (candidate.hotelStayId === stay.hotelStayId || !hotelStayIsOpen(candidate)) return false;
+    return candidate.roomAssignments.some((assignment) => {
+      if (assignment.roomId !== room.id) return false;
+      const assignmentInterval = roomAssignmentInterval(candidate, assignment);
+      return Boolean(assignmentInterval && bookingIntervalsOverlap(interval, assignmentInterval));
+    });
+  });
+  const capacityExceeded = overlapping.length + 1 > room.capacity;
+  if (!capacityExceeded) return { available: true, conflicts: [] };
+  const dates = calendarDaysInInterval(interval).filter((date) => overlapping.some((candidate) => candidate.roomAssignments.some((assignment) => {
+    if (assignment.roomId !== room.id) return false;
+    const assignmentInterval = roomAssignmentInterval(candidate, assignment);
+    const dayStart = dateTimestamp(date);
+    return Boolean(assignmentInterval && dayStart !== null && bookingIntervalsOverlap(assignmentInterval, { start: dayStart, end: dayStart + DAY_IN_MILLISECONDS }));
+  })));
+  const isZone = room.hotelRole === "zone";
+  return {
+    available: false,
+    conflicts: [{
+      roomId: room.id,
+      roomLabel: room.label,
+      message: isZone
+        ? `${room.label} เต็มในวันที่ ${dates.map(thaiBookingDate).join(", ") || thaiBookingDate(startDate)}`
+        : `${room.label} มีน้องเข้าพักช่วงวันที่เลือกแล้ว`,
+      stayIds: overlapping.map((candidate) => candidate.hotelStayId),
+      dates,
+    }],
+  };
+}
+
+export type HotelStaySummary = {
+  total: number;
+  arrivals: number;
+  departures: number;
+  current: number;
+  occupiedRooms: number;
+  totalRooms: number;
+  availableRooms: number;
+  careDue: number;
+  unassignedArrivals: number;
+  attention: number;
+};
+
+export function summarizePrototypeHotelStays(
+  stays: readonly PrototypeHotelStay[],
+  context: DemoBusinessContext,
+  date = BOOKING_DEMO_DATE,
+): HotelStaySummary {
+  const visible = stays.filter((stay) => hotelStayMatchesContext(stay, context));
+  const open = visible.filter(hotelStayIsOpen);
+  const arrivals = open.filter((stay) => stay.scheduledCheckIn === date && (stay.status === "booked" || stay.status === "expected-today")).length;
+  const departures = open.filter((stay) => stay.scheduledCheckOut === date).length;
+  const currentStays = open.filter((stay) => (
+    ["checked-in", "in-stay", "ready-for-checkout"].includes(stay.status)
+    && (hotelStayOccursOnDate(stay, date) || stay.scheduledCheckOut === date)
+  ));
+  const occupiedRoomIds = new Set(currentStays.map((stay) => getPrototypeHotelStayRoomId(stay, date)).filter((roomId): roomId is string => Boolean(roomId)));
+  const totalRooms = getHotelRooms(context).length;
+  const careDue = currentStays.reduce((total, stay) => total + stay.dailyCareTasks.filter((task) => task.scheduledDate === date && task.state === "pending").length, 0);
+  const unassignedArrivals = open.filter((stay) => stay.scheduledCheckIn === date && !getPrototypeHotelStayRoomId(stay, date)).length;
+  // A same-day ready-for-checkout stay is already represented in departures;
+  // keep the dashboard action count useful instead of counting it twice.
+  const readyOutsideDeparture = open.filter((stay) => (
+    stay.status === "ready-for-checkout" && stay.scheduledCheckOut !== date
+  )).length;
+  const attention = unassignedArrivals + departures + careDue + readyOutsideDeparture;
+  return {
+    total: open.length,
+    arrivals,
+    departures,
+    current: currentStays.length,
+    occupiedRooms: occupiedRoomIds.size,
+    totalRooms,
+    availableRooms: Math.max(0, totalRooms - occupiedRoomIds.size),
+    careDue,
+    unassignedArrivals,
+    attention,
+  };
+}
+
+export function getPrototypeHotelStaySummary(
+  context: DemoBusinessContext,
+  date = BOOKING_DEMO_DATE,
+  fixtureOnly = false,
+) {
+  const stays = fixtureOnly
+    ? listPrototypeHotelStayFixtures(context, { includeClosed: false })
+    : listPrototypeHotelStays(context, { includeClosed: false });
+  return summarizePrototypeHotelStays(stays, context, date);
+}
+
+function hotelStayHasOutstandingCare(stay: PrototypeHotelStay, throughDate: string = BOOKING_DEMO_DATE) {
+  return stay.dailyCareTasks.some((task) => task.scheduledDate <= throughDate && task.state !== "completed");
+}
+
+const HOTEL_STAY_TRANSITIONS: Record<HotelStayStatus, readonly HotelStayStatus[]> = {
+  booked: ["expected-today", "checked-in", "cancelled", "no-show"],
+  "expected-today": ["checked-in", "cancelled", "no-show"],
+  "checked-in": ["in-stay", "ready-for-checkout", "cancelled"],
+  "in-stay": ["ready-for-checkout", "cancelled"],
+  "ready-for-checkout": ["checked-out", "cancelled"],
+  "checked-out": [],
+  cancelled: [],
+  "no-show": [],
+};
+
+export function hotelStayCanTransition(from: HotelStayStatus, to: HotelStayStatus) {
+  return HOTEL_STAY_TRANSITIONS[from].includes(to);
+}
+
+function transitionHotelStayValue(stay: PrototypeHotelStay, nextStatus: HotelStayStatus, now: string, source: "board" | "intake" = "board") {
+  const checkedIn = nextStatus === "checked-in" ? stay.actualCheckInAt ?? now : stay.actualCheckInAt;
+  const checkedOut = nextStatus === "checked-out" ? stay.actualCheckOutAt ?? now : stay.actualCheckOutAt;
+  const cancelledAt = nextStatus === "cancelled" ? stay.cancelledAt ?? now : stay.cancelledAt;
+  const careTasks = nextStatus === "checked-in" && stay.dailyCareTasks.length === 0
+    ? defaultHotelCareTasks(stay.hotelStayId, BOOKING_DEMO_DATE)
+    : stay.dailyCareTasks.map((task) => ({ ...task }));
+  const statusLabel = nextStatus === "checked-in" && source === "intake"
+    ? "รับเข้าแล้วจาก Intake"
+    : `เปลี่ยนสถานะเป็น ${HOTEL_STAY_STATUS_LABELS[nextStatus]}`;
+  return {
+    ...clonePrototypeHotelStay(stay),
+    status: nextStatus,
+    actualCheckInAt: checkedIn,
+    actualCheckOutAt: checkedOut,
+    cancelledAt,
+    dailyCareTasks: careTasks,
+    updatedAt: now,
+    history: [...stay.history.map((item) => ({ ...item })), { id: hotelStayHistoryId(source === "intake" ? "intake" : "status"), at: now, type: source === "intake" ? "intake" : "status", summary: statusLabel }],
+  } satisfies PrototypeHotelStay;
+}
+
+export function transitionPrototypeHotelStay(
+  hotelStayId: string,
+  nextStatus: HotelStayStatus,
+  context?: DemoBusinessContext | null,
+): HotelStayTransitionResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context", stay: clonePrototypeHotelStay(stay) };
+  if (stay.status === nextStatus) return { ok: true, stay: clonePrototypeHotelStay(stay), duplicate: true };
+  if (!hotelStayCanTransition(stay.status, nextStatus)) return { ok: false, reason: "invalid-transition", stay: clonePrototypeHotelStay(stay) };
+  if (nextStatus === "checked-in" && !getPrototypeHotelStayRoomId(stay, BOOKING_DEMO_DATE)) return { ok: false, reason: "room-required", stay: clonePrototypeHotelStay(stay) };
+  if (nextStatus === "checked-out" && hotelStayHasOutstandingCare(stay)) return { ok: false, reason: "care-incomplete", stay: clonePrototypeHotelStay(stay) };
+
+  const next = transitionHotelStayValue(stay, nextStatus, new Date().toISOString());
+  store.hotelStays[next.hotelStayId] = next;
+  if (!writeStore(store)) return { ok: false, reason: "storage", stay: clonePrototypeHotelStay(stay) };
+  return { ok: true, stay: clonePrototypeHotelStay(next), duplicate: false };
+}
+
+export function checkInPrototypeHotelStay(hotelStayId: string, context: DemoBusinessContext): HotelStayTransitionResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context", stay: clonePrototypeHotelStay(stay) };
+  if (stay.status === "checked-in" || stay.status === "in-stay") return { ok: true, stay: clonePrototypeHotelStay(stay), duplicate: true };
+  if (!stay.intakeId || store.intakes[stay.intakeId]?.checkInState !== "checked-in") return { ok: false, reason: "intake-required", stay: clonePrototypeHotelStay(stay) };
+  if (!getPrototypeHotelStayRoomId(stay, BOOKING_DEMO_DATE)) return { ok: false, reason: "room-required", stay: clonePrototypeHotelStay(stay) };
+  if (!hotelStayCanTransition(stay.status, "checked-in")) return { ok: false, reason: "invalid-transition", stay: clonePrototypeHotelStay(stay) };
+  const next = transitionHotelStayValue(stay, "checked-in", new Date().toISOString(), "intake");
+  store.hotelStays[next.hotelStayId] = next;
+  if (!writeStore(store)) return { ok: false, reason: "storage", stay: clonePrototypeHotelStay(stay) };
+  return { ok: true, stay: clonePrototypeHotelStay(next), duplicate: false };
+}
+
+function roomAvailabilityForStore(
+  store: BusinessStore,
+  stay: PrototypeHotelStay,
+  roomId: string,
+  startDate: string,
+  endDate: string,
+  context: DemoBusinessContext,
+) {
+  return evaluatePrototypeHotelStayRoomAvailability(
+    stay,
+    roomId,
+    startDate,
+    endDate,
+    context,
+    filterAndSortPrototypeHotelStays(mergedPrototypeHotelStays(store), context, { includeClosed: true }),
+  );
+}
+
+export function assignPrototypeHotelStayRoom(
+  hotelStayId: string,
+  roomId: string,
+  context: DemoBusinessContext,
+): AssignPrototypeHotelStayRoomResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context" };
+  const availability = roomAvailabilityForStore(store, stay, roomId, stay.scheduledCheckIn, stay.scheduledCheckOut, context);
+  if (!availability.available) return { ok: false, reason: "unavailable", availability };
+
+  const existing = getPrototypeHotelStayRoomAssignment(stay, stay.scheduledCheckIn);
+  const now = new Date().toISOString();
+  const next: PrototypeHotelStay = {
+    ...clonePrototypeHotelStay(stay),
+    roomAssignments: existing
+      ? stay.roomAssignments.map((assignment) => assignment.id === existing.id ? { ...assignment, roomId, assignedAt: now, assignedBy: context.memberLabel } : { ...assignment })
+      : [...stay.roomAssignments.map((assignment) => ({ ...assignment })), {
+        id: hotelRoomAssignmentId(),
+        roomId,
+        startDate: stay.scheduledCheckIn,
+        endDate: stay.scheduledCheckOut,
+        assignedAt: now,
+        assignedBy: context.memberLabel,
+        reason: null,
+      }],
+    updatedAt: now,
+    history: [...stay.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("room-assignment"), at: now, type: "room-assignment", summary: "ระบุห้องหรือโซนสำหรับการเข้าพัก" }],
+  };
+  store.hotelStays[next.hotelStayId] = next;
+  if (!writeStore(store)) return { ok: false, reason: "storage", availability };
+  return { ok: true, stay: clonePrototypeHotelStay(next), availability };
+}
+
+export function movePrototypeHotelStayRoom(
+  hotelStayId: string,
+  roomId: string,
+  context: DemoBusinessContext,
+  reason = "",
+  effectiveDate = BOOKING_DEMO_DATE,
+): AssignPrototypeHotelStayRoomResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context" };
+  const current = getPrototypeHotelStayRoomAssignment(stay, effectiveDate);
+  const availability = roomAvailabilityForStore(store, stay, roomId, effectiveDate, stay.scheduledCheckOut, context);
+  if (!availability.available) return { ok: false, reason: "unavailable", availability };
+  const now = new Date().toISOString();
+  if (current?.roomId === roomId) return { ok: true, stay: clonePrototypeHotelStay(stay), availability };
+  const normalizedReason = reason.trim() || null;
+  const next: PrototypeHotelStay = {
+    ...clonePrototypeHotelStay(stay),
+    roomAssignments: [
+      ...stay.roomAssignments.map((assignment) => assignment.id === current?.id ? { ...assignment, endDate: effectiveDate } : { ...assignment }),
+      {
+        id: hotelRoomAssignmentId(),
+        roomId,
+        startDate: effectiveDate,
+        endDate: stay.scheduledCheckOut,
+        assignedAt: now,
+        assignedBy: context.memberLabel,
+        reason: normalizedReason,
+      },
+    ],
+    roomMoveHistory: [...stay.roomMoveHistory.map((move) => ({ ...move })), {
+      id: hotelRoomMoveId(),
+      movedAt: now,
+      fromRoomId: current?.roomId ?? null,
+      toRoomId: roomId,
+      reason: normalizedReason,
+    }],
+    updatedAt: now,
+    history: [...stay.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("room-move"), at: now, type: "room-move", summary: "ย้ายห้องหรือโซนระหว่างเข้าพัก" }],
+  };
+  store.hotelStays[next.hotelStayId] = next;
+  if (!writeStore(store)) return { ok: false, reason: "storage", availability };
+  return { ok: true, stay: clonePrototypeHotelStay(next), availability };
+}
+
+function dateChangeAvailability(
+  store: BusinessStore,
+  stay: PrototypeHotelStay,
+  startDate: string,
+  endDate: string,
+  context: DemoBusinessContext,
+) {
+  const source = filterAndSortPrototypeHotelStays(mergedPrototypeHotelStays(store), context, { includeClosed: true });
+  for (const assignment of stay.roomAssignments) {
+    const assignmentStart = assignment.startDate === stay.scheduledCheckIn ? startDate : assignment.startDate;
+    const assignmentEnd = (assignment.endDate ?? stay.scheduledCheckOut) === stay.scheduledCheckOut ? endDate : assignment.endDate ?? endDate;
+    const availability = evaluatePrototypeHotelStayRoomAvailability(stay, assignment.roomId, assignmentStart, assignmentEnd, context, source);
+    if (!availability.available) return availability;
+  }
+  return { available: true, conflicts: [] } satisfies HotelRoomAvailability;
+}
+
+export function updatePrototypeHotelStayDates(
+  hotelStayId: string,
+  scheduledCheckIn: string,
+  scheduledCheckOut: string,
+  context: DemoBusinessContext,
+): UpdatePrototypeHotelStayDatesResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context" };
+  if (!getBookingInterval("date-range", scheduledCheckIn, scheduledCheckOut)) return { ok: false, reason: "invalid-dates" };
+  const roomAvailability = dateChangeAvailability(store, stay, scheduledCheckIn, scheduledCheckOut, context);
+  if (!roomAvailability.available) return { ok: false, reason: "unavailable", availability: roomAvailability };
+  const booking = mergedPrototypeBookings(store).find((item) => item.bookingId === stay.bookingId) ?? null;
+  if (!booking || booking.serviceModule !== "hotel") return { ok: false, reason: "missing" };
+  const result = savePrototypeBooking({
+    bookingId: booking.bookingId,
+    businessId: booking.businessId,
+    branchId: booking.branchId,
+    serviceModule: booking.serviceModule,
+    serviceId: booking.service.id,
+    timeModel: booking.timeModel,
+    customer: { ...booking.customer },
+    pets: booking.pets.map((pet) => ({ ...pet })),
+    start: scheduledCheckIn,
+    end: scheduledCheckOut,
+    assignedResourceIds: [...booking.assignedResources],
+    notes: booking.notes,
+    estimate: booking.estimate,
+    status: booking.status,
+  }, context);
+  if (!result.ok) return { ok: false, reason: result.reason === "storage" ? "storage" : "unavailable", availability: roomAvailability };
+  const updated = readPrototypeHotelStay(hotelStayId);
+  return updated ? { ok: true, stay: updated } : { ok: false, reason: "storage" };
+}
+
+export function completePrototypeHotelCareTask(
+  hotelStayId: string,
+  taskId: string,
+  context: DemoBusinessContext,
+) {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay || !hotelStayMatchesContext(stay, context)) return null;
+  const task = stay.dailyCareTasks.find((item) => item.id === taskId) ?? null;
+  if (!task) return null;
+  if (task.state === "completed") return clonePrototypeHotelStay(stay);
+  const now = new Date().toISOString();
+  const next: PrototypeHotelStay = {
+    ...clonePrototypeHotelStay(stay),
+    dailyCareTasks: stay.dailyCareTasks.map((item) => item.id === task.id ? { ...item, state: "completed", completedAt: now, completedBy: context.memberLabel } : { ...item }),
+    updatedAt: now,
+    history: [...stay.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("care"), at: now, type: "care", summary: `ทำงานดูแล: ${task.label}` }],
+  };
+  store.hotelStays[next.hotelStayId] = next;
+  return writeStore(store) ? clonePrototypeHotelStay(next) : null;
+}
+
+export function updatePrototypeHotelStayNote(hotelStayId: string, businessNote: string, context: DemoBusinessContext) {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay || !hotelStayMatchesContext(stay, context)) return null;
+  const note = businessNote.trim();
+  if (note === stay.businessNote) return clonePrototypeHotelStay(stay);
+  const now = new Date().toISOString();
+  const next: PrototypeHotelStay = {
+    ...clonePrototypeHotelStay(stay),
+    businessNote: note,
+    updatedAt: now,
+    history: [...stay.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("note"), at: now, type: "note", summary: "อัปเดตหมายเหตุของร้าน" }],
+  };
+  store.hotelStays[next.hotelStayId] = next;
+  return writeStore(store) ? clonePrototypeHotelStay(next) : null;
+}
+
+export function listPrototypeHotelLinkedGroomingJobs(stay: PrototypeHotelStay, fixtureOnly = false) {
+  const jobs = fixtureOnly
+    ? listPrototypeGroomingServiceJobFixtures(null, { includeCancelled: false })
+    : listPrototypeGroomingServiceJobs(null, { includeCancelled: false });
+  return jobs.filter((job) => (
+    job.businessId === stay.businessId
+    && job.branchId === stay.branchId
+    && job.customerId === stay.customerId
+    && job.petId === stay.petId
+    && job.scheduledStart.slice(0, 10) >= stay.scheduledCheckIn
+    && job.scheduledStart.slice(0, 10) <= stay.scheduledCheckOut
+  ));
+}
+
+function synchronizePrototypeHotelStaysForBooking(store: BusinessStore, booking: PrototypeBooking, now: string) {
+  const existingStays = mergedPrototypeHotelStays(store).filter((stay) => stay.bookingId === booking.bookingId);
+  if (booking.serviceModule !== "hotel" || booking.status === "cancelled") {
+    for (const existing of existingStays) {
+      if (existing.status === "checked-out" || existing.status === "cancelled") continue;
+      const cancelled: PrototypeHotelStay = {
+        ...clonePrototypeHotelStay(existing),
+        status: "cancelled",
+        cancelledAt: now,
+        updatedAt: now,
+        history: [...existing.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("status"), at: now, type: "status", summary: "ยกเลิกรายการเข้าพักตามการจอง" }],
+      };
+      store.hotelStays[cancelled.hotelStayId] = cancelled;
+    }
+    return;
+  }
+
+  for (const pet of booking.pets) {
+    const existing = existingStays.find((stay) => stay.petId === pet.id) ?? null;
+    if (!existing) {
+      const created = buildHotelStayFromBooking(booking, pet, now);
+      store.hotelStays[created.hotelStayId] = created;
+      continue;
+    }
+    if (existing.status === "checked-out" || existing.status === "cancelled") continue;
+    const datesChanged = existing.scheduledCheckIn !== booking.start || existing.scheduledCheckOut !== (booking.end ?? addBusinessCalendarDays(booking.start, 1));
+    const nextCheckOut = booking.end ?? addBusinessCalendarDays(booking.start, 1);
+    const next: PrototypeHotelStay = {
+      ...clonePrototypeHotelStay(existing),
+      businessId: booking.businessId,
+      branchId: booking.branchId,
+      customerId: booking.customer.id,
+      scheduledCheckIn: booking.start,
+      scheduledCheckOut: nextCheckOut,
+      roomAssignments: existing.roomAssignments.map((assignment) => ({
+        ...assignment,
+        startDate: assignment.startDate === existing.scheduledCheckIn ? booking.start : assignment.startDate,
+        endDate: (assignment.endDate ?? existing.scheduledCheckOut) === existing.scheduledCheckOut ? nextCheckOut : assignment.endDate,
+      })),
+      status: existing.status === "booked" && booking.start === BOOKING_DEMO_DATE ? "expected-today" : existing.status,
+      updatedAt: now,
+      history: datesChanged ? [...existing.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("dates"), at: now, type: "dates", summary: "ปรับวันเข้าพักจาก Calendar" }] : existing.history.map((item) => ({ ...item })),
+    };
+    store.hotelStays[next.hotelStayId] = next;
+  }
+  for (const existing of existingStays) {
+    if (booking.pets.some((pet) => pet.id === existing.petId) || existing.status === "checked-out" || existing.status === "cancelled") continue;
+    const cancelled: PrototypeHotelStay = {
+      ...clonePrototypeHotelStay(existing),
+      status: "cancelled",
+      cancelledAt: now,
+      updatedAt: now,
+      history: [...existing.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("status"), at: now, type: "status", summary: "ยกเลิกรายการเข้าพักของน้องที่ถูกนำออกจากการจอง" }],
+    };
+    store.hotelStays[cancelled.hotelStayId] = cancelled;
+  }
 }
 
 export function getBusinessHomeDemo(context: DemoBusinessContext) {
@@ -1534,15 +3400,26 @@ export function findTemporaryAccessFromScanValue(value: string) {
   return accessId ? readTemporaryAccess(accessId) : findTemporaryAccessByFallbackCode(value);
 }
 
-export function createOrResumeBusinessIntake(access: TemporaryAccess, context: DemoBusinessContext) {
+export function createOrResumeBusinessIntake(
+  access: TemporaryAccess,
+  context: DemoBusinessContext,
+  target: { hotelStayId?: string | null } = {},
+) {
   const store = readStore();
-  const existing = Object.values(store.intakes).find((record) => record.accessId === access.id);
+  const requestedHotelStayId = target.hotelStayId ?? null;
+  const existing = Object.values(store.intakes).find((record) => record.accessId === access.id && (!requestedHotelStayId || record.hotelStayId === requestedHotelStayId));
   if (existing) return existing;
 
   // The scanner has already passed recipient, Branch, scope, expiry, and
   // consent checks before this function runs. Reuse an explicit local match
   // only; an unknown QR never creates a permanent Customer relationship.
   const knownRelationship = findKnownBusinessCustomerPetByPassportSlug(context.businessId, access.petSlug);
+  const hotelStay = requestedHotelStayId ? readPrototypeHotelStay(requestedHotelStayId) : null;
+  if (requestedHotelStayId && (!hotelStay
+    || hotelStay.businessId !== context.businessId
+    || hotelStay.branchId !== context.branchId
+    || hotelStay.customerId !== knownRelationship?.customer.id
+    || hotelStay.petId !== knownRelationship?.pet.id)) return null;
 
   const now = new Date().toISOString();
   const suffix = access.id.replace(/^prototype-access-/, "").replace(/[^a-z0-9-]/gi, "").slice(-32) || Date.now().toString(36);
@@ -1553,6 +3430,8 @@ export function createOrResumeBusinessIntake(access: TemporaryAccess, context: D
     branchId: context.branchId,
     customerId: knownRelationship?.customer.id ?? null,
     petRelationshipId: knownRelationship?.pet.id ?? null,
+    serviceJobId: null,
+    hotelStayId: hotelStay?.hotelStayId ?? null,
     role: context.role,
     staffLabel: context.memberLabel,
     servicePurpose: access.purpose,
@@ -1662,14 +3541,60 @@ export function confirmPrototypeCheckIn(intakeId: string, activeContext?: DemoBu
   }
 
   const checkedInAt = new Date().toISOString();
-  const completed = updateBusinessIntake(intakeId, (current) => ({
-    ...current,
+  const store = readStore();
+  const context = activeContext ?? getDemoBusinessContextForBranch(record.businessId, record.branchId);
+  let serviceJobId = record.serviceJobId ?? null;
+
+  // A Hotel target is passed explicitly from its Arrival card. Intake never
+  // guesses a Stay from free-text purpose or the first matching Pet.
+  if (record.hotelStayId) {
+    const hotelStay = mergedPrototypeHotelStays(store).find((stay) => stay.hotelStayId === record.hotelStayId) ?? null;
+    if (!hotelStay
+      || hotelStay.businessId !== context.businessId
+      || hotelStay.branchId !== context.branchId
+      || hotelStay.customerId !== record.customerId
+      || hotelStay.petId !== record.petRelationshipId) return { ok: false, reason: "changed" };
+    if (hotelStay.intakeId !== intakeId) {
+      const prepared: PrototypeHotelStay = {
+        ...clonePrototypeHotelStay(hotelStay),
+        intakeId,
+        updatedAt: checkedInAt,
+        history: [...hotelStay.history.map((item) => ({ ...item })), { id: hotelStayHistoryId("intake"), at: checkedInAt, type: "intake", summary: "Intake เสร็จแล้ว รอระบุห้องก่อนรับเข้า" }],
+      };
+      store.hotelStays[prepared.hotelStayId] = prepared;
+    }
+  // Scan/Intake does not infer a service from a free-text purpose. It only
+  // attaches a known Grooming Job when Business, Branch, Customer, Pet, and
+  // an already-scheduled booked Job all match the shared records.
+  } else if (getEnabledBusinessModules(context).includes("grooming") && record.customerId && record.petRelationshipId) {
+    const jobs = mergedPrototypeServiceJobs(store);
+    const candidate = (serviceJobId ? jobs.find((job) => job.serviceJobId === serviceJobId) : null)
+      ?? jobs.find((job) => (
+        job.businessId === context.businessId
+        && job.branchId === context.branchId
+        && job.customerId === record.customerId
+        && job.petId === record.petRelationshipId
+        && job.status === "booked"
+      ))
+      ?? null;
+    if (candidate && candidate.status === "booked") {
+      const activated = transitionServiceJobValue(candidate, "checked-in", checkedInAt, "intake");
+      store.serviceJobs[activated.serviceJobId] = { ...activated, intakeId: intakeId };
+      serviceJobId = activated.serviceJobId;
+    }
+  }
+
+  const completed: BusinessIntakeRecord = {
+    ...record,
+    serviceJobId,
     taskState: "complete",
     checkInState: "checked-in",
     checkedInAt,
+    updatedAt: checkedInAt,
     prototypeSessionReference: `LOCAL-SESSION-${Date.now().toString(36).toUpperCase()}`,
-  }));
-  return completed
+  };
+  store.intakes[intakeId] = completed;
+  return writeStore(store)
     ? { ok: true, record: completed, duplicate: false }
     : { ok: false, reason: "changed" };
 }

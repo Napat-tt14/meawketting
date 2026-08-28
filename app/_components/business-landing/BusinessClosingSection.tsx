@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight, IdentificationCard, PawPrint, ShieldCheck, Storefront } from "../icons";
 
 export function BusinessClosingSection() {
@@ -20,9 +19,9 @@ export function BusinessClosingSection() {
           <h2>รวมงานสำคัญของร้านไว้ในที่เดียว</h2>
           <p>จัดการ Business Home, Calendar และการรับเข้า พร้อมมองเห็นงานของทีมในจังหวะเดียว</p>
           <div className="business-closing-card__actions">
-            <Link className="button button--business button--large" href="/business/login">
+            <a className="button button--business button--large" href="/business/login">
               เข้าสู่ระบบสำหรับธุรกิจ <ArrowRight size={18} />
-            </Link>
+            </a>
           </div>
         </div>
       </article>
@@ -41,16 +40,15 @@ export function BusinessClosingSection() {
           <h2>เป็นเจ้าของสัตว์เลี้ยง?</h2>
           <p>ดู Pet Passport เปิดโหมด Safety / Lost และแชร์ข้อมูลกับร้านได้ตามที่คุณเลือก</p>
           <div className="business-closing-card__actions">
-            <Link className="button button--paper button--large" href="/my-pets">
+            <a className="button button--paper button--large" href="/my-pets">
               <ShieldCheck size={18} /> ดูสัตว์เลี้ยงของฉัน <ArrowRight size={16} />
-            </Link>
-            <Link className="business-closing-card__create-link" href="/create-passport">
+            </a>
+            <a className="business-closing-card__create-link" href="/create-passport">
               <IdentificationCard size={18} /> ยังไม่มี Passport? เริ่มสร้าง
-            </Link>
+            </a>
           </div>
         </div>
       </article>
     </section>
   );
 }
-

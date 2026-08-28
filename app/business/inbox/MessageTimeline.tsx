@@ -106,7 +106,7 @@ function StructuredRequestCard({
       ) : request.responseSource === "guardian-local-preview" ? (
         <small className="structured-request-card__source">คำตอบจำลองจากฝั่งเจ้าของ · เฉพาะเบราว์เซอร์นี้</small>
       ) : null}
-      {request.requestStatus === "approved" ? <small className="structured-request-card__effect">ยังไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ</small> : null}
+      {request.requestStatus === "approved" ? <small className="structured-request-card__effect">{request.serviceJobId ? "อัปเดตเฉพาะงานบริการในต้นแบบ · ไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ" : "ยังไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ"}</small> : null}
     </article>
   );
 }

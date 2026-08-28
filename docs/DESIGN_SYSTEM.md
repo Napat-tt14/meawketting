@@ -1,6 +1,6 @@
 # Design System
 
-Status: **CANONICAL VISUAL/UI DIRECTION (BUSINESS UI REFINEMENT 2026-08-26)**
+Status: **CANONICAL VISUAL/UI DIRECTION (BUSINESS UI REFINEMENT + BF-6 HOTEL OPERATIONS 2026-08-28)**
 Owner: Product Design
 
 ## Context direction
@@ -168,8 +168,8 @@ Service identity is a secondary classification system and never replaces status:
 ## Business navigation architecture
 
 - Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, and `ข้อความ`; the Inbox uses the same unread source as Home and mobile navigation.
-- The Sidebar shows `งานบริการ · ยังไม่เปิดใช้` for services enabled by the active Branch, followed by `การเงิน`, `รายงาน`, `ทีม`, and `ตั้งค่า` under `ยังไม่เปิดใช้`.
-- Planned rows are native disabled buttons with `aria-disabled`, reduced emphasis, and no `href` or fake route. Mobile More mirrors the live Customers link and the same Branch-enabled service/management groups.
+- The Sidebar exposes Grooming and Hotel as live `งานบริการ` destinations only when the active Branch enables that module. Daycare remains a native disabled planned row when enabled, followed by `การเงิน`, `รายงาน`, `ทีม`, and `ตั้งค่า` under `ยังไม่เปิดใช้`.
+- Planned rows are native disabled buttons with `aria-disabled`, reduced emphasis, and no `href` or fake route. Mobile More mirrors the live Customers and capability-enabled service links, plus the same Branch-enabled planned/service-management groups.
 
 ## Operational focal points and schedules
 
@@ -180,6 +180,14 @@ Service identity is a secondary classification system and never replaces status:
 - Calendar weeks begin on Sunday. Both Hotel edges and both appointment time edges can shrink or extend; touch uses a deliberate long-press drag while pointer users can move, Alt-drag to duplicate, or copy/paste the focused Booking with Ctrl/Cmd+C and Ctrl/Cmd+V.
 - Calendar view/range choices are browser-local preferences (cookie), never database state. Interaction guidance and shortcut keys are a quiet legend after the schedule; transient success feedback must not insert content above the grid or shift its position.
 - Calendar density is limited to Pet, service, time/date, and critical status. Customer, Branch, notes, and resources belong in selection/detail UI.
+- Grooming is the execution companion to Calendar, not another planning grid. Its desktop/tablet board uses clear status columns and a touch-safe horizontal workflow width; mobile switches to status tabs and a readable Job list instead of squeezing five columns.
+- A Grooming Job card uses the permitted Pet photo/avatar as its visual scan anchor, then Pet, base service, scheduled time, groomer, visible status, and at most one concise attention cue. Coral/Scissors provide module recognition only; semantic status/attention must remain text-plus-icon and independent of Coral.
+- Grooming board drag gives the card a restrained lift and the destination a valid/invalid highlight. Settle/rollback and status/detail drawer transitions use the existing 180–300ms premium motion; bounce, confetti, color-only success, and drag-only mobile workflows are prohibited.
+- Grooming detail is a focus-managed right drawer on larger screens and a sheet/task surface on smaller screens. It uses compact section hierarchy for identity/contact, service/timing, status, resources, add-ons, internal notes, messages, and history rather than a long text modal.
+- Hotel is the occupancy/execution companion to Calendar, not another planning grid. Its opening hierarchy prioritizes today (arrivals, departures, current stays, vacancy, care and attention), then Occupancy, Stays and Daily Care. Hotel/Bed/Sky establishes module recognition only; semantic status and alert color remain independent.
+- Desktop/tablet Hotel occupancy uses room/zone rows and dates as columns. One Stay appears as one continuous rounded span across the applicable date range, with Pet image/avatar, pet name and arrival/departure context; it is never duplicated as daily cards. Vacancy/gap, occupied/full capacity, and conflict states use readable text/icon labels, not blue surfaces alone.
+- Hotel Stay cards and daily-care rows place the permitted Pet photo/avatar first as a fast scan anchor, followed by Pet, room/zone, time/task/status or stay state. Species placeholders are used if an image is unavailable or not permitted; protected imagery must not persist after consent expiry/revoke.
+- Hotel room move, date resize and task completion use the same restrained 180–300ms premium motion: lift/ghost/destination treatment may accelerate desktop/tablet drag, invalid targets remain visibly invalid, and rejected changes settle back without ambiguity. The focus-managed Stay drawer/sheet provides complete room/date/status controls, so drag is never required and mobile never squeezes a many-column occupancy grid.
 
 ## Business landing imagery
 
@@ -194,7 +202,7 @@ Service identity is a secondary classification system and never replaces status:
 - It contains the real Meawketting brand, compact navigation to implemented anchors/routes and one primary Business CTA. It contains no theme toggle, Design System badge, Emoji or dead/planned link.
 - The logged-in Business Header inherits Warm White, brand Yellow, refined radius and subtle interaction while remaining compact. Active Business/Branch context, Branch switcher, Scanner action, User Menu and mobile navigation preserve the current operational architecture; the top-right icon controls share a 44px alignment grid and opening the account menu does not blur the work behind it.
 - The public Footer is a centered, rounded Warm White/white surface with a thin warm border, controlled spacing, optional SVG/art decoration and only real destinations/actions. Privacy, Terms, Pricing and Support are not invented as links.
-- Marketing Footer rendering is restricted to public/marketing surfaces. It is absent from `/business/home`, `/business/calendar`, `/business/customers`, `/business/inbox`, `/business/scan`, `/business/intake/*` and every other logged-in operational route.
+- Marketing Footer rendering is restricted to public/marketing surfaces. It is absent from `/business/home`, `/business/calendar`, `/business/grooming`, `/business/hotel`, `/business/customers`, `/business/inbox`, `/business/scan`, `/business/intake/*` and every other logged-in operational route.
 
 ## Cards and Bento
 
@@ -241,7 +249,7 @@ Service identity is a secondary classification system and never replaces status:
 
 - Canonical easing is `--ease-premium: cubic-bezier(0.22, 1, 0.36, 1)`. Typical interactive duration is 180–300ms.
 - Approved patterns include button hover/press, subtle card lift, modal fade/scale, toast slide/fade, accordion/tabs, normal progress and structural skeleton shimmer.
-- Calendar, Booking, Customer records, Scanner and Intake remain responsive and restrained. Bounce, wobble and confetti are not used.
+- Calendar, Booking, Grooming board, Customer records, Scanner and Intake remain responsive and restrained. Bounce, wobble and confetti are not used.
 - Shared skeletons match content structure: Customer rows, Calendar, Home metrics and Inbox list. Prefer structural skeletons over a giant generic spinner.
 - Normal progress uses Brand/Semantic colors. AI Rainbow progress remains reserved/unused.
 - `prefers-reduced-motion: reduce` removes non-essential animation, shimmer travel and transforms without hiding state or feedback.
@@ -273,9 +281,9 @@ Service identity is a secondary classification system and never replaces status:
 
 | Viewport | Range | Behavior |
 |---|---|---|
-| Mobile | 320–767px | Landing copy and full-width CTAs first, product preview below, stacked service/core/flow sections; Business App keeps bottom navigation and sheet tasks; Calendar defaults to Agenda instead of compressing a seven-day grid |
-| Tablet | 768–1023px | Landing uses a wide single-column Hero until the preview has enough room; Business App uses adaptive grids |
-| Desktop | 1024px+ | Balanced Landing Hero within the approximately 1280px marketing shell; Business App keeps persistent navigation and may use workflow-appropriate width for Calendar/boards |
+| Mobile | 320–767px | Landing copy and full-width CTAs first, product preview below, stacked service/core/flow sections; Business App keeps bottom navigation and sheet tasks; Calendar defaults to Agenda and Hotel uses date/list/detail views instead of compressing occupancy columns |
+| Tablet | 768–1023px | Landing uses a wide single-column Hero until the preview has enough room; Business App uses adaptive grids and a touch-friendly, contained Hotel occupancy surface when appropriate |
+| Desktop | 1024px+ | Balanced Landing Hero within the approximately 1280px marketing shell; Business App keeps persistent navigation and may use workflow-appropriate width for Calendar, Grooming, and Hotel occupancy boards |
 
 - Required QA widths are 320, 375, 390, 430, 768, 1024, 1200 and 1440px. The final acceptance sweep records at least 390, 768, 1200 and 1440px.
 - Desktop hover enhancement always has a usable focus, pressed and touch equivalent. No mobile path depends on hover.
@@ -291,3 +299,4 @@ Service identity is a secondary classification system and never replaces status:
 - Status and validation are never conveyed by color alone; Light Sweep and glass never reduce text readability.
 - Thai wrapping and 200% text zoom must not clip content or controls.
 - `prefers-reduced-motion: reduce` disables non-essential animations while preserving understandable state transitions.
+- Occupancy spans expose an accessible name containing the Pet, room/zone and arrival/departure range; room/date drag always has an accessible detail-control alternative. Pet images have meaningful alt text or an intentionally empty decorative alt when adjacent text already supplies identity.

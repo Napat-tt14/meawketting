@@ -1,8 +1,10 @@
 import {
   DEMO_BUSINESS_CONTEXTS,
+  applyPrototypeApprovedGroomingAddOn,
   type DemoBusinessContext,
   readPrototypeBooking,
   readPrototypeCustomer,
+  readPrototypeGroomingServiceJob,
 } from "./businessState";
 
 // BF-4 stores only Business communication records and opaque relationship
@@ -31,6 +33,9 @@ export type PrototypeAddServiceRequestMessage = PrototypeMessageBase & {
   kind: "add-service-request";
   direction: "business";
   bookingId: string;
+  // Added by BF-5; optional so existing BF-4 browser-local messages remain
+  // readable until a new structured request is created from a Grooming Job.
+  serviceJobId?: string | null;
   serviceName: string;
   additionalPrice: number;
   additionalMinutes: number;
@@ -124,11 +129,11 @@ export const DEMO_CONVERSATION_FIXTURES: readonly PrototypeConversation[] = [
     petId: "booking-pet-mochi",
     bookingId: "booking-fixture-ari-grooming-1030",
     branchId: "whisker-ari",
-    serviceJobId: null,
+    serviceJobId: "grooming-job-fixture-mochi",
     unreadCount: 2,
     lastReadAt: "2026-08-18T02:50:00.000Z",
     createdAt: CONVERSATION_FIXTURE_CREATED_AT,
-    updatedAt: "2026-08-18T03:18:00.000Z",
+    updatedAt: "2026-08-18T10:50:00.000Z",
     messages: [
       {
         messageId: "message-nalin-business-confirmed",
@@ -156,6 +161,22 @@ export const DEMO_CONVERSATION_FIXTURES: readonly PrototypeConversation[] = [
         text: "ขอเลื่อนเวลารับเป็นบ่ายโมงได้ไหมคะ",
         sentAt: "2026-08-18T03:18:00.000Z",
         deliveryState: null,
+      },
+      {
+        messageId: "message-nalin-grooming-addon",
+        conversationId: "conversation-fixture-nalin",
+        direction: "business",
+        kind: "add-service-request",
+        bookingId: "booking-fixture-ari-grooming-1030",
+        serviceJobId: "grooming-job-fixture-mochi",
+        serviceName: "แกะสางขน",
+        additionalPrice: 300,
+        additionalMinutes: 30,
+        note: "พบขนพันกันมากระหว่างเตรียมบริการค่ะ",
+        requestStatus: "waiting",
+        respondedAt: null,
+        responseSource: null,
+        sentAt: "2026-08-18T10:50:00.000Z",
       },
     ],
   },
@@ -259,6 +280,7 @@ function isPrototypeInboxMessage(value: unknown): value is PrototypeInboxMessage
   return message.kind === "add-service-request"
     && message.direction === "business"
     && typeof message.bookingId === "string"
+    && (typeof message.serviceJobId === "string" || message.serviceJobId === null || typeof message.serviceJobId === "undefined")
     && typeof message.serviceName === "string"
     && typeof message.additionalPrice === "number"
     && typeof message.additionalMinutes === "number"
@@ -366,6 +388,7 @@ export function ensurePrototypeConversation(input: {
   petId?: string | null;
   bookingId?: string | null;
   branchId?: string | null;
+  serviceJobId?: string | null;
 }): EnsurePrototypeConversationResult {
   const customer = readPrototypeCustomer(input.customerId);
   if (!customer || customer.businessId !== input.businessId) return { ok: false, reason: "missing-customer" };
@@ -373,11 +396,20 @@ export function ensurePrototypeConversation(input: {
   const petId = input.petId ?? null;
   if (petId && !customer.pets.some((pet) => pet.id === petId)) return { ok: false, reason: "invalid-context" };
 
-  const booking = input.bookingId ? readPrototypeBooking(input.bookingId) : null;
-  if (input.bookingId && (!booking || booking.businessId !== input.businessId || booking.customer.id !== customer.id)) {
+  const serviceJob = input.serviceJobId ? readPrototypeGroomingServiceJob(input.serviceJobId) : null;
+  if (input.serviceJobId && (!serviceJob || serviceJob.businessId !== input.businessId || serviceJob.customerId !== customer.id)) {
+    return { ok: false, reason: "invalid-context" };
+  }
+  const bookingId = input.bookingId ?? serviceJob?.bookingId ?? null;
+  const booking = bookingId ? readPrototypeBooking(bookingId) : null;
+  if (bookingId && (!booking || booking.businessId !== input.businessId || booking.customer.id !== customer.id)) {
+    return { ok: false, reason: "invalid-context" };
+  }
+  if (serviceJob && (serviceJob.bookingId !== booking?.bookingId || (petId && serviceJob.petId !== petId))) {
     return { ok: false, reason: "invalid-context" };
   }
   const bookingPetId = booking?.pets.find((pet) => customer.pets.some((candidate) => candidate.id === pet.id))?.id ?? null;
+  const serviceJobPetId = serviceJob?.petId ?? null;
   const validatedBranchId = booking?.branchId
     ?? (input.branchId && DEMO_BUSINESS_CONTEXTS.some((context) => context.businessId === input.businessId && context.branchId === input.branchId)
       ? input.branchId
@@ -390,12 +422,13 @@ export function ensurePrototypeConversation(input: {
   if (existing) {
     const next: PrototypeConversation = {
       ...existing,
-      petId: petId || bookingPetId || existing.petId,
+      petId: petId || serviceJobPetId || bookingPetId || existing.petId,
       bookingId: booking?.bookingId ?? existing.bookingId,
       branchId: validatedBranchId ?? existing.branchId,
-      updatedAt: booking || petId ? now : existing.updatedAt,
+      serviceJobId: serviceJob?.serviceJobId ?? existing.serviceJobId,
+      updatedAt: booking || petId || serviceJob ? now : existing.updatedAt,
     };
-    if (next.petId === existing.petId && next.bookingId === existing.bookingId && next.branchId === existing.branchId) {
+    if (next.petId === existing.petId && next.bookingId === existing.bookingId && next.branchId === existing.branchId && next.serviceJobId === existing.serviceJobId) {
       return { ok: true, conversation: clonePrototypeConversation(existing), reused: true };
     }
     store.conversations[next.conversationId] = next;
@@ -407,10 +440,10 @@ export function ensurePrototypeConversation(input: {
     conversationId: generatedPrototypeId("prototype-conversation"),
     businessId: customer.businessId,
     customerId: customer.id,
-    petId: petId || bookingPetId,
+    petId: petId || serviceJobPetId || bookingPetId,
     bookingId: booking?.bookingId ?? null,
     branchId: validatedBranchId,
-    serviceJobId: null,
+    serviceJobId: serviceJob?.serviceJobId ?? null,
     messages: [],
     unreadCount: 0,
     lastReadAt: now,
@@ -489,6 +522,7 @@ export function createPrototypeAddServiceRequest(input: {
   conversationId: string;
   businessId: string;
   bookingId: string;
+  serviceJobId?: string | null;
   serviceName: string;
   additionalPrice: number;
   additionalMinutes: number;
@@ -505,6 +539,11 @@ export function createPrototypeAddServiceRequest(input: {
   if (!booking || booking.status === "cancelled" || booking.businessId !== conversation.businessId || booking.customer.id !== conversation.customerId) {
     return { ok: false, reason: "booking-mismatch" };
   }
+  const serviceJobId = input.serviceJobId ?? conversation.serviceJobId ?? null;
+  const serviceJob = serviceJobId ? readPrototypeGroomingServiceJob(serviceJobId) : null;
+  if (serviceJobId && (!serviceJob || serviceJob.businessId !== conversation.businessId || serviceJob.customerId !== conversation.customerId || serviceJob.bookingId !== booking.bookingId)) {
+    return { ok: false, reason: "booking-mismatch" };
+  }
 
   const sentAt = new Date().toISOString();
   const message: PrototypeAddServiceRequestMessage = {
@@ -513,6 +552,7 @@ export function createPrototypeAddServiceRequest(input: {
     direction: "business",
     kind: "add-service-request",
     bookingId: booking.bookingId,
+    serviceJobId: serviceJob?.serviceJobId ?? null,
     serviceName,
     additionalPrice: Math.round(input.additionalPrice),
     additionalMinutes: Math.round(input.additionalMinutes),
@@ -527,6 +567,7 @@ export function createPrototypeAddServiceRequest(input: {
     bookingId: booking.bookingId,
     branchId: booking.branchId,
     petId: booking.pets[0]?.id ?? conversation.petId,
+    serviceJobId: serviceJob?.serviceJobId ?? conversation.serviceJobId,
     messages: [...conversation.messages.map(cloneMessage), message],
     updatedAt: sentAt,
   };
@@ -577,6 +618,20 @@ export function simulatePrototypeGuardianResponse(
   };
   store.conversations[next.conversationId] = next;
   if (!writeInboxStore(store)) return { ok: false, reason: "storage" };
+  // The Guardian-only local simulator is the sole approval surface. An
+  // approved Grooming request may update the linked execution Job's add-on
+  // estimate; it never mutates the Booking or creates a Charge/Payment.
+  if (decision === "approved") {
+    applyPrototypeApprovedGroomingAddOn({
+      serviceJobId: applied.message.serviceJobId ?? next.serviceJobId,
+      bookingId: applied.message.bookingId,
+      sourceRequestId: applied.message.messageId,
+      serviceName: applied.message.serviceName,
+      additionalPrice: applied.message.additionalPrice,
+      additionalMinutes: applied.message.additionalMinutes,
+      approvedAt: applied.message.respondedAt ?? new Date().toISOString(),
+    });
+  }
   return { ok: true, conversation: clonePrototypeConversation(next), message: { ...applied.message }, duplicate: false };
 }
 

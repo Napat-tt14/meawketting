@@ -1,6 +1,6 @@
 # Meawketting Documentation
 
-Status: **CANONICAL / LOCAL FRONT-END PROTOTYPE / BUSINESS DESIGN SYSTEM REBASE VALIDATED 2026-08-24**
+Status: **CANONICAL / LOCAL FRONT-END PROTOTYPE / BF-6 HOTEL FOUNDATION (FINAL VALIDATION PENDING)**
 
 This directory is the source of truth for Product direction, UX architecture, repository status, and validation. Read only the documents needed for the task.
 
@@ -48,10 +48,12 @@ The derived [HTML manual](./.htmlmanual/manual.html) is a compact reading aid, n
 - **Business typography and theme:** LINE Seed Sans TH via local WOFF2 webfonts, runtime faces 400/700, 14px operational body, 16px minimum mobile form controls and maximum UI weight 700; Light / Warm White only; Background `#FFFDF9`, Foreground `#2B2B2B`, Primary `#F4C95D`, Primary Hover `#D7B152`, and Primary Foreground `#3D2B00`. Consumer typography and visual tokens remain unchanged.
 - **Business visual exclusions:** no Dark Mode/theme toggle, no Emoji/Dingbat UI icons, and no active AI Rainbow/Gradient/Progress. AI visual examples are reserved/experimental only.
 - **Public shell direction:** floating glass Business Header and rounded public Footer with real links only. Logged-in Business operational routes never render the marketing Footer.
-- **BF-1 through BF-4 foundations are live local prototypes:** Business Home (`/business/home`), Shared Calendar & Booking Editor (`/business/calendar`), Customers & Pets (`/business/customers`, `/business/customers/[customerId]`), Inbox (`/business/inbox`), and Shared Business Intake Engine (`/business/scan`, `/business/intake/[id]`).
-- **Inbox boundary:** local text/quick replies/unread and structured request states are implemented; real delivery, notifications, attachments, full Consumer Inbox, and Booking/Charge effects are not.
+- **BF-1 through BF-6 foundations are live local prototypes:** Business Home (`/business/home`), Shared Calendar & Booking Editor (`/business/calendar`), Customers & Pets (`/business/customers`, `/business/customers/[customerId]`), Inbox (`/business/inbox`), Shared Business Intake Engine (`/business/scan`, `/business/intake/[id]`), Grooming Operations (`/business/grooming` when the active Branch enables Grooming), and Hotel / Boarding Operations (`/business/hotel` when the active Branch enables Hotel).
+- **Calendar / execution split:** Calendar plans and edits Bookings; Grooming executes distinct Grooming Service Jobs and Hotel executes distinct Hotel Stays linked to those Bookings. Neither operational surface turns Booking planning status into an execution-status field.
+- **Hotel foundation:** `/business/hotel` is an execution dashboard, not a second Calendar. It derives today, arrivals, current stays, departures, attention, room/zone occupancy, room-move history, and per-Pet daily-care state from the shared browser-local Business envelope. The occupancy board uses continuous date spans and blocks conflicting assignment/date changes by default.
+- **Inbox boundary:** local text/quick replies/unread and structured request states are implemented; only the local Guardian-response simulator can approve. An approved linked Grooming request updates the Service Job add-ons and estimated duration only—not a Booking, Charge, Payment, or settlement. Real delivery, notifications, attachments, and full Consumer Inbox are not implemented.
 - **Target production platform direction:** Cloudflare. **PRODUCTION: NOT DEPLOYED / NOT VERIFIED.** BF-4 does not select a Cloudflare runtime or storage architecture.
-- **Strict Boundary:** Consumer visual redesign remains paused. Do not start BF-5, AI Product features or any other next phase automatically. Backend, database, real auth, real payments, and production deployment remain future work.
+- **Strict Boundary:** Consumer visual redesign remains paused. BF-6 Hotel is an implemented local foundation only; do not start Daycare, Billing, CareProof, AI Product features, or any other next phase automatically. Backend, database, real auth, real payments, and production deployment remain future work. Overbooking, room-sharing, waitlist, cross-Branch transfer, full CareProof, full Incident Management, and LINE transport remain OPEN or NOT IMPLEMENTED as documented by their owner files.
 
 ## Source order and update rules
 

@@ -30,6 +30,7 @@ import {
   bookingOccursAfterDemoStart,
   bookingDateLabel,
   bookingSummary,
+  customerTagLabel,
   customerBookings,
   nextPetBooking,
   petSpeciesLabel,
@@ -134,11 +135,11 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
         <div className="business-customer-detail__main">
           <section className="customer-detail-section customer-detail-section--pets" aria-labelledby="customer-pets-title">
             <header>
-              <div><h2 id="customer-pets-title">สัตว์เลี้ยงที่ใช้บริการ</h2><p>ดูนัดถัดไปหรือเริ่มการจองให้น้อง</p></div>
+              <div><h2 id="customer-pets-title">สัตว์เลี้ยงที่ใช้บริการ</h2></div>
               <span>{customer.pets.length} ตัว</span>
             </header>
             {customer.pets.length > 0 ? (
-              <ul className="customer-pet-list">
+              <ul className="customer-pet-list" aria-label="สัตว์เลี้ยงของลูกค้ารายนี้">
                 {customer.pets.map((pet) => {
                   const nextBooking = nextPetBooking(pet, relatedBookings);
                   return (
@@ -173,7 +174,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
 
           {currentHotelStays.length > 0 ? (
             <section className="customer-detail-section customer-detail-section--hotel" aria-labelledby="customer-hotel-title">
-              <header><div><h2 id="customer-hotel-title">กำลังเข้าพัก</h2><p>น้องแต่ละตัวมีห้องและงานดูแลของตัวเอง</p></div><BusinessServiceIcon module="hotel" size={21} /></header>
+              <header><div><h2 id="customer-hotel-title">กำลังเข้าพัก</h2></div><BusinessServiceIcon module="hotel" size={21} /></header>
               <ol className="customer-booking-list customer-booking-list--hotel">
                 {currentHotelStays.map((stay) => {
                   const pet = customer.pets.find((item) => item.id === stay.petId);
@@ -191,7 +192,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
           ) : null}
 
           <section className="customer-detail-section" aria-labelledby="customer-upcoming-title">
-            <header><div><h2 id="customer-upcoming-title">นัดหมายที่กำลังจะมาถึง</h2><p>แสดงสูงสุด 3 รายการถัดไป</p></div><CalendarDays size={22} /></header>
+            <header><div><h2 id="customer-upcoming-title">นัดหมายที่กำลังจะมาถึง</h2></div><CalendarDays size={22} /></header>
             {upcomingBookings.length > 0 ? (
               <ol className="customer-booking-list">
                 {upcomingBookings.map((booking) => {
@@ -204,7 +205,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
           </section>
 
           <section className="customer-detail-section" aria-labelledby="customer-recent-title">
-            <header><div><h2 id="customer-recent-title">การใช้บริการล่าสุด</h2><p>ประวัติ 3 รายการล่าสุดของลูกค้ารายนี้</p></div></header>
+            <header><div><h2 id="customer-recent-title">การใช้บริการล่าสุด</h2></div></header>
             {completedGroomingJobs.length > 0 ? (
               <ol className="customer-booking-list customer-booking-list--recent">
                 {completedGroomingJobs.map((job) => {
@@ -236,7 +237,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
 
         <aside className="business-customer-detail__aside">
           <section className="customer-detail-section customer-team-card" aria-labelledby="customer-team-title">
-            <header><div><h2 id="customer-team-title">ข้อมูลสำหรับทีมงาน</h2><p>ข้อมูลภายในร้าน ใช้เตรียมการบริการครั้งถัดไป</p></div></header>
+            <header><div><h2 id="customer-team-title">ข้อมูลสำหรับทีมงาน</h2></div></header>
             <div className="customer-business-notes" aria-labelledby="customer-notes-title">
               <header><h3 id="customer-notes-title">หมายเหตุของร้าน</h3><button type="button" title="แก้ไขหมายเหตุของร้าน" aria-label="แก้ไขหมายเหตุของร้าน" onClick={() => setEditor("customer")}><Save size={17} /></button></header>
               {customer.businessNote ? <p>{customer.businessNote}</p> : <p className="customer-section-empty">ยังไม่มีหมายเหตุของร้าน</p>}
@@ -244,7 +245,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             <div className="customer-tags" aria-labelledby="customer-tags-title">
               <header><h3 id="customer-tags-title">ป้ายกำกับ</h3></header>
               <div className="customer-tags__list">
-                {customer.tags.length > 0 ? customer.tags.map((tag) => <span key={tag}>{tag}<button type="button" title={`เอาป้ายกำกับ ${tag} ออก`} aria-label={`เอาป้ายกำกับ ${tag} ออก`} onClick={() => updateTags(customer.tags.filter((item) => item !== tag))}><X size={14} /></button></span>) : <p>ยังไม่มีป้ายกำกับ</p>}
+                {customer.tags.length > 0 ? customer.tags.map((tag) => <span key={tag}>{customerTagLabel(tag)}<button type="button" title={`เอาป้ายกำกับ ${customerTagLabel(tag)} ออก`} aria-label={`เอาป้ายกำกับ ${customerTagLabel(tag)} ออก`} onClick={() => updateTags(customer.tags.filter((item) => item !== tag))}><X size={14} /></button></span>) : <p>ยังไม่มีป้ายกำกับ</p>}
               </div>
               <form className="customer-tags__form" onSubmit={addTag}>
                 <label className="sr-only" htmlFor="customer-tag-input">เพิ่มป้ายกำกับ</label>

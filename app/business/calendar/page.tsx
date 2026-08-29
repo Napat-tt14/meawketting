@@ -3,7 +3,7 @@ import { BusinessCalendar } from "./BusinessCalendar";
 
 export const metadata: Metadata = {
   title: "ปฏิทินธุรกิจ",
-  description: "ปฏิทินการจองต้นแบบสำหรับดูงานของสาขาและตรวจเวลาพร้อมให้บริการ",
+  description: "ดูงานของสาขา จัดการการจอง และตรวจเวลาพร้อมให้บริการ",
 };
 
 type BusinessCalendarPageProps = {

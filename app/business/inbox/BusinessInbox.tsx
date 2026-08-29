@@ -152,18 +152,6 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
         context={unreadCount > 0 ? `${unreadCount} ข้อความใหม่` : "ไม่มีข้อความใหม่"}
         actions={<span className="inbox-local-state"><MessageCircle size={17} />บันทึกในอุปกรณ์นี้</span>}
       />
-      <section className="inbox-overview" aria-label="ภาพรวมข้อความ">
-        <div className="inbox-overview__lead">
-          <span>ศูนย์ข้อความ</span>
-          <strong>คุยกับลูกค้าให้จบในที่เดียว</strong>
-          <small>เห็นน้อง การจอง และสถานะบริการก่อนตอบกลับ</small>
-        </div>
-        <div className="inbox-overview__stats">
-          <div><strong>{items.length}</strong><span>บทสนทนา</span></div>
-          <div><strong>{filterCounts.unread}</strong><span>ยังไม่ได้อ่าน</span></div>
-          <div><strong>{filterCounts["in-service"]}</strong><span>กำลังใช้บริการ</span></div>
-        </div>
-      </section>
       {notice ? <p className="business-inbox__notice" role="status">{notice}</p> : null}
       <div className="inbox-layout">
         <ConversationList

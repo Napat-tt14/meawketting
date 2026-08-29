@@ -3,7 +3,7 @@ import { BusinessIntake } from "./BusinessIntake";
 
 export const metadata: Metadata = {
   title: "รับน้องเข้าร้าน",
-  description: "ตรวจข้อมูลที่ร้านได้รับ บันทึกการรับเข้า และยืนยันรับน้องเข้าร้านในต้นแบบ",
+  description: "ตรวจข้อมูลที่ร้านได้รับ บันทึกการรับเข้า และยืนยันรับน้องเข้าร้าน",
 };
 
 export default async function BusinessIntakePage({ params }: { params: Promise<{ intakeId: string }> }) {

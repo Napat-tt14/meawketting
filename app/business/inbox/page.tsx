@@ -3,7 +3,7 @@ import { BusinessInbox, type InboxLaunchRequest } from "./BusinessInbox";
 
 export const metadata: Metadata = {
   title: "ข้อความธุรกิจ",
-  description: "กล่องข้อความต้นแบบที่เชื่อมลูกค้า สัตว์เลี้ยง และบริบทการจองของร้าน",
+  description: "ข้อความที่เชื่อมลูกค้า สัตว์เลี้ยง และบริบทการจองของร้าน",
 };
 
 type BusinessInboxPageProps = {

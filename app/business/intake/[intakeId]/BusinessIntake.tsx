@@ -16,7 +16,6 @@ import type {
   IntakeTaskState,
 } from "../../../_prototype/businessState";
 import {
-  approveOwnerDecisionPrototype,
   beginOwnerDecisionPrototype,
   businessRoleLabel,
   businessStaffLabel,
@@ -27,7 +26,6 @@ import {
   readActiveBusinessContext,
   readBusinessIntake,
   readPrototypeCustomer,
-  setPrototypeAccessInterruption,
   submitCorrectionSuggestion,
   updateBusinessIntake,
 } from "../../../_prototype/businessState";
@@ -223,19 +221,6 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     }
   }
 
-  function approvePrototype() {
-    if (!access) return;
-    approveOwnerDecisionPrototype(access.id);
-    refresh(true);
-    setAnnouncement("จำลองว่าเจ้าของอนุมัติแล้ว ระบบเปิดเฉพาะข้อมูลที่ขอไว้");
-  }
-
-  function interrupt(state: "revoked" | "expired") {
-    if (!access) return;
-    setPrototypeAccessInterruption(access.id, state);
-    refresh();
-  }
-
   function confirmCheckIn() {
     if (!record || submitting || record.checkInState === "checked-in") return;
     setSubmitting(true);
@@ -244,7 +229,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
       const result = confirmPrototypeCheckIn(record.id, activeContext);
       if (result.ok) {
         setRecord(result.record);
-        setAnnouncement(result.duplicate ? "รายการนี้รับเข้าแล้ว จึงไม่สร้างซ้ำ" : "รับเข้าเรียบร้อยในต้นแบบ");
+        setAnnouncement(result.duplicate ? "รายการนี้รับเข้าแล้ว จึงไม่สร้างซ้ำ" : "รับเข้าเรียบร้อย");
       } else {
         setCheckInError(result.reason === "expired"
           ? "สิทธิ์เข้าถึงหมดอายุแล้ว จึงไม่สามารถยืนยันรับเข้าได้"
@@ -270,7 +255,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
   }
 
   if (!consentActive || access?.status === "awaiting-owner") {
-    return <div className="business-shell business-shell--narrow shell"><BusinessPageHeader title="รับน้องเข้าร้าน" /><p className="sr-live" role="status" aria-live="polite">{announcement}</p><section className="awaiting-consent business-state-enter" aria-labelledby="awaiting-heading"><Clock size={40} weight="bold" /><h2 ref={stateHeadingRef} id="awaiting-heading" tabIndex={-1}>รอเจ้าของอนุมัติ</h2><p>ยังไม่แสดงชื่อ รูป หมายเลขอ้างอิง Passport หรือข้อมูลของน้องที่ต้องมีสิทธิ์</p><dl className="consent-facts"><div><dt>ร้าน</dt><dd>{details.business?.name}</dd></div><div><dt>สาขา</dt><dd>{details.branch?.name}</dd></div><div><dt>ใช้เพื่อ</dt><dd>{access?.purpose ?? record.servicePurpose}</dd></div><div><dt>ข้อมูลที่ขอ</dt><dd>{access?.scope.map(scopeLabel).join(" · ") ?? record.sharedScope.map(scopeLabel).join(" · ")}</dd></div><div><dt>สถานะ</dt><dd>รอเจ้าของอนุมัติ · ต้นแบบนี้ไม่แจ้งเตือนแบบทันที</dd></div></dl><div className="awaiting-privacy"><LockKey size={22} weight="bold" /><span><strong>ข้อมูลของน้องยังถูกซ่อน</strong><small>พนักงานร้านไม่สามารถอนุมัติแทนเจ้าของได้</small></span></div><div className="scanner-actions"><button className="button button--business" type="button" onClick={() => refresh(true)}>ตรวจสถานะอีกครั้ง</button><button className="button button--ghost" type="button" onClick={approvePrototype}>จำลองว่าเจ้าของอนุมัติ</button><a className="button button--ghost" href="/business/scan">ยกเลิกและกลับหน้าสแกน</a></div></section></div>;
+    return <div className="business-shell business-shell--narrow shell"><BusinessPageHeader title="รับน้องเข้าร้าน" /><p className="sr-live" role="status" aria-live="polite">{announcement}</p><section className="awaiting-consent business-state-enter" aria-labelledby="awaiting-heading"><Clock size={40} weight="bold" /><h2 ref={stateHeadingRef} id="awaiting-heading" tabIndex={-1}>รอเจ้าของอนุมัติ</h2><p>ยังไม่แสดงชื่อ รูป หมายเลขอ้างอิง Passport หรือข้อมูลของน้องที่ต้องมีสิทธิ์</p><dl className="consent-facts"><div><dt>ร้าน</dt><dd>{details.business?.name}</dd></div><div><dt>สาขา</dt><dd>{details.branch?.name}</dd></div><div><dt>ใช้เพื่อ</dt><dd>{access?.purpose ?? record.servicePurpose}</dd></div><div><dt>ข้อมูลที่ขอ</dt><dd>{access?.scope.map(scopeLabel).join(" · ") ?? record.sharedScope.map(scopeLabel).join(" · ")}</dd></div><div><dt>สถานะ</dt><dd>รอการตอบกลับจากเจ้าของ</dd></div></dl><div className="awaiting-privacy"><LockKey size={22} weight="bold" /><span><strong>ข้อมูลของน้องยังถูกซ่อน</strong><small>พนักงานร้านไม่สามารถอนุมัติแทนเจ้าของได้</small></span></div><div className="scanner-actions"><button className="button button--business" type="button" onClick={() => refresh(true)}>ตรวจสถานะอีกครั้ง</button><a className="button button--ghost" href="/business/scan">ยกเลิกและกลับหน้าสแกน</a></div></section></div>;
   }
 
   if (!pet || !access) {
@@ -298,7 +283,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
             </article>
             {knownCustomer && knownPet ? <section className="allowed-group"><h3><Storefront size={20} weight="bold" /> ความสัมพันธ์ที่ร้านรู้จักแล้ว</h3><dl><div><dt>ผู้ติดต่อหลัก</dt><dd>{knownCustomer.name}</dd></div><div><dt>รายชื่อในร้าน</dt><dd>{knownPet.name}</dd></div></dl><p>ใช้เชื่อมบริบทการรับเข้ากับข้อมูลของร้านเท่านั้น ไม่สร้างลูกค้าใหม่ และไม่แก้ Pet Passport</p></section> : null}
             <section className="allowed-group"><h3><Check size={20} weight="bold" /> เปิดให้ร้าน</h3><dl><div><dt>ชื่อ</dt><dd>{pet.name}</dd></div><div><dt>ชนิดสัตว์</dt><dd>{speciesLabel(pet.species)}</dd></div>{access.scope.includes("passportReference") ? <div><dt>หมายเลขอ้างอิง Passport</dt><dd>{pet.passportLabel}</dd></div> : null}{access.scope.includes("photo") ? <div><dt>รูป</dt><dd>เปิดให้ดูตามสิทธิ์นี้</dd></div> : null}</dl></section>
-            <section className="not-shared-group"><h3><EyeSlash size={20} weight="bold" /> ไม่ได้เปิดให้ร้าน</h3><ul>{!access.scope.includes("photo") ? <li>รูปสัตว์เลี้ยง</li> : null}{!access.scope.includes("passportReference") ? <li>หมายเลขอ้างอิง Passport</li> : null}<li>ยา ภูมิแพ้ วัคซีน ประวัติสุขภาพ และเอกสาร — ไม่มีอยู่ในแบบจำลองการอนุญาตนี้</li><li>บันทึกส่วนตัวและข้อมูลของเจ้าของ</li></ul><p>ส่วนนี้บอกเพียงประเภทข้อมูลที่ไม่ได้รับ โดยไม่เปิดค่าข้างใน</p></section>
+            <section className="not-shared-group"><h3><EyeSlash size={20} weight="bold" /> ไม่ได้เปิดให้ร้าน</h3><ul>{!access.scope.includes("photo") ? <li>รูปสัตว์เลี้ยง</li> : null}{!access.scope.includes("passportReference") ? <li>หมายเลขอ้างอิง Passport</li> : null}<li>ยา ภูมิแพ้ วัคซีน ประวัติสุขภาพ และเอกสาร — สิทธิ์ครั้งนี้ไม่ครอบคลุมข้อมูลประเภทนี้</li><li>บันทึกส่วนตัวและข้อมูลของเจ้าของ</li></ul><p>ส่วนนี้บอกเพียงประเภทข้อมูลที่ไม่ได้รับ โดยไม่เปิดค่าข้างใน</p></section>
           </div>
           <aside className="consent-snapshot"><div className="consent-snapshot__heading"><ShieldCheck size={24} weight="bold" /><h2>สิทธิ์การดูข้อมูล</h2></div><dl><div><dt>ร้าน</dt><dd>{details.business?.name}</dd></div><div><dt>สาขา</dt><dd>{details.branch?.name}</dd></div><div><dt>ใช้เพื่อ</dt><dd>{access.purpose}</dd></div><div><dt>ข้อมูลที่เปิด</dt><dd>{access.scope.map(scopeLabel).join(" · ")}</dd></div><div><dt>หมดอายุ</dt><dd>{formatSharingDate(access.expiresAt)}</dd></div></dl><button ref={correctionTriggerRef} className="button button--ghost" type="button" onClick={() => setCorrectionOpen(true)}>เสนอแก้ไขข้อมูล</button></aside>
           <div className="intake-sticky-actions"><a className="button button--ghost" href="/business/scan"><ArrowLeft size={18} weight="bold" /> กลับหน้าสแกน</a><button className="button button--business button--large" type="button" onClick={() => moveTo("intake")}>บันทึกรับเข้า</button></div>
@@ -313,7 +298,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
             <fieldset className="belongings-fieldset"><legend>ของที่เจ้าของนำมาด้วย</legend><p>เลือกเฉพาะสิ่งที่รับมอบจริง</p><div>{BELONGING_OPTIONS.map((item) => <label key={item}><input type="checkbox" checked={record.belongings.includes(item)} onChange={() => toggleBelonging(item)} /><span><Check size={18} weight="bold" /> {item}</span></label>)}</div></fieldset>
             <label className="business-field" htmlFor="business-note"><span>หมายเหตุการรับเข้า</span><textarea id="business-note" rows={5} value={record.businessNote} aria-describedby="business-note-help" placeholder="ข้อเท็จจริงขณะรับเข้า เช่น มาถึงเวลาใด หรือฝากของไว้ตรงไหน" onChange={(event) => persist((current) => ({ ...current, businessNote: event.target.value }), "บันทึกหมายเหตุการรับเข้าแล้ว")} /><small id="business-note-help">หมายเหตุนี้เป็นข้อมูลของร้าน และไม่เพิ่มข้อมูลสุขภาพให้น้อง</small></label>
             <section className="relevant-instruction"><Info size={22} weight="bold" /><div><h3>คำแนะนำที่เกี่ยวข้อง</h3><p>สิทธิ์นี้ไม่มีคำแนะนำการดูแล จึงไม่มีการสร้างข้อมูลสุขภาพหรือคำแนะนำเพิ่ม</p></div></section>
-            {record.correctionSuggestion ? <section className="correction-submitted"><CheckCircle size={22} weight="bold" /><div><h3>ส่งข้อเสนอแก้ไขแล้ว</h3><p>{record.correctionSuggestion.currentValue} → {record.correctionSuggestion.suggestedValue}</p><small>ข้อมูลต้นฉบับของน้องยังไม่เปลี่ยน · ต้นแบบเท่านั้น</small></div></section> : null}
+            {record.correctionSuggestion ? <section className="correction-submitted"><CheckCircle size={22} weight="bold" /><div><h3>ส่งข้อเสนอแก้ไขแล้ว</h3><p>{record.correctionSuggestion.currentValue} → {record.correctionSuggestion.suggestedValue}</p><small>ข้อมูลต้นฉบับของน้องยังไม่เปลี่ยน</small></div></section> : null}
             <button ref={correctionTriggerRef} className="button button--ghost" type="button" onClick={() => setCorrectionOpen(true)}>เสนอแก้ไขข้อมูล</button>
             <div className="intake-sticky-actions"><button className="button button--ghost" type="button" onClick={() => moveTo("allowed-data")}>กลับไปดูข้อมูลที่ได้รับ</button><button className="button button--business button--large" type="submit">ตรวจทานก่อนรับเข้า</button></div>
           </form>
@@ -330,10 +315,8 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
       ) : null}
 
       {record.taskState === "complete" || record.checkInState === "checked-in" ? (
-        <section className="checkin-complete business-state-enter" aria-labelledby="checkin-complete-heading"><span className="checkin-complete__icon"><CheckCircle size={48} weight="bold" /></span><h2 ref={stateHeadingRef} id="checkin-complete-heading" tabIndex={-1}>รับเข้าเรียบร้อย</h2><p>{pet.name} เข้ารับบริการกับ {details.business?.name} · {details.branch?.name}</p><dl><div><dt>เวลารับเข้า</dt><dd>{formatSharingDate(record.checkedInAt)}</dd></div><div><dt>งานบริการ</dt><dd>{record.servicePurpose}</dd></div><div><dt>เลขอ้างอิงของต้นแบบ</dt><dd><code>{record.prototypeSessionReference}</code><small>เป็นเลขในเครื่องนี้เท่านั้น ไม่ใช่เลขงานบริการจริง</small></dd></div></dl><div className="scanner-actions">{record.hotelStayId ? <a className="button button--business button--large" href={`/business/hotel?stayId=${encodeURIComponent(record.hotelStayId)}`}>ระบุห้องและไปที่โรงแรม</a> : null}{record.serviceJobId ? <a className="button button--business button--large" href={`/business/grooming?jobId=${encodeURIComponent(record.serviceJobId)}`}>ไปที่งานอาบน้ำ / ตัดขน</a> : null}<a className="button button--ghost" href="/business/scan">สแกนน้องตัวถัดไป</a></div></section>
+        <section className="checkin-complete business-state-enter" aria-labelledby="checkin-complete-heading"><span className="checkin-complete__icon"><CheckCircle size={48} weight="bold" /></span><h2 ref={stateHeadingRef} id="checkin-complete-heading" tabIndex={-1}>รับเข้าเรียบร้อย</h2><p>{pet.name} เข้ารับบริการกับ {details.business?.name} · {details.branch?.name}</p><dl><div><dt>เวลารับเข้า</dt><dd>{formatSharingDate(record.checkedInAt)}</dd></div><div><dt>งานบริการ</dt><dd>{record.servicePurpose}</dd></div><div><dt>เลขอ้างอิงรายการ</dt><dd><code>{record.prototypeSessionReference}</code><small>ใช้ติดตามรายการในอุปกรณ์นี้</small></dd></div></dl><div className="scanner-actions">{record.hotelStayId ? <a className="button button--business button--large" href={`/business/hotel?stayId=${encodeURIComponent(record.hotelStayId)}`}>ระบุห้องและไปที่โรงแรม</a> : null}{record.serviceJobId ? <a className="button button--business button--large" href={`/business/grooming?jobId=${encodeURIComponent(record.serviceJobId)}`}>ไปที่งานอาบน้ำ / ตัดขน</a> : null}<a className="button button--ghost" href="/business/scan">สแกนน้องตัวถัดไป</a></div></section>
       ) : null}
-
-      {record.taskState !== "complete" ? <details className="prototype-state-controls"><summary>เครื่องมือทดสอบสิทธิ์ระหว่างรับเข้า</summary><p>ใช้ทดสอบในเครื่องนี้เท่านั้น เมื่อสิทธิ์เปลี่ยน ข้อมูลของน้องจะถูกซ่อนและยืนยันรับเข้าไม่ได้</p><div><button type="button" onClick={() => interrupt("revoked")}>จำลองว่าเจ้าของยกเลิกสิทธิ์</button><button type="button" onClick={() => interrupt("expired")}>จำลองว่าสิทธิ์หมดอายุ</button></div></details> : null}
 
       {correctionOpen ? (
         <div className="correction-layer" role="presentation">

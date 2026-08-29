@@ -1,12 +1,31 @@
 # Validation
 
-Status: **BUSINESS PHASE BF-6 — HOTEL / BOARDING OPERATIONS FOUNDATION — PASS (LOCAL PROTOTYPE)**
-Validation date: 2026-08-28
+Status: **BUSINESS UX/UI + DESIGN SYSTEM FULL RESET — PASS (LOCAL PROTOTYPE)**
+Validation date: 2026-08-30
 Owner: Engineering / QA
 
 This document owns current test evidence. A passing build is not a production-readiness claim.
 
-BF-6 is browser-local implementation evidence only. It is not a production-readiness claim, and it does not add backend, database, payment, LINE transport, Consumer, Daycare, CareProof, Incident, or deployment work.
+This reset is browser-local implementation evidence only. It is not a production-readiness claim, and it does not add backend, database, payment, LINE transport, Consumer, Daycare, CareProof, Incident, or deployment work.
+
+## Business UX/UI + responsive system reset — PASS
+
+| Check | Result | Evidence |
+|---|---|---|
+| Repository / route audit | **PASS** | Audited `/`, `/business/login`, Business shell/navigation, Home, Calendar and Booking overlays, Customers/detail, Inbox, Scanner/Intake, Grooming and Hotel plus their operational detail/state surfaces before refactoring |
+| Text reduction / progressive disclosure | **PASS** | Removed redundant Customers and Inbox overview panels, unsupported Home revenue, repeated detail explanations and staff-facing development controls; Calendar/Grooming/Hotel guidance moved into optional disclosure |
+| Design-system reset | **PASS** | Computed Business body is 16px; supporting text is 14px; page titles use 24–30px; shared 4px spacing rhythm, semantic color/status, 44px touch controls and 160/220/300ms + 280ms navigation motion tokens are active |
+| Mobile composition | **PASS** | 320/375/390/430px checks cover all core Business routes with Agenda Calendar, Grooming tabs/list, Hotel task tabs, mobile Customer Pet snap/peek and full-screen Booking sheet; no accidental document overflow |
+| Tablet composition | **PASS** | 768/820/1024px checks cover compact Home banner/actions, touch-safe Calendar spans/handles, adaptive Customer/detail, Inbox split behavior and contained Grooming/Hotel workflow boards |
+| Desktop composition | **PASS** | 1200/1440px checks retain persistent navigation, Home banner/action rail, operational rows, Inbox split pane and planning/occupancy density without reducing body text |
+| Horizontal interaction | **PASS** | Scrolling is limited to filters/tabs, multiple-Pet snap/peek and contained board/timeline surfaces; Customer lists, messages, forms, detail copy, alerts and dialogs have no document-level horizontal overflow |
+| Accessibility | **PASS** | Settled routes expose one meaningful H1; audited mobile controls are at least 44px; icon controls are labelled; service/status uses text plus non-color cues; Booking sheet is labelled/modal, moves focus inside and closes cleanly |
+| Browser console | **PASS** | In-app Browser diagnostics across the route/breakpoint sweep contain no warning/error entries; only Vite debug connection/HMR and React DevTools information messages were present |
+| Product / privacy regression | **PASS** | 73 executable contracts pass; BF1–BF6, Customer != Guardian, Business never owns Passport, consent/access boundaries, planned navigation and drag alternatives remain intact |
+| Boundary audit | **PASS** | Consumer/Guardian and `/workfiledesign` have no diff entries; no feature phase, backend, database, LINE API, commit, push or deploy was started |
+| `npm run lint` | **PASS** | ESLint exited 0 |
+| `npm test` | **PASS — 73 tests, 73 passed** | Includes a successful Vinext production build and `node --test tests/rendered-html.test.mjs` |
+| `npm run build` | **PASS** | Explicit standalone Vinext build completed with 29 route entries |
 
 ## BF-6 required validation — PASS (local prototype)
 
@@ -21,12 +40,12 @@ BF-6 is browser-local implementation evidence only. It is not a production-readi
 | Multi-Pet & hybrid service | **PASS** | Grouped Booking fixtures project independent Mochi/Biscuit Stays; Hotel links the separate Luna Grooming Job without duplicating identity or lifecycle |
 | Shared integrations | **PASS** | Calendar, Home, Customer Detail, Resources, Scan/Intake and Inbox use IDs/shared selectors; Hotel sends existing structured requests and offers no Business approval action |
 | Privacy | **PASS** | Hotel uses Business-safe pet avatars and permitted instruction projection only; it does not render Passport fields or grant access |
-| Responsive, accessibility & motion | **PASS** | Browser QA confirms no document overflow at 320/375/390/430/768/1024/1200/1440; mobile replaces the grid with room/stay lists, and detail controls provide the drag alternative |
+| Responsive, accessibility & motion | **PASS** | Browser QA confirms no document overflow at 320/375/390/430/768/820/1024/1200/1440; mobile replaces the grid with task tabs/lists, and detail controls provide the drag alternative |
 | Regression boundaries | **PASS** | 73 executable contracts cover BF1–BF6/Phase E/Consumer freeze; no Daycare, Billing, Full CareProof, Full Incident, backend, data persistence, or LINE transport was introduced |
 | `npm run lint` | **PASS** | ESLint exited 0 |
 | `npm test` | **PASS — 73 tests, 73 passed** | Production build plus `node --test tests/rendered-html.test.mjs` |
 | `npm run build` | **PASS** | Vinext build completed with 29 `page.tsx` route entries including `/business/hotel` |
-| Browser console / route audit | **PASS** | Local `/business/hotel` QA at 320/375/390/430/768/1024/1200/1440 produced no error/warn console entries; QA server is stopped after final verification |
+| Browser console / route audit | **PASS** | Local `/business/hotel` QA at 320/375/390/430/768/820/1024/1200/1440 produced no error/warn console entries; mobile uses task tabs and the QA server is stopped after final verification |
 
 ## Business font replacement
 
@@ -91,8 +110,8 @@ BF-6 is browser-local implementation evidence only. It is not a production-readi
 | **Root Homepage (`/`) Business-first content and real links** | **PASS** | One Business H1, `/business/login` primary CTA, secondary Guardian bridge, floating glass Header and rounded real-link Footer |
 | **`/business` Compatibility Redirect** | **PASS** | Redirect remains `/business` → `/` |
 | **Warm White / Pastel Yellow Business system** | **PASS** | `#F4C95D` with `#3D2B00` (**8.65:1**), `#FFFDF9` with `#2B2B2B`, semantic status separation and scoped LINE Seed Sans TH |
-| **Responsive source contract** | **PASS** | 16px mobile form text, approximately 1280px public shell, workflow-appropriate Calendar width, safe-area navigation and 44px major controls |
-| **Visual browser QA** | **PASS** | Hotel was checked at 320/375/390/430/768/1024/1200/1440: 320–430 hide the multi-day grid and show room/stay lists; 768–1440 retain a contained occupancy board with no document overflow. Daily-care completion, room move history, blocked occupied-room assignment, capability gating and a zero error/warn console were verified locally. |
+| **Responsive source contract** | **PASS** | 16px Business body/form text, approximately 1280px public shell, workflow-appropriate Calendar width, safe-area navigation and 44px touch controls |
+| **Visual browser QA** | **PASS** | Business routes were checked at 320/375/390/430/768/820/1024/1200/1440. Mobile uses task-native compositions, tablet retains contained touch workflows, desktop preserves operational density, and all audited routes avoid document overflow. Booking focus/close, Hotel task selection, Calendar span handles and a zero error/warn console were verified locally. |
 | **Business navigation runtime** | **PASS — local production preview** | Upgraded to `vinext@1.0.0-beta.8` with its compatible `@vitejs/plugin-rsc@0.5.34`. Native Business document navigation remains intentional; Home → Customers was reverified in production preview with one rendered page H1 and zero RSC prefetch/client-navigation errors. Deployment itself was not run in this task. |
 | **Planned-vs-implemented honesty** | **PASS** | Grooming and Hotel are local execution foundations; real delivery, Finance, Reports, team management, Daycare, CareProof, Backend and deployment remain unimplemented/planned |
 | **Consumer Development Freeze** | **PASS** | Existing Consumer web prototype, routes, and visual system remain unchanged/frozen; no Consumer-specific implementation files changed |
@@ -108,10 +127,10 @@ BF-6 is browser-local implementation evidence only. It is not a production-readi
 
 | Viewport | Evidence |
 |---|---|
-| 320 / 375 / 390 / 430px | **PASS — browser** — room/stay alternative replaces the occupancy grid; no document overflow |
-| 768 / 1024px | **PASS — browser** — contained desktop occupancy board; no document overflow |
-| 1200px | **PASS — browser** — five summary cards and contained desktop occupancy board; no document overflow |
-| 1440px | **PASS — browser** — full operational dashboard/board remains scannable; no document overflow |
+| 320 / 375 / 390 / 430px | **PASS — browser** — task tabs/lists replace compressed boards; core Business routes have no document overflow and audited controls meet 44px |
+| 768 / 820 / 1024px | **PASS — browser** — touch-first adaptive composition and contained Calendar/Grooming/Hotel workflow scrolling; no document overflow |
+| 1200px | **PASS — browser** — persistent navigation, split Inbox and contained operational boards; no document overflow |
+| 1440px | **PASS — browser** — Home action rail and full operational boards remain scannable at 16px body text; no document overflow |
 | Focus / hover / active / disabled / error / empty / loading / reduced motion | **PASS — browser interaction plus automated/source contracts** |
 | Navigation | **PASS** — native Business links remain the local fallback; Hotel is live only for Hotel-enabled Branches |
 
@@ -130,12 +149,12 @@ BF-6 is browser-local implementation evidence only. It is not a production-readi
 11. Temporary Business Sharing, scope, duration, and consent gateway.
 12. `/business` compatibility redirect to `/`.
 13. Business Login mock authentication and returnTo handling.
-14. Business Home three-variant 16:9 auto-rotating Spotlight with adjacent arrows, existing local image reuse, desktop right-hand quick actions, priority overview, one demo-context indicator, and booking-derived today counts (`/business/home`).
+14. Business Home three-variant Spotlight with accessible overlaid arrows, 16:9 desktop / compact tablet / square mobile composition, existing local image reuse, desktop right-hand quick actions, priority overview, no unsupported revenue, and booking-derived today counts (`/business/home`).
 15. Branch switcher and capability-aware navigation (Ari, Thonglor, Onnut), including architecture-visible planned service and management groups in desktop Sidebar and Mobile More.
 16. BF-2 Sunday-first Day/Week/Month/Custom Calendar, remembered view cookie, 28/35/42-day ranges, continuous Hotel spans, time-positioned appointments, mobile Agenda, and date-normalized Booking Editor (`/business/calendar`).
 17. Pure appointment/Hotel move and both-edge resize adapter, duration/night preservation, touch pointer affordances, Ctrl/Cmd copy-paste, Alt-drag copy, existing availability evaluator, specific conflict recovery, capacity checks, and duplicate confirmation prevention.
 18. Shared icon + label + tint service identity and Branch-enabled visual service selection; inline Add Customer/Add Pet reuse without a second relationship store.
-19. Customers & Pets counted booking filters without a Passport-connection filter, one-boundary search, readable desktop table/mobile cards, responsive detail routes, local add/edit actions, duplicate warning, multiple Pets, local tags/notes, progressive Passport disclosure, and Customer/Pet Booking preselection.
+19. Customers & Pets counted booking filters without a Passport-connection filter, one-boundary search, readable operational rows/mobile summaries, responsive detail routes and multiple-Pet snap/peek, local add/edit actions, duplicate warning, local tags/notes, progressive Passport disclosure, and Customer/Pet Booking preselection.
 20. Customer/Guardian/Passport boundaries, source labels, access presentation, known Intake relationship reuse, and no auto-create from unknown QR.
 21. Scanner and Intake QR type rejection, consent checks, belongings logging, and check-in completion.
 22. BF-4 contextual route/list/split UI, Customer/Pet/Booking projection, one-boundary search, compact filters, unread, local send, three default quick replies, remembered collapse state, dashed add action, and absence of a needless dynamic Conversation route.
@@ -150,7 +169,7 @@ BF-6 is browser-local implementation evidence only. It is not a production-readi
 31. Cloudflare direction / Vercel supersession documentation and absence of a production-deployment claim.
 32. Absence of scattered raw color values and Emoji in component source; no Business dark theme/toggle and no active AI Rainbow rendering.
 33. Consumer regression contracts remain preserved while the future LINE Mini App direction is documented without implementation.
-34. LINE Seed Sans TH Business webfonts, loaded 400/700 faces, 14px operational body, maximum weight 700, `font-display: swap`, `font-synthesis: none`, no FC Minimal/Anuphan loading, and no Consumer font change.
+34. LINE Seed Sans TH Business webfonts, loaded 400/700 faces, 16px operational body with 14px supporting text, maximum weight 700, `font-display: swap`, `font-synthesis: none`, no FC Minimal/Anuphan loading, and no Consumer font change.
 
 ## Partially validated / not in scope
 

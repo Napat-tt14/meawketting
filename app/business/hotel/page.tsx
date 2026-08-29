@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { HotelOperations } from "./HotelOperations";
+
+export const metadata: Metadata = {
+  title: "โรงแรม",
+  description: "จัดการการเข้าพัก ห้อง งานรับเข้า รับกลับ และงานดูแลประจำวัน",
+};
 
 type HotelPageProps = {
   searchParams: Promise<{ stayId?: string | string[]; filter?: string | string[] }>;

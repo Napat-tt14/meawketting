@@ -19,6 +19,14 @@ export function petSpeciesLabel(species: BusinessLocalPetRelationship["species"]
   return species === "cat" ? "แมว" : "สุนัข";
 }
 
+export function customerTagLabel(tag: string) {
+  const labels: Record<string, string> = {
+    Grooming: "อาบน้ำ / ตัดขน",
+    Hotel: "โรงแรม",
+  };
+  return labels[tag] ?? tag;
+}
+
 export function passportConnectionPresentation(connection: PetPassportConnectionState) {
   if (connection === "linked-active") {
     return {

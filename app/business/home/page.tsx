@@ -3,7 +3,7 @@ import { BusinessHome } from "./BusinessHome";
 
 export const metadata: Metadata = {
   title: "หน้าหลักธุรกิจ",
-  description: "หน้าหลักต้นแบบสำหรับดูงานที่ต้องจัดการตามร้าน สาขา และบริการที่เปิดใช้",
+  description: "ดูงานที่ต้องจัดการตามร้าน สาขา และบริการที่เปิดใช้",
 };
 
 export default function BusinessHomePage() {

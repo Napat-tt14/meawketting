@@ -258,7 +258,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
         <BusinessPageHeader title="อาบน้ำ / ตัดขน" />
         <section className="grooming-blocked" role="status">
           <CircleAlert size={34} />
-          <div><h2>สาขานี้ยังไม่เปิดงานอาบน้ำ / ตัดขน</h2><p>เมนูนี้จะแสดงเมื่อสาขาปัจจุบันเปิด capability Grooming เท่านั้น</p></div>
+          <div><h2>สาขานี้ยังไม่เปิดงานอาบน้ำ / ตัดขน</h2><p>เมนูนี้จะแสดงเมื่อสาขาปัจจุบันเปิดใช้งานบริการนี้</p></div>
           <Link className="button button--business" href="/business/home">กลับหน้าหลัก</Link>
         </section>
       </div>
@@ -294,7 +294,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
         </section>
       ) : (
         <>
-          <p className="grooming-board-hint"><Clock size={17} />เลื่อนบอร์ดเพื่อดูทุกสถานะ · ลากงานไปยังสถานะถัดไป</p>
+          <details className="grooming-board-hint"><summary><Clock size={17} />วิธีจัดการบอร์ด</summary><p>เลื่อนเพื่อดูทุกสถานะ แล้วลากงานไปยังสถานะถัดไป หรือเปิดงานเพื่อเปลี่ยนสถานะด้วยปุ่ม</p></details>
           <div className="grooming-board-scroll" role="region" aria-label="บอร์ดงานอาบน้ำและตัดขน">
             <div className="grooming-board">
               {GROOMING_BOARD_LANES.map((lane) => {

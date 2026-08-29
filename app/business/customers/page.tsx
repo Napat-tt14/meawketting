@@ -3,7 +3,7 @@ import { CustomersScreen } from "./CustomersScreen";
 
 export const metadata: Metadata = {
   title: "ลูกค้าและสัตว์เลี้ยง",
-  description: "ค้นหาความสัมพันธ์ลูกค้า สัตว์เลี้ยง และการจองของร้านในต้นแบบ",
+  description: "ค้นหาความสัมพันธ์ลูกค้า สัตว์เลี้ยง และการจองของร้าน",
 };
 
 type BusinessCustomersPageProps = {

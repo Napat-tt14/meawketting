@@ -15,14 +15,12 @@ import {
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
 import {
-  CalendarDays,
   CheckCircle,
   Clock,
   MessageCircle,
   Plus,
   Scan,
   Search,
-  ShieldCheck,
 } from "../../_components/icons";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
@@ -102,7 +100,6 @@ export function BusinessHome() {
     readyForPickup: groomingEnabled ? groomingSummary.readyForPickup : demo.today.readyForPickup ?? 0,
     newMessages: unreadMessageCount,
   };
-  const revenue = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(demo.revenueToday);
   return (
     <div className="business-home shell" key={context.key}>
       <BusinessPageHeader title="หน้าหลัก" context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"}`} />
@@ -202,11 +199,6 @@ export function BusinessHome() {
             </ul>
           </section>
 
-          <section className="business-home-section business-revenue" aria-labelledby="business-revenue-title">
-            <span><ShieldCheck size={20} /></span>
-            <div><p id="business-revenue-title">รายรับวันนี้</p><strong>{revenue}</strong><small>ยังไม่เชื่อมระบบการเงินจริง</small></div>
-            <CalendarDays size={18} />
-          </section>
         </aside>
       </div>
 

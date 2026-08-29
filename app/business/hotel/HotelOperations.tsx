@@ -39,6 +39,7 @@ import { HOTEL_LIST_FILTERS, hasHotelStayAttention, hotelCareTaskStateLabel, hot
 
 type DragState = { stayId: string; sourceRoomId: string } | null;
 type DropTarget = { roomId: string; valid: boolean } | null;
+type HotelMobileView = "today" | "staying" | "arrivals" | "departures" | "care";
 
 type HotelStayItem = {
   stay: PrototypeHotelStay;
@@ -91,6 +92,7 @@ export function HotelOperations({
   const [range, setRange] = useState<7 | 14 | 28>(7);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<HotelListFilter>(validFilter(launchFilter) ? launchFilter : "all");
+  const [mobileView, setMobileView] = useState<HotelMobileView>("today");
   const [selectedStayId, setSelectedStayId] = useState<string | null>(launchStayId);
   const [notice, setNotice] = useState<string | null>(null);
   const [dragging, setDragging] = useState<DragState>(null);
@@ -109,7 +111,7 @@ export function HotelOperations({
   const waitingRequests = conversations.flatMap((conversation) => conversation.messages)
     .filter((message): message is PrototypeAddServiceRequestMessage => message.kind === "add-service-request" && message.requestStatus === "waiting");
 
-  const items = useMemo(() => stays.flatMap((stay) => {
+  const items = stays.flatMap((stay) => {
     const customer = stateReady ? readPrototypeCustomer(stay.customerId) : readPrototypeCustomerFixture(stay.customerId);
     const pet = customer?.pets.find((item) => item.id === stay.petId) ?? null;
     if (!customer || !pet) return [];
@@ -126,22 +128,20 @@ export function HotelOperations({
       pendingCare,
       waitingApproval,
     } satisfies HotelStayItem];
-  }), [date, rooms, stateReady, stays, waitingRequests]);
+  });
 
-  const visibleItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase("th-TH");
-    return items.filter((item) => {
-      const current = isHotelStayCurrent(item.stay, date);
-      const attention = hasHotelStayAttention(item.stay, date, Boolean(item.roomId)) || item.waitingApproval;
-      const matchesFilter = filter === "all"
-        || (filter === "arrivals" && item.stay.scheduledCheckIn === date)
-        || (filter === "current" && current)
-        || (filter === "departures" && item.stay.scheduledCheckOut === date)
-        || (filter === "attention" && attention);
-      const searchText = `${item.pet.name} ${item.customerName} ${item.roomLabel ?? ""}`.toLocaleLowerCase("th-TH");
-      return matchesFilter && (!normalizedQuery || searchText.includes(normalizedQuery));
-    });
-  }, [date, filter, items, query]);
+  const normalizedQuery = query.trim().toLocaleLowerCase("th-TH");
+  const visibleItems = items.filter((item) => {
+    const current = isHotelStayCurrent(item.stay, date);
+    const attention = hasHotelStayAttention(item.stay, date, Boolean(item.roomId)) || item.waitingApproval;
+    const matchesFilter = filter === "all"
+      || (filter === "arrivals" && item.stay.scheduledCheckIn === date)
+      || (filter === "current" && current)
+      || (filter === "departures" && item.stay.scheduledCheckOut === date)
+      || (filter === "attention" && attention);
+    const searchText = `${item.pet.name} ${item.customerName} ${item.roomLabel ?? ""}`.toLocaleLowerCase("th-TH");
+    return matchesFilter && (!normalizedQuery || searchText.includes(normalizedQuery));
+  });
 
   const arrivalItems = items.filter((item) => item.stay.scheduledCheckIn === date && ["booked", "expected-today"].includes(item.stay.status));
   const departureItems = items.filter((item) => item.stay.scheduledCheckOut === date && item.stay.status !== "checked-out");
@@ -198,7 +198,7 @@ export function HotelOperations({
       setNotice(formatConflict(availability) || "ห้องหรือโซนนี้ไม่พร้อมในช่วงวันที่เลือก");
       return;
     }
-    const result = movePrototypeHotelStayRoom(stay.hotelStayId, roomId, context, "ย้ายจาก Occupancy board", effectiveDate);
+    const result = movePrototypeHotelStayRoom(stay.hotelStayId, roomId, context, "ย้ายจากตารางห้องพัก", effectiveDate);
     if (!result.ok) {
       setNotice(result.availability ? formatConflict(result.availability) : "ย้ายห้องไม่สำเร็จ ลองอีกครั้ง");
       return;
@@ -213,7 +213,7 @@ export function HotelOperations({
         <BusinessPageHeader title="โรงแรม" />
         <section className="hotel-empty-state" role="status">
           <BedDouble size={34} />
-          <div><h2>สาขานี้ยังไม่เปิดโรงแรม</h2><p>เมนูนี้จะแสดงเป็นงาน Live เมื่อสาขาปัจจุบันเปิด capability Hotel เท่านั้น</p></div>
+          <div><h2>สาขานี้ยังไม่เปิดโรงแรม</h2><p>เมนูนี้จะแสดงเมื่อสาขาปัจจุบันเปิดใช้งานบริการโรงแรม</p></div>
           <Link className="button button--business" href="/business/home">กลับหน้าหลัก</Link>
         </section>
       </div>
@@ -221,12 +221,35 @@ export function HotelOperations({
   }
 
   return (
-    <div className={`business-hotel shell${dragging ? " is-dragging" : ""}`}>
+    <div className={`business-hotel shell${dragging ? " is-dragging" : ""}`} data-mobile-view={mobileView}>
       <BusinessPageHeader
         title="โรงแรม"
         context={`วันนี้ ${calendarDateLabel(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })} · ${summary.current} ตัวกำลังพัก`}
         actions={<Link className="button button--business" href="/business/calendar?new=1"><Plus size={18} />เพิ่มการจอง</Link>}
       />
+
+      <div className="hotel-mobile-view-tabs" role="tablist" aria-label="เลือกมุมมองงานโรงแรม">
+        {([
+          ["today", "วันนี้", summary.attention],
+          ["staying", "กำลังพัก", currentItems.length],
+          ["arrivals", "เข้าพัก", arrivalItems.length],
+          ["departures", "ออกวันนี้", departureItems.length],
+          ["care", "งานดูแล", careItems.length],
+        ] as const).map(([value, label, count]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={mobileView === value}
+            onClick={() => {
+              setMobileView(value);
+              if (value === "staying") setFilter("current");
+            }}
+          >
+            {label}<span>{count}</span>
+          </button>
+        ))}
+      </div>
 
       <section className="hotel-today-summary" aria-label="ภาพรวมโรงแรมวันนี้">
         <article><span><CalendarDays size={20} />เข้าพักวันนี้</span><strong>{summary.arrivals}</strong><small>รอรับเข้า {summary.unassignedArrivals} ตัว</small></article>
@@ -237,7 +260,7 @@ export function HotelOperations({
       </section>
 
       <nav className="hotel-section-links" aria-label="ข้ามไปส่วนการทำงานโรงแรม">
-        <a href="#hotel-occupancy">Occupancy</a><a href="#hotel-stays">Stays</a><a href="#hotel-care">Daily Care</a>
+        <a href="#hotel-occupancy">ห้องพัก</a><a href="#hotel-stays">การเข้าพัก</a><a href="#hotel-care">งานดูแล</a>
       </nav>
 
       <section className="hotel-toolbar" aria-label="เลือกวัน ช่วงแสดงผล ค้นหา และกรองการเข้าพัก">
@@ -251,7 +274,7 @@ export function HotelOperations({
       {notice ? <p className="business-hotel__notice" role="status"><CircleAlert size={17} />{notice}</p> : null}
 
       <section className="hotel-attention" aria-labelledby="hotel-attention-title">
-        <header><div><span>Attention</span><h2 id="hotel-attention-title">ต้องจัดการ</h2></div><CircleAlert size={23} /></header>
+        <header><div><span>วันนี้</span><h2 id="hotel-attention-title">ต้องจัดการ</h2></div><CircleAlert size={23} /></header>
         {attentionItems.length > 0 ? <div className="hotel-attention__list">{attentionItems.slice(0, 5).map((item) => {
           const message = item.waitingApproval ? "รอลูกค้าตอบเรื่องบริการเพิ่มเติม" : !item.roomId && item.stay.scheduledCheckIn === date ? "วันนี้เข้าพักแต่ยังไม่ได้ระบุห้อง" : item.stay.scheduledCheckOut === date ? "ต้องเตรียมรับกลับวันนี้" : item.pendingCare > 0 ? `งานดูแลค้าง ${item.pendingCare} งาน` : "ตรวจสถานะการเข้าพัก";
           return <button key={item.stay.hotelStayId} type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}><BusinessPetAvatar pet={item.pet} size="small" /><span><strong>{item.pet.name}</strong><small>{message}</small></span><CircleAlert size={17} /></button>;
@@ -259,8 +282,8 @@ export function HotelOperations({
       </section>
 
       <section id="hotel-occupancy" className="hotel-occupancy" aria-labelledby="hotel-occupancy-title">
-        <header className="hotel-section-heading"><div><span>Occupancy</span><h2 id="hotel-occupancy-title">ห้องและโซน</h2><p>{range} วัน · {calendarDateLabel(days[0] ?? date, { day: "numeric", month: "short" })} – {calendarDateLabel(days.at(-1) ?? date, { day: "numeric", month: "short", year: "numeric" })}</p></div><BedDouble size={24} /></header>
-        <p className="hotel-occupancy__hint"><CheckCircle size={17} />หนึ่ง span คือหนึ่งช่วงเข้าพัก · ลากไปห้องอื่นบนเดสก์ท็อปได้ หรือเปิดรายละเอียดเพื่อย้ายห้องบนมือถือ</p>
+        <header className="hotel-section-heading"><div><span>ห้องพัก</span><h2 id="hotel-occupancy-title">ห้องและโซน</h2><p>{range} วัน · {calendarDateLabel(days[0] ?? date, { day: "numeric", month: "short" })} – {calendarDateLabel(days.at(-1) ?? date, { day: "numeric", month: "short", year: "numeric" })}</p></div><BedDouble size={24} /></header>
+        <details className="hotel-occupancy__hint"><summary>วิธีจัดห้อง</summary><p><CheckCircle size={17} />หนึ่งแถบคือหนึ่งช่วงเข้าพัก ลากไปห้องอื่นได้ หรือเปิดรายละเอียดเพื่อเลือกห้อง</p></details>
         <div className="hotel-occupancy-board-wrap" role="region" aria-label="ตารางการเข้าพักตามห้องและวัน">
           <div className="hotel-occupancy-board" style={{ "--hotel-days": days.length } as CSSProperties}>
             <div className="hotel-occupancy-board__header"><span>ห้อง / โซน</span><div>{days.map((day) => <time key={day} dateTime={day}><b>{calendarDateLabel(day, { weekday: "short" })}</b><small>{calendarDateLabel(day, { day: "numeric", month: "short" })}</small></time>)}</div></div>
@@ -275,25 +298,21 @@ export function HotelOperations({
             })}
           </div>
         </div>
-        <div className="hotel-occupancy-mobile" aria-label="รายการห้องสำหรับมือถือ">{rooms.map((room) => {
-          const roomItems = items.filter((item) => item.roomId === room.id || item.stay.roomAssignments.some((assignment) => assignment.roomId === room.id && assignment.startDate <= date && date < (assignment.endDate ?? item.stay.scheduledCheckOut)));
-          return <article key={room.id}><header><span><BedDouble size={18} /><strong>{room.label}</strong></span><small>ความจุ {room.capacity}</small></header>{roomItems.length > 0 ? roomItems.map((item) => <button key={item.stay.hotelStayId} type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}><BusinessPetAvatar pet={item.pet} size="small" /><span><strong>{item.pet.name}</strong><small>{hotelStatusLabel(item.stay.status)}</small></span></button>) : <p>ว่างในวันที่เลือก</p>}</article>;
-        })}</div>
       </section>
 
       <section id="hotel-stays" className="hotel-stays" aria-labelledby="hotel-stays-title">
-        <header className="hotel-section-heading"><div><span>Stays</span><h2 id="hotel-stays-title">การเข้าพัก</h2><p>ค้นหาและกรองได้ตามน้อง ลูกค้า และห้อง</p></div><UserRound size={24} /></header>
+        <header className="hotel-section-heading"><div><span>รายการ</span><h2 id="hotel-stays-title">การเข้าพัก</h2></div><UserRound size={24} /></header>
         <div className="hotel-stays__filters" role="tablist" aria-label="กรองการเข้าพักบนมือถือ">{HOTEL_LIST_FILTERS.map((option) => <button key={option.key} type="button" role="tab" aria-selected={filter === option.key} onClick={() => setFilter(option.key)}>{option.label}<span>{option.key === "all" ? items.length : option.key === "arrivals" ? arrivalItems.length : option.key === "current" ? currentItems.length : option.key === "departures" ? departureItems.length : attentionItems.length}</span></button>)}</div>
         {visibleItems.length > 0 ? <div className="hotel-stay-cards">{visibleItems.map((item) => <HotelStayCard key={item.stay.hotelStayId} item={item} date={date} onOpen={openStay} />)}</div> : <div className="hotel-empty-inline"><Search size={22} /><p>ไม่พบการเข้าพักตามตัวกรองนี้</p></div>}
       </section>
 
       <div className="hotel-daily-columns">
-        <section className="hotel-arrivals" aria-labelledby="hotel-arrivals-title"><header className="hotel-section-heading"><div><span>Today</span><h2 id="hotel-arrivals-title">เข้าพักวันนี้</h2></div><Scan size={24} /></header>{arrivalItems.length > 0 ? <div className="hotel-compact-list">{arrivalItems.map((item) => <article key={item.stay.hotelStayId}><BusinessPetAvatar pet={item.pet} size="medium" /><span><strong>{item.pet.name}</strong><small>{item.customerName} · {item.roomLabel ?? "ยังไม่ได้ระบุห้อง"}</small></span>{item.stay.intakeId ? <button type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}>รับเข้า</button> : <Link href={`/business/scan?hotelStayId=${encodeURIComponent(item.stay.hotelStayId)}`}><Scan size={17} />รับเข้า</Link>}</article>)}</div> : <p className="hotel-empty-inline">วันนี้ไม่มีน้องเข้าพักใหม่</p>}</section>
-        <section className="hotel-departures" aria-labelledby="hotel-departures-title"><header className="hotel-section-heading"><div><span>Today</span><h2 id="hotel-departures-title">ออกวันนี้</h2></div><Clock size={24} /></header>{departureItems.length > 0 ? <div className="hotel-compact-list">{departureItems.map((item) => <article key={item.stay.hotelStayId}><BusinessPetAvatar pet={item.pet} size="medium" /><span><strong>{item.pet.name}</strong><small>{item.customerName} · {item.roomLabel ?? "ยังไม่ได้ระบุห้อง"}</small></span><button type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}>เตรียมรับกลับ</button></article>)}</div> : <p className="hotel-empty-inline">วันนี้ไม่มีน้องออกจากการเข้าพัก</p>}</section>
+        <section className="hotel-arrivals" aria-labelledby="hotel-arrivals-title"><header className="hotel-section-heading"><div><span>วันนี้</span><h2 id="hotel-arrivals-title">เข้าพักวันนี้</h2></div><Scan size={24} /></header>{arrivalItems.length > 0 ? <div className="hotel-compact-list">{arrivalItems.map((item) => <article key={item.stay.hotelStayId}><BusinessPetAvatar pet={item.pet} size="medium" /><span><strong>{item.pet.name}</strong><small>{item.customerName} · {item.roomLabel ?? "ยังไม่ได้ระบุห้อง"}</small></span>{item.stay.intakeId ? <button type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}>รับเข้า</button> : <Link href={`/business/scan?hotelStayId=${encodeURIComponent(item.stay.hotelStayId)}`}><Scan size={17} />รับเข้า</Link>}</article>)}</div> : <p className="hotel-empty-inline">วันนี้ไม่มีน้องเข้าพักใหม่</p>}</section>
+        <section className="hotel-departures" aria-labelledby="hotel-departures-title"><header className="hotel-section-heading"><div><span>วันนี้</span><h2 id="hotel-departures-title">ออกวันนี้</h2></div><Clock size={24} /></header>{departureItems.length > 0 ? <div className="hotel-compact-list">{departureItems.map((item) => <article key={item.stay.hotelStayId}><BusinessPetAvatar pet={item.pet} size="medium" /><span><strong>{item.pet.name}</strong><small>{item.customerName} · {item.roomLabel ?? "ยังไม่ได้ระบุห้อง"}</small></span><button type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}>เตรียมรับกลับ</button></article>)}</div> : <p className="hotel-empty-inline">วันนี้ไม่มีน้องออกจากการเข้าพัก</p>}</section>
       </div>
 
       <section id="hotel-care" className="hotel-daily-care" aria-labelledby="hotel-care-title">
-        <header className="hotel-section-heading"><div><span>Daily Care</span><h2 id="hotel-care-title">ต้องดูแลวันนี้</h2><p>งานดูแลแยกตามน้องและสถานะการเข้าพัก</p></div><CheckCircle size={24} /></header>
+        <header className="hotel-section-heading"><div><span>ตามเวลา</span><h2 id="hotel-care-title">ต้องดูแลวันนี้</h2></div><CheckCircle size={24} /></header>
         {careItems.length > 0 ? <div className="hotel-daily-care__list">{careItems.map(({ item, task }) => <button key={task.id} type="button" onClick={(event) => openStay(item.stay, event.currentTarget)}><BusinessPetAvatar pet={item.pet} size="medium" /><span className="hotel-daily-care__pet"><strong>{item.pet.name}</strong><small>{item.roomLabel ?? "ยังไม่ได้ระบุห้อง"}</small></span><time>{task.scheduledTime}</time><span className="hotel-daily-care__task"><strong>{task.label}</strong><small>{hotelCareTaskStateLabel(task, date)}</small></span><span className="hotel-daily-care__state">{hotelCareTaskStateLabel(task, date)}</span></button>)}</div> : <p className="hotel-empty-inline">ยังไม่มีงานดูแลที่ค้างอยู่</p>}
       </section>
 

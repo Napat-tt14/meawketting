@@ -117,7 +117,7 @@ export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string |
       }
       setValidAccessId(access.id);
       setScannerState("valid");
-      setAnnouncement(`ตรวจ QR ชั่วคราวสำหรับร้านจาก ${source === "camera" ? "กล้อง" : source === "manual" ? "รหัสใต้ QR" : "ตัวควบคุมทดสอบ"} สำเร็จ`);
+      setAnnouncement(`ตรวจ QR ชั่วคราวสำหรับร้านจาก ${source === "camera" ? "กล้อง" : source === "manual" ? "รหัสใต้ QR" : "รหัสระบบ"} สำเร็จ`);
     }, 320);
   }, [context.branchId, context.businessId, stopCamera]);
 
@@ -314,8 +314,8 @@ export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string |
           <h2 id="manual-heading">กรอกรหัสใต้ QR</h2>
           <form onSubmit={submitManualCode} noValidate>
             <label htmlFor="temporary-code">รหัสใต้ QR สำหรับร้าน</label>
-            <input ref={manualInputRef} id="temporary-code" value={manualCode} aria-invalid={Boolean(manualError)} aria-describedby={manualError ? "temporary-code-error" : "temporary-code-help"} autoComplete="off" placeholder="เช่น DEMO-TEMP-ACTIVE" onChange={(event) => { setManualCode(event.target.value); setManualError(""); }} />
-            <p id="temporary-code-help">รหัสทดลอง: <code>DEMO-TEMP-ACTIVE</code>, <code>DEMO-TEMP-PENDING</code>, <code>DEMO-TEMP-EXPIRY-MIDFLOW</code></p>
+            <input ref={manualInputRef} id="temporary-code" value={manualCode} aria-invalid={Boolean(manualError)} aria-describedby={manualError ? "temporary-code-error" : "temporary-code-help"} autoComplete="off" placeholder="กรอกรหัสที่แสดงใต้ QR" onChange={(event) => { setManualCode(event.target.value); setManualError(""); }} />
+            <p id="temporary-code-help">ใช้ตัวอักษรและตัวเลขตามที่แสดงใต้ QR</p>
             {manualError ? <p id="temporary-code-error" className="field-error" role="alert"><CircleAlert size={18} weight="bold" /> {manualError}</p> : null}
             <div className="scanner-actions"><button className="button button--business" type="submit"><ShieldCheck size={18} weight="bold" /> ตรวจรหัส</button><button className="button button--ghost" type="button" onClick={() => resetScanner()}>ยกเลิก</button></div>
           </form>

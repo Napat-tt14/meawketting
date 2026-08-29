@@ -852,7 +852,7 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(html, /งานถัดไป/);
   assert.match(html, /อาบน้ำ \/ ตัดขน/);
   assert.match(html, /โรงแรม/);
-  assert.match(html, /รายรับวันนี้/);
+  assert.doesNotMatch(html, /รายรับวันนี้|ยังไม่เชื่อมระบบการเงินจริง/);
   assert.doesNotMatch(html, /เริ่มจาก 3 เรื่องที่ต้องจัดการ|ภาพรวมงานสำคัญของร้าน|ข้อมูลตัวอย่าง/);
   assert.match(html, /href="\/business\/scan"/);
   assert.match(html, /href="\/business\/calendar\?new=1"/);
@@ -869,7 +869,7 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(state, /"whisker-ari-frontdesk": \["grooming", "hotel"\]/);
   assert.match(state, /"whisker-thonglor-frontdesk": \["grooming"\]/);
   assert.match(state, /"paw-partner-onnut": \["hotel", "daycare"\]/);
-  assert.match(source, /ยังไม่เชื่อมระบบการเงินจริง/);
+  assert.doesNotMatch(source, /รายรับวันนี้|ยังไม่เชื่อมระบบการเงินจริง/);
   assert.match(source, /BusinessHomeSpotlight/);
   assert.match(source, /BusinessServiceIcon/);
   assert.equal((spotlight.match(/\/images\/business\/business-banner-[^"']+\.png/g) ?? []).length, 3);
@@ -1308,9 +1308,9 @@ test("renders BF-6 Hotel as a capability-aware operational occupancy and daily-c
   ]);
 
   assert.match(html, /<h1[^>]*>โรงแรม<\/h1>/);
-  assert.match(html, /Occupancy/);
-  assert.match(html, /Stays/);
-  assert.match(html, /Daily Care/);
+  assert.match(html, /ห้องพัก/);
+  assert.match(html, /การเข้าพัก/);
+  assert.match(html, /งานดูแล/);
   assert.match(html, /Luna/);
   assert.match(html, /ห้อง A01/);
   assert.match(html, /ต้องดูแลวันนี้/);
@@ -1325,7 +1325,9 @@ test("renders BF-6 Hotel as a capability-aware operational occupancy and daily-c
   assert.match(operations, /onDrop=/);
   assert.match(operations, /evaluatePrototypeHotelStayRoomAvailability/);
   assert.match(operations, /movePrototypeHotelStayRoom/);
-  assert.match(operations, /hotel-occupancy-mobile/);
+  assert.match(operations, /HotelMobileView/);
+  assert.match(operations, /hotel-mobile-view-tabs/);
+  assert.doesNotMatch(operations, /hotel-occupancy-mobile/);
   assert.match(detail, /role="dialog"/);
   assert.match(detail, /checkInPrototypeHotelStay/);
   assert.match(detail, /assignPrototypeHotelStayRoom/);
@@ -1356,7 +1358,8 @@ test("renders BF-6 Hotel as a capability-aware operational occupancy and daily-c
   assert.match(css, /\.hotel-occupancy-board-wrap\s*\{[\s\S]*?overflow-x: auto/);
   assert.match(css, /\.hotel-occupancy-row\.is-drop-valid/);
   assert.match(css, /\.hotel-occupancy-row\.is-drop-invalid/);
-  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.hotel-occupancy-mobile \{ display: grid/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.hotel-occupancy \{ display: none/);
+  assert.match(css, /data-mobile-view="staying"/);
   assert.match(css, /@media \(max-width: 430px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.hotel-occupancy-span/);
 });
@@ -1703,11 +1706,9 @@ test("keeps structured approval Guardian-owned and limits approved Grooming add-
   assert.match(state, /if \(decision === "approved"\)[\s\S]*applyPrototypeApprovedGroomingAddOn/);
   assert.doesNotMatch(state, /savePrototypeBooking/);
   assert.doesNotMatch(state, /savePrototype(?:Charge|Payment)|createPrototype(?:Charge|Payment)/);
-  assert.match(timeline, /โหมดทดสอบในเบราว์เซอร์ ไม่ใช่สิทธิ์อนุมัติของร้าน/);
-  assert.match(timeline, /อนุมัติ \(จำลองเจ้าของ\)/);
-  assert.match(timeline, /ไม่อนุมัติ \(จำลองเจ้าของ\)/);
+  assert.doesNotMatch(timeline, /โหมดทดสอบ|จำลองเจ้าของ|simulatePrototypeGuardianResponse/);
   assert.match(timeline, /request\.serviceJobId \?/);
-  assert.match(timeline, /อัปเดตเฉพาะงานบริการในต้นแบบ/);
+  assert.match(timeline, /อัปเดตเฉพาะงานบริการ/);
   assert.match(timeline, /ไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ/);
   assert.match(dialog, /บริการเพิ่มเติม/);
   assert.match(dialog, /ราคาเพิ่ม/);
@@ -1909,10 +1910,11 @@ test("renders the Phase E Business Scanner as a reachable operational route", as
   ]);
 
   assert.match(html, /<h1[^>]*>สแกนรับเข้า<\/h1>/);
-  assert.match(html, /QR ชั่วคราวสำหรับร้าน/);
+  assert.match(html, /QR ชั่วคราว/);
   assert.match(source, /navigator\.mediaDevices\?\.getUserMedia/);
   assert.match(source, /BarcodeDetector/);
   assert.match(source, /กรอกรหัสใต้ QR/);
+  assert.doesNotMatch(source, /รหัสทดลอง:|placeholder="เช่น DEMO-|ตัวควบคุมทดสอบ/);
   assert.match(source, /camera-denied/);
   assert.match(source, /camera-unavailable/);
   assert.match(source, /no-camera/);
@@ -1972,7 +1974,7 @@ test("shows only allowed Phase D scope and invents no health facts in Intake", a
   assert.match(source, /ไม่ได้เปิดให้ร้าน/);
   assert.match(source, /access\.scope\.includes\("photo"\)/);
   assert.match(source, /access\.scope\.includes\("passportReference"\)/);
-  assert.match(source, /ยา ภูมิแพ้ วัคซีน ประวัติสุขภาพ และเอกสาร — ไม่มีอยู่ในแบบจำลองการอนุญาตนี้/);
+  assert.match(source, /ยา ภูมิแพ้ วัคซีน ประวัติสุขภาพ และเอกสาร — สิทธิ์ครั้งนี้ไม่ครอบคลุมข้อมูลประเภทนี้/);
   assert.match(source, /สิทธิ์นี้ไม่มีคำแนะนำการดูแล/);
   assert.doesNotMatch(source, /Amoxicillin|Apoquel|โปรตีนไก่|rabies date|vaccine date|medication dose/i);
 });
@@ -1994,15 +1996,15 @@ test("preserves Business Intake separately and Suggest Correction never mutates 
   assert.doesNotMatch(petState, /businessNote|correctionSuggestion|belongings/);
 });
 
-test("supports awaiting consent, approval, and mid-flow access interruption", async () => {
+test("supports awaiting consent while keeping owner-decision and interruption controls out of Business UI", async () => {
   const [source, businessState] = await Promise.all([
     readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
   ]);
   assert.match(source, /รอเจ้าของอนุมัติ/);
   assert.match(source, /ข้อมูลของน้องยังถูกซ่อน/);
-  assert.match(source, /ต้นแบบนี้ไม่แจ้งเตือนแบบทันที/);
-  assert.match(source, /จำลองว่าเจ้าของอนุมัติ/);
+  assert.match(source, /รอการตอบกลับจากเจ้าของ/);
+  assert.doesNotMatch(source, /ต้นแบบนี้ไม่แจ้งเตือนแบบทันที|จำลองว่าเจ้าของอนุมัติ|prototype-state-controls|approveOwnerDecisionPrototype|setPrototypeAccessInterruption/);
   assert.match(source, /สิทธิ์เข้าถึงหมดอายุแล้ว/);
   assert.match(source, /เจ้าของยกเลิกสิทธิ์แล้ว/);
   assert.match(source, /แบบร่างการรับเข้ายังอยู่/);
@@ -2021,7 +2023,7 @@ test("revalidates and de-duplicates receiving then stops before Service Session 
   assert.match(source, /aria-busy=\{submitting\}/);
   assert.match(source, /รับเข้าเรียบร้อย/);
   assert.match(source, /รับเข้าเรียบร้อย/);
-  assert.match(source, /เป็นเลขในเครื่องนี้เท่านั้น ไม่ใช่เลขงานบริการจริง/);
+  assert.match(source, /ใช้ติดตามรายการในอุปกรณ์นี้/);
   assert.match(businessState, /record\.checkInState === "checked-in"/);
   assert.match(businessState, /evaluateTemporaryAccess\(access, record\.businessId, record\.branchId\)/);
   assert.match(businessState, /prototypeSessionReference/);
@@ -2179,6 +2181,10 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   assert.match(businessCss, /--radius-control:\s*0\.5rem/);
   assert.match(businessCss, /--radius-button:\s*0\.625rem/);
   assert.match(businessCss, /--radius-card:\s*1\.25rem/);
+  assert.match(businessCss, /--type-body:\s*1rem/);
+  assert.match(businessCss, /--duration-fast:\s*160ms/);
+  assert.match(businessCss, /--duration-base:\s*220ms/);
+  assert.match(businessCss, /--duration-slow:\s*300ms/);
   assert.match(businessCss, /business-skeleton-shimmer/);
   assert.match(businessCss, /backdrop-filter:\s*blur/);
   assert.match(businessCss, /prefers-reduced-motion:\s*reduce/);

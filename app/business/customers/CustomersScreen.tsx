@@ -20,6 +20,7 @@ import {
   CUSTOMER_LIST_FILTERS,
   type CustomerListFilter,
   bookingDateLabel,
+  customerTagLabel,
   customerMatchesFilter,
   matchesCustomerSearch,
   nextCustomerBooking,
@@ -69,27 +70,12 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const visibleCustomers = customers.filter((customer) => (
     matchesCustomerSearch(customer, query) && customerMatchesFilter(customer, filter, bookings)
   ));
-  const petCount = customers.reduce((total, customer) => total + customer.pets.length, 0);
-  const customersWithUpcomingBookings = customers.filter((customer) => nextCustomerBooking(customer, bookings)).length;
-
   return (
     <div className="business-customers shell">
       <BusinessPageHeader
         title="ลูกค้าและสัตว์เลี้ยง"
         actions={<button className="button button--business" type="button" onClick={() => { setNotice(null); setEditorOpen(true); }}><Plus size={19} />เพิ่มลูกค้า</button>}
       />
-
-      <section className="customer-overview" aria-label="ภาพรวมลูกค้า">
-        <div className="customer-overview__lead">
-          <strong>สมุดรายชื่อลูกค้าของร้าน</strong>
-          <small>ค้นหาผู้ติดต่อ ดูน้อง และเปิดงานจองได้จากรายการเดียว</small>
-        </div>
-        <div className="customer-overview__stats">
-          <div><strong>{customers.length}</strong><span>ลูกค้า</span></div>
-          <div><strong>{petCount}</strong><span>สัตว์เลี้ยง</span></div>
-          <div><strong>{customersWithUpcomingBookings}</strong><span>ลูกค้ามีนัดถัดไป</span></div>
-        </div>
-      </section>
 
       <section className="customer-search-panel" aria-label="ค้นหาและกรองลูกค้า">
         <div className="customer-search-panel__field">
@@ -165,7 +151,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
                         {nextBooking ? <><strong><BusinessServiceIcon module={nextBooking.serviceModule} size={16} />{nextPet?.name ?? "น้อง"} · {nextBooking.service.label}</strong><span><CalendarDays size={16} />{bookingDateLabel(nextBooking)}{nextBranch ? ` · ${nextBranch}` : ""}</span></> : <strong className="customer-list-item__empty">ยังไม่มีนัดหมาย</strong>}
                       </span>
                       <span className="customer-list-item__tags">
-                        {visibleTags.map((tag) => <span key={tag}>{tag}</span>)}
+                        {visibleTags.map((tag) => <span key={tag}>{customerTagLabel(tag)}</span>)}
                         {hiddenTagCount > 0 ? <small className="customer-list-item__more">+{hiddenTagCount}</small> : null}
                         {customer.tags.length === 0 ? <small className="customer-list-item__empty">—</small> : null}
                       </span>

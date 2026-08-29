@@ -3,12 +3,11 @@
 import { useEffect, useRef } from "react";
 import {
   cancelPrototypeAddServiceRequest,
-  simulatePrototypeGuardianResponse,
   type PrototypeAddServiceRequestMessage,
   type PrototypeConversation,
   type PrototypeInboxMessage,
 } from "../../_prototype/inboxState";
-import { Check, CheckCircle, CircleOff, Clock, Info, X } from "../../_components/icons";
+import { CheckCircle, CircleOff, Clock, X } from "../../_components/icons";
 import {
   prototypeMessageTimeLabel,
   prototypeRequestPriceLabel,
@@ -57,19 +56,6 @@ function StructuredRequestCard({
         ? X
         : Clock;
 
-  function simulateDecision(decision: "approved" | "declined") {
-    const result = simulatePrototypeGuardianResponse(request.messageId, decision);
-    if (!result.ok) {
-      onMutation("จำลองคำตอบไม่สำเร็จ ลองอีกครั้ง");
-      return;
-    }
-    onMutation(result.duplicate
-      ? "คำขอนี้มีคำตอบแล้ว จึงไม่บันทึกผลซ้ำ"
-      : decision === "approved"
-        ? "บันทึกคำตอบจำลองจากฝั่งเจ้าของแล้ว"
-        : "บันทึกการไม่อนุมัติจำลองจากฝั่งเจ้าของแล้ว");
-  }
-
   function cancelRequest() {
     const result = cancelPrototypeAddServiceRequest(request.messageId, businessId);
     onMutation(result ? "ยกเลิกคำขอแล้ว" : "ยกเลิกคำขอไม่สำเร็จ ลองอีกครั้ง");
@@ -94,19 +80,11 @@ function StructuredRequestCard({
       {request.requestStatus === "waiting" ? (
         <div className="structured-request-card__waiting-actions">
           <button type="button" onClick={cancelRequest}>ยกเลิกคำขอ</button>
-          <details>
-            <summary>ทดสอบคำตอบฝั่งเจ้าของ</summary>
-            <div>
-              <p><Info size={16} />โหมดทดสอบในเบราว์เซอร์ ไม่ใช่สิทธิ์อนุมัติของร้าน</p>
-              <button type="button" onClick={() => simulateDecision("approved")}><Check size={16} />อนุมัติ (จำลองเจ้าของ)</button>
-              <button type="button" onClick={() => simulateDecision("declined")}><CircleOff size={16} />ไม่อนุมัติ (จำลองเจ้าของ)</button>
-            </div>
-          </details>
         </div>
       ) : request.responseSource === "guardian-local-preview" ? (
-        <small className="structured-request-card__source">คำตอบจำลองจากฝั่งเจ้าของ · เฉพาะเบราว์เซอร์นี้</small>
+        <small className="structured-request-card__source">เจ้าของตอบแล้ว · บันทึกในอุปกรณ์นี้</small>
       ) : null}
-      {request.requestStatus === "approved" ? <small className="structured-request-card__effect">{request.serviceJobId ? "อัปเดตเฉพาะงานบริการในต้นแบบ · ไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ" : "ยังไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ"}</small> : null}
+      {request.requestStatus === "approved" ? <small className="structured-request-card__effect">{request.serviceJobId ? "อัปเดตเฉพาะงานบริการ · ไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ" : "ยังไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ"}</small> : null}
     </article>
   );
 }

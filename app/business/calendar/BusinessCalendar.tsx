@@ -274,7 +274,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     settledTimerRef.current = window.setTimeout(() => {
       setSettledBookingId(null);
       settledTimerRef.current = null;
-    }, 620);
+    }, 300);
   }
 
   function commitDropFor(booking: PrototypeBooking, operation: CalendarDragOperation, target: BookingDropTarget, copy = false) {
@@ -538,14 +538,17 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
         </div>
       </div>
 
-      <footer id="calendar-shortcut-guide" className="calendar-interaction-guide" aria-label="วิธีจัดการรายการในปฏิทิน">
-        <p>ลากรายการเพื่อย้าย · กดค้างแล้วลากบนจอสัมผัส · ใช้ขอบซ้าย/ขวาเพื่อย่อหรือขยายวันพัก และขอบบน/ล่างเพื่อปรับเวลา</p>
-        <ul aria-label="คีย์ลัดปฏิทิน">
-          <li><kbd>Ctrl</kbd><span>+</span><kbd>C</kbd><span>คัดลอก</span></li>
-          <li><kbd>Ctrl</kbd><span>+</span><kbd>V</kbd><span>วางในวันที่เลือก</span></li>
-          <li><kbd>Alt</kbd><span>+</span><span>ลาก</span><span>ทำสำเนา</span></li>
-        </ul>
-      </footer>
+      <details id="calendar-shortcut-guide" className="calendar-interaction-guide">
+        <summary>วิธีจัดการตารางและคีย์ลัด</summary>
+        <div>
+          <p>ลากรายการเพื่อย้าย · กดค้างแล้วลากบนจอสัมผัส · ใช้ขอบซ้าย/ขวาเพื่อย่อหรือขยายวันพัก และขอบบน/ล่างเพื่อปรับเวลา</p>
+          <ul aria-label="คีย์ลัดปฏิทิน">
+            <li><kbd>Ctrl</kbd><span>+</span><kbd>C</kbd><span>คัดลอก</span></li>
+            <li><kbd>Ctrl</kbd><span>+</span><kbd>V</kbd><span>วางในวันที่เลือก</span></li>
+            <li><kbd>Alt</kbd><span>+</span><span>ลาก</span><span>ทำสำเนา</span></li>
+          </ul>
+        </div>
+      </details>
 
       {editor ? (
         <BookingEditor

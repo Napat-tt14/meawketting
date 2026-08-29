@@ -1,6 +1,6 @@
 # Design System
 
-Status: **CANONICAL VISUAL/UI DIRECTION (BUSINESS UI REFINEMENT + BF-6 HOTEL OPERATIONS 2026-08-28)**
+Status: **CANONICAL VISUAL/UI DIRECTION (BUSINESS UX/UI + RESPONSIVE SYSTEM RESET 2026-08-30)**
 Owner: Product Design
 
 ## Context direction
@@ -124,20 +124,18 @@ Service identity is a secondary classification system and never replaces status:
 
 | Role | Size / Line-height | Typical weight |
 |---|---|---:|
-| Display | 48px | 700 |
-| H1 | 36px | 700 |
-| H2 | 30px | 600 |
-| H3 | 24px | 600 |
-| H4 | 20px | 600 |
-| Large | 18px | 500 |
-| Body | 14px | 400 |
-| Small | 12px | 400–500 |
-| Caption | 12px | 500 |
-| Micro / Tag | 10px | 600; exceptional compact tag only |
+| Display | 40–48px | 700; public surfaces only |
+| Page title | 24–30px | 700 |
+| Section | 18–22px | 600–700 |
+| Large | 18px | 500–600 |
+| Body | 16px / 1.5 | 400–500 |
+| Supporting | 14px / 1.5 | 400–500 |
+| Caption | 12–13px | 500 |
+| Micro / Tag | 10–11px | 600; exceptional compact tag only |
 
 - Persistent labels; placeholders never replace labels.
-- Business operational page titles normally use the H3/H2 range (24–30px); Display/H1 scale is not forced into dense app workflows.
-- Business content defaults to 14px with a 1.55 line-height. Mobile form controls remain at least 16px to avoid input zoom; important working information never drops to Caption or Micro.
+- Business operational page titles use a responsive 24–30px scale; Display scale is not forced into dense app workflows.
+- Business content defaults to 16px with a 1.5 line-height. Supporting copy uses 14px, mobile form controls remain at least 16px to avoid input zoom, and important working information never drops to Caption or Micro.
 - No Business component uses a weight above 700. Use 400 for body, 600 for controls/labels and 700 only for the strongest heading or value in a group.
 - Numeric operational columns, amounts, times and counts use tabular numerals.
 - Do not bold label, value, helper and status at the same time; weight establishes one reading priority per block.
@@ -174,7 +172,7 @@ Service identity is a secondary classification system and never replaces status:
 ## Operational focal points and schedules
 
 - Business Home begins with a three-variant 16:9 Spotlight using local Business imagery. It advances every six seconds, pauses while hovered or focused, stops under reduced-motion, and always exposes 44px previous/next arrow controls.
-- On desktop the Spotlight is the left focal column and add Booking / scan intake / find Customer form a dedicated right-hand action rail. Tablet/mobile stacks the same content without changing task order.
+- On desktop the Spotlight is the left focal column and add Booking / scan intake / find Customer form a dedicated right-hand action rail. Tablet uses a compact 2:1 crop so direct actions and the first operational section remain in the initial viewport. Mobile uses a square artwork composition followed by the same task order.
 - Calendar uses service-tinted schedule surfaces instead of border color alone. Grooming appointments are time-positioned blocks; Hotel stays are continuous bars with distinct start, continuation, and end edges; Daycare uses the day-based service treatment.
 - A Hotel stay label appears once per visible week segment, not once per day column. The domain keeps an exclusive check-out date even though the visual bar communicates the complete arrival-to-check-out span.
 - Calendar weeks begin on Sunday. Both Hotel edges and both appointment time edges can shrink or extend; touch uses a deliberate long-press drag while pointer users can move, Alt-drag to duplicate, or copy/paste the focused Booking with Ctrl/Cmd+C and Ctrl/Cmd+V.
@@ -182,12 +180,12 @@ Service identity is a secondary classification system and never replaces status:
 - Calendar density is limited to Pet, service, time/date, and critical status. Customer, Branch, notes, and resources belong in selection/detail UI.
 - Grooming is the execution companion to Calendar, not another planning grid. Its desktop/tablet board uses clear status columns and a touch-safe horizontal workflow width; mobile switches to status tabs and a readable Job list instead of squeezing five columns.
 - A Grooming Job card uses the permitted Pet photo/avatar as its visual scan anchor, then Pet, base service, scheduled time, groomer, visible status, and at most one concise attention cue. Coral/Scissors provide module recognition only; semantic status/attention must remain text-plus-icon and independent of Coral.
-- Grooming board drag gives the card a restrained lift and the destination a valid/invalid highlight. Settle/rollback and status/detail drawer transitions use the existing 180–300ms premium motion; bounce, confetti, color-only success, and drag-only mobile workflows are prohibited.
+- Grooming board drag gives the card a restrained lift and the destination a valid/invalid highlight. Settle/rollback and status/detail drawer transitions use the canonical 160/220/300ms motion scale; bounce, confetti, color-only success, and drag-only mobile workflows are prohibited.
 - Grooming detail is a focus-managed right drawer on larger screens and a sheet/task surface on smaller screens. It uses compact section hierarchy for identity/contact, service/timing, status, resources, add-ons, internal notes, messages, and history rather than a long text modal.
-- Hotel is the occupancy/execution companion to Calendar, not another planning grid. Its opening hierarchy prioritizes today (arrivals, departures, current stays, vacancy, care and attention), then Occupancy, Stays and Daily Care. Hotel/Bed/Sky establishes module recognition only; semantic status and alert color remain independent.
+- Hotel is the occupancy/execution companion to Calendar, not another planning grid. Desktop/tablet opening hierarchy prioritizes today (arrivals, departures, current stays, vacancy, care and attention), then Occupancy, Stays and Daily Care. Mobile instead exposes task tabs—`วันนี้`, `กำลังพัก`, `เข้าพัก`, `ออกวันนี้`, `งานดูแล`—and renders only the selected task surface. Hotel/Bed/Sky establishes module recognition only; semantic status and alert color remain independent.
 - Desktop/tablet Hotel occupancy uses room/zone rows and dates as columns. One Stay appears as one continuous rounded span across the applicable date range, with Pet image/avatar, pet name and arrival/departure context; it is never duplicated as daily cards. Vacancy/gap, occupied/full capacity, and conflict states use readable text/icon labels, not blue surfaces alone.
 - Hotel Stay cards and daily-care rows place the permitted Pet photo/avatar first as a fast scan anchor, followed by Pet, room/zone, time/task/status or stay state. Species placeholders are used if an image is unavailable or not permitted; protected imagery must not persist after consent expiry/revoke.
-- Hotel room move, date resize and task completion use the same restrained 180–300ms premium motion: lift/ghost/destination treatment may accelerate desktop/tablet drag, invalid targets remain visibly invalid, and rejected changes settle back without ambiguity. The focus-managed Stay drawer/sheet provides complete room/date/status controls, so drag is never required and mobile never squeezes a many-column occupancy grid.
+- Hotel room move, date resize and task completion use the same restrained 160/220/300ms motion scale: lift/ghost/destination treatment may accelerate desktop/tablet drag, invalid targets remain visibly invalid, and rejected changes settle back without ambiguity. The focus-managed Stay drawer/sheet provides complete room/date/status controls, so drag is never required and mobile never squeezes a many-column occupancy grid.
 
 ## Business landing imagery
 
@@ -247,7 +245,8 @@ Service identity is a secondary classification system and never replaces status:
 
 ## Motion and loading
 
-- Canonical easing is `--ease-premium: cubic-bezier(0.22, 1, 0.36, 1)`. Typical interactive duration is 180–300ms.
+- Canonical easing is `--ease-premium: cubic-bezier(0.22, 1, 0.36, 1)`.
+- Canonical duration tokens are `--duration-fast: 160ms`, `--duration-base: 220ms`, `--duration-slow: 300ms`, and `--duration-navigation: 280ms`. Fast covers press/hover, Base covers tabs/accordion/dropdown, Slow covers emphasized settle/rollback, and Navigation covers sheet/drawer transitions.
 - Approved patterns include button hover/press, subtle card lift, modal fade/scale, toast slide/fade, accordion/tabs, normal progress and structural skeleton shimmer.
 - Calendar, Booking, Grooming board, Customer records, Scanner and Intake remain responsive and restrained. Bounce, wobble and confetti are not used.
 - Shared skeletons match content structure: Customer rows, Calendar, Home metrics and Inbox list. Prefer structural skeletons over a giant generic spinner.
@@ -265,7 +264,7 @@ Service identity is a secondary classification system and never replaces status:
 - The list carries only a compact Passport connection state. Source, expiry, allowed-data and no-additional-access detail is disclosed inside Customer/Pet detail when relevant.
 - Connection/access states use visible text and an icon, not color alone. A connected state never implies permanent access.
 - `ข้อมูลที่ลูกค้าแจ้ง`, `ข้อมูลของร้าน`, and `ข้อมูลจาก Pet Passport` are reserved source labels where a boundary matters. Business notes and lightweight tags remain visually separate from Guardian-controlled information.
-- At 390px the order is search → filters → results for the list, and identity → contact actions → Pets → upcoming/recent Bookings → notes/tags for detail. The detail overview explains the relationship once, then divides contact, Pet care, Booking history and Business notes into clear sections. Dialogs become bottom sheets while retaining focus trap and restoration.
+- At 390px the order is search → filters → results for the list, and identity → contact actions → Pets → upcoming/recent Bookings → notes/tags for detail. Multiple Pets use a horizontal snap/peek strip; ordinary detail sections never require horizontal scrolling. Dialogs become bottom sheets while retaining focus trap and restoration.
 
 ## Inbox & communication (BF-4) visual language
 
@@ -281,11 +280,13 @@ Service identity is a secondary classification system and never replaces status:
 
 | Viewport | Range | Behavior |
 |---|---|---|
-| Mobile | 320–767px | Landing copy and full-width CTAs first, product preview below, stacked service/core/flow sections; Business App keeps bottom navigation and sheet tasks; Calendar defaults to Agenda and Hotel uses date/list/detail views instead of compressing occupancy columns |
-| Tablet | 768–1023px | Landing uses a wide single-column Hero until the preview has enough room; Business App uses adaptive grids and a touch-friendly, contained Hotel occupancy surface when appropriate |
-| Desktop | 1024px+ | Balanced Landing Hero within the approximately 1280px marketing shell; Business App keeps persistent navigation and may use workflow-appropriate width for Calendar, Grooming, and Hotel occupancy boards |
+| Mobile | 320–767px | Low–medium density; bottom navigation and full-screen/sheet tasks; Calendar is Agenda-first; Grooming is status tabs + list; Hotel is task tabs; Customer Pets may use a snap/peek strip |
+| Tablet | 768–1023px | Medium density; touch-first adaptive grids; compact Home banner; Calendar day/week hybrid; Grooming and Hotel boards remain contained and horizontally navigable only inside the workflow surface |
+| Desktop | 1024px+ | Medium–high density without smaller body text; persistent navigation; split panes, operational rows and planning/occupancy boards use the available width |
 
-- Required QA widths are 320, 375, 390, 430, 768, 1024, 1200 and 1440px. The final acceptance sweep records at least 390, 768, 1200 and 1440px.
+- Required QA widths are 320, 375, 390, 430, 768, 820, 1024, 1200 and 1440px.
+- Horizontal scrolling is allowed only for filter chips, segmented views, multiple-Pet snap/peek summaries, tablet workflow boards and occupancy timelines. It is prohibited for body copy, forms, Customer lists, Inbox messages, detail sections, critical alerts and confirmation dialogs.
+- Responsive components keep the same data and behavior but may change composition: desktop row/board/split pane → tablet adaptive row/contained board → mobile stacked summary/tabbed task/full-screen sheet.
 - Desktop hover enhancement always has a usable focus, pressed and touch equivalent. No mobile path depends on hover.
 - The public shell may cap around 1280px; operational Calendar/board workflows are not artificially constrained when wider space materially improves planning.
 - The responsive rules above describe current Business/public surfaces. The future LINE Mini App is mobile-first by direction, but its detailed navigation and component specification are deferred to the Consumer LINE Mini App phase.

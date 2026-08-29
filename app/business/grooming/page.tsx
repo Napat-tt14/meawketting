@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { GroomingOperations } from "./GroomingOperations";
+
+export const metadata: Metadata = {
+  title: "อาบน้ำ / ตัดขน",
+  description: "จัดคิว ติดตามสถานะ และดูงานอาบน้ำหรือตัดขนของสาขา",
+};
 
 type GroomingPageProps = {
   searchParams: Promise<{ jobId?: string | string[] }>;

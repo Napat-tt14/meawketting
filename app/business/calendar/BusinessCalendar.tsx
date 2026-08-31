@@ -5,6 +5,7 @@ import type { BookingStatus, BusinessServiceModule, PrototypeBooking } from "../
 import {
   BOOKING_DEMO_DATE,
   BOOKING_STATUS_LABELS,
+  cancelPrototypeBooking,
   evaluatePrototypeBookingAvailability,
   getEnabledBusinessModules,
   listPrototypeBookingFixtures,
@@ -12,17 +13,21 @@ import {
   readPrototypeBooking,
   savePrototypeBooking,
 } from "../../_prototype/businessState";
-import { ArrowLeft, ArrowRight, CalendarDays, CircleAlert, Plus } from "../../_components/icons";
+import { ArrowLeft, ArrowRight, CalendarDays, Plus } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { BusinessAlert } from "../_components/BusinessFeedback";
+import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { BookingEditor } from "./BookingEditor";
 import { CalendarAgenda } from "./CalendarAgenda";
 import { CalendarDayTimeline } from "./CalendarDayTimeline";
 import { CalendarPlanningBoard } from "./CalendarPlanningBoard";
+import { CalendarViewControl } from "./CalendarViewControl";
 import {
   type BookingDropTarget,
   type CalendarDragOperation,
   bookingDropTargetKey,
+  bookingDraftFromPrototype,
   buildBookingCopyDraft,
   buildBookingMutationDraft,
 } from "./bookingMutation";
@@ -31,18 +36,20 @@ import {
   addCalendarMonths,
   calendarDateLabel,
   calendarRangeLabel,
+  bookingTimeLabel,
   daysForCalendarMonth,
   daysForCalendarWeek,
   daysForCustomRange,
 } from "./calendarPresentation";
 
 export type CalendarView = "day" | "week" | "month" | "custom";
-type CustomRangeDays = 28 | 35 | 42;
+export type CustomRangeDays = 28 | 35 | 42;
 type StatusFilter = "active" | "all" | BookingStatus;
 type EditorState = { kind: "new"; customerId?: string | null; petId?: string | null } | { kind: "edit"; booking: PrototypeBooking } | null;
 type DragState = { booking: PrototypeBooking; operation: CalendarDragOperation; copy: boolean } | null;
 type DropPreview = { key: string; available: boolean } | null;
 type InteractionConflict = { booking: PrototypeBooking; messages: readonly string[]; allowAlternative: boolean } | null;
+type CalendarUndoAction = { kind: "restore"; booking: PrototypeBooking } | { kind: "cancel-created"; bookingId: string; petName: string };
 export type CalendarLaunchRequest = { key: string; customerId: string | null; petId: string | null; bookingId: string | null };
 
 export const CUSTOM_CALENDAR_RANGE_OPTIONS = [28, 35, 42] as const satisfies readonly CustomRangeDays[];
@@ -106,8 +113,10 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [dragState, setDragState] = useState<DragState>(null);
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview>(null);
   const [settledBookingId, setSettledBookingId] = useState<string | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [interactionConflict, setInteractionConflict] = useState<InteractionConflict>(null);
   const handledLaunchRef = useRef<string | null>(launchBookingId ? null : launchKey);
   const pointerDragRef = useRef<{ dispose: () => void } | null>(null);
@@ -116,6 +125,8 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const suppressSelectRef = useRef(false);
   const suppressSelectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiedBookingRef = useRef<PrototypeBooking | null>(null);
+  const undoStackRef = useRef<CalendarUndoAction[]>([]);
+  const calendarSurfaceRef = useRef<HTMLDivElement>(null);
   const bookingStateReady = useIsClient();
   const viewPreferenceName = calendarViewCookieName(context.businessId, context.branchId);
 
@@ -211,9 +222,19 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       suppressSelectRef.current = false;
       return;
     }
+    setSelectedBookingId(booking.bookingId);
     setConfirmation(null);
     setInteractionConflict(null);
     setEditor({ kind: "edit", booking });
+  }
+
+  function selectBooking(booking: PrototypeBooking) {
+    if (suppressSelectRef.current) {
+      suppressSelectRef.current = false;
+      return;
+    }
+    setSelectedBookingId(booking.bookingId);
+    setAnnouncement(`เลือกรายการของ ${booking.pets[0]?.name ?? "น้อง"} แล้ว กด Control C เพื่อคัดลอก หรือ Enter เพื่อแก้ไข`);
   }
 
   function clearLaunchQuery() {
@@ -230,7 +251,36 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     setEditor(null);
   }
 
+  function recordUndo(action: CalendarUndoAction) {
+    undoStackRef.current = [...undoStackRef.current.slice(-19), action];
+  }
+
+  function focusCalendarDate(date: string) {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const target = calendarSurfaceRef.current?.querySelector<HTMLElement>(`[data-calendar-date="${date}"][data-calendar-keyboard]`)
+          ?? calendarSurfaceRef.current?.querySelector<HTMLElement>(`[data-calendar-date="${date}"]`);
+        if (!target) return;
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center", inline: "center" });
+        target.focus({ preventScroll: true });
+      });
+    });
+  }
+
+  function goToToday() {
+    setSelectedDate(BOOKING_DEMO_DATE);
+    setAnnouncement(`ไปที่วันนี้ ${calendarDateLabel(BOOKING_DEMO_DATE)}`);
+    focusCalendarDate(BOOKING_DEMO_DATE);
+  }
+
   function completeSave(booking: PrototypeBooking, created: boolean) {
+    setSelectedBookingId(booking.bookingId);
+    if (created) {
+      recordUndo({ kind: "cancel-created", bookingId: booking.bookingId, petName: booking.pets[0]?.name ?? "สัตว์เลี้ยง" });
+    } else if (editor?.kind === "edit") {
+      recordUndo({ kind: "restore", booking: editor.booking });
+    }
     clearLaunchQuery();
     setEditor(null);
     if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
@@ -242,12 +292,14 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   function beginDrag(booking: PrototypeBooking, operation: CalendarDragOperation, event: DragEvent<HTMLElement>) {
+    setSelectedBookingId(booking.bookingId);
     const copy = operation === "move" && event.altKey;
     event.dataTransfer.effectAllowed = "copyMove";
     event.dataTransfer.setData("text/plain", `${booking.bookingId}:${operation}:${copy ? "copy" : "move"}`);
     setConfirmation(null);
     setInteractionConflict(null);
     setDropPreview(null);
+    setDragPointer(null);
     setDragState({ booking, operation, copy });
   }
 
@@ -265,6 +317,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
 
   function endDrag() {
     setDragState(null);
+    setDragPointer(null);
     setDropPreview(null);
   }
 
@@ -299,6 +352,9 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       endDrag();
       return;
     }
+    recordUndo(copy
+      ? { kind: "cancel-created", bookingId: result.booking.bookingId, petName: result.booking.pets[0]?.name ?? "สัตว์เลี้ยง" }
+      : { kind: "restore", booking });
     setRevision((current) => current + 1);
     markBookingSettled(result.booking.bookingId);
     setAnnouncement(copy
@@ -309,6 +365,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
           ? `ปรับ${operation === "resize-start" ? "วันเริ่ม" : "วันเช็กเอาต์"}ของ ${result.booking.pets[0]?.name ?? "น้อง"} แล้ว`
           : `ปรับระยะเวลาของ ${result.booking.pets[0]?.name ?? "น้อง"} แล้ว`);
     endDrag();
+    setSelectedBookingId(result.booking.bookingId);
   }
 
   function commitDrop(target: BookingDropTarget) {
@@ -326,18 +383,39 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   function beginPointerDrag(booking: PrototypeBooking, operation: CalendarDragOperation, event: ReactPointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" || event.button !== 0) return;
+    if (event.button !== 0) return;
     pointerDragRef.current?.dispose();
 
     const pointerId = event.pointerId;
     const origin = { x: event.clientX, y: event.clientY };
     const source = event.currentTarget;
+    const pointerKind = event.pointerType === "mouse" ? "mouse" : "touch";
     const copy = operation === "move" && event.altKey;
     let active = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    const previousDraggable = source.getAttribute("draggable");
+
+    // Use the same pointer path for mouse, pen, and touch. Temporarily opting
+    // out of the browser's native HTML drag prevents it from stealing the
+    // pointer stream before resize handles can receive a drop target.
+    source.setAttribute("draggable", "false");
+
+    const activate = () => {
+      if (active) return;
+      active = true;
+      setSelectedBookingId(booking.bookingId);
+      if (source.isConnected) source.setPointerCapture(pointerId);
+      setConfirmation(null);
+      setInteractionConflict(null);
+      setDropPreview(null);
+      setDragPointer(origin);
+      setDragState({ booking, operation, copy });
+    };
     const dispose = () => {
       if (timer) clearTimeout(timer);
       if (source.hasPointerCapture(pointerId)) source.releasePointerCapture(pointerId);
+      if (previousDraggable === null) source.removeAttribute("draggable");
+      else source.setAttribute("draggable", previousDraggable);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", finish);
@@ -346,12 +424,20 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     const move = (moveEvent: PointerEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       if (!active) {
-        if (Math.hypot(moveEvent.clientX - origin.x, moveEvent.clientY - origin.y) > 8) dispose();
-        return;
+        const distance = Math.hypot(moveEvent.clientX - origin.x, moveEvent.clientY - origin.y);
+        if (pointerKind === "mouse" && distance > 6) {
+          activate();
+        } else if (pointerKind !== "mouse" && distance > 8) {
+          dispose();
+        }
+        if (!active) return;
       }
-      if (moveEvent.cancelable) moveEvent.preventDefault();
-      const target = pointerDropTarget(moveEvent.clientX, moveEvent.clientY);
-      if (target) previewDropFor(booking, operation, target);
+      if (active) {
+        if (moveEvent.cancelable) moveEvent.preventDefault();
+        setDragPointer({ x: moveEvent.clientX, y: moveEvent.clientY });
+        const target = pointerDropTarget(moveEvent.clientX, moveEvent.clientY);
+        if (target) previewDropFor(booking, operation, target);
+      }
     };
     const finish = (finishEvent: PointerEvent) => {
       if (finishEvent.pointerId !== pointerId) return;
@@ -367,14 +453,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       }
     };
 
-    timer = window.setTimeout(() => {
-      active = true;
-      if (source.isConnected) source.setPointerCapture(pointerId);
-      setConfirmation(null);
-      setInteractionConflict(null);
-      setDropPreview(null);
-      setDragState({ booking, operation, copy });
-    }, 240);
+    if (pointerKind !== "mouse") timer = window.setTimeout(activate, 240);
     pointerDragRef.current = { dispose };
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", finish);
@@ -382,27 +461,121 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   const handleCalendarShortcut = useEffectEvent((event: KeyboardEvent) => {
-    if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.repeat) return;
+    if (editor || event.altKey || event.repeat) return;
     const activeElement = document.activeElement;
     if (!(activeElement instanceof HTMLElement) || isEditableTarget(activeElement)) return;
 
     const key = event.key.toLowerCase();
-    if (key === "c") {
-      const bookingId = activeElement.closest<HTMLElement>("[data-booking-id]")?.dataset.bookingId;
-      const booking = bookingId ? bookings.find((item) => item.bookingId === bookingId) ?? null : null;
-      if (!booking || booking.status === "cancelled") return;
+    const commandKey = event.ctrlKey || event.metaKey;
+    const focusedBookingId = activeElement.closest<HTMLElement>("[data-booking-id]")?.dataset.bookingId ?? selectedBookingId;
+    const focusedBooking = focusedBookingId ? bookings.find((item) => item.bookingId === focusedBookingId) ?? null : null;
+
+    if (!commandKey && event.key === "Enter") {
+      if (!focusedBooking || focusedBooking.status === "cancelled") return;
       event.preventDefault();
-      copiedBookingRef.current = booking;
-      setAnnouncement(`คัดลอกการจองของ ${booking.pets[0]?.name ?? "น้อง"} แล้ว เลือกวันและกด Control V เพื่อวาง`);
+      openEdit(focusedBooking);
       return;
     }
 
-    if (key !== "v" || !copiedBookingRef.current) return;
-    const targetElement = activeElement.closest<HTMLElement>("[data-calendar-drop-date]");
-    const targetDate = targetElement?.dataset.calendarDropDate ?? selectedDate;
-    const targetTime = targetElement?.dataset.calendarDropTime;
+    if (commandKey && key === "z") {
+      const action = undoStackRef.current.pop();
+      if (!action) {
+        setAnnouncement("ยังไม่มีการเปลี่ยนแปลงให้ย้อนกลับ");
+        return;
+      }
+      event.preventDefault();
+      if (action.kind === "cancel-created") {
+        const result = cancelPrototypeBooking(action.bookingId, context);
+        if (!result.ok) {
+          undoStackRef.current.push(action);
+          setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้");
+          return;
+        }
+        setAnnouncement(`ย้อนกลับการเพิ่มการจองของ ${action.petName} แล้ว`);
+      } else {
+        const result = savePrototypeBooking(bookingDraftFromPrototype(action.booking), context);
+        if (!result.ok) {
+          undoStackRef.current.push(action);
+          setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้ เพราะช่วงเวลาไม่ว่างแล้ว");
+          return;
+        }
+        markBookingSettled(result.booking.bookingId);
+        setAnnouncement(`ย้อนกลับการเปลี่ยนแปลงของ ${result.booking.pets[0]?.name ?? "สัตว์เลี้ยง"} แล้ว`);
+      }
+      setRevision((current) => current + 1);
+      return;
+    }
+
+    if (commandKey && key === "c") {
+      if (!focusedBooking || focusedBooking.status === "cancelled") return;
+      event.preventDefault();
+      copiedBookingRef.current = focusedBooking;
+      setAnnouncement(`คัดลอกการจองของ ${focusedBooking.pets[0]?.name ?? "น้อง"} แล้ว เลือกวันและกด Control V เพื่อวาง`);
+      return;
+    }
+
+    if (commandKey && key === "v" && copiedBookingRef.current) {
+      const targetElement = activeElement.closest<HTMLElement>("[data-calendar-drop-date]");
+      const targetDate = targetElement?.dataset.calendarDropDate ?? selectedDate;
+      const targetTime = targetElement?.dataset.calendarDropTime;
+      event.preventDefault();
+      commitDropFor(copiedBookingRef.current, "move", { date: targetDate, time: targetTime || undefined }, true);
+      return;
+    }
+
+    if (commandKey) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      pointerDragRef.current?.dispose();
+      copiedBookingRef.current = null;
+      setSelectedBookingId(null);
+      setInteractionConflict(null);
+      endDrag();
+      calendarSurfaceRef.current?.focus({ preventScroll: true });
+      setAnnouncement("ยกเลิกการเลือกและพร้อมรับคำสั่งใหม่");
+      return;
+    }
+
+    if (event.key === "Delete") {
+      if (!focusedBooking || focusedBooking.status === "cancelled") return;
+      event.preventDefault();
+      const result = cancelPrototypeBooking(focusedBooking.bookingId, context);
+      if (!result.ok) {
+        setAnnouncement("ยกเลิกรายการนี้ไม่ได้");
+        return;
+      }
+      recordUndo({ kind: "restore", booking: focusedBooking });
+      setRevision((current) => current + 1);
+      setAnnouncement(`ยกเลิกการจองของ ${focusedBooking.pets[0]?.name ?? "สัตว์เลี้ยง"} แล้ว กด Control Z เพื่อย้อนกลับ`);
+      window.requestAnimationFrame(() => {
+        calendarSurfaceRef.current?.querySelector<HTMLElement>("[data-calendar-keyboard]")?.focus();
+      });
+      return;
+    }
+
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    const current = activeElement.closest<HTMLElement>("[data-calendar-keyboard]");
+    const keyboardKind = current?.dataset.calendarKeyboard === "cell" ? "cell" : "booking";
+    const items = [...(calendarSurfaceRef.current?.querySelectorAll<HTMLElement>(`[data-calendar-keyboard="${keyboardKind}"]`) ?? [])]
+      .filter((item) => item.getClientRects().length > 0 && !item.hasAttribute("disabled"));
+    if (items.length === 0) return;
     event.preventDefault();
-    commitDropFor(copiedBookingRef.current, "move", { date: targetDate, time: targetTime || undefined }, true);
+    const currentIndex = current ? items.indexOf(current) : -1;
+    const verticalStep = keyboardKind === "cell" && view !== "day" ? 7 : 1;
+    const delta = event.key === "ArrowLeft" ? -1
+      : event.key === "ArrowRight" ? 1
+        : event.key === "ArrowUp" ? -verticalStep
+          : event.key === "ArrowDown" ? verticalStep
+            : 0;
+    const targetIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? items.length - 1
+        : Math.max(0, Math.min(items.length - 1, (currentIndex < 0 ? 0 : currentIndex) + delta));
+    const target = items[targetIndex];
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "nearest", inline: "nearest" });
   });
 
   useEffect(() => {
@@ -412,15 +585,33 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }, []);
 
   const boardDragState = dragState ? { bookingId: dragState.booking.bookingId, operation: dragState.operation, copy: dragState.copy } : null;
+  const dragOperationLabel = dragState?.operation === "move"
+    ? dragState.copy ? "คัดลอก" : "ย้าย"
+    : dragState?.operation === "resize-start" ? "ปรับวันเริ่ม" : "ปรับวันสิ้นสุด";
 
   return (
-    <div className={`business-calendar shell${dragState ? " is-dragging" : ""}`} aria-keyshortcuts="Control+C Control+V Meta+C Meta+V">
+    <div className={`business-calendar shell${dragState ? " is-dragging" : ""}`} aria-keyshortcuts="Control+C Control+V Control+Z Meta+C Meta+V Meta+Z Delete Escape ArrowLeft ArrowRight ArrowUp ArrowDown">
       <BusinessPageHeader
         title="ปฏิทิน"
-        actions={<button className="button button--business business-calendar__add" type="button" onClick={() => { setConfirmation(null); setEditor({ kind: "new" }); }}>
-          <Plus size={19} />เพิ่มการจอง
+        actions={<button className="button button--business business-signature-sweep business-calendar__add" type="button" onClick={() => { setConfirmation(null); setEditor({ kind: "new" }); }}>
+          <Plus size={19} /><span>เพิ่มการจอง</span>
         </button>}
       />
+
+      {dragState && dragPointer ? (
+        <div
+          className="business-calendar__drag-preview"
+          style={{ left: dragPointer.x + 14, top: dragPointer.y + 14 }}
+          aria-hidden="true"
+        >
+          <BusinessServiceIcon module={dragState.booking.serviceModule} size={18} />
+          <span className="business-calendar__drag-preview-copy">
+            <strong>{dragState.booking.pets[0]?.name ?? "น้อง"}</strong>
+            <small>{dragState.booking.service.label} · {dragOperationLabel}</small>
+          </span>
+          <span className="business-calendar__drag-preview-time">{bookingTimeLabel(dragState.booking)}</span>
+        </div>
+      ) : null}
 
       <section className="calendar-toolbar" aria-label="เครื่องมือปฏิทิน">
         <div className="calendar-toolbar__date">
@@ -430,17 +621,18 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
             <input type="date" value={selectedDate} onInput={(event) => setSelectedDate(event.currentTarget.value)} />
           </label>
           <button type="button" aria-label="ดูช่วงถัดไป" onClick={() => moveDate(1)}><ArrowRight size={18} /></button>
-          <button className="calendar-toolbar__demo-day" type="button" aria-label={`ไปวันนี้ ${calendarDateLabel(BOOKING_DEMO_DATE, { day: "numeric", month: "short" })}`} onClick={() => setSelectedDate(BOOKING_DEMO_DATE)}>
+          <button className="calendar-toolbar__demo-day" type="button" aria-label={`ไปวันนี้ ${calendarDateLabel(BOOKING_DEMO_DATE, { day: "numeric", month: "short" })}`} onClick={goToToday}>
             <strong>วันนี้</strong>
             <span>{calendarDateLabel(BOOKING_DEMO_DATE, { day: "numeric", month: "short" })}</span>
           </button>
         </div>
-        <div className="calendar-toolbar__view" aria-label="มุมมองปฏิทิน">
-          <button type="button" aria-pressed={view === "day"} onClick={() => chooseView("day")}>วัน</button>
-          <button type="button" aria-pressed={view === "week"} onClick={() => chooseView("week")}>สัปดาห์</button>
-          <button type="button" aria-pressed={view === "month"} onClick={() => chooseView("month")}>เดือน</button>
-          <button type="button" aria-pressed={view === "custom"} onClick={() => chooseView("custom")}>กำหนดเอง</button>
-        </div>
+        <CalendarViewControl
+          value={view}
+          customRangeDays={customRangeDays}
+          customRangeOptions={CUSTOM_CALENDAR_RANGE_OPTIONS}
+          onChange={chooseView}
+          onCustomRangeChange={setCustomRangeDays}
+        />
         <div className="calendar-toolbar__filters">
           <label>
             <span>บริการ</span>
@@ -456,36 +648,30 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
               {Object.entries(BOOKING_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
-          {view === "custom" ? (
-            <label>
-              <span>จำนวนวัน</span>
-              <select value={customRangeDays} onChange={(event) => setCustomRangeDays(Number(event.target.value) as CustomRangeDays)}>
-                {CUSTOM_CALENDAR_RANGE_OPTIONS.map((days) => <option key={days} value={days}>{days} วัน</option>)}
-              </select>
-            </label>
-          ) : null}
         </div>
         <p className="calendar-toolbar__range"><CalendarDays size={16} />{calendarRangeLabel(displayedDays)}</p>
       </section>
 
-      {confirmation ? <p className="business-calendar__confirmation" role="status" aria-live="polite">{confirmation}</p> : null}
+      {confirmation ? <BusinessAlert className="business-calendar__confirmation" tone="success" title={confirmation} role="status" aria-live="polite" /> : null}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
       {interactionConflict ? (
-        <section className="calendar-interaction-conflict" role="alert">
-          <CircleAlert size={20} />
-          <div>
-            <strong>ยังย้ายรายการนี้ไม่ได้</strong>
-            <ul>{interactionConflict.messages.map((message) => <li key={message}>{message}</li>)}</ul>
-            <div>
+        <BusinessAlert
+          className="calendar-interaction-conflict"
+          tone="critical"
+          title="ยังย้ายรายการนี้ไม่ได้"
+          actions={(
+            <>
               <button type="button" onClick={() => setInteractionConflict(null)}>กลับตำแหน่งเดิม</button>
               <button type="button" onClick={() => { setInteractionConflict(null); openEdit(interactionConflict.booking); }}>เลือกวัน/เวลาใหม่</button>
               {interactionConflict.allowAlternative ? <button type="button" onClick={() => { setInteractionConflict(null); openEdit(interactionConflict.booking); }}>เลือกตัวเลือกอื่น</button> : null}
-            </div>
-          </div>
-        </section>
+            </>
+          )}
+        >
+            <ul>{interactionConflict.messages.map((message) => <li key={message}>{message}</li>)}</ul>
+        </BusinessAlert>
       ) : null}
 
-      <div className="business-calendar__surface">
+      <div className="business-calendar__surface" ref={calendarSurfaceRef} tabIndex={-1}>
         <div className="business-calendar__desktop-view">
           {view === "day" ? (
             <CalendarDayTimeline
@@ -493,7 +679,9 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
               bookings={filteredBookings}
               dragState={boardDragState}
               dropPreview={dropPreview}
-              onSelect={openEdit}
+              onSelect={selectBooking}
+              onOpen={openEdit}
+              selectedBookingId={selectedBookingId}
               onDragStart={beginDrag}
               onPreviewDrop={previewDrop}
               onCommitDrop={commitDrop}
@@ -509,7 +697,10 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
               bookings={filteredBookings}
               dragState={boardDragState}
               dropPreview={dropPreview}
-              onSelect={openEdit}
+              onSelect={selectBooking}
+              onOpen={openEdit}
+              selectedBookingId={selectedBookingId}
+              onDateChange={setSelectedDate}
               onDragStart={beginDrag}
               onPreviewDrop={previewDrop}
               onCommitDrop={commitDrop}
@@ -526,7 +717,9 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
             bookings={filteredBookings}
             dragState={boardDragState}
             dropPreview={dropPreview}
-            onSelect={openEdit}
+            onSelect={selectBooking}
+            onOpen={openEdit}
+            selectedBookingId={selectedBookingId}
             onDateChange={setSelectedDate}
             onDragStart={beginDrag}
             onPreviewDrop={previewDrop}
@@ -543,8 +736,12 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
         <div>
           <p>ลากรายการเพื่อย้าย · กดค้างแล้วลากบนจอสัมผัส · ใช้ขอบซ้าย/ขวาเพื่อย่อหรือขยายวันพัก และขอบบน/ล่างเพื่อปรับเวลา</p>
           <ul aria-label="คีย์ลัดปฏิทิน">
+            <li><kbd>↑↓←→</kbd><span>เลื่อนไปช่องถัดไป</span></li>
+            <li><kbd>Enter</kbd><span>เปิดรายการ</span></li>
+            <li><kbd>Delete</kbd><span>ยกเลิกรายการ</span></li>
             <li><kbd>Ctrl</kbd><span>+</span><kbd>C</kbd><span>คัดลอก</span></li>
-            <li><kbd>Ctrl</kbd><span>+</span><kbd>V</kbd><span>วางในวันที่เลือก</span></li>
+            <li><kbd>Ctrl</kbd><span>+</span><kbd>V</kbd><span>วาง</span></li>
+            <li><kbd>Ctrl</kbd><span>+</span><kbd>Z</kbd><span>ย้อนกลับ</span></li>
             <li><kbd>Alt</kbd><span>+</span><span>ลาก</span><span>ทำสำเนา</span></li>
           </ul>
         </div>

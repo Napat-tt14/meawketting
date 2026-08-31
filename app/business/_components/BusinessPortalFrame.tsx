@@ -13,7 +13,7 @@ export function BusinessPortalFrame({ children }: { children: React.ReactNode })
   return (
     <div className="business-app-frame">
       <BusinessNavigation />
-      <div className="business-app-frame__content">{children}</div>
+      <div key={pathname} className="business-app-frame__content business-route-stage">{children}</div>
       <BusinessMobileNavigation />
     </div>
   );

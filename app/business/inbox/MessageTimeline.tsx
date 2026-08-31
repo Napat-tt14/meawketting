@@ -136,7 +136,7 @@ export function MessageTimeline({
                   <span>
                     <time dateTime={message.sentAt}>{prototypeMessageTimeLabel(message.sentAt)}</time>
                     {message.direction === "business" && message.deliveryState ? (
-                      <small>{message.deliveryState === "local-read" ? "อ่านแล้ว" : "ส่งแล้ว"} · ในเบราว์เซอร์</small>
+                      <small>{message.deliveryState === "local-read" ? "อ่านแล้ว" : "ส่งแล้ว"}</small>
                     ) : null}
                   </span>
                 </div>

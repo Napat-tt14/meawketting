@@ -43,6 +43,7 @@ import {
   LuPlus,
   LuPalette,
   LuPawPrint,
+  LuPencil,
   LuPhone,
   LuQrCode,
   LuRotateCcw,
@@ -142,6 +143,7 @@ export const Megaphone = meawIcon(LuMegaphone);
 export const MessageCircle = meawIcon(LuMessageCircle);
 export const Palette = meawIcon(LuPalette);
 export const PawPrint = meawIcon(LuPawPrint);
+export const Pencil = meawIcon(LuPencil);
 export const Phone = meawIcon(LuPhone);
 export const Plus = meawIcon(LuPlus);
 export const QrCode = meawIcon(LuQrCode);

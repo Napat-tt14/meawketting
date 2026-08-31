@@ -20,11 +20,12 @@ import {
   readPrototypeCustomer,
   savePrototypeBooking,
 } from "../../_prototype/businessState";
-import { CheckCircle, CircleAlert, MessageCircle, Plus, Save, X } from "../../_components/icons";
+import { CheckCircle, CircleAlert, MessageCircle, Plus, X } from "../../_components/icons";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { CustomerEditor } from "../customers/CustomerEditor";
 import { PetRelationshipEditor } from "../customers/PetRelationshipEditor";
 import { AvailabilityStatus } from "./AvailabilityStatus";
+import { BookingCustomerCombobox, BookingPetPicker } from "./BookingIdentityFields";
 import { DaycareBookingFields } from "./DaycareBookingFields";
 import { GroomingBookingFields } from "./GroomingBookingFields";
 import { HotelBookingFields } from "./HotelBookingFields";
@@ -149,6 +150,7 @@ export function BookingEditor({
   const selectedContact = draft.customer ? contacts.find((contact) => contact.id === draft.customer?.id) ?? null : null;
   const availability = useMemo(() => evaluatePrototypeBookingAvailability(draft, context), [context, draft]);
   const availabilityId = "booking-availability";
+  const showAutomaticAvailability = Boolean(contextMatches && service && draft.customer?.id && draft.pets.length > 0);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -261,7 +263,7 @@ export function BookingEditor({
     setRelationshipRevision((current) => current + 1);
     updateDraft({ ...draft, customer: { id: customer.id, name: customer.name }, pets: [] });
     setRelationshipEditor({ kind: "pet", customer });
-    setNotice(`เพิ่ม ${customer.name} แล้ว · เพิ่มน้องเพื่อจบข้อมูลการจอง`);
+    setNotice(`เพิ่ม ${customer.name} แล้ว · เพิ่มสัตว์เลี้ยงเพื่อจบข้อมูลการจอง`);
   }
 
   function petCreated(customer: PrototypeCustomer) {
@@ -351,13 +353,13 @@ export function BookingEditor({
                 <CircleAlert size={20} />
                 <div>
                   <strong>สาขาที่กำลังใช้งานเปลี่ยนแล้ว</strong>
-                  <p>เราเก็บลูกค้า น้อง วันที่ และหมายเหตุไว้ให้ แต่บริการกับตัวเลือกเดิมต้องตรวจใหม่กับสาขาปัจจุบัน</p>
+                  <p>เราเก็บลูกค้า สัตว์เลี้ยง วันที่ และหมายเหตุไว้ให้ แต่บริการกับตัวเลือกเดิมต้องตรวจใหม่กับสาขาปัจจุบัน</p>
                   <button type="button" onClick={resetToCurrentBranch}>เลือกบริการของสาขานี้</button>
                 </div>
               </section>
             ) : null}
 
-            <section className="booking-fields booking-fields--shared" aria-label="บริการ ลูกค้า และสัตว์เลี้ยง">
+            <section className="booking-fields booking-fields--service" aria-label="บริการ">
               <fieldset className="booking-service-selector">
                 <legend>บริการ</legend>
                 <div>
@@ -376,25 +378,26 @@ export function BookingEditor({
                   ))}
                 </div>
               </fieldset>
+            </section>
+            <section className="booking-fields booking-fields--relationships" aria-label="ลูกค้าและสัตว์เลี้ยง">
               <div className="booking-form-grid booking-relationship-fields">
                 <div className="booking-field-with-action">
-                  <label className="booking-field">
-                    <span>ลูกค้า</span>
-                    <select value={draft.customer?.id ?? ""} onChange={(event) => chooseContact(event.target.value)} aria-describedby={availabilityId} required>
-                      <option value="">เลือกลูกค้า</option>
-                      {contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
-                    </select>
-                  </label>
+                  <BookingCustomerCombobox
+                    key={draft.customer?.id ?? "unselected-customer"}
+                    contacts={contacts}
+                    selectedId={draft.customer?.id ?? null}
+                    describedBy={availabilityId}
+                    onChange={chooseContact}
+                  />
                   <button type="button" onClick={() => setRelationshipEditor({ kind: "customer" })}><Plus size={16} />เพิ่มลูกค้าใหม่</button>
                 </div>
                 <div className="booking-field-with-action">
-                  <label className="booking-field">
-                    <span>สัตว์เลี้ยง</span>
-                    <select value={draft.pets[0]?.id ?? ""} onChange={(event) => choosePet(event.target.value)} aria-describedby={availabilityId} required disabled={!selectedContact}>
-                      <option value="">เลือกน้อง</option>
-                      {selectedContact?.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-                    </select>
-                  </label>
+                  <BookingPetPicker
+                    contact={selectedContact}
+                    selectedPetId={draft.pets[0]?.id ?? null}
+                    describedBy={availabilityId}
+                    onChange={choosePet}
+                  />
                   {selectedContact ? <button type="button" onClick={beginPetCreation}><Plus size={16} />เพิ่มสัตว์เลี้ยง</button> : null}
                 </div>
               </div>
@@ -418,10 +421,10 @@ export function BookingEditor({
             </section>
 
             {notice ? <p className="booking-editor__notice" role="status">{notice}</p> : null}
-            <AvailabilityStatus result={availability} id={availabilityId} show={didCheck || !contextMatches} onRecovery={handleRecovery} />
+            <AvailabilityStatus result={availability} id={availabilityId} show={showAutomaticAvailability || didCheck || !contextMatches} automatic={showAutomaticAvailability} onRecovery={handleRecovery} />
             <footer className="booking-editor__actions">
               {initialBooking ? <button className="button button--business-ghost booking-editor__cancel-action" type="button" onClick={() => setCancelConfirmation(true)}>ยกเลิกการจอง</button> : <span />}
-              <button className="button button--business" type="submit"><Save size={18} />ตรวจเวลาว่างและทบทวน</button>
+              <button className="button button--business business-signature-sweep" type="submit"><CheckCircle size={18} /><span>ทบทวนการจอง</span></button>
             </footer>
             </form>
           ) : (
@@ -432,13 +435,13 @@ export function BookingEditor({
             <dl>
               <div><dt>บริการ</dt><dd>{service?.label ?? "ยังไม่ได้เลือก"}</dd></div>
               <div><dt>ลูกค้า</dt><dd>{draft.customer?.name ?? "ยังไม่ได้เลือก"}</dd></div>
-              <div><dt>น้อง</dt><dd>{draft.pets.map((pet) => pet.name).join(", ") || "ยังไม่ได้เลือก"}</dd></div>
+              <div><dt>สัตว์เลี้ยง</dt><dd>{draft.pets.map((pet) => pet.name).join(", ") || "ยังไม่ได้เลือก"}</dd></div>
               {service ? <div><dt>วันและเวลา</dt><dd>{reviewTimeLabel(draft, service)}</dd></div> : null}
               <div><dt>ตัวเลือกที่ใช้</dt><dd>{selectedResources.join(" · ") || "ยังไม่ได้เลือก"}</dd></div>
               <div><dt>ราคาประมาณ</dt><dd>{bookingEstimateLabel(draft.estimate)}</dd></div>
               {draft.notes ? <div><dt>หมายเหตุ</dt><dd>{draft.notes}</dd></div> : null}
             </dl>
-            <AvailabilityStatus result={availability} id={availabilityId} show onRecovery={handleRecovery} />
+            <AvailabilityStatus result={availability} id={availabilityId} show automatic onRecovery={handleRecovery} />
             <footer className="booking-editor__actions">
               <button className="button button--business-ghost" type="button" onClick={() => setStep("details")}>กลับไปแก้การจอง</button>
               <button className="button button--business" type="button" disabled={!availability.available || saving} aria-busy={saving} onClick={saveBooking}>

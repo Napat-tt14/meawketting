@@ -19,8 +19,8 @@ export function BusinessClosingSection() {
           <h2>รวมงานสำคัญของร้านไว้ในที่เดียว</h2>
           <p>จัดการ Business Home, Calendar และการรับเข้า พร้อมมองเห็นงานของทีมในจังหวะเดียว</p>
           <div className="business-closing-card__actions">
-            <a className="button button--business button--large" href="/business/login">
-              เข้าสู่ระบบสำหรับธุรกิจ <ArrowRight size={18} />
+            <a className="button button--business business-signature-sweep button--large" href="/business/login">
+              <span>เข้าสู่ระบบสำหรับธุรกิจ</span> <ArrowRight size={18} />
             </a>
           </div>
         </div>

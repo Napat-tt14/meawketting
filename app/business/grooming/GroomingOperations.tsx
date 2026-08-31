@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BOOKING_DEMO_DATE,
   assignPrototypeGroomingServiceJobResources,
@@ -24,13 +24,13 @@ import {
 } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { BusinessSidebarSectionHeader } from "../_components/BusinessNavigationPrimitives";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
-import { CalendarDays, CircleAlert, Clock, Plus, Scissors, Search, SlidersHorizontal } from "../../_components/icons";
+import { CircleAlert, Plus, Scissors } from "../../_components/icons";
 import { GroomingJobCard } from "./GroomingJobCard";
 import { GroomingJobDetail } from "./GroomingJobDetail";
 import {
   GROOMING_BOARD_LANES,
-  GROOMING_MOBILE_FILTERS,
   groomingBoardLaneForStatus,
   groomingStatusLabel,
   type GroomingBoardLane,
@@ -38,13 +38,22 @@ import {
 
 type DragState = { jobId: string; input: "native" | "touch" } | null;
 type DropTarget = { lane: GroomingBoardLane; valid: boolean } | null;
-type AttentionFilter = "all" | "attention" | "unassigned" | "approval";
+type GroomingPointerState = {
+  jobId: string;
+  pointerId: number;
+  x: number;
+  y: number;
+  source: HTMLElement;
+  previousDraggable: string | null;
+  dragging: boolean;
+};
 
 function statusForDestination(job: PrototypeServiceJob, lane: GroomingBoardLane): ServiceJobStatus | null {
   if (lane === "waiting") {
     if (job.status === "booked") return "checked-in";
     if (job.status === "checked-in") return "waiting";
-    return null;
+    if (job.status === "waiting") return null;
+    return serviceJobCanTransition(job.status, "waiting") ? "waiting" : null;
   }
   const destination: Record<Exclude<GroomingBoardLane, "waiting">, ServiceJobStatus> = {
     booked: "booked",
@@ -63,16 +72,14 @@ function requestMatchesJob(request: PrototypeAddServiceRequestMessage, job: Prot
 export function GroomingOperations({ launchJobId = null }: { launchJobId?: string | null }) {
   const { context, revision } = useBusinessContext();
   const stateReady = useBusinessStateReady();
-  const [date, setDate] = useState(BOOKING_DEMO_DATE);
-  const [query, setQuery] = useState("");
-  const [attentionFilter, setAttentionFilter] = useState<AttentionFilter>("all");
-  const [mobileFilter, setMobileFilter] = useState<"all" | GroomingBoardLane>("all");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(launchJobId);
   const [dragging, setDragging] = useState<DragState>(null);
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
   const [settledJobId, setSettledJobId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const touchStartRef = useRef<{ jobId: string; x: number; y: number; dragging: boolean } | null>(null);
+  const [, setNotice] = useState<string | null>(null);
+  const touchStartRef = useRef<GroomingPointerState | null>(null);
+  const draggingJobIdRef = useRef<string | null>(null);
   const suppressOpenRef = useRef<string | null>(null);
   const settledTimerRef = useRef<number | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -84,8 +91,8 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
 
   const groomingEnabled = getEnabledBusinessModules(context).includes("grooming");
   const jobs = stateReady
-    ? listPrototypeGroomingServiceJobs(context, { date, includeCancelled: false })
-    : listPrototypeGroomingServiceJobFixtures(context, { date, includeCancelled: false });
+    ? listPrototypeGroomingServiceJobs(context, { date: BOOKING_DEMO_DATE, includeCancelled: false })
+    : listPrototypeGroomingServiceJobFixtures(context, { date: BOOKING_DEMO_DATE, includeCancelled: false });
   const conversations = stateReady ? listPrototypeConversations(context) : listPrototypeConversationFixtures(context);
   const requests = conversations.flatMap((conversation) => conversation.messages)
     .filter((message): message is PrototypeAddServiceRequestMessage => message.kind === "add-service-request");
@@ -95,20 +102,11 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     const pet = customer?.pets.find((item) => item.id === job.petId) ?? null;
     if (!customer || !pet) return [];
     const resources = getBookingResources(context, job.baseServiceId);
-    const hasGroomer = resources.some((resource) => resource.kind === "groomer" && job.assignedResourceIds.includes(resource.id));
     const waitingApproval = requests.some((request) => request.requestStatus === "waiting" && requestMatchesJob(request, job));
-    const queryText = `${pet.name} ${customer.name} อาบน้ำ ตัดขน ${resources.filter((resource) => job.assignedResourceIds.includes(resource.id)).map((resource) => resource.label).join(" ")}`.toLocaleLowerCase("th-TH");
-    const normalizedQuery = query.trim().toLocaleLowerCase("th-TH");
-    const matchesQuery = !normalizedQuery || queryText.includes(normalizedQuery);
-    const late = job.status !== "completed" && job.status !== "cancelled" && job.scheduledEnd && job.scheduledEnd < "2026-08-18T12:20";
-    const matchesAttention = attentionFilter === "all"
-      || (attentionFilter === "attention" && (waitingApproval || !hasGroomer || late || job.status === "ready-for-pickup"))
-      || (attentionFilter === "unassigned" && !hasGroomer)
-      || (attentionFilter === "approval" && waitingApproval);
-    return matchesQuery && matchesAttention ? [{ job, customer, pet, resources, waitingApproval }] : [];
-  }), [attentionFilter, context, jobs, query, requests, stateReady]);
+    return [{ job, customer, pet, resources, waitingApproval }];
+  }), [context, jobs, requests, stateReady]);
 
-  const summary = summarizeGroomingServiceJobs(jobs, date);
+  const summary = summarizeGroomingServiceJobs(jobs, BOOKING_DEMO_DATE);
   const selectedJob = jobs.find((job) => job.serviceJobId === selectedJobId || job.bookingId === selectedJobId) ?? null;
 
   function openJob(job: PrototypeServiceJob, source?: HTMLElement) {
@@ -129,16 +127,18 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
   function finishDrop(serviceJobId: string, lane: GroomingBoardLane) {
     const current = jobs.find((job) => job.serviceJobId === serviceJobId) ?? null;
     const next = current ? statusForDestination(current, lane) : null;
+    draggingJobIdRef.current = null;
     setDropTarget(null);
     setDragging(null);
+    setDragPointer(null);
     if (!current || !next) {
-      setNotice("ย้ายงานไม่ได้ตามลำดับสถานะ · งานกลับอยู่สถานะเดิมแล้ว");
-      return { ok: false, notice: "ย้ายงานไม่ได้ตามลำดับสถานะ · งานกลับอยู่สถานะเดิมแล้ว" };
+      setNotice("ย้ายงานไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว");
+      return { ok: false, notice: "ย้ายงานไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว" };
     }
     const result = transitionPrototypeGroomingServiceJob(serviceJobId, next, context);
     if (!result.ok) {
       const message = result.reason === "invalid-transition"
-        ? "ย้ายงานไม่ได้ตามลำดับสถานะ · งานกลับอยู่สถานะเดิมแล้ว"
+        ? "ย้ายงานไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว"
         : "เปลี่ยนสถานะงานไม่สำเร็จ ลองอีกครั้ง";
       setNotice(message);
       return { ok: false, notice: message };
@@ -153,24 +153,23 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
 
   function transitionFromDetail(serviceJobId: string, nextStatus: ServiceJobStatus) {
     const current = jobs.find((job) => job.serviceJobId === serviceJobId) ?? null;
-    if (nextStatus === "cancelled") {
-      if (!current) return { ok: false, notice: "เปลี่ยนสถานะงานไม่สำเร็จ" };
-      const result = transitionPrototypeGroomingServiceJob(serviceJobId, nextStatus, context);
-      if (!result.ok) {
-        const message = result.reason === "invalid-transition" ? "ยกเลิกงานไม่ได้ตามลำดับสถานะ" : "เปลี่ยนสถานะงานไม่สำเร็จ ลองอีกครั้ง";
-        setNotice(message);
-        return { ok: false, notice: message };
-      }
-      const message = "ยกเลิกงานบริการแล้ว";
+    if (!current) return { ok: false, notice: "เปลี่ยนสถานะงานไม่สำเร็จ" };
+    const result = transitionPrototypeGroomingServiceJob(serviceJobId, nextStatus, context);
+    if (!result.ok) {
+      const message = result.reason === "invalid-transition"
+        ? "เปลี่ยนสถานะนี้ไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว"
+        : "เปลี่ยนสถานะงานไม่สำเร็จ ลองอีกครั้ง";
       setNotice(message);
-      setSettledJobId(serviceJobId);
-      if (settledTimerRef.current !== null) window.clearTimeout(settledTimerRef.current);
-      settledTimerRef.current = window.setTimeout(() => setSettledJobId(null), 320);
-      return { ok: true, notice: message };
+      return { ok: false, notice: message };
     }
-    const lane = nextStatus === "checked-in" || nextStatus === "waiting" ? "waiting" : groomingBoardLaneForStatus(nextStatus);
-    if (!current || !lane) return { ok: false, notice: "เปลี่ยนสถานะงานไม่สำเร็จ" };
-    return finishDrop(serviceJobId, lane);
+    const message = nextStatus === "cancelled"
+      ? "ยกเลิกงานบริการแล้ว"
+      : result.duplicate ? "สถานะนี้ถูกบันทึกไว้แล้ว" : `เปลี่ยนสถานะเป็น ${groomingStatusLabel(nextStatus)} แล้ว`;
+    setNotice(message);
+    setSettledJobId(serviceJobId);
+    if (settledTimerRef.current !== null) window.clearTimeout(settledTimerRef.current);
+    settledTimerRef.current = window.setTimeout(() => setSettledJobId(null), 320);
+    return { ok: true, notice: message };
   }
 
   function assignResources(serviceJobId: string, assignments: readonly string[]) {
@@ -196,13 +195,16 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
   function nativeDragStart(job: PrototypeServiceJob, event: DragEvent<HTMLElement>) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", job.serviceJobId);
+    draggingJobIdRef.current = job.serviceJobId;
     setDragging({ jobId: job.serviceJobId, input: "native" });
+    setDragPointer(null);
     setNotice(null);
   }
 
   function previewDrop(lane: GroomingBoardLane, event: DragEvent<HTMLElement>) {
     event.preventDefault();
-    const job = dragging ? jobs.find((item) => item.serviceJobId === dragging.jobId) ?? null : null;
+    const serviceJobId = draggingJobIdRef.current ?? dragging?.jobId;
+    const job = serviceJobId ? jobs.find((item) => item.serviceJobId === serviceJobId) ?? null : null;
     const valid = Boolean(job && statusForDestination(job, lane));
     event.dataTransfer.dropEffect = valid ? "move" : "none";
     setDropTarget({ lane, valid });
@@ -210,46 +212,112 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
 
   function nativeDrop(lane: GroomingBoardLane, event: DragEvent<HTMLElement>) {
     event.preventDefault();
-    const serviceJobId = dragging?.jobId ?? event.dataTransfer.getData("text/plain");
+    const serviceJobId = draggingJobIdRef.current ?? dragging?.jobId ?? event.dataTransfer.getData("text/plain");
     if (serviceJobId) finishDrop(serviceJobId, lane);
   }
 
+  function clearDrag() {
+    const pointer = touchStartRef.current;
+    if (pointer) {
+      if (pointer.source.hasPointerCapture(pointer.pointerId)) pointer.source.releasePointerCapture(pointer.pointerId);
+      if (pointer.previousDraggable === null) pointer.source.removeAttribute("draggable");
+      else pointer.source.setAttribute("draggable", pointer.previousDraggable);
+    }
+    draggingJobIdRef.current = null;
+    touchStartRef.current = null;
+    setDragging(null);
+    setDragPointer(null);
+    setDropTarget(null);
+  }
+
+  function moveWithKeyboard(job: PrototypeServiceJob, event: KeyboardEvent<HTMLElement>) {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    if (job.status === "cancelled") return;
+    const currentLane = groomingBoardLaneForStatus(job.status);
+    const currentIndex = GROOMING_BOARD_LANES.findIndex((lane) => lane.key === currentLane);
+    if (currentIndex < 0) return;
+    const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
+    const destination = GROOMING_BOARD_LANES[currentIndex + direction];
+    if (!destination || !statusForDestination(job, destination.key)) return;
+    event.preventDefault();
+    finishDrop(job.serviceJobId, destination.key);
+  }
+
   function pointerDown(job: PrototypeServiceJob, event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" || job.status === "completed" || job.status === "cancelled") return;
-    touchStartRef.current = { jobId: job.serviceJobId, x: event.clientX, y: event.clientY, dragging: false };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.button !== 0 || job.status === "cancelled") return;
+    clearDrag();
+    const source = event.currentTarget;
+    touchStartRef.current = {
+      jobId: job.serviceJobId,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      source,
+      previousDraggable: source.getAttribute("draggable"),
+      dragging: false,
+    };
+    setDragPointer(null);
+    // Keep mouse, pen, and touch on one predictable pointer path so native
+    // HTML drag cannot steal the stream before the board sees the drop lane.
+    source.setAttribute("draggable", "false");
+    source.setPointerCapture(event.pointerId);
+  }
+
+  function laneAtPoint(x: number, y: number) {
+    const target = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-grooming-drop-lane], [data-segmented-value]");
+    const candidate = target?.dataset.groomingDropLane ?? target?.dataset.segmentedValue;
+    return GROOMING_BOARD_LANES.some((lane) => lane.key === candidate) ? candidate as GroomingBoardLane : undefined;
   }
 
   function pointerMove(event: PointerEvent<HTMLElement>) {
     const touch = touchStartRef.current;
-    if (!touch) return;
+    if (!touch || event.pointerId !== touch.pointerId) return;
     const distance = Math.hypot(event.clientX - touch.x, event.clientY - touch.y);
     if (!touch.dragging && distance < 8) return;
     touch.dragging = true;
     event.preventDefault();
     setDragging({ jobId: touch.jobId, input: "touch" });
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-grooming-drop-lane]");
-    const lane = target?.dataset.groomingDropLane as GroomingBoardLane | undefined;
+    setDragPointer({ x: event.clientX, y: event.clientY });
+    const lane = laneAtPoint(event.clientX, event.clientY);
     const job = jobs.find((item) => item.serviceJobId === touch.jobId) ?? null;
     setDropTarget(lane ? { lane, valid: Boolean(job && statusForDestination(job, lane)) } : null);
   }
 
   function pointerUp(event: PointerEvent<HTMLElement>) {
     const touch = touchStartRef.current;
-    if (!touch) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!touch || event.pointerId !== touch.pointerId) return;
+    if (touch.source.hasPointerCapture(touch.pointerId)) touch.source.releasePointerCapture(touch.pointerId);
+    if (touch.previousDraggable === null) touch.source.removeAttribute("draggable");
+    else touch.source.setAttribute("draggable", touch.previousDraggable);
     touchStartRef.current = null;
     if (!touch.dragging) return;
     event.preventDefault();
     suppressOpenRef.current = touch.jobId;
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-grooming-drop-lane]");
-    const lane = target?.dataset.groomingDropLane as GroomingBoardLane | undefined;
-    if (lane) finishDrop(touch.jobId, lane);
-    else {
-      setDragging(null);
-      setDropTarget(null);
-      setNotice("วางงานนอกสถานะปลายทาง · งานกลับอยู่สถานะเดิมแล้ว");
+    window.setTimeout(() => {
+      if (suppressOpenRef.current === touch.jobId) suppressOpenRef.current = null;
+    }, 0);
+    const lane = laneAtPoint(event.clientX, event.clientY);
+    if (lane) {
+      finishDrop(touch.jobId, lane);
+      return;
     }
+    const deltaX = event.clientX - touch.x;
+    const job = jobs.find((item) => item.serviceJobId === touch.jobId) ?? null;
+    if (job && Math.abs(deltaX) >= 56) {
+      const currentLane = groomingBoardLaneForStatus(job.status);
+      const currentIndex = GROOMING_BOARD_LANES.findIndex((item) => item.key === currentLane);
+      const direction = deltaX < 0 ? 1 : -1;
+      const destination = GROOMING_BOARD_LANES[currentIndex + direction];
+      if (destination && statusForDestination(job, destination.key)) {
+        finishDrop(touch.jobId, destination.key);
+        return;
+      }
+    }
+    setDragging(null);
+    setDragPointer(null);
+    setDropTarget(null);
+    draggingJobIdRef.current = null;
+    setNotice("ยังย้ายงานไม่ได้ · ลากไปยังคอลัมน์ที่ต้องการ");
   }
 
   if (!groomingEnabled) {
@@ -265,36 +333,36 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     );
   }
 
-  const mobileVisibleItems = mobileFilter === "all"
-    ? jobItems
-    : jobItems.filter(({ job }) => GROOMING_MOBILE_FILTERS.find((filter) => filter.key === mobileFilter)?.statuses?.includes(job.status));
-
   return (
     <div className={`business-grooming shell${dragging ? " is-dragging" : ""}`}>
       <BusinessPageHeader
         title="อาบน้ำ / ตัดขน"
-        context={`${summary.total} งานในวันที่เลือก · ${summary.readyForPickup} พร้อมรับกลับ`}
-        actions={<Link className="button button--business" href="/business/calendar?new=1"><Plus size={18} />เพิ่มการจอง</Link>}
+        context={`${summary.total} งาน · ${summary.readyForPickup} พร้อมรับกลับ`}
+        actions={<Link className="button button--business business-signature-sweep" href="/business/calendar?new=1"><Plus size={18} /><span>เพิ่มการจอง</span></Link>}
       />
 
-      <section className="grooming-toolbar" aria-label="เลือกวัน ค้นหา และกรองงานอาบน้ำตัดขน">
-        <label className="grooming-toolbar__date"><span>วันที่</span><input type="date" value={date} onChange={(event) => setDate(event.currentTarget.value)} /></label>
-        <button type="button" onClick={() => setDate(BOOKING_DEMO_DATE)}><CalendarDays size={17} />วันนี้</button>
-        <label className="grooming-toolbar__search"><Search size={19} /><span className="sr-only">ค้นหางาน</span><input value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="ค้นหาน้อง ลูกค้า หรือช่าง" /></label>
-        <label className="grooming-toolbar__filter"><SlidersHorizontal size={18} /><span className="sr-only">กรองงาน</span><select value={attentionFilter} onChange={(event) => setAttentionFilter(event.currentTarget.value as AttentionFilter)}><option value="all">ทุกงาน</option><option value="attention">ต้องดูแล</option><option value="unassigned">ยังไม่มีช่าง</option><option value="approval">รอลูกค้าตอบ</option></select></label>
-      </section>
-
-      {notice ? <p className="business-grooming__notice" role="status"><CircleAlert size={17} />{notice}</p> : null}
+      {dragging && dragPointer ? (
+        <div
+          className="business-grooming__drag-preview"
+          style={{ left: dragPointer.x + 14, top: dragPointer.y + 14 }}
+          aria-hidden="true"
+        >
+          <span className="business-grooming__drag-preview-avatar"><Scissors size={18} /></span>
+          <span className="business-grooming__drag-preview-copy">
+            <strong>{jobItems.find(({ job }) => job.serviceJobId === dragging.jobId)?.pet.name ?? "น้อง"}</strong>
+            <small>ลากไปยังสถานะที่ต้องการ</small>
+          </span>
+        </div>
+      ) : null}
 
       {jobItems.length === 0 ? (
         <section className="grooming-empty-state" aria-labelledby="grooming-empty-title">
           <ScissorsPlaceholder />
           <div><h2 id="grooming-empty-title">วันนี้ยังไม่มีงานอาบน้ำ / ตัดขน</h2><p>เพิ่มการจองจาก Calendar เพื่อเริ่มงานบริการในบอร์ดนี้</p></div>
-          <Link className="button button--business" href="/business/calendar?new=1"><Plus size={18} />เพิ่มการจอง</Link>
+          <Link className="button button--business business-signature-sweep" href="/business/calendar?new=1"><Plus size={18} /><span>เพิ่มการจอง</span></Link>
         </section>
       ) : (
         <>
-          <details className="grooming-board-hint"><summary><Clock size={17} />วิธีจัดการบอร์ด</summary><p>เลื่อนเพื่อดูทุกสถานะ แล้วลากงานไปยังสถานะถัดไป หรือเปิดงานเพื่อเปลี่ยนสถานะด้วยปุ่ม</p></details>
           <div className="grooming-board-scroll" role="region" aria-label="บอร์ดงานอาบน้ำและตัดขน">
             <div className="grooming-board">
               {GROOMING_BOARD_LANES.map((lane) => {
@@ -310,7 +378,9 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
                     onDragLeave={() => setDropTarget((current) => current?.lane === lane.key ? null : current)}
                     onDrop={(event) => nativeDrop(lane.key, event)}
                   >
-                    <header><h2>{lane.label}</h2><span>{laneItems.length}</span></header>
+                    <div className="grooming-board-column__header">
+                      <BusinessSidebarSectionHeader title={lane.label} />
+                    </div>
                     <div className="grooming-board-column__cards">
                       {laneItems.map(({ job, pet, resources, waitingApproval }) => (
                         <GroomingJobCard
@@ -323,11 +393,12 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
                           settled={settledJobId === job.serviceJobId}
                           onOpen={(opened) => openJob(opened)}
                           onDragStart={(event) => nativeDragStart(job, event)}
-                          onDragEnd={() => { setDragging(null); setDropTarget(null); }}
+                          onDragEnd={clearDrag}
                           onPointerDown={(event) => pointerDown(job, event)}
                           onPointerMove={pointerMove}
                           onPointerUp={pointerUp}
-                          onPointerCancel={() => { touchStartRef.current = null; setDragging(null); setDropTarget(null); }}
+                          onPointerCancel={clearDrag}
+                          onKeyDown={(event) => moveWithKeyboard(job, event)}
                         />
                       ))}
                       {laneItems.length === 0 ? <p className="grooming-board-column__empty">ยังไม่มีงาน</p> : null}
@@ -339,16 +410,18 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
           </div>
 
           <section className="grooming-mobile-list" aria-label="รายการงานอาบน้ำและตัดขนบนมือถือ">
-            <div className="grooming-mobile-list__filters" role="tablist" aria-label="กรองสถานะงาน">
-              {GROOMING_MOBILE_FILTERS.map((filter) => {
-                const count = filter.key === "all" ? jobItems.length : jobItems.filter(({ job }) => filter.statuses?.includes(job.status)).length;
-                return <button key={filter.key} type="button" role="tab" aria-selected={mobileFilter === filter.key} onClick={() => setMobileFilter(filter.key)}>{filter.label}<span>{count}</span></button>;
-              })}
-            </div>
-            <div className="grooming-mobile-list__cards">
-              {mobileVisibleItems.map(({ job, pet, resources, waitingApproval }) => <GroomingJobCard key={job.serviceJobId} job={job} pet={pet} resources={resources} waitingApproval={waitingApproval} draggable={false} settled={settledJobId === job.serviceJobId} onOpen={(opened) => openJob(opened)} />)}
-              {mobileVisibleItems.length === 0 ? <p className="grooming-mobile-list__empty">ไม่มีงานในสถานะนี้</p> : null}
-            </div>
+            {GROOMING_BOARD_LANES.map((lane) => {
+              const laneItems = jobItems.filter(({ job }) => lane.statuses.includes(job.status));
+              return (
+                <section className="grooming-mobile-list__group" key={lane.key} aria-labelledby={`grooming-mobile-${lane.key}`}>
+                  <header><strong id={`grooming-mobile-${lane.key}`}>{lane.label}</strong><span>{laneItems.length}</span></header>
+                  <div className="grooming-mobile-list__cards">
+                    {laneItems.map(({ job, pet, resources, waitingApproval }) => <GroomingJobCard key={job.serviceJobId} job={job} pet={pet} resources={resources} waitingApproval={waitingApproval} draggable={false} dragging={dragging?.jobId === job.serviceJobId} settled={settledJobId === job.serviceJobId} onOpen={(opened) => openJob(opened)} onPointerDown={(event) => pointerDown(job, event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={clearDrag} onKeyDown={(event) => moveWithKeyboard(job, event)} />)}
+                    {laneItems.length === 0 ? <p className="grooming-mobile-list__empty">ยังไม่มีงาน</p> : null}
+                  </div>
+                </section>
+              );
+            })}
           </section>
         </>
       )}

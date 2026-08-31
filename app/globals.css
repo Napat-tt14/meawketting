@@ -18690,7 +18690,7 @@ a.business-nav-item:focus-visible,
 
 /* BF-2 — shared Booking and Calendar foundation.
    This remains a calm cross-module planning surface, not a Grooming board,
-   Hotel occupancy board, or Daycare attendance screen. */
+   Hotel date-range Booking, or Daycare attendance screen. */
 
 .business-calendar-page {
   min-height: calc(100vh - 72px);
@@ -26262,7 +26262,7 @@ a.business-nav-item:focus-visible,
   line-height: 1.5;
 }
 
-/* Calendar range board: Hotel stays are logical spans, not repeated day cards. */
+/* Calendar range board: Hotel Bookings are logical spans, not repeated day cards. */
 .calendar-toolbar {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) auto;

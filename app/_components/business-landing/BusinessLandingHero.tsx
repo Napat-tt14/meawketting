@@ -136,8 +136,8 @@ export function BusinessLandingHero() {
         </div>
 
         <div className="business-homepage-hero__actions">
-          <a className="button button--business button--large" href="/business/login">
-            เข้าสู่ระบบสำหรับธุรกิจ <ArrowRight size={18} />
+          <a className="button button--business business-signature-sweep button--large" href="/business/login">
+            <span>เข้าสู่ระบบสำหรับธุรกิจ</span> <ArrowRight size={18} />
           </a>
           <a className="button button--business-ghost button--large" href="#business-core">
             ดูว่าระบบช่วยอะไรได้บ้าง <ChevronDown size={18} />
@@ -198,4 +198,3 @@ export function BusinessLandingHero() {
     </section>
   );
 }
-

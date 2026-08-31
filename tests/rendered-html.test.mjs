@@ -837,12 +837,13 @@ test("keeps Business Login visually separate while reusing the Google behavior p
 });
 
 test("renders Business Home as a priority-first local prototype with booking-derived work", async () => {
-  const [html, source, spotlight, serviceVisual, state] = await Promise.all([
+  const [html, source, spotlight, serviceVisual, state, businessCss] = await Promise.all([
     htmlFor("/business/home"),
     readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
     readFile(new URL("business/home/BusinessHomeSpotlight.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessServiceVisual.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
   ]);
 
   assert.match(html, /<h1[^>]*>หน้าหลัก<\/h1>/);
@@ -879,8 +880,20 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(spotlight, /business-home-banner__arrow--previous/);
   assert.match(spotlight, /business-home-banner__arrow--next/);
   assert.match(spotlight, /BANNER_ROTATION_MS = 6_000/);
+  assert.match(spotlight, /SWIPE_THRESHOLD_PX = 48/);
   assert.match(spotlight, /window\.setInterval/);
   assert.match(spotlight, /prefers-reduced-motion/);
+  assert.match(spotlight, /onPointerDown=\{handlePointerDown\}/);
+  assert.match(spotlight, /onPointerUp=\{handlePointerUp\}/);
+  assert.match(spotlight, /business-home-banner__track/);
+  assert.match(spotlight, /--business-banner-index/);
+  assert.match(spotlight, /variants\.map/);
+  assert.match(businessCss, /\.business-home-hero \.business-home-banner__image\s*\{[\s\S]*?aspect-ratio:\s*1 \/ 1 !important/);
+  assert.match(businessCss, /\.business-home-banner__track\s*\{[\s\S]*?transform:\s*translate3d\(calc\(var\(--business-banner-index, 0\) \* -100%\), 0, 0\);[\s\S]*?transition:\s*transform/);
+  assert.match(businessCss, /@media \(min-width: 1024px\) \{[\s\S]*?\.business-home-hero\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(businessCss, /\.business-home-hero \.business-home-banner\s*\{[\s\S]*?width:\s*min\(100%, 400px\) !important/);
+  assert.doesNotMatch(businessCss, /@keyframes business-banner-slide-(?:next|previous)/);
+  assert.doesNotMatch(spotlight, /setDirection|slide--\$\{direction\}/);
   assert.doesNotMatch(spotlight, /role="tablist"|aria-selected=/);
   assert.doesNotMatch(spotlight, /วันนี้|ตารางงาน|หลายบริการ|ความไว้ใจ/);
   assert.doesNotMatch(spotlight, /autoPlay|autoplay/);
@@ -931,12 +944,13 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.match(model, /href:\s*"\/business\/inbox"/);
   assert.match(model, /BUSINESS_GROOMING_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/grooming"/);
-  assert.match(model, /BUSINESS_HOTEL_DESTINATION/);
-  assert.match(model, /href:\s*"\/business\/hotel"/);
+  assert.doesNotMatch(model, /BUSINESS_HOTEL_DESTINATION/);
+  assert.doesNotMatch(model, /href:\s*"\/business\/hotel"/);
   assert.match(desktopNav + mobileNav, /module === "grooming"/);
-  assert.match(desktopNav + mobileNav, /module === "hotel"/);
+  assert.match(desktopNav + mobileNav, /PlannedBusinessModule key=\{module\} module=\{module\}/);
   assert.match(desktopNav + mobileNav, /BUSINESS_GROOMING_DESTINATION/);
-  assert.match(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
+  assert.doesNotMatch(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
+  assert.doesNotMatch(desktopNav + mobileNav, /href="\/business\/hotel"/);
   assert.match(mobileNav, /BUSINESS_CUSTOMERS_DESTINATION\.href/);
   assert.match(mobileNav, /BUSINESS_MESSAGES_DESTINATION\.href/);
   assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/(?:daycare|finance|reports|team|settings)/);
@@ -1048,6 +1062,7 @@ test("renders BF-2 Business Calendar as a live local planning route", async () =
   assert.match(dayTimeline, /SNAP_MINUTES = 30/);
   assert.match(dayTimeline, /resize-start/);
   assert.match(dayTimeline, /resize-end/);
+  assert.match(css, /\.calendar-stay-span\.is-dragging,[\s\S]*?pointer-events:\s*none/);
   assert.match(mutation, /appointmentDuration/);
   assert.match(mutation, /calendarDayDistance/);
   assert.match(presentation, /daysForCalendarMonth/);
@@ -1093,6 +1108,8 @@ test("moves and resizes supported Calendar bookings through one pure mutation ad
     const resizedAppointment = mutation.buildBookingMutationDraft(grooming, "resize-end", { date: "2026-08-18", time: "12:30" });
     assert.equal(resizedAppointment.start, "2026-08-18T10:30");
     assert.equal(resizedAppointment.end, "2026-08-18T12:30");
+    const shortenedAppointment = mutation.buildBookingMutationDraft(grooming, "resize-end", { date: "2026-08-18", time: "11:30" });
+    assert.equal(shortenedAppointment.end, "2026-08-18T11:30");
 
     const movedStay = mutation.buildBookingMutationDraft(hotel, "move", { date: "2026-08-24" });
     assert.equal(movedStay.start, "2026-08-24");
@@ -1102,6 +1119,9 @@ test("moves and resizes supported Calendar bookings through one pure mutation ad
     const shortenedStay = mutation.buildBookingMutationDraft(hotel, "resize-start", { date: "2026-08-20" });
     assert.equal(shortenedStay.start, "2026-08-20");
     assert.equal(shortenedStay.end, "2026-08-21");
+    const shortenedStayEnd = mutation.buildBookingMutationDraft(hotel, "resize-end", { date: "2026-08-19" });
+    assert.equal(shortenedStayEnd.start, "2026-08-18");
+    assert.equal(shortenedStayEnd.end, "2026-08-20");
 
     const conflictCandidate = {
       ...grooming,
@@ -1142,7 +1162,7 @@ test("keeps one shared Booking foundation for appointment, stay, and day work", 
   assert.match(hotel, /วันเช็กอิน/);
   assert.match(hotel, /วันเช็กเอาต์/);
   assert.match(hotel, /พื้นที่พักตามเงื่อนไข/);
-  assert.match(hotel, /ระบุห้องหรือโซนจริงตอนรับเข้าในหน้าโรงแรม/);
+  assert.match(hotel, /รายละเอียดห้องหรือโซนจริงจะออกแบบในขั้นตอน Hotel ภายหลัง/);
   assert.match(daycare, /วันที่ใช้บริการ/);
   assert.match(daycare, /โซนดูแล/);
 });
@@ -1227,7 +1247,7 @@ test("supports local Booking create, edit, cancellation history, and safe recove
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?booking-editor/);
 });
 
-test("keeps shared Business Core routes live with capability-aware Grooming and Hotel operations", async () => {
+test("keeps shared Business Core routes live while Hotel remains planned", async () => {
   const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
   const routePaths = routes
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
@@ -1238,7 +1258,7 @@ test("keeps shared Business Core routes live with capability-aware Grooming and 
   assert.equal(routePaths.some((path) => /business\/customers\/\[customerId\]$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/inbox$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/grooming$/.test(path)), true);
-  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), false);
   assert.equal(routePaths.some((path) => /business\/(?:bookings|daycare|finance|reports|team|settings)(?:\/|$)/.test(path)), false);
   assert.equal(routePaths.some((path) => /business\/pets(?:\/|$)/.test(path)), false);
 });
@@ -1268,7 +1288,8 @@ test("renders BF-5 Grooming as a visual, capability-aware execution board with a
   assert.match(operations, /onDrop=/);
   assert.match(operations, /onPointerDown/);
   assert.match(operations, /งานกลับอยู่สถานะเดิมแล้ว/);
-  assert.match(operations, /GROOMING_MOBILE_FILTERS/);
+  assert.doesNotMatch(operations, /GROOMING_MOBILE_FILTERS|GROOMING_ATTENTION_FILTER_OPTIONS|grooming-toolbar/);
+  assert.match(operations, /grooming-mobile-list__group/);
   assert.match(card, /BusinessPetAvatar/);
   assert.match(card, /data-service-job-id/);
   assert.match(card, /<button/);
@@ -1289,79 +1310,35 @@ test("renders BF-5 Grooming as a visual, capability-aware execution board with a
   assert.doesNotMatch(desktopNav + mobileNav, /href="\/business\/daycare"/);
 });
 
-test("renders BF-6 Hotel as a capability-aware operational occupancy and daily-care foundation", async () => {
-  const [html, page, operations, detail, presentation, css, state, calendar, scanner, intake, home, customerDetail, desktopNav, mobileNav] = await Promise.all([
-    htmlFor("/business/hotel"),
-    readFile(new URL("business/hotel/page.tsx", appRoot), "utf8"),
-    readFile(new URL("business/hotel/HotelOperations.tsx", appRoot), "utf8"),
-    readFile(new URL("business/hotel/HotelStayDetail.tsx", appRoot), "utf8"),
-    readFile(new URL("business/hotel/hotelPresentation.ts", appRoot), "utf8"),
-    readFile(businessCssUrl, "utf8"),
-    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
-    readFile(new URL("business/calendar/HotelBookingFields.tsx", appRoot), "utf8"),
-    readFile(new URL("business/scan/BusinessScanner.tsx", appRoot), "utf8"),
-    readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
-    readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
-    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+test("keeps Hotel explicitly planned without an operations route", async () => {
+  const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
+  const routePaths = routes
+    .filter((entry) => entry.isFile() && entry.name === "page.tsx")
+    .map((entry) => entry.parentPath.replaceAll("\\", "/"));
+  const [desktopNav, mobileNav, model, command, home, scanner, intake, customerDetail, state, css, calendar] = await Promise.all([
     readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/businessNavigationModel.ts", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessCommandPalette.tsx", appRoot), "utf8"),
+    readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
+    readFile(new URL("business/scan/BusinessScanner.tsx", appRoot), "utf8"),
+    readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+    readFile(new URL("business/calendar/HotelBookingFields.tsx", appRoot), "utf8"),
   ]);
 
-  assert.match(html, /<h1[^>]*>โรงแรม<\/h1>/);
-  assert.match(html, /ห้องพัก/);
-  assert.match(html, /การเข้าพัก/);
-  assert.match(html, /งานดูแล/);
-  assert.match(html, /Luna/);
-  assert.match(html, /ห้อง A01/);
-  assert.match(html, /ต้องดูแลวันนี้/);
-  assert.match(html, /role="img"[^>]*aria-label="Luna · แมว"/);
-  assert.match(page, /HotelOperations/);
-  assert.match(operations, /getEnabledBusinessModules\(context\)\.includes\("hotel"\)/);
-  assert.match(operations, /listPrototypeHotelStays/);
-  assert.match(operations, /listPrototypeHotelStayFixtures/);
-  assert.match(operations, /\[7, 14, 28\]/);
-  assert.match(operations, /hotel-occupancy-span/);
-  assert.match(operations, /onDragStart/);
-  assert.match(operations, /onDrop=/);
-  assert.match(operations, /evaluatePrototypeHotelStayRoomAvailability/);
-  assert.match(operations, /movePrototypeHotelStayRoom/);
-  assert.match(operations, /HotelMobileView/);
-  assert.match(operations, /hotel-mobile-view-tabs/);
-  assert.doesNotMatch(operations, /hotel-occupancy-mobile/);
-  assert.match(detail, /role="dialog"/);
-  assert.match(detail, /checkInPrototypeHotelStay/);
-  assert.match(detail, /assignPrototypeHotelStayRoom/);
-  assert.match(detail, /movePrototypeHotelStayRoom/);
-  assert.match(detail, /updatePrototypeHotelStayDates/);
-  assert.match(detail, /completePrototypeHotelCareTask/);
-  assert.match(detail, /roomMoveHistory/);
-  assert.match(detail, /ร้านส่งคำขอเพิ่มบริการผ่าน Inbox ได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้/);
-  assert.doesNotMatch(detail, /passport|allerg|medication|health/i);
-  assert.match(presentation, /HOTEL_LIST_FILTERS/);
-  assert.match(state, /export type PrototypeHotelStay/);
-  assert.match(state, /Hotel execution is deliberately not coerced into the Grooming Service Job/);
-  assert.match(state, /DEMO_HOTEL_STAY_FIXTURES/);
-  assert.match(state, /roomMoveHistory/);
-  assert.match(state, /dailyCareTasks/);
-  assert.match(state, /evaluatePrototypeHotelStayRoomAvailability/);
-  assert.match(state, /checkInPrototypeHotelStay/);
-  assert.match(state, /hotelStayId: string \| null/);
-  assert.match(state, /synchronizePrototypeHotelStaysForBooking/);
-  assert.match(calendar, /hotelRole !== "room"/);
-  assert.match(scanner, /hotelStayId/);
-  assert.match(intake, /\/business\/hotel\?stayId=/);
-  assert.match(home, /getPrototypeHotelStaySummary/);
-  assert.match(customerDetail, /listPrototypeHotelStays/);
-  assert.match(customerDetail, /\/business\/hotel\?stayId=/);
-  assert.match(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
-  assert.doesNotMatch(desktopNav + mobileNav, /href="\/business\/daycare"/);
-  assert.match(css, /\.hotel-occupancy-board-wrap\s*\{[\s\S]*?overflow-x: auto/);
-  assert.match(css, /\.hotel-occupancy-row\.is-drop-valid/);
-  assert.match(css, /\.hotel-occupancy-row\.is-drop-invalid/);
-  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.hotel-occupancy \{ display: none/);
-  assert.match(css, /data-mobile-view="staying"/);
-  assert.match(css, /@media \(max-width: 430px\)/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.hotel-occupancy-span/);
+  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), false);
+  assert.doesNotMatch(desktopNav + mobileNav + model + command + home + scanner + intake + customerDetail, /\/business\/hotel/);
+  assert.doesNotMatch(desktopNav + mobileNav + model + command, /BUSINESS_HOTEL_DESTINATION/);
+  assert.match(desktopNav + mobileNav, /PlannedBusinessModule/);
+  assert.match(desktopNav + mobileNav, /ยังไม่เปิดใช้/);
+  assert.match(model, /hotel: "โรงแรม"/);
+  assert.match(calendar, /hotelRole/);
+  assert.doesNotMatch(state, /PrototypeHotelStay|hotelStayId|hotelStays|dailyCareTasks|roomMoveHistory|synchronizePrototypeHotelStaysForBooking/);
+  assert.doesNotMatch(scanner + intake + customerDetail + home, /HotelStay|hotelStayId|\/business\/hotel/);
+  assert.doesNotMatch(css, /business-hotel|hotel-occupancy|hotel-stay|hotel-toolbar/);
 });
 
 test("keeps Grooming Service Jobs distinct from Bookings with verified lifecycle, timing, history, and resource conflict rules", async () => {
@@ -1396,15 +1373,18 @@ test("keeps Grooming Service Jobs distinct from Bookings with verified lifecycle
     assert.equal(mochiJob.petId, mochiBooking.pets[0].id);
     assert.equal(mochiJob.assignedResourceIds.join(","), mochiBooking.assignedResources.join(","));
     assert.equal(state.serviceJobCanTransition("booked", "checked-in"), true);
-    assert.equal(state.serviceJobCanTransition("booked", "completed"), false);
-    assert.equal(state.buildPrototypeGroomingServiceJobTransition(bookedJob, "in-service", "2026-08-18T14:40:00.000Z"), null);
+    assert.equal(state.serviceJobCanTransition("booked", "completed"), true);
+    const directInService = state.buildPrototypeGroomingServiceJobTransition(bookedJob, "in-service", "2026-08-18T14:40:00.000Z");
+    assert.equal(directInService?.status, "in-service");
     const checkedIn = state.buildPrototypeGroomingServiceJobTransition(bookedJob, "checked-in", "2026-08-18T14:35:00.000Z");
     const inService = state.buildPrototypeGroomingServiceJobTransition(checkedIn, "in-service", "2026-08-18T14:40:00.000Z");
     const ready = state.buildPrototypeGroomingServiceJobTransition(inService, "ready-for-pickup", "2026-08-18T15:40:00.000Z");
     const completed = state.buildPrototypeGroomingServiceJobTransition(ready, "completed", "2026-08-18T15:45:00.000Z");
+    const reversed = state.buildPrototypeGroomingServiceJobTransition(completed, "in-service", "2026-08-18T16:00:00.000Z");
     assert.equal(inService.actualStartedAt, "2026-08-18T14:40:00.000Z");
     assert.equal(completed.actualCompletedAt, "2026-08-18T15:45:00.000Z");
     assert.equal(completed.history.at(-1).type, "status");
+    assert.equal(reversed?.status, "in-service");
     assert.equal(bookedJob.status, "booked");
     const resourceCollision = state.evaluatePrototypeGroomingServiceJobResources(
       { ...mochiJob, serviceJobId: "grooming-job-resource-collision" },
@@ -2076,10 +2056,10 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   }
 
   assert.match(html, /Person → Business → Branch → Enabled Service Modules/);
-  assert.match(overviewPanel, /BF1–BF6 Operational Foundation/);
+  assert.match(overviewPanel, /BF1–BF5 Operational Foundation/);
   assert.match(overviewPanel, /\/business\/customers/);
   assert.match(overviewPanel, /\/business\/grooming/);
-  assert.match(overviewPanel, /\/business\/hotel/);
+  assert.doesNotMatch(overviewPanel, /\/business\/hotel/);
   assert.match(overviewPanel, /Cloudflare/);
   assert.match(modelPanel, /Customer/);
   assert.match(modelPanel, /Visit \/ Order/);
@@ -2093,21 +2073,39 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(corePanel, /\/business\/home/);
   assert.match(corePanel, /Branch-aware/);
   assert.match(corePanel, /Inbox/);
-  assert.match(corePanel, /Hotel Operations/);
+  assert.match(corePanel, /Hotel \/ Boarding/);
   assert.match(corePanel, /Billing/);
   assert.match(modulePanel, /Grooming \/ Bathing/);
   assert.match(modulePanel, /BF-5 LOCAL/);
   assert.match(modulePanel, /Hotel \/ Boarding/);
-  assert.match(modulePanel, /BF-6 LOCAL/);
+  assert.match(modulePanel, /PLANNED \/ NOT STARTED/);
   assert.match(modulePanel, /Daycare/);
-  assert.match(modulePanel, /Room × Date/);
+  assert.match(modulePanel, /date-range Hotel Booking/);
   assert.equal((scenarioPanel.match(/class="scenario"/g) ?? []).length, 5);
-  assert.match(scenarioPanel, /Hotel \+ Grooming/);
+  assert.match(scenarioPanel, /Hotel Booking \+ Grooming/);
   assert.match(scenarioPanel, /Guardian approval เพิ่มเฉพาะ add-on และเวลา/);
   assert.match(scenarioPanel, /Branch transfer/);
 
   assert.match(html, /Noto Sans Thai/);
   assert.match(html, /LINE Seed Sans TH/);
+  for (const sharedComponent of [
+    "BusinessSegmentedControl",
+    "BusinessBreadcrumbs",
+    "BusinessSidebarSectionHeader",
+    "BusinessDataTable",
+    "BusinessAlert",
+    "BusinessModal",
+    "BusinessProgress",
+    "BusinessSkeleton",
+  ]) {
+    assert.match(html, new RegExp(sharedComponent));
+  }
+  assert.match(html, /mounted transform-only track/);
+  assert.match(html, /400×400px/);
+  assert.match(html, /Shared component registry · 3\.3 และ 7–10/);
+  assert.match(html, /business-signature-sweep[\s\S]*?Primary Yellow[\s\S]*?Foreground Black/);
+  assert.doesNotMatch(html, /three auto 16:9 variants/);
+  assert.doesNotMatch(html, /73\s*\/\s*73/);
   assert.match(designPanel, /WARM OPERATIONAL CLARITY/);
   assert.match(designPanel, /Pastel Yellow/);
   assert.match(designPanel, /#F4C95D/i);
@@ -2126,12 +2124,12 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(roadmapPanel, /BF-4/);
   assert.match(roadmapPanel, /Cloudflare/);
   assert.match(roadmapPanel, /BF-5 Grooming implemented locally/);
-  assert.match(roadmapPanel, /BF-6 Hotel implemented locally/);
+  assert.match(roadmapPanel, /Hotel \/ Boarding planned/);
   assert.match(roadmapPanel, /Daycare operations/);
 
   assert.match(validation, /# Validation/);
-  assert.match(validation, /73 tests, 73 passed/);
-  assert.match(validation, /29 `page\.tsx` route entries/);
+  assert.match(validation, /Hotel rollback/);
+  assert.match(validation, /28 `page\.tsx` route entries/);
   assert.match(validation, /Cloudflare is the target platform direction/);
   assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
   assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
@@ -2249,6 +2247,128 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   assert.ok(themeBlock.length > 0);
   const componentCss = css.replace(themeBlock, "");
   assert.doesNotMatch(componentCss, /#[0-9a-fA-F]{3,8}|rgba?\(/);
+});
+
+test("keeps the requested Business interaction and component refinements explicit", async () => {
+  const [
+    frame,
+    calendar,
+    viewControl,
+    identityFields,
+    bookingEditor,
+    hotelFields,
+    grooming,
+    groomingCard,
+    customers,
+    inboxList,
+    inboxPane,
+    inboxComposer,
+    inboxTimeline,
+    customerDetail,
+    searchField,
+    businessCss,
+  ] = await Promise.all([
+    readFile(new URL("business/_components/BusinessPortalFrame.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BusinessCalendar.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/CalendarViewControl.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingIdentityFields.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/HotelBookingFields.tsx", appRoot), "utf8"),
+    readFile(new URL("business/grooming/GroomingOperations.tsx", appRoot), "utf8"),
+    readFile(new URL("business/grooming/GroomingJobCard.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomersScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationList.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/ConversationPane.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageComposer.tsx", appRoot), "utf8"),
+    readFile(new URL("business/inbox/MessageTimeline.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessSearchField.tsx", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+  ]);
+
+  assert.match(frame, /key=\{pathname\}[\s\S]*?business-route-stage/);
+  assert.match(businessCss, /@keyframes business-route-enter/);
+  assert.match(businessCss, /@keyframes business-section-enter/);
+  assert.match(calendar, /key === "z"/);
+  assert.match(calendar, /focusCalendarDate/);
+  assert.match(calendar, /scrollIntoView/);
+  assert.match(calendar, /data-calendar-keyboard/);
+  assert.match(viewControl, /CALENDAR_VIEW_OPTIONS/);
+  assert.match(viewControl, /BusinessSegmentedControl/);
+  assert.match(identityFields, /role="combobox"/);
+  assert.match(identityFields, /พิมพ์ชื่อลูกค้า/);
+  assert.match(identityFields, /BusinessPetAvatar/);
+  assert.match(bookingEditor, /showAutomaticAvailability/);
+  assert.match(bookingEditor, /automatic=\{showAutomaticAvailability\}/);
+  assert.doesNotMatch(hotelFields, /วันเช็กเอาต์ไม่นับเป็นคืนพัก/);
+  assert.doesNotMatch(grooming, /grooming-toolbar__search|grooming-board-hint/);
+  assert.match(grooming, /elementFromPoint/);
+  assert.match(grooming, /data-grooming-drop-lane/);
+  assert.match(groomingCard, /grooming-job-card--\$\{job\.status\}/);
+  assert.match(businessCss, /\.grooming-job-card--in-service[\s\S]*?background:/);
+  assert.match(searchField, /forwardRef/);
+  assert.match(customers, /BusinessSearchField/);
+  assert.match(inboxList, /BusinessSearchField/);
+  assert.doesNotMatch(inboxPane + inboxComposer, /ส่งข้อความในเบราว์เซอร์นี้แล้ว/);
+  assert.doesNotMatch(inboxTimeline, /ในเบราว์เซอร์/);
+  assert.match(customerDetail, /customer-detail-icon-action--edit/);
+  assert.match(customerDetail, /customer-pets-heading-actions/);
+  assert.match(businessCss, /\.business-inbox \.add-service-request[\s\S]*?inset: 50% auto auto 50%/);
+  assert.match(calendar, /<span>เพิ่มการจอง<\/span>/);
+  assert.match(bookingEditor, /<span>ทบทวนการจอง<\/span>/);
+  assert.match(businessCss, /\.business-signature-sweep\s*\{[\s\S]*?color: var\(--primary-foreground\);[\s\S]*?background: var\(--primary\);/);
+  assert.match(businessCss, /\.business-signature-sweep > \*\s*\{[\s\S]*?transition: color 1000ms cubic-bezier\(0\.86, 0, 0\.07, 1\);/);
+  assert.match(businessCss, /\.business-signature-sweep::after,\s*\.business-signature-sweep::before/);
+  assert.match(businessCss, /\.business-signature-sweep::before\s*\{[\s\S]*?background: var\(--foreground\);/);
+  assert.match(businessCss, /\.business-signature-sweep:hover::after,[\s\S]*?left: calc\(0% - 10px\)/);
+});
+
+test("promotes navigation, data, feedback, modal, progress, skeleton, and signature patterns into shared Business components", async () => {
+  const [segmented, navigation, table, feedback, modal, calendarView, bookingItem, navigationUsage, loading, businessCss] = await Promise.all([
+    readFile(new URL("business/_components/BusinessSegmentedControl.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigationPrimitives.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessDataTable.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessFeedback.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessModal.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/CalendarViewControl.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingItem.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/loading.tsx", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+  ]);
+
+  assert.match(segmented, /role="tablist"/);
+  assert.match(segmented, /role="tab"/);
+  assert.match(segmented, /aria-selected/);
+  assert.match(segmented, /ArrowLeft/);
+  assert.match(segmented, /ArrowRight/);
+  assert.match(calendarView, /BusinessSegmentedControl/);
+  assert.match(bookingItem, /className="sr-only">สถานะ/);
+  assert.doesNotMatch(bookingItem, /booking-status--|StatusIcon/);
+  assert.match(navigation, /BusinessBreadcrumbs/);
+  assert.match(navigation, /aria-current/);
+  assert.match(navigation, /BusinessSidebarSectionHeader/);
+  assert.match(navigationUsage, /BusinessSidebarSectionHeader title="งานบริการ"/);
+  assert.match(table, /<table/);
+  assert.match(table, /<caption className="sr-only"/);
+  assert.match(feedback, /BusinessAlert/);
+  assert.match(feedback, /BusinessProgress/);
+  assert.match(feedback, /BusinessSkeleton/);
+  assert.match(feedback, /CheckCircle/);
+  assert.match(feedback, /TriangleAlert/);
+  assert.match(modal, /role="dialog"/);
+  assert.match(modal, /aria-modal="true"/);
+  assert.match(modal, /event\.key === "Escape"/);
+  assert.match(modal, /event\.key !== "Tab"/);
+  assert.match(loading, /BusinessProgress/);
+  assert.match(loading, /BusinessSkeleton/);
+  assert.match(businessCss, /--segmented-bg:/);
+  assert.match(businessCss, /\.business-data-table/);
+  assert.match(businessCss, /\.business-alert--critical/);
+  assert.match(businessCss, /\.business-modal__backdrop/);
+  assert.match(businessCss, /\.business-progress--indeterminate/);
+  assert.match(businessCss, /\.business-signature-sweep/);
+  assert.match(businessCss, /\.business-signature-rainbow/);
 });
 
 test("keeps raw color values out of page and component source", async () => {

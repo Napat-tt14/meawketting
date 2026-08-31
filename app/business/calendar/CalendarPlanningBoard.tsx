@@ -41,11 +41,14 @@ export function CalendarPlanningBoard({
   dragState,
   dropPreview,
   onSelect,
+  onDateChange,
   onDragStart,
   onPreviewDrop,
   onCommitDrop,
   onDragEnd,
   onPointerDragStart,
+  onOpen,
+  selectedBookingId = null,
   settledBookingId = null,
 }: {
   days: readonly string[];
@@ -55,11 +58,14 @@ export function CalendarPlanningBoard({
   dragState: DragState;
   dropPreview: DropPreview;
   onSelect: (booking: PrototypeBooking) => void;
+  onDateChange: (date: string) => void;
   onDragStart: (booking: PrototypeBooking, operation: CalendarDragOperation, event: DragEvent<HTMLElement>) => void;
   onPreviewDrop: (target: BookingDropTarget) => void;
   onCommitDrop: (target: BookingDropTarget) => void;
   onDragEnd: () => void;
   onPointerDragStart?: (booking: PrototypeBooking, operation: CalendarDragOperation, event: PointerEvent<HTMLElement>) => void;
+  onOpen?: (booking: PrototypeBooking) => void;
+  selectedBookingId?: string | null;
   settledBookingId?: string | null;
 }) {
   const weeks = weeksFromDays(days);
@@ -72,7 +78,7 @@ export function CalendarPlanningBoard({
 
   return (
     <section className={`calendar-planning-board calendar-planning-board--${variant}${dragState ? " is-dragging" : ""}`} aria-label={`ตารางวางแผน ${calendarDateLabel(selectedDate)}`}>
-      {weeks.map((weekDays) => {
+      {weeks.map((weekDays, weekIndex) => {
         const weekStart = weekDays[0];
         const weekEnd = addCalendarDays(weekStart, 7);
         const stays = stayLanes(bookings.filter((booking) => (
@@ -82,7 +88,7 @@ export function CalendarPlanningBoard({
         )));
         const laneCount = Math.max(0, ...stays.map(({ lane }) => lane + 1));
         const bodyStyle = {
-          gridTemplateRows: `${laneCount > 0 ? `repeat(${laneCount}, 38px) ` : ""}minmax(${variant === "week" ? "150px" : "96px"}, auto)`,
+          gridTemplateRows: `${laneCount > 0 ? `repeat(${laneCount}, 34px) ` : ""}minmax(${variant === "week" ? "112px" : "76px"}, auto)`,
         } satisfies CSSProperties;
 
         return (
@@ -100,12 +106,19 @@ export function CalendarPlanningBoard({
                 const target = { date: day } satisfies BookingDropTarget;
                 const style = { gridColumn: index + 1, gridRow: `1 / -1` } satisfies CSSProperties;
                 return (
-                  <div
+                  <button
+                    type="button"
                     className={`calendar-planning-drop-zone${dropClass(target)}`}
                     key={`drop-${day}`}
                     style={style}
-                    aria-hidden="true"
+                    aria-label={`เลือก ${calendarDateLabel(day)}`}
                     data-calendar-drop-date={day}
+                    data-calendar-date={day}
+                    data-calendar-keyboard="cell"
+                    data-calendar-row={weekIndex}
+                    data-calendar-column={index}
+                    onFocus={() => onDateChange(day)}
+                    onClick={() => onDateChange(day)}
                     onDragOver={(event) => {
                       if (!dragState) return;
                       event.preventDefault();
@@ -132,6 +145,8 @@ export function CalendarPlanningBoard({
                     startEdge={booking.start >= weekStart}
                     endEdge={Boolean(booking.end && booking.end <= weekEnd)}
                     onSelect={onSelect}
+                    onOpen={onOpen}
+                    selected={selectedBookingId === booking.bookingId}
                     onMoveStart={(event) => onDragStart(booking, "move", event)}
                     onResizeStart={(event) => { event.stopPropagation(); onDragStart(booking, "resize-start", event); }}
                     onResizeEnd={(event) => { event.stopPropagation(); onDragStart(booking, "resize-end", event); }}
@@ -153,8 +168,10 @@ export function CalendarPlanningBoard({
                         key={booking.bookingId}
                         booking={booking}
                         onSelect={onSelect}
+                        onOpen={onOpen}
                         compact
                         draggable={booking.status !== "cancelled"}
+                        selected={selectedBookingId === booking.bookingId}
                         dragging={dragState?.bookingId === booking.bookingId}
                         settled={settledBookingId === booking.bookingId}
                         onDragStart={(event) => onDragStart(booking, "move", event)}

@@ -23,7 +23,6 @@ import { BrandMark } from "../../_components/BrandMark";
 import {
   BUSINESS_MANAGEMENT_DESTINATIONS,
   BUSINESS_GROOMING_DESTINATION,
-  BUSINESS_HOTEL_DESTINATION,
   BUSINESS_MODULE_LABELS,
   BUSINESS_TOP_DESTINATIONS,
   type BusinessDestinationKey,
@@ -32,6 +31,7 @@ import {
 } from "./businessNavigationModel";
 import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
 import { BusinessContextSwitcher } from "./BusinessContextSwitcher";
+import { BusinessSidebarSectionHeader } from "./BusinessNavigationPrimitives";
 
 const DESTINATION_ICONS: Record<BusinessDestinationKey, IconType> = {
   calendar: CalendarDays,
@@ -149,7 +149,7 @@ export function BusinessNavigation() {
         ))}
 
         <div className="business-nav-group business-nav-group--services" aria-label="งานบริการ">
-          <p>งานบริการ</p>
+          <BusinessSidebarSectionHeader title="งานบริการ" />
           {enabledModules.map((module) => (
             module === "grooming" ? (
               <LiveBusinessDestination
@@ -157,18 +157,12 @@ export function BusinessNavigation() {
                 destination={BUSINESS_GROOMING_DESTINATION}
                 active={pathname === BUSINESS_GROOMING_DESTINATION.href}
               />
-            ) : module === "hotel" ? (
-              <LiveBusinessDestination
-                key={module}
-                destination={BUSINESS_HOTEL_DESTINATION}
-                active={pathname === BUSINESS_HOTEL_DESTINATION.href}
-              />
             ) : <PlannedBusinessModule key={module} module={module} />
           ))}
         </div>
 
         <div className="business-nav-group business-nav-group--management" aria-label="เมนูธุรกิจที่ยังไม่เปิดใช้">
-          <p>ยังไม่เปิดใช้</p>
+          <BusinessSidebarSectionHeader title="ยังไม่เปิดใช้" />
           {BUSINESS_MANAGEMENT_DESTINATIONS.map((item) => (
             <PlannedBusinessDestination key={item.key} destinationKey={item.key} label={item.label} />
           ))}

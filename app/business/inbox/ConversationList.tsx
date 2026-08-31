@@ -1,7 +1,8 @@
 import type { RefCallback } from "react";
 import type { PrototypeConversation } from "../../_prototype/inboxState";
-import { Search } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
+import { BusinessSearchField } from "../_components/BusinessSearchField";
+import { BusinessSegmentedControl } from "../_components/BusinessSegmentedControl";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import {
   latestPrototypeConversationMessage,
@@ -28,7 +29,6 @@ export function ConversationList({
   totalCount,
   query,
   filter,
-  filterCounts,
   selectedConversationId,
   onQueryChange,
   onFilterChange,
@@ -39,7 +39,6 @@ export function ConversationList({
   totalCount: number;
   query: string;
   filter: InboxFilter;
-  filterCounts: Record<InboxFilter, number>;
   selectedConversationId: string | null;
   onQueryChange: (query: string) => void;
   onFilterChange: (filter: InboxFilter) => void;
@@ -49,30 +48,21 @@ export function ConversationList({
   return (
     <section className="inbox-list-pane" aria-label="รายการบทสนทนา">
       <div className="inbox-list-tools">
-        <label className="inbox-search" htmlFor="inbox-search">
-          <span className="sr-only">ค้นหาบทสนทนา</span>
-          <Search size={20} />
-          <input
-            id="inbox-search"
-            type="search"
-            value={query}
-            autoComplete="off"
-            placeholder="ค้นหาลูกค้า น้อง หรือข้อความ"
-            onInput={(event) => onQueryChange(event.currentTarget.value)}
-          />
-        </label>
-        <div className="inbox-filter-group" role="group" aria-label="กรองบทสนทนา">
-          {INBOX_FILTERS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={filter === option.value}
-              onClick={() => onFilterChange(option.value)}
-            >
-              {option.label}<span>{filterCounts[option.value]}</span>
-            </button>
-          ))}
-        </div>
+        <BusinessSearchField
+          id="inbox-search"
+          label="ค้นหาบทสนทนา"
+          value={query}
+          autoComplete="off"
+          placeholder="ค้นหาลูกค้า น้อง หรือข้อความ"
+          onInput={(event) => onQueryChange(event.currentTarget.value)}
+        />
+        <BusinessSegmentedControl
+          className="inbox-filter-group"
+          value={filter}
+          options={INBOX_FILTERS}
+          ariaLabel="กรองบทสนทนา"
+          onChange={onFilterChange}
+        />
       </div>
 
       <div className="inbox-list-summary" aria-live="polite">

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft, Scan, Storefront } from "../../_components/icons";
 import { BrandMark } from "../../_components/BrandMark";
 import { BusinessContextSwitcher } from "./BusinessContextSwitcher";
+import { BusinessCommandPalette } from "./BusinessCommandPalette";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import { BusinessUserMenu } from "./BusinessUserMenu";
 
@@ -45,7 +46,7 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
           {variant === "landing" ? (
             <>
               <Link className="business-header__login" href="/login">เข้าสู่ระบบ</Link>
-              <Link className="button button--business" href="/business/login" aria-label="เข้าสู่ระบบสำหรับธุรกิจ">
+              <Link className="button button--business business-signature-sweep" href="/business/login" aria-label="เข้าสู่ระบบสำหรับธุรกิจ">
                 <span className="business-header__cta-full">เข้าสู่ระบบสำหรับธุรกิจ</span>
                 <span className="business-header__cta-short">เข้าสู่ระบบธุรกิจ</span>
               </Link>
@@ -54,6 +55,7 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
           {variant === "auth" ? <Link className="button button--business-ghost" href="/"><ArrowLeft size={18} weight="bold" /> กลับหน้าสำหรับธุรกิจ</Link> : null}
           {variant === "app" ? (
             <>
+              <BusinessCommandPalette />
               <Link className={`business-header__scan${scannerActive ? " is-active" : ""}`} href="/business/scan" aria-current={pathname === "/business/scan" ? "page" : undefined}>
                 <Scan size={18} weight="bold" /> <span>สแกนรับเข้า</span>
               </Link>

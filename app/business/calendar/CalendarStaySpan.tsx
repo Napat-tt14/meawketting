@@ -2,7 +2,7 @@ import type { CSSProperties, DragEvent, PointerEvent } from "react";
 import type { PrototypeBooking } from "../../_prototype/businessState";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { BookingStatusBadge } from "./BookingItem";
-import { bookingPetLabel, bookingTimeLabel } from "./calendarPresentation";
+import { bookingPetLabel, bookingStatusLabel, bookingTimeLabel } from "./calendarPresentation";
 
 export function CalendarStaySpan({
   booking,
@@ -17,6 +17,8 @@ export function CalendarStaySpan({
   onResizeEnd,
   onDragEnd,
   onPointerDown,
+  onOpen,
+  selected = false,
   dragging = false,
   settled = false,
 }: {
@@ -32,6 +34,8 @@ export function CalendarStaySpan({
   onResizeEnd: (event: DragEvent<HTMLButtonElement>) => void;
   onDragEnd: () => void;
   onPointerDown?: (operation: "move" | "resize-start" | "resize-end", event: PointerEvent<HTMLElement>) => void;
+  onOpen?: (booking: PrototypeBooking) => void;
+  selected?: boolean;
   dragging?: boolean;
   settled?: boolean;
 }) {
@@ -42,10 +46,10 @@ export function CalendarStaySpan({
 
   return (
     <article
-      className={`calendar-stay-span${startEdge ? " is-start" : " is-continuation"}${endEdge ? " is-end" : ""}${draggable ? " is-draggable" : ""}${compact ? " is-compact" : ""}${dragging ? " is-dragging" : ""}${settled ? " is-settled" : ""}`}
+      className={`calendar-stay-span calendar-stay-span--${booking.status}${startEdge ? " is-start" : " is-continuation"}${endEdge ? " is-end" : ""}${draggable ? " is-draggable" : ""}${compact ? " is-compact" : ""}${selected ? " is-selected" : ""}${dragging ? " is-dragging" : ""}${settled ? " is-settled" : ""}`}
       style={style}
       data-booking-id={booking.bookingId}
-      aria-label={`${petLabel} ${booking.service.label} ${bookingTimeLabel(booking)}`}
+      aria-label={`${petLabel} ${booking.service.label} ${bookingTimeLabel(booking)} สถานะ ${bookingStatusLabel(booking.status)}`}
     >
       {startEdge && draggable ? (
         <button
@@ -61,16 +65,19 @@ export function CalendarStaySpan({
         />
       ) : null}
       <button
-        className="calendar-stay-span__content"
+        className={`calendar-stay-span__content${selected ? " is-selected" : ""}`}
         type="button"
         draggable={draggable}
         data-booking-id={booking.bookingId}
+        data-calendar-keyboard="booking"
         aria-keyshortcuts="Control+C Meta+C"
         aria-describedby="calendar-shortcut-guide"
         onDragStart={onMoveStart}
         onDragEnd={onDragEnd}
         onPointerDown={(event) => onPointerDown?.("move", event)}
         onClick={() => onSelect(booking)}
+        onDoubleClick={() => onOpen?.(booking)}
+        aria-pressed={selected}
       >
         <BusinessServiceIcon module="hotel" size={17} />
         <span className="calendar-stay-span__copy"><strong>{petLabel}</strong><small>{booking.service.label} · {bookingTimeLabel(booking)}</small></span>

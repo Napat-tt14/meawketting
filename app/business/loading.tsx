@@ -1,3 +1,5 @@
+import { BusinessProgress, BusinessSkeleton } from "./_components/BusinessFeedback";
+
 export default function BusinessLoading() {
   return (
     <main
@@ -12,25 +14,26 @@ export default function BusinessLoading() {
       <p className="sr-only" role="status" aria-live="polite">
         กำลังเตรียมข้อมูลธุรกิจ โปรดรอสักครู่
       </p>
+      <BusinessProgress className="business-loading__progress" indeterminate label="กำลังเตรียมข้อมูลธุรกิจ" />
 
       <div className="business-loading__layout" aria-hidden="true">
         <header className="business-loading__page-header">
           <div className="business-loading__page-header-copy">
-            <span className="business-skeleton business-skeleton--eyebrow" />
-            <span className="business-skeleton business-skeleton--title" />
-            <span className="business-skeleton business-skeleton--context" />
+            <BusinessSkeleton variant="eyebrow" />
+            <BusinessSkeleton variant="title" />
+            <BusinessSkeleton variant="context" />
           </div>
-          <span className="business-skeleton business-skeleton--action" />
+          <BusinessSkeleton variant="action" />
         </header>
 
         <section className="business-loading__metrics">
-          <span className="business-skeleton business-skeleton--section-title" />
+          <BusinessSkeleton variant="section-title" />
           <ul className="business-loading__metric-grid">
             {Array.from({ length: 3 }, (_, index) => (
               <li className="business-loading__metric" key={index}>
-                <span className="business-skeleton business-skeleton--metric-label" />
-                <span className="business-skeleton business-skeleton--metric-value" />
-                <span className="business-skeleton business-skeleton--metric-detail" />
+                <BusinessSkeleton variant="metric-label" />
+                <BusinessSkeleton variant="metric-value" />
+                <BusinessSkeleton variant="metric-detail" />
               </li>
             ))}
           </ul>
@@ -39,18 +42,18 @@ export default function BusinessLoading() {
         <div className="business-loading__work-grid">
           <section className="business-loading__list">
             <div className="business-loading__section-header">
-              <span className="business-skeleton business-skeleton--section-title" />
-              <span className="business-skeleton business-skeleton--section-action" />
+              <BusinessSkeleton variant="section-title" />
+              <BusinessSkeleton variant="section-action" />
             </div>
             <ul className="business-loading__rows">
               {Array.from({ length: 4 }, (_, index) => (
                 <li className="business-loading__row" key={index}>
-                  <span className="business-skeleton business-skeleton--avatar" />
+                  <BusinessSkeleton variant="avatar" />
                   <span className="business-loading__row-copy">
-                    <span className="business-skeleton business-skeleton--row-title" />
-                    <span className="business-skeleton business-skeleton--row-detail" />
+                    <BusinessSkeleton variant="row-title" />
+                    <BusinessSkeleton variant="row-detail" />
                   </span>
-                  <span className="business-skeleton business-skeleton--badge" />
+                  <BusinessSkeleton variant="badge" />
                 </li>
               ))}
             </ul>
@@ -58,17 +61,17 @@ export default function BusinessLoading() {
 
           <section className="business-loading__calendar">
             <div className="business-loading__section-header">
-              <span className="business-skeleton business-skeleton--section-title" />
-              <span className="business-skeleton business-skeleton--section-action" />
+              <BusinessSkeleton variant="section-title" />
+              <BusinessSkeleton variant="section-action" />
             </div>
             <div className="business-loading__calendar-head">
               {Array.from({ length: 5 }, (_, index) => (
-                <span className="business-skeleton business-skeleton--calendar-day" key={index} />
+                <BusinessSkeleton variant="calendar-day" key={index} />
               ))}
             </div>
             <div className="business-loading__calendar-grid">
               {Array.from({ length: 10 }, (_, index) => (
-                <span className="business-skeleton business-skeleton--calendar-slot" key={index} />
+                <BusinessSkeleton variant="calendar-slot" key={index} />
               ))}
             </div>
           </section>

@@ -4,9 +4,9 @@ import { assignedResourceId, resourcesForKind, withAssignedResource } from "./bo
 import { addCalendarDays } from "./calendarPresentation";
 
 export function HotelBookingFields({ draft, resources, describedBy, onDraftChange }: BookingServiceFieldsProps) {
-  // Booking reserves aggregate Hotel capacity. A specific room or zone is an
-  // execution-time decision in Hotel Operations, so Calendar never forces a
-  // room lock before Intake/check-in.
+  // Booking reserves aggregate Hotel capacity. A specific room or zone is a
+  // future execution-time decision, so Calendar never forces a room lock
+  // before any future Hotel workflow is designed.
   const roomOptions = resourcesForKind(resources, "hotel-room-type").filter((resource) => resource.hotelRole !== "room" && resource.hotelRole !== "zone");
   const selectedRoomId = assignedResourceId(draft, resources, "hotel-room-type");
   const checkInDate = draft.start.slice(0, 10);
@@ -29,7 +29,6 @@ export function HotelBookingFields({ draft, resources, describedBy, onDraftChang
         <label className="booking-field">
           <span>วันเช็กเอาต์</span>
           <input id="booking-end-date" type="date" min={minimumCheckOutDate} value={checkOutDate} onInput={(event) => onDraftChange({ ...draft, start: checkInDate, end: event.currentTarget.value })} aria-describedby={describedBy} required />
-          <small>วันเช็กเอาต์ไม่นับเป็นคืนพัก</small>
         </label>
       </div>
       <label className="booking-field">
@@ -44,7 +43,7 @@ export function HotelBookingFields({ draft, resources, describedBy, onDraftChang
           <option value="">เลือกพื้นที่พัก</option>
           {roomOptions.map((resource) => <option key={resource.id} value={resource.id}>{resource.label}</option>)}
         </select>
-        <small>ระบุห้องหรือโซนจริงตอนรับเข้าในหน้าโรงแรม</small>
+        <small>รายละเอียดห้องหรือโซนจริงจะออกแบบในขั้นตอน Hotel ภายหลัง</small>
       </label>
     </section>
   );

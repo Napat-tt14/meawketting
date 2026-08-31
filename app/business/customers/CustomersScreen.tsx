@@ -10,12 +10,14 @@ import {
   listPrototypeBookings,
 } from "../../_prototype/businessState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
-import { CalendarDays, ChevronRight, Info, Phone, Plus, Search } from "../../_components/icons";
+import { CalendarDays, ChevronRight, Info, Phone, Plus } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { CustomerEditor } from "./CustomerEditor";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
+import { BusinessSearchField } from "../_components/BusinessSearchField";
+import { BusinessSegmentedControl } from "../_components/BusinessSegmentedControl";
 import {
   CUSTOMER_LIST_FILTERS,
   type CustomerListFilter,
@@ -74,21 +76,29 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
     <div className="business-customers shell">
       <BusinessPageHeader
         title="ลูกค้าและสัตว์เลี้ยง"
-        actions={<button className="button button--business" type="button" onClick={() => { setNotice(null); setEditorOpen(true); }}><Plus size={19} />เพิ่มลูกค้า</button>}
+        actions={<button className="button button--business business-signature-sweep" type="button" onClick={() => { setNotice(null); setEditorOpen(true); }}><Plus size={19} /><span>เพิ่มลูกค้า</span></button>}
       />
 
       <section className="customer-search-panel" aria-label="ค้นหาและกรองลูกค้า">
-        <div className="customer-search-panel__field">
-          <label className="sr-only" htmlFor="customer-search">ค้นหาลูกค้าและสัตว์เลี้ยง</label>
-          <span><Search size={20} /><input ref={searchRef} id="customer-search" value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="ค้นหาชื่อลูกค้า ชื่อน้อง หรือเบอร์โทร" autoComplete="off" /></span>
-        </div>
-        <div className="customer-filter-group" role="group" aria-label="กรองรายชื่อลูกค้า">
-          {CUSTOMER_LIST_FILTERS.map((option) => (
-            <button key={option.value} type="button" aria-pressed={filter === option.value} onClick={() => setFilter(option.value)}>
-              {option.label}<span>{customers.filter((customer) => customerMatchesFilter(customer, option.value, bookings)).length}</span>
-            </button>
-          ))}
-        </div>
+        <BusinessSearchField
+          ref={searchRef}
+          id="customer-search"
+          label="ค้นหาลูกค้าและสัตว์เลี้ยง"
+          value={query}
+          onInput={(event) => setQuery(event.currentTarget.value)}
+          placeholder="ค้นหาชื่อลูกค้า ชื่อน้อง หรือเบอร์โทร"
+          autoComplete="off"
+        />
+        <BusinessSegmentedControl
+          className="customer-filter-group"
+          value={filter}
+          options={CUSTOMER_LIST_FILTERS.map((option) => ({
+            ...option,
+            label: `${option.label} ${customers.filter((customer) => customerMatchesFilter(customer, option.value, bookings)).length}`,
+          }))}
+          ariaLabel="กรองรายชื่อลูกค้า"
+          onChange={setFilter}
+        />
       </section>
 
       {notice ? <p className="business-customers__notice" role="status"><Info size={18} />{notice}</p> : null}
@@ -101,7 +111,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
         {customers.length === 0 ? (
           <div className="customer-empty-state">
             <div><strong>ยังไม่มีลูกค้าในรายการ</strong><p>เพิ่มลูกค้าและสัตว์เลี้ยงเพื่อใช้กับการจองและงานบริการ</p></div>
-            <button className="button button--business" type="button" onClick={() => setEditorOpen(true)}><Plus size={18} />เพิ่มลูกค้า</button>
+            <button className="button button--business business-signature-sweep" type="button" onClick={() => setEditorOpen(true)}><Plus size={18} /><span>เพิ่มลูกค้า</span></button>
           </div>
         ) : visibleCustomers.length === 0 ? (
           <div className="customer-empty-state customer-empty-state--search">

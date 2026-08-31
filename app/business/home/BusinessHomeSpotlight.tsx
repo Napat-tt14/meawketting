@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { ArrowLeft, ArrowRight } from "../../_components/icons";
 
 type BannerVariant = {
@@ -13,6 +15,7 @@ type BannerVariant = {
 };
 
 const BANNER_ROTATION_MS = 6_000;
+const SWIPE_THRESHOLD_PX = 48;
 
 const variants: readonly BannerVariant[] = [
   {
@@ -40,6 +43,8 @@ const variants: readonly BannerVariant[] = [
 
 export function BusinessHomeSpotlight() {
   const panelId = useId();
+  const pointerStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const suppressNextClick = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -69,6 +74,36 @@ export function BusinessHomeSpotlight() {
     setActiveIndex((current) => (current + 1) % variants.length);
   }
 
+  function handlePointerDown(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType !== "touch") return;
+    pointerStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPaused(true);
+  }
+
+  function handlePointerUp(event: ReactPointerEvent<HTMLElement>) {
+    const start = pointerStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    pointerStart.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+
+    const distanceX = event.clientX - start.x;
+    const distanceY = event.clientY - start.y;
+    if (Math.abs(distanceX) >= SWIPE_THRESHOLD_PX && Math.abs(distanceX) > Math.abs(distanceY) * 1.1) {
+      suppressNextClick.current = true;
+      window.setTimeout(() => { suppressNextClick.current = false; }, 0);
+      if (distanceX < 0) showNext();
+      else showPrevious();
+    }
+    setPaused(false);
+  }
+
+  function handlePointerCancel(event: ReactPointerEvent<HTMLElement>) {
+    pointerStart.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setPaused(false);
+  }
+
   return (
     <section
       className="business-home-banner"
@@ -79,12 +114,35 @@ export function BusinessHomeSpotlight() {
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
       }}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     >
-      <a className="business-home-banner__image" id={panelId} href={active.href} aria-label={active.label}>
-        <picture key={active.id}>
-          {active.mobileImageSrc ? <source media="(max-width: 767px)" srcSet={active.mobileImageSrc} /> : null}
-          <img src={active.imageSrc} alt={active.imageAlt} />
-        </picture>
+      <a
+        className="business-home-banner__image"
+        id={panelId}
+        href={active.href}
+        aria-label={active.label}
+        onClickCapture={(event) => {
+          if (!suppressNextClick.current) return;
+          event.preventDefault();
+          suppressNextClick.current = false;
+        }}
+      >
+        <span
+          className="business-home-banner__track"
+          style={{ "--business-banner-index": activeIndex } as CSSProperties}
+        >
+          {variants.map((variant, index) => (
+            <picture
+              className="business-home-banner__slide"
+              key={variant.id}
+            >
+              {variant.mobileImageSrc ? <source media="(max-width: 767px)" srcSet={variant.mobileImageSrc} /> : null}
+              <img src={variant.imageSrc} alt={index === activeIndex ? variant.imageAlt : ""} />
+            </picture>
+          ))}
+        </span>
       </a>
       <button className="business-home-banner__arrow business-home-banner__arrow--previous" type="button" aria-controls={panelId} aria-label="แบนเนอร์ก่อนหน้า" onClick={showPrevious}>
         <ArrowLeft size={20} aria-hidden="true" />

@@ -4,13 +4,12 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDemoBusinessContextDetails, getEnabledBusinessModules } from "../../_prototype/businessState";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
-import { BedDouble, CalendarDays, House, List, MessageCircle, Scan, Scissors, UsersRound, X } from "../../_components/icons";
+import { CalendarDays, House, List, MessageCircle, Scan, Scissors, UsersRound, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import {
   BUSINESS_CALENDAR_DESTINATION,
   BUSINESS_CUSTOMERS_DESTINATION,
   BUSINESS_GROOMING_DESTINATION,
-  BUSINESS_HOTEL_DESTINATION,
   BUSINESS_MANAGEMENT_DESTINATIONS,
   BUSINESS_MESSAGES_DESTINATION,
 } from "./businessNavigationModel";
@@ -128,17 +127,6 @@ export function BusinessMobileNavigation() {
                     >
                       <Scissors size={19} />
                       <span>{BUSINESS_GROOMING_DESTINATION.label}</span>
-                    </Link>
-                  ) : module === "hotel" ? (
-                    <Link
-                      key={module}
-                      className={`business-nav-item business-nav-item--sheet${pathname === BUSINESS_HOTEL_DESTINATION.href ? " is-active" : ""}`}
-                      href={BUSINESS_HOTEL_DESTINATION.href}
-                      aria-current={pathname === BUSINESS_HOTEL_DESTINATION.href ? "page" : undefined}
-                      onClick={close}
-                    >
-                      <BedDouble size={19} />
-                      <span>{BUSINESS_HOTEL_DESTINATION.label}</span>
                     </Link>
                   ) : <PlannedBusinessModule key={module} module={module} className="business-nav-item--sheet" />
                 ))}

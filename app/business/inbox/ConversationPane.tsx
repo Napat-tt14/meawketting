@@ -52,7 +52,6 @@ export function ConversationPane({
   function send(message: string) {
     const result = sendPrototypeTextMessage(conversation.conversationId, businessId, message);
     if (!result.ok) return false;
-    handleMutation("ส่งข้อความในเบราว์เซอร์นี้แล้ว");
     return true;
   }
 

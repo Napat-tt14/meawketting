@@ -12,11 +12,13 @@ export function AvailabilityStatus({
   result,
   id,
   show,
+  automatic = false,
   onRecovery,
 }: {
   result: BookingAvailabilityResult;
   id: string;
   show: boolean;
+  automatic?: boolean;
   onRecovery: (recovery: BookingConflictRecovery) => void;
 }) {
   if (!show) {
@@ -25,9 +27,9 @@ export function AvailabilityStatus({
 
   if (result.available) {
     return (
-      <div className="availability-status availability-status--ready" id={id} role="status" tabIndex={-1}>
+      <div className="availability-status availability-status--ready" id={id} role="status" aria-live="polite" tabIndex={-1}>
         <CheckCircle size={19} />
-        <strong>เวลานี้ว่าง</strong>
+        <div><small>{automatic ? "ตรวจสอบอัตโนมัติ" : "ผลการตรวจสอบ"}</small><strong>เวลานี้ว่าง</strong></div>
       </div>
     );
   }
@@ -37,6 +39,7 @@ export function AvailabilityStatus({
     <section className="availability-status availability-status--conflict" id={id} role="alert" aria-live="assertive" tabIndex={-1}>
       <CircleAlert size={20} />
       <div>
+        {automatic ? <small>ตรวจสอบอัตโนมัติ</small> : null}
         <strong>ยังยืนยันการจองไม่ได้</strong>
         <ul>
           {result.conflicts.map((conflict, index) => <li key={`${conflict.code}-${index}`}>{conflict.message}</li>)}

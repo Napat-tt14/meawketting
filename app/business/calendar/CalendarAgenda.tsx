@@ -22,6 +22,8 @@ export function CalendarAgenda({
   onCommitDrop,
   onDragEnd,
   onPointerDragStart,
+  onOpen,
+  selectedBookingId = null,
   settledBookingId = null,
 }: {
   date: string;
@@ -36,6 +38,8 @@ export function CalendarAgenda({
   onCommitDrop: (target: BookingDropTarget) => void;
   onDragEnd: () => void;
   onPointerDragStart?: (booking: PrototypeBooking, operation: CalendarDragOperation, event: PointerEvent<HTMLElement>) => void;
+  onOpen?: (booking: PrototypeBooking) => void;
+  selectedBookingId?: string | null;
   settledBookingId?: string | null;
 }) {
   const agendaBookings = bookings.filter((booking) => bookingOccursOnDate(booking, date));
@@ -66,6 +70,9 @@ export function CalendarAgenda({
                 role="tab"
                 aria-selected={day === date}
                 data-calendar-drop-date={day}
+                data-calendar-date={day}
+                data-calendar-keyboard="cell"
+                onFocus={() => onDateChange(day)}
                 onClick={() => onDateChange(day)}
                 onDragOver={(event) => {
                   if (!dragState) return;
@@ -108,9 +115,11 @@ export function CalendarAgenda({
                   booking={booking}
                   compact
                   draggable={draggable}
+                  selected={selectedBookingId === booking.bookingId}
                   dragging={dragState?.bookingId === booking.bookingId}
                   settled={settledBookingId === booking.bookingId}
                   onSelect={onSelect}
+                  onOpen={onOpen}
                   onDragStart={(event) => onDragStart(booking, "move", event)}
                   onDragEnd={onDragEnd}
                   onPointerDown={(event) => onPointerDragStart?.(booking, "move", event)}

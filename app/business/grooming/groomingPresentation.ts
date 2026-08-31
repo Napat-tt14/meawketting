@@ -15,9 +15,13 @@ export const GROOMING_BOARD_LANES: readonly { key: GroomingBoardLane; label: str
   { key: "completed", label: "เสร็จแล้ว", statuses: ["completed"] },
 ];
 
-export const GROOMING_MOBILE_FILTERS: readonly { key: "all" | GroomingBoardLane; label: string; statuses?: readonly ServiceJobStatus[] }[] = [
-  { key: "all", label: "ทั้งหมด" },
-  ...GROOMING_BOARD_LANES,
+const GROOMING_WORKFLOW_STATUSES: readonly ServiceJobStatus[] = [
+  "booked",
+  "checked-in",
+  "waiting",
+  "in-service",
+  "ready-for-pickup",
+  "completed",
 ];
 
 export function groomingBoardLaneForStatus(status: ServiceJobStatus): GroomingBoardLane | null {
@@ -63,14 +67,7 @@ export function groomingAttention(job: PrototypeServiceJob, hasGroomer: boolean,
 }
 
 export function statusOptionsForGroomingJob(status: ServiceJobStatus) {
-  const transitions: Record<ServiceJobStatus, readonly ServiceJobStatus[]> = {
-    booked: ["checked-in", "cancelled"],
-    "checked-in": ["waiting", "in-service", "cancelled"],
-    waiting: ["in-service", "cancelled"],
-    "in-service": ["ready-for-pickup", "cancelled"],
-    "ready-for-pickup": ["completed", "cancelled"],
-    completed: [],
-    cancelled: [],
-  };
-  return transitions[status];
+  if (status === "cancelled") return [];
+  const reversibleStatuses = GROOMING_WORKFLOW_STATUSES.filter((candidate) => candidate !== status);
+  return status === "completed" ? reversibleStatuses : [...reversibleStatuses, "cancelled" as const];
 }

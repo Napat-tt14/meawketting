@@ -211,7 +211,7 @@ export function GroomingJobDetail({
                 {availableTransitions.map((status) => <option key={status} value={status}>{groomingStatusLabel(status)}</option>)}
               </select>
             </label>
-            <p className="grooming-detail-section__hint"><CheckCircle size={16} />เปลี่ยนได้ตามลำดับงานเท่านั้น · ใช้ได้แทนการลากบนมือถือ</p>
+            <p className="grooming-detail-section__hint"><CheckCircle size={16} />ย้ายไปสถานะก่อนหน้าหรือถัดไปได้ · ใช้ได้แทนการลากบนมือถือ</p>
           </section>
 
           <section className="grooming-detail-section" aria-labelledby="grooming-resource-title">

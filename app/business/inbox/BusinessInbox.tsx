@@ -72,7 +72,7 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
       window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
       const frame = window.requestAnimationFrame(() => {
         setSelectedConversationId(result.conversation.conversationId);
-        setNotice(result.reused ? "เปิดบทสนทนาเดิมแล้ว" : "สร้างบทสนทนาในเบราว์เซอร์นี้แล้ว");
+        setNotice(result.reused ? "เปิดบทสนทนาเดิมแล้ว" : "เริ่มบทสนทนาใหม่แล้ว");
       });
       return () => window.cancelAnimationFrame(frame);
     }
@@ -101,11 +101,6 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
     return () => window.cancelAnimationFrame(frame);
   }, [conversations, selectedConversationId]);
 
-  const filterCounts: Record<InboxFilter, number> = {
-    all: items.length,
-    unread: items.filter(({ conversation }) => conversation.unreadCount > 0).length,
-    "in-service": items.filter(({ context: itemContext }) => conversationIsInService(itemContext)).length,
-  };
   const visibleItems = items.filter((item) => (
     conversationMatchesPrototypeSearch(item.conversation, item.context, query)
     && (filter === "all"
@@ -150,7 +145,6 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
       <BusinessPageHeader
         title="ข้อความ"
         context={unreadCount > 0 ? `${unreadCount} ข้อความใหม่` : "ไม่มีข้อความใหม่"}
-        actions={<span className="inbox-local-state"><MessageCircle size={17} />บันทึกในอุปกรณ์นี้</span>}
       />
       {notice ? <p className="business-inbox__notice" role="status">{notice}</p> : null}
       <div className="inbox-layout">
@@ -159,7 +153,6 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
           totalCount={items.length}
           query={query}
           filter={filter}
-          filterCounts={filterCounts}
           selectedConversationId={selectedConversationId}
           onQueryChange={setQuery}
           onFilterChange={setFilter}

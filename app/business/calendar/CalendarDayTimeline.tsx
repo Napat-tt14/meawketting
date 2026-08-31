@@ -4,7 +4,7 @@ import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { BookingItem, BookingStatusBadge } from "./BookingItem";
 import type { BookingDropTarget, CalendarDragOperation } from "./bookingMutation";
 import { bookingDropTargetKey } from "./bookingMutation";
-import { bookingOccursOnDate, bookingPetLabel, bookingTimeLabel, calendarDateLabel } from "./calendarPresentation";
+import { bookingOccursOnDate, bookingPetLabel, bookingStatusLabel, bookingTimeLabel, calendarDateLabel } from "./calendarPresentation";
 
 const START_HOUR = 8;
 const END_HOUR = 20;
@@ -30,6 +30,8 @@ export function CalendarDayTimeline({
   onCommitDrop,
   onDragEnd,
   onPointerDragStart,
+  onOpen,
+  selectedBookingId = null,
   settledBookingId = null,
 }: {
   date: string;
@@ -42,6 +44,8 @@ export function CalendarDayTimeline({
   onCommitDrop: (target: BookingDropTarget) => void;
   onDragEnd: () => void;
   onPointerDragStart?: (booking: PrototypeBooking, operation: CalendarDragOperation, event: PointerEvent<HTMLElement>) => void;
+  onOpen?: (booking: PrototypeBooking) => void;
+  selectedBookingId?: string | null;
   settledBookingId?: string | null;
 }) {
   const dateBookings = bookings.filter((booking) => bookingOccursOnDate(booking, date));
@@ -63,8 +67,10 @@ export function CalendarDayTimeline({
               key={booking.bookingId}
               booking={booking}
               onSelect={onSelect}
+              onOpen={onOpen}
               compact
               draggable={booking.status !== "cancelled"}
+              selected={selectedBookingId === booking.bookingId}
               dragging={dragState?.bookingId === booking.bookingId}
               settled={settledBookingId === booking.bookingId}
               onDragStart={(event) => onDragStart(booking, "move", event)}
@@ -84,12 +90,15 @@ export function CalendarDayTimeline({
             <div key={time} className="calendar-day-timeline__slot" style={{ gridColumn: "1 / -1", gridRow: index + 1 }}>
               <time>{time.endsWith(":00") ? time : ""}</time>
               <span />
-              <div
+              <button
+                type="button"
                 className={`calendar-day-timeline__drop-zone${active ? dropPreview?.available ? " is-drop-valid" : " is-drop-invalid" : ""}`}
                 style={style}
-                aria-hidden="true"
+                aria-label={`เลือก ${calendarDateLabel(date)} เวลา ${time}`}
                 data-calendar-drop-date={date}
                 data-calendar-drop-time={time}
+                data-calendar-date={date}
+                data-calendar-keyboard="cell"
                 onDragOver={(event) => {
                   if (!dragState) return;
                   event.preventDefault();
@@ -111,20 +120,23 @@ export function CalendarDayTimeline({
           const petLabel = bookingPetLabel(booking);
           const draggable = booking.status !== "cancelled";
           return (
-            <article className={`calendar-timeline-appointment calendar-timeline-appointment--${booking.serviceModule}${dragState?.bookingId === booking.bookingId ? " is-dragging" : ""}${settledBookingId === booking.bookingId ? " is-settled" : ""}`} style={style} key={booking.bookingId} data-booking-id={booking.bookingId}>
+            <article className={`calendar-timeline-appointment calendar-timeline-appointment--${booking.serviceModule} calendar-timeline-appointment--${booking.status}${selectedBookingId === booking.bookingId ? " is-selected" : ""}${dragState?.bookingId === booking.bookingId ? " is-dragging" : ""}${settledBookingId === booking.bookingId ? " is-settled" : ""}`} style={style} key={booking.bookingId} data-booking-id={booking.bookingId}>
               {draggable ? <button className="calendar-timeline-appointment__resize is-start" type="button" draggable aria-label={`ปรับเวลาเริ่มของ ${petLabel}`} title="ลากเพื่อปรับเวลาเริ่ม" onDragStart={(event) => onDragStart(booking, "resize-start", event)} onDragEnd={onDragEnd} onPointerDown={(event) => onPointerDragStart?.(booking, "resize-start", event)} /> : null}
               <button
-                className="calendar-timeline-appointment__content"
+                className={`calendar-timeline-appointment__content${selectedBookingId === booking.bookingId ? " is-selected" : ""}`}
                 type="button"
                 draggable={draggable}
                 data-booking-id={booking.bookingId}
+                data-calendar-keyboard="booking"
                 aria-keyshortcuts="Control+C Meta+C"
                 aria-describedby="calendar-shortcut-guide"
                 onDragStart={(event) => onDragStart(booking, "move", event)}
                 onDragEnd={onDragEnd}
                 onPointerDown={(event) => onPointerDragStart?.(booking, "move", event)}
                 onClick={() => onSelect(booking)}
-                aria-label={`แก้ไขการจอง ${petLabel} ${booking.service.label}`}
+                onDoubleClick={() => onOpen?.(booking)}
+                aria-pressed={selectedBookingId === booking.bookingId}
+                aria-label={`เลือกการจอง ${petLabel} ${booking.service.label} สถานะ ${bookingStatusLabel(booking.status)} กด Enter เพื่อแก้ไข`}
               >
                 <BusinessServiceIcon module={booking.serviceModule} size={18} />
                 <span><strong>{petLabel}</strong><small>{bookingTimeLabel(booking)} · {booking.service.label}</small></span>

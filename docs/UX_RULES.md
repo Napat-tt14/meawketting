@@ -31,7 +31,7 @@ Visual treatment is owned by [DESIGN_SYSTEM](./DESIGN_SYSTEM.md); domain objects
 - The attached `workfiledesign/htmlpack/index.html` and `design-system.css` define Business/public visual direction only; existing Product behavior, privacy and authority rules remain canonical here and in Architecture.
 - Business uses LINE Seed Sans TH and a Light / Warm White theme only. There is no Business dark theme, dark portal mode or theme toggle. Consumer retains its current visual system and font.
 - Emoji/Dingbat glyphs are not UI icons. Use the existing Lucide wrapper plus accessible text/labels.
-- AI Rainbow/Gradient/Progress concepts are reserved/experimental and remain absent from active Business UI. Reference AI Marketing/Agency examples are not Product content.
+- Rainbow CTA concepts remain reserved/experimental. Multi-accent indeterminate progress is allowed only for structural Business loading; reference AI Marketing/Agency examples are not Product content.
 
 ## Business language
 
@@ -53,16 +53,7 @@ Use natural Thai for normal staff work. Established Brand/protocol nouns may rem
 | Booking | `การจอง` |
 | New Booking | `เพิ่มการจอง` |
 | Service Job | Use natural service wording such as `งานอาบน้ำ / ตัดขน`; avoid exposing the internal object name in ordinary staff copy |
-| Hotel Stay | `การเข้าพัก` or context-specific `น้องที่กำลังพัก`; avoid exposing the local object name in ordinary staff copy |
-| Booked stay | `กำลังจะเข้าพัก` |
-| Expected today | `เข้าพักวันนี้` |
-| In stay | `พักอยู่` |
-| Ready for checkout | `พร้อมรับกลับ` |
-| Departure today | `ออกวันนี้` |
-| Checked out | `เช็กเอาต์แล้ว` |
-| No-show | `ไม่มาตามนัด` |
-| Daily care | `งานดูแลวันนี้` |
-| Room move | `ย้ายห้อง` |
+| Hotel Booking | `การจองโรงแรม` or `การจองเข้าพัก` when the date range is the focus |
 | Waiting to start | `รอเริ่ม` |
 | In service | `กำลังทำ` |
 | Ready for pickup | `พร้อมรับกลับ` |
@@ -87,12 +78,12 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 
 - Mock Business Login enters `/business/home` by default.
 - Business Home prioritizes attention and next work before compact summaries. The shell labels the page context as demo once; unavailable real integrations are named only where their limitation matters.
-- Business Home uses an operational banner with explicit previous/next arrows. It advances every six seconds, pauses during hover/focus, and stops for reduced-motion. Desktop keeps the 16:9 banner on the left and add Booking / scan intake / find Customer in a right-hand action rail; tablet uses a compact 2:1 crop; mobile uses a square artwork composition before the same three actions. Unsupported revenue is not shown.
+- Business Home uses an operational banner with explicit previous/next arrows. It advances every six seconds, pauses during hover/focus, and stops for reduced-motion. Images stay mounted in one transform-only track so transitions slide without replacement flicker. Desktop uses a 50:50 hero split with square media capped at 400×400px beside add Booking / scan intake / find Customer; tablet uses a compact 2:1 crop; mobile uses a square composition before the same actions. Unsupported revenue is not shown.
 - The compact header keeps the active Business and Branch visible. Role remains inspectable in the user menu; top-right controls align to the same 44px grid and the account click-away layer never blurs the page. The prototype switcher changes browser-local context only.
 - The logged-in Header may inherit the public Warm White/glass visual DNA, but compact operational usability, Branch context, Scanner access, User Menu and mobile safe areas take priority over a marketing pill treatment.
-- Changing Branch updates Home values and the visible module menu together. Grooming and Hotel are live service destinations only when their active Branch capability is enabled; Daycare remains visible planned/disabled when enabled, and modules not enabled for the Branch remain absent.
+- Changing Branch updates Home values and the visible module menu together. Grooming is a live service destination only when its active Branch capability is enabled; Hotel and Daycare remain visible as planned/disabled rows, and modules not enabled for the Branch remain absent.
 - Desktop navigation has live Home, Calendar, Customers & Pets, and Messages plus a prominent Scanner action in the header. Mobile has exactly Home, Calendar, Scan, Messages and More; Customers & Pets is live inside More.
-- Planned navigation remains visible to communicate Product architecture: live Grooming and Hotel (when capable) appear under `งานบริการ`; Branch-enabled Daycare and Finance, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`. BF-4 removed disabled treatment from `ข้อความ`, BF-5 from Grooming, and BF-6 from Hotel only.
+- Planned navigation remains visible to communicate Product architecture: live Grooming appears under `งานบริการ`; Hotel, Daycare and Finance, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`.
 - Planned destinations use native disabled semantics plus `aria-disabled`, reduced emphasis, and no `href`; Mobile More mirrors the same planned groups without adding navigation behavior.
 
 ## Shared Booking & Calendar rules (BF-2 Live)
@@ -106,43 +97,29 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Capacity checks validate all required people, places/equipment, and capacity constraints before review.
 - Pointer drag moves supported Bookings; both appointment edges resize in 30-minute steps and both Hotel edges shrink/extend the exclusive check-out range. Alt-drag duplicates instead of moving. A focused Booking supports Ctrl/Cmd+C then Ctrl/Cmd+V; copy always receives a new Booking ID. Touch uses deliberate long-press drag with larger edge handles. Every preview and commit passes through the existing Branch/resource/capacity evaluator. Invalid destinations keep the original Booking and name the concrete conflict plus recovery actions.
 - Drag/resize success must not insert an alert above the schedule. Use settle emphasis or a fixed neutral toast; keep the concise gesture/shortcut legend after the schedule so the grid never jumps.
-- Selecting a Booking opens the same date/time editor, so keyboard and assistive-technology users can complete every supported edit without drag.
+- Clicking a Booking selects it in place so staff can copy it before editing; Enter or a deliberate double-click opens the same date/time editor. Keyboard and assistive-technology users can complete every supported edit without drag.
 - Cancellation preserves booking history in local state and releases demo allocation.
 
 ## Grooming Operations rules (BF-5 Live Local Prototype)
 
 - Calendar plans a **Booking**; Grooming executes a distinct Pet-specific **Grooming Service Job** linked by reference. Booking status and Job status must never be merged into one field or treated as synonyms.
-- The local Grooming lifecycle is guarded: `booked → checked-in → waiting → in-service → ready-for-pickup → completed`; `checked-in → in-service` is also allowed when the waiting queue is skipped, and `cancelled` is terminal. A Job cannot jump from `booked` to `completed`.
+- The local Grooming lifecycle is guarded and reversible across active workflow states: `booked ↔ checked-in ↔ waiting ↔ in-service ↔ ready-for-pickup ↔ completed`; direct movement to a selected active destination is allowed from the board, while `cancelled` remains terminal.
 - Grooming status uses visible Thai text, icon/non-color context, and semantic status treatment. Coral and Scissors identify the Grooming module only; they never communicate a status, approval, error, or attention level.
-- Desktop/tablet support status drag/drop as an acceleration. Lifted cards, valid/invalid destination highlights, and a calm settle or rollback feedback must preserve the original Job when a transition is rejected. Keyboard, touch, and mobile users can open the detail and choose a permitted next status; drag is never the sole state-change path.
-- Each Job card keeps Pet photo/avatar as the scan anchor, then the minimum operational context: Pet, base service, scheduled time, groomer, current status, and a short attention cue. Avoid text-only cards and do not make a broad badge wall.
+- Desktop/tablet support status drag/drop as an acceleration. A pointer-following card preview, valid/invalid destination highlights, and calm settle or rollback feedback must preserve the original Job when a transition is rejected. Keyboard, touch, and mobile users can open the detail and choose a permitted active status; drag is never the sole state-change path.
+- Each Job card keeps Pet photo/avatar as the scan anchor, then separates Pet/time on the left, status on the right, and groomer/attention context below. Date and job filter rails are not part of the board surface.
 - Job detail uses a section hierarchy: Pet/Customer contact → service/timing → status → resources → add-ons → internal Business notes → separate Customer messages → history. It does not present one long undifferentiated modal, duplicate Customer/Pet records, or expose non-consented Passport data.
 - Resource UI names existing shared Resources as `ช่าง`, `จุดบริการ`, and `เครื่องเป่า`. Changing a resource runs the same local availability/conflict foundation; it is not a staff roster, payroll, commission, or scheduling system.
-- Attention is short and actionable: delayed versus the local scheduled estimate, awaiting Guardian consent, unassigned groomer, or pickup readiness. It uses text and an icon with a semantic surface; it is never color-only.
+- Attention states remain accessible context and are shown as a compact card row; there is no date/job filter rail. Status is communicated by the centered lane heading, visible text badge and full card surface.
 - Internal Business notes remain separate from Customer messages. The Inbox action opens/reuses the Business-wide Customer conversation; the note does not become a Customer-visible message or Passport write.
 - Intake reuses the existing consent-safe path. At check-in it may attach/activate only a valid matching Grooming Job; it does not introduce another scan/intake state machine.
 - Business may send or cancel an add-service request but **cannot self-approve**. A local Guardian-response helper exists only in fixture/state tests; it is not a staff-facing control. Test approval updates only the linked Job add-on and estimated duration, not Booking, Charge, Payment, discount, refund, or settlement state.
 - Completed Jobs contribute a lightweight shared recent-service item. That item is not Full CareProof and has no photo proof, certificate, or Guardian-returned service-record claim.
 
-## Hotel / Boarding Operations rules (BF-6 Live Local Prototype)
+## Hotel / Boarding planned rules
 
-- Calendar plans a Hotel **Booking**; Hotel executes a distinct Pet-specific **Hotel Stay** linked by reference. Booking planning/cancellation status and Hotel Stay lifecycle must never be merged into one field or treated as synonyms. The local Stay is a module-specific record in the shared Business envelope, not a duplicate Booking, Customer, Pet, Room, or generic Service Job migration.
-- `/business/hotel` answers execution questions: who arrives today, who is in stay, who departs today, what room/zone is vacant, which Pet needs care, and what attention is unresolved. It begins with today/attention content, then exposes Occupancy, Stays and Daily Care; it is not a Calendar clone.
-- Hotel direct navigation and the live service row use the same active-Branch capability. A Branch without Hotel receives a calm unavailable state and never a working operations board. Daycare remains planned/disabled; no BF-6 control implies Daycare implementation.
-- The local execution lifecycle is `booked → expected-today → checked-in → in-stay → ready-for-checkout → checked-out`, with terminal `cancelled` or `no-show`. Staff copy distinguishes the naturally readable Thai stages; state changes preserve Booking planning records. A checked-out Stay adds only a lightweight shared recent-service entry—never a billing, payment, CareProof, certificate, Guardian-history, or checkout-settlement claim.
-- Desktop/tablet occupancy is a room/zone-by-date board. A Stay renders as one continuous range span with accessible Pet, room/zone, arrival and departure context; it is never rendered as repeated daily cards. Seven, fourteen and twenty-eight-day views reuse the Calendar date foundation. Mobile removes the occupancy board and uses task tabs—`วันนี้`, `กำลังพัก`, `เข้าพัก`, `ออกวันนี้`, `งานดูแล`—with a focused list/detail surface.
-- A room/zone uses the shared Resource model but staff language says `ห้อง` or `โซน`. The UI may show name, type/capacity and usable state from available fixture/config context, but BF-6 does not become full room-management settings or hardcode a universal room taxonomy.
-- Before creating/checking in a Stay with a room, assigning a room, moving room, extending, shortening, or changing a Stay date, the local overlap/capacity evaluator must run. It blocks conflicts by default, leaves the existing state intact, and says what happened (for example, that a named room is occupied during the selected range or a zone is full on a date) with `เลือกห้องอื่น`, `เปลี่ยนวัน`, or `ยกเลิกการเปลี่ยน` recovery. Never use a generic error or silently overbook.
-- Conflict-blocking is a **PROTOTYPE ASSUMPTION**, not a production overbooking decision. BF-6 has no overbooking override/permission flow, no waitlist, and no final room-sharing rule. Current behavior uses Resource capacity without declaring one Pet per room or automatic sharing. Those policies remain OPEN.
-- A room move preserves history. The existing room/zone is not overwritten: the Stay appends the prior room/zone, next room/zone, timestamp and optional operational note. Desktop/tablet may offer guarded drag with lift/ghost/destination/invalid/rollback feedback; Stay detail has an equally complete room-change control for keyboard, touch and mobile users.
-- Daily care is per Pet/Stay and only for the local in-stay context. It shows compact icon/time/task/state rows (for example food, water check, activity, cleaning or permitted care instruction); completion retains local `completedAt` and available `completedBy` state through browser navigation. It is operational evidence only, not medical management, a medication system, workforce scheduling, Full CareProof, or an incident system.
-- Guardian-provided care instruction, internal Business note and Daily Care task are separate content types and sections. Protected Passport information/photos are shown only under active Business/Branch/scope/duration permission; expiry/revoke hides protected values rather than leaving stale data in the Stay UI. Business-owned operational facts remain separate from Guardian-controlled Passport data.
-- Hotel Arrival uses the shared Intake path when intake/consent review is required. Completing Intake explicitly attaches the existing linked Stay; staff then selects an available room/zone or preserves an unassigned attention state and performs the separately guarded Stay check-in. It never creates a Hotel-only scan/intake model. Belongings and permitted instructions remain in their existing consent-safe domains.
-- Departures use a lightweight operational readiness check for required daily care, belongings, Business notes and any linked add-on/Service Job state. It never becomes a payment/Billing gate. An outstanding item is named as attention rather than silently bypassed.
-- A Customer can be grouped visually with several Pets, but each Pet retains independent Stay state, room assignment, care instruction, active consent and task completion. Customer convenience never makes one Guardian consent cover another Pet.
-- A linked Grooming Job can appear as an additional service in the same Customer/Pet context while retaining its own lifecycle and shared identity references. Add-service requests reuse the existing local Inbox structured-request boundary: Business can send/cancel but cannot approve for the Guardian; no LINE transport or API is added.
-- Hotel attention is concise and actionable: arriving today without a room, departure today, overdue/unfinished care, pending customer response, detected room conflict, recent move, or a late pickup fixture. It uses semantic text/icon treatment rather than a wall of colored cards.
-- Hotel search covers Pet, Customer and room/zone. Lightweight filters are `ทั้งหมด`, `เข้าวันนี้`, `กำลังพัก`, `ออกวันนี้`, and `ต้องจัดการ`; advanced reporting is outside BF-6.
+- Calendar may represent a Hotel Booking as a date-range plan. It does not imply an implemented Hotel execution workflow.
+- Hotel / Boarding has no operational route, Stay state, occupancy board, room assignment/move controls, daily-care workflow or Hotel-specific Intake path yet.
+- The Business sidebar and mobile More menu keep `โรงแรม` as a native disabled button with `aria-disabled` and no `href`, labeled `ยังไม่เปิดใช้`. Future Hotel design must define its states, permissions and recovery before implementation.
 
 ## Customers & Pets rules (BF-3 Live Local Prototype)
 
@@ -175,14 +152,14 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - `ข้อมูลที่ร้านได้รับ` shows consented fields only with source/expiry context.
 - `ข้อมูลรับเข้า` creates Business facts and correction suggestions without mutating the Pet Passport.
 - Required Guardian decision blocks receive/check-in; mid-flow revoke/expiry hides protected data.
-- Final receive/check-in is explicit, duplicate-safe, and names the responsibility transition. A valid matching Grooming Booking may attach its shared Grooming Service Job; a valid matching Hotel Booking/Stay may target its existing Hotel Stay and available room/zone. Neither path creates a duplicate Job, Stay, Customer, Pet, Booking, or intake model.
+- Final receive/check-in is explicit, duplicate-safe, and names the responsibility transition. A valid matching Grooming Booking may attach its shared Grooming Service Job. The current intake flow does not target Hotel execution state or create a Hotel Stay.
 
 ## Responsive composition and horizontal interaction
 
 - Mobile (320–430px) is task-first and low–medium density: one primary action, stacked summaries, Agenda/list/timeline content, bottom navigation and full-screen or sheet overlays. It is never a squeezed desktop table or board.
-- Tablet (768/820/1024px) is a first-class touch surface with medium density, 44px controls, compact adaptive grids and contained workflow scrolling where a board or occupancy timeline genuinely requires it.
+- Tablet (768/820/1024px) is a first-class touch surface with medium density, 44px controls, compact adaptive grids and contained workflow scrolling where an implemented board genuinely requires it.
 - Desktop (1200/1440px) uses medium–high density through columns, split panes and operational boards—not smaller body text or card walls.
-- Horizontal scrolling is allowed for filter chips, segmented controls, multiple-Pet snap/peek summaries, tablet Grooming columns and Hotel occupancy timelines. A partial next item should signal that more content is available.
+- Horizontal scrolling is allowed for filter chips, segmented controls, multiple-Pet snap/peek summaries, tablet Grooming columns and contained Calendar date-range spans. A partial next item should signal that more content is available.
 - Body copy, forms, Customer lists, Inbox messages, detail sections, critical alerts and confirmation dialogs must never require horizontal scrolling.
 - Progressive disclosure owns advanced guidance, shortcut legends, access metadata, history and development context. The current task and required safety/recovery information remain visible.
 
@@ -191,16 +168,16 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Business forms retain persistent labels and low-text guidance. Helper text is added only for a rule, conflict, permission or consequence; fields are not individually wrapped in decorative cards.
 - On mobile, form controls use at least 16px text. Major actions and icon controls retain at least 44×44px targets.
 - Primary, Secondary, Outline, Destructive, Ghost and Link actions keep a clear hierarchy. Disabled controls do not respond to pointer interaction; destructive actions name the consequence.
-- Hover may enhance a button, card, row or table, but the same action/state remains usable by keyboard and touch. Operational Calendar, Booking, Grooming board, Hotel occupancy/stay controls, Customer, Scanner and Intake interactions remain calm and immediate.
-- Badge, dot, alert and validation status always combine semantic color with visible text and an icon or other non-color cue. Service color remains classification, never status.
-- Dialogs and mobile sheets trap and restore focus, support predictable close/recovery and keep the primary/destructive hierarchy clear. Grooming Job and Hotel Stay detail drawer/sheets move focus to their title and return it to the triggering record. Toast placement respects mobile safe areas and is reserved for meaningful feedback.
-- Structural skeletons mirror Customer rows, Calendar, Home metrics and Inbox lists. Normal progress uses Brand/Semantic color; AI Rainbow progress is not active.
+- Hover may enhance a button, card, row or table, but the same action/state remains usable by keyboard and touch. Operational Calendar, Booking, Grooming board, Customer, Scanner and Intake interactions remain calm and immediate.
+- Badge, alert and validation status normally combine semantic color with visible text and an icon or other non-color cue. Compact Calendar cards intentionally omit status dots/labels, retain full Thai status in their accessible name and use the semantic card surface; service color remains classification, never status.
+- Dialogs and mobile sheets trap and restore focus, support predictable close/recovery and keep the primary/destructive hierarchy clear. Grooming Job detail drawer/sheets move focus to their title and return it to the triggering record. Toast placement respects mobile safe areas and is reserved for meaningful feedback.
+- Structural skeletons mirror Customer rows, Calendar, Home metrics and Inbox lists. Determinate progress uses Brand/Semantic color; the multi-accent indeterminate bar is loading-only and carries no operational meaning.
 - Motion uses the premium easing with canonical 160ms Fast, 220ms Base, 300ms Slow and 280ms Navigation tokens from the Design System. No bounce, wobble or confetti; reduced-motion removes non-essential transforms, shimmer travel and animation.
 
 ## Accessibility and mobile behavior
 
 - Targets are at least 44×44px; no hover-only paths; sticky regions respect safe area insets.
-- Status uses text plus a non-color cue (e.g. icon or badge); live updates do not steal focus. Grooming drag and Hotel occupancy drag each have an explicit detail/control alternative for keyboard and touch users; every occupancy span has an accessible Pet/room/date-range label.
+- Status uses text plus a non-color cue (e.g. icon or badge); live updates do not steal focus. Grooming drag has an explicit detail/control alternative for keyboard and touch users; every Calendar date-range span has an accessible Pet/date-range label.
 - Visible focus rings use the Business primary/ring Yellow treatment with sufficient contrast; error state remains separately understandable.
 - Semantic HTML and keyboard behavior come first; icon-only controls require a screen-reader label and modals restore focus.
 - Responsive QA covers 320, 375, 390, 430, 768, 820, 1024, 1200 and 1440px. Public content caps around 1280px while Calendar/board width follows the workflow.

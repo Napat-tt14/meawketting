@@ -79,10 +79,10 @@ Business capabilities have two operational layers:
    - Priority-first Business Home (`/business/home`)
    - Shared Calendar & Booking Engine (BF-2 live at `/business/calendar`)
    - Shared Business Intake & Scanner (`/business/scan`, `/business/intake/[intakeId]`)
-   - Customers & Pets (BF-3 live local prototype), Inbox & Customer Communication (BF-4 live local prototype), Grooming Operations (BF-5 live local prototype), Hotel / Boarding Operations (BF-6 live local prototype), CareProof & Checkout (future/planned)
+   - Customers & Pets (BF-3 live local prototype), Inbox & Customer Communication (BF-4 live local prototype), Grooming Operations (BF-5 live local prototype), Hotel / Boarding Operations (planned / not started), CareProof & Checkout (future/planned)
 2. **Service Modules**:
    - Grooming (M-GROOM): Station queues, pet handling notes, styling preferences
-   - Hotel / Boarding (M-HOTEL): Date-range stays, room/zone occupancy, arrival/departure execution, and daily-care foundation
+   - Hotel / Boarding (M-HOTEL): Date-range Booking representation remains in Calendar; dedicated occupancy, arrival/departure execution and daily-care workflows are planned
    - Daycare (M-DAYCARE): Daytime playgroup attendance, hourly capacity, observation notes
    - Future modules: Training, Medical records, Transport
 
@@ -159,7 +159,7 @@ The three contracts never inherit each other's permissions.
 - **Inbox & Customer Communication Foundation (BF-4)**: Business-wide Customer conversation reuse, readable desktop split/mobile task layouts, compact search/filters, Pet/Booking/Branch context, unread state, browser-local text, three default quick replies with remembered visibility, and one structured add-service request prototype at `/business/inbox`. Real delivery/read state, attachments, notifications, full Consumer Inbox, and Booking/Charge effects are not implemented.
 - **Shared Intake & Scanner (Phase E)**: Camera scan, manual code entry, QR type validation, consent checks, belongings logging, check-in completion.
 - **Grooming Operations Foundation (BF-5)**: Capability-aware `/business/grooming` execution board for distinct Pet-specific Grooming Service Jobs. It reuses Booking planning, Customer/Pet, Resource, Intake, Inbox and Home references; lifecycle, actual timing, assignments, Business notes and lightweight recent-service history remain separate from Booking, Charge, Payment and CareProof.
-- **Hotel / Boarding Operations Foundation (BF-6)**: Capability-aware `/business/hotel` execution dashboard for distinct Pet-specific Hotel Stays. It derives today/arrivals/current stays/departures/attention and Home summaries from shared local Hotel state, renders continuous room/zone occupancy spans, validates assignment/date changes, preserves room-move history, stores per-Pet daily-care completion, and reuses Intake, Calendar, Customer/Pet, Resource and Inbox context. Booking remains planning; a Hotel Stay is not a Booking status, bill, CareProof, or Passport copy.
+- **Hotel / Boarding Operations**: Planned and not started. Shared Calendar retains date-range Hotel Booking representation, while the dedicated operations route, occupancy, room assignment/moves, daily care, Stay state and Hotel-specific Intake handoff will be designed in a future milestone. The Business menu keeps a disabled planned button; no `/business/hotel` route exists.
 - **Consumer web prototype (CURRENT / FROZEN)**: Anonymous create flow, 6 passport themes, My Pets, Public Safety, Lost flow, Temporary Business Sharing. Existing routes remain implemented and tested; no Consumer expansion is authorized.
 - **LINE-first Guardian experience (TARGET / NOT IMPLEMENTED)**: LINE entry, LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking are not implemented.
 

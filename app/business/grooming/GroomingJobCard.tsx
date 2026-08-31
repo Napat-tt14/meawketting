@@ -1,6 +1,6 @@
-import type { DragEvent, PointerEvent } from "react";
+import type { DragEvent, KeyboardEvent, PointerEvent } from "react";
 import type { DemoBookingPet, DemoBookingResource, PrototypeServiceJob } from "../../_prototype/businessState";
-import { CircleAlert, Clock, Scissors, UserRound } from "../../_components/icons";
+import { CircleAlert, Clock, UserRound } from "../../_components/icons";
 import { BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { groomingAttention, groomingScheduleLabel, groomingStatusLabel } from "./groomingPresentation";
 
@@ -19,6 +19,7 @@ export function GroomingJobCard({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  onKeyDown,
 }: {
   job: PrototypeServiceJob;
   pet: DemoBookingPet;
@@ -34,6 +35,7 @@ export function GroomingJobCard({
   onPointerMove?: (event: PointerEvent<HTMLElement>) => void;
   onPointerUp?: (event: PointerEvent<HTMLElement>) => void;
   onPointerCancel?: (event: PointerEvent<HTMLElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
 }) {
   const groomer = resources.find((resource) => resource.kind === "groomer" && job.assignedResourceIds.includes(resource.id)) ?? null;
   const attention = groomingAttention(job, Boolean(groomer), waitingApproval);
@@ -41,10 +43,12 @@ export function GroomingJobCard({
   return (
     <button
       type="button"
-      className={`grooming-job-card${dragging ? " is-dragging" : ""}${settled ? " is-settled" : ""}${attention ? ` has-attention is-${attention.tone}` : ""}`}
-      draggable={draggable && job.status !== "completed" && job.status !== "cancelled"}
+      className={`grooming-job-card grooming-job-card--${job.status}${dragging ? " is-dragging" : ""}${settled ? " is-settled" : ""}${attention ? ` has-attention is-${attention.tone}` : ""}`}
+      draggable={draggable && job.status !== "cancelled"}
       data-service-job-id={job.serviceJobId}
       aria-label={`เปิดงาน ${pet.name} สถานะ ${groomingStatusLabel(job.status)}`}
+      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+      title="ลากไปยังคอลัมน์ที่ต้องการ · กดลูกศรเพื่อย้ายสถานะ"
       onClick={() => onOpen(job)}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -52,20 +56,22 @@ export function GroomingJobCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onKeyDown={onKeyDown}
     >
       <header className="grooming-job-card__header">
-        <BusinessPetAvatar pet={pet} size="large" />
-        <span className={`grooming-job-status grooming-job-status--${job.status}`}><Scissors size={15} />{groomingStatusLabel(job.status)}</span>
+        <div className="grooming-job-card__identity-row">
+          <BusinessPetAvatar pet={pet} size="medium" />
+          <div className="grooming-job-card__identity">
+            <strong>{pet.name}</strong>
+            <span><Clock size={14} /><time>{groomingScheduleLabel(job)}</time></span>
+          </div>
+        </div>
+        <span className={`grooming-job-status grooming-job-status--${job.status}`}>{groomingStatusLabel(job.status)}</span>
       </header>
-      <div className="grooming-job-card__identity">
-        <strong>{pet.name}</strong>
-        <span>อาบน้ำ / ตัดขน</span>
-      </div>
       <div className="grooming-job-card__facts">
-        <span><Clock size={16} /><time>{groomingScheduleLabel(job)}</time></span>
         <span><UserRound size={16} />{groomer?.label ?? "ยังไม่ได้ระบุช่าง"}</span>
       </div>
-      {attention ? <p className="grooming-job-card__attention"><CircleAlert size={16} />{attention.label}</p> : null}
+      {attention ? <span className="grooming-job-card__attention"><CircleAlert size={14} />{attention.label}</span> : null}
     </button>
   );
 }

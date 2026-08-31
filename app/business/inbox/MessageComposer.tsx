@@ -52,11 +52,11 @@ export function MessageComposer({
     const text = message.trim();
     if (!text || disabled) return;
     if (!onSend(text)) {
-      setNotice("ส่งข้อความในเบราว์เซอร์ไม่สำเร็จ ลองอีกครั้ง");
+      setNotice("ส่งข้อความไม่สำเร็จ ลองอีกครั้ง");
       return;
     }
     setMessage("");
-    setNotice("ส่งข้อความในเบราว์เซอร์นี้แล้ว");
+    setNotice(null);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }
 
@@ -133,7 +133,7 @@ export function MessageComposer({
         </button>
       </form>
       <div className="message-composer__meta">
-        <small id="business-message-composer-boundary">ข้อความบันทึกในอุปกรณ์นี้</small>
+        <small id="business-message-composer-boundary">Enter เพื่อส่ง · Shift+Enter เพื่อขึ้นบรรทัดใหม่</small>
         <span role="status" aria-live="polite">{notice}</span>
       </div>
     </div>

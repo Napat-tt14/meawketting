@@ -7,7 +7,7 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
 
 ## Product priority and portal entry
 
-- **Primary Commercial Experience**: Business Landing (`/`) → Business Login (`/business/login`) → Business Home (`/business/home`) → Shared Calendar & Bookings (`/business/calendar`) → Grooming Operations (`/business/grooming`, when enabled) → Customers & Pets (`/business/customers`) → Inbox (`/business/inbox`) → Shared Scanner & Intake (`/business/scan`). Hotel / Boarding remains a planned module with no operations route.
+- **Primary Commercial Experience**: Business Landing (`/`) → Business Login (`/business/login`) → Business Home (`/business/home`) → Shared Calendar & Bookings (`/business/calendar`) → Grooming Operations (`/business/grooming`, when enabled) or Hotel Operations (`/business/hotel`, when enabled) → Customers & Pets (`/business/customers`) → Inbox (`/business/inbox`) → Shared Scanner & Intake (`/business/scan`).
 - **Compatibility Redirect**: `/business` immediately redirects to `/`.
 - **Consumer web prototype (CURRENT / FROZEN)**: Pet owners can access `/my-pets`, `/create-passport`, `/activity`, `/passports`, and `/qr-preview`. These routes remain retained and regression-tested, but the standalone web experience is no longer the target final Guardian channel.
 - **Guardian target (FUTURE / PAUSED)**: LINE-first experience through a LINE Mini App. LINE Login, the Mini App, LINE notifications, and production identity linking are not implemented.
@@ -15,9 +15,9 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
 
 ### Business navigation architecture
 
-- Desktop shows live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, and `ข้อความ`. A Grooming-enabled Branch sees live `อาบน้ำ / ตัดขน`; `โรงแรม` remains a disabled planned button under `งานบริการ`.
-- The Sidebar keeps Hotel and Daycare visible as planned/disabled rows, followed by planned `การเงิน`, `รายงาน`, `ทีม`, and `ตั้งค่า`. A Branch without Grooming never presents a service execution board as usable.
-- Mobile keeps Home, Calendar, Scan, Messages, and More. More contains live Customers, the capability-enabled Grooming destination, and the disabled planned Hotel/Daycare and management groups.
+- Desktop shows live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, and `ข้อความ`. Under `งานบริการ`, `อาบน้ำ / ตัดขน` and `โรงแรม` are live only when the active Branch enables the matching capability.
+- The Sidebar keeps Daycare and the planned `การเงิน`, `รายงาน`, `ทีม`, and `ตั้งค่า` rows visible as disabled architecture. A Branch without Grooming or Hotel never presents that service execution board as usable.
+- Mobile keeps Home, Calendar, Scan, Messages, and More. More contains live Customers plus only the capability-enabled Grooming/Hotel destinations, followed by disabled planned groups.
 
 ## Business flows (Primary commercial experience)
 
@@ -38,7 +38,7 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
   1. Review priority cues in `สิ่งที่ต้องจัดการ` (e.g., arrivals, pending decisions).
   2. Use the 16:9 banner as the visual focal point. It auto-advances every six seconds, pauses on hover/focus, and always provides previous/next arrows.
   3. On desktop, start `เพิ่มการจอง`, `สแกนรับเข้า`, or `ค้นหาลูกค้า` from the action rail to the banner's right; smaller screens stack the same actions below it.
-  4. Inspect `งานถัดไป`, today counters, and compact service summaries. When Grooming is enabled, its today and ready-for-pickup values come from the same local Service Job state as the Grooming board. Hotel remains represented by shared Booking planning only.
+  4. Inspect `งานถัดไป`, today counters, and compact service summaries. Grooming values derive from Service Job state; Hotel arrivals, departures, occupancy/capacity, available/reserved, ready-for-pickup and attention derive from the same Branch Hotel Stay state as Hotel Operations.
   5. Open the Inbox-derived `ข้อความใหม่` item; the count and navigation badge use the same browser-local conversation state.
 
 ### 3. Shared Booking & Calendar flow (BF-2 Live)
@@ -63,13 +63,13 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
   4. Display allowed pet profile and medical/care facts without leaking unshared fields.
   5. Log belongings (อาหาร, ยา, ปลอกคอ, ของเล่น, อื่น ๆ) and intake notes.
   6. Review intake summary and confirm receive/check-in.
-  7. Status advances to Checked In. When the consented local relationship has a matching Grooming Booking/Job at the active Branch, the intake attaches and activates that shared Grooming Service Job; it does not create a second Customer, Pet, Booking, or check-in flow.
+  7. Status advances to Checked In. A Grooming launch attaches the matching Service Job; a Hotel launch carries the explicit `hotelStayId`, returns to that same Stay, and enables its guarded check-in. The engine never infers a Stay from free text or creates a second Customer, Pet, Booking, Intake, Job, Stay, or check-in flow.
 
 ### 5. Customers & Pets foundation (BF-3 Live Local Prototype)
 - **Routes**: `/business/customers` → `/business/customers/[customerId]`.
 - **Flow**:
   1. Frontdesk searches by Customer name, Pet name, or phone using one clear search field and only actionable relationship filters; Passport connected/not-connected is not a browse filter.
-  2. Open the stable Business relationship detail. The page first explains the relationship, then separates contact/actions, local Pets, upcoming/recent Bookings, lightweight tags and Business notes.
+  2. Open the stable Business relationship detail. The page first explains the relationship, then separates contact/actions, local Pets, upcoming/recent Bookings, current/recent Hotel Stays, lightweight tags and Business notes.
   3. Add a local Customer without a Meawketting account or Pet Passport. A matching phone shows a calm possible-duplicate warning; staff chooses existing record or explicitly continues without an automatic merge.
   4. Add a local Pet relationship with name/species and an optional Business note. It starts as `ยังไม่ได้เชื่อม Pet Passport`.
   5. Start the existing Booking Editor with Customer and optional Pet preselected; no new Booking engine is created.
@@ -82,7 +82,7 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
   2. Desktop selects a conversation beside the list. At 320–430px, open a row as a full conversation task and return with the explicit Back control; selection recovers through `?conversation=<id>`.
   3. Read only useful Customer/Pet/Booking/Branch context. Opening a conversation clears its browser-local unread count but does not claim server synchronization.
   4. Send text or choose one of three unnumbered Thai quick replies. The dashed add control extends the local list; collapse/expand is remembered by a cookie. Messages keep explicit local delivery labels.
-  5. From Customer Detail, `ส่งข้อความ` reuses the existing Business + Customer conversation; Booking may add Pet/Booking/Branch context without creating another permanent thread.
+  5. From Customer Detail or Hotel Stay, `ส่งข้อความ` reuses the existing Business + Customer conversation; Booking/Stay may add Pet/Booking/Branch context without creating another permanent thread. Business notes, care notes and incident notes never become Customer messages automatically.
   6. From a valid Booking, send one structured `ขออนุมัติเพิ่มบริการ` request with service, demo amount, added time, and optional note. The state begins at `รอเจ้าของตอบ`.
   7. The minimum Guardian-response simulator is visibly labeled as a local test. Business has no normal approve action and duplicate decisions are idempotent. When the request is linked to a Grooming Service Job, a Guardian approval updates only that Job's local add-ons and estimated duration; it never mutates Booking or creates Charge/Payment.
   8. Switching Branch within the same Business keeps the Customer conversation. Context from another Branch is named and its Booking action is withheld; protected Passport values remain governed by the original active consent.
@@ -100,10 +100,19 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
   7. If an add-on needs consent, send the existing structured Inbox request. The Job shows `รอลูกค้าตอบ`; Business cannot approve. A local Guardian-simulator approval appends the add-on and time only to the linked Job.
   8. On completion, a lightweight Grooming service entry appears in the shared Customer/Pet recent history. This is not a CareProof, certificate, photo proof, or billing record.
 
-### 8. Hotel / Boarding (Planned / Not Started)
-- **Route**: No `/business/hotel` route exists. The Business sidebar and mobile More menu keep a disabled `โรงแรม` button labeled `ยังไม่เปิดใช้`.
-- **Current flow**: Staff can create and view a date-range Hotel Booking through the shared Calendar. There is no Hotel operations dashboard, occupancy board, Hotel Stay lifecycle, room assignment/move workflow, daily-care workspace or Hotel-specific Intake handoff.
-- **Future milestone**: Design the execution workflow only after the Hotel / Boarding milestone is approved; this planned menu item does not imply an implemented page or backend capability.
+### 8. Hotel / Boarding Operations Foundation (BF-6 Live Local Prototype)
+- **Route**: `/business/hotel` for a Hotel-enabled active Branch only.
+- **Goal**: answer who arrives/leaves today, who is staying, where each Pet is assigned, remaining capacity, care due, attention notes, and who is ready for pickup without turning Calendar into an execution board.
+- **Flow**:
+  1. Open Hotel Operations from capability-gated navigation, Home, Customer detail, Calendar context, or the explicit post-Intake handoff. A Branch without Hotel receives a calm unavailable state and no live Hotel menu/command.
+  2. Review Today arrivals, departures, currently staying, care due, unresolved attention/incident notes, ready-for-pickup work, and occupied/reserved/available capacity from the shared Branch Stay state.
+  3. On desktop/tablet, scan each room/zone across a continuous date range. Occupied, reserved and available counts respect room capacity, including multi-Pet Bookings as separate Pet-specific Stays.
+  4. Start with the existing Hotel Booking in Calendar, then open the Shared Business Intake Engine with its explicit Stay target. After consented Intake succeeds, assign a valid room and move through checked-in → staying → ready for pickup/checkout → completed; cancelled/no-show remain terminal alternatives as appropriate.
+  5. Assign or move a Stay only after capacity/conflict validation. A valid move records date-bounded assignment and movement history; an invalid target preserves the original room and shows rollback feedback.
+  6. Complete lightweight food, water, activity, cleaning/check and note tasks. Medication is actionable only when the same Stay has Customer-confirmed Intake authorization plus explicit instructions; this is not a medical system.
+  7. Keep Business notes and lightweight incident/attention notes internal. Use the existing Inbox action for Customer communication so no Conversation is duplicated.
+  8. On mobile, use grouped Today/Stay lists and the detail sheet with the room selector and lifecycle controls. No work depends on dragging or on squeezing the desktop occupancy grid into the viewport.
+- **Boundary**: Calendar remains date-range planning; Hotel Operations owns Stay execution and occupancy. Billing, pricing, full inventory, full Incident Management, medical records and CareProof are not part of BF6.
 
 ### 9. Planned Business flows
 - **Multi-Service Checkout & Billing**: Combine hotel nights, grooming add-ons, and daycare into one visit checkout. **PLANNED**.

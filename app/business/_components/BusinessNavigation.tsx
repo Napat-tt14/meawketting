@@ -23,6 +23,7 @@ import { BrandMark } from "../../_components/BrandMark";
 import {
   BUSINESS_MANAGEMENT_DESTINATIONS,
   BUSINESS_GROOMING_DESTINATION,
+  BUSINESS_HOTEL_DESTINATION,
   BUSINESS_MODULE_LABELS,
   BUSINESS_TOP_DESTINATIONS,
   type BusinessDestinationKey,
@@ -156,6 +157,12 @@ export function BusinessNavigation() {
                 key={module}
                 destination={BUSINESS_GROOMING_DESTINATION}
                 active={pathname === BUSINESS_GROOMING_DESTINATION.href}
+              />
+            ) : module === "hotel" ? (
+              <LiveBusinessDestination
+                key={module}
+                destination={BUSINESS_HOTEL_DESTINATION}
+                active={pathname === BUSINESS_HOTEL_DESTINATION.href}
               />
             ) : <PlannedBusinessModule key={module} module={module} />
           ))}

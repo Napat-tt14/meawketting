@@ -79,10 +79,10 @@ Business capabilities have two operational layers:
    - Priority-first Business Home (`/business/home`)
    - Shared Calendar & Booking Engine (BF-2 live at `/business/calendar`)
    - Shared Business Intake & Scanner (`/business/scan`, `/business/intake/[intakeId]`)
-   - Customers & Pets (BF-3 live local prototype), Inbox & Customer Communication (BF-4 live local prototype), Grooming Operations (BF-5 live local prototype), Hotel / Boarding Operations (planned / not started), CareProof & Checkout (future/planned)
+   - Customers & Pets (BF-3 live local prototype), Inbox & Customer Communication (BF-4 live local prototype), Grooming Operations (BF-5 live local prototype), Hotel / Boarding Operations (BF-6 live local prototype for enabled Branches), CareProof & Checkout (future/planned)
 2. **Service Modules**:
    - Grooming (M-GROOM): Station queues, pet handling notes, styling preferences
-   - Hotel / Boarding (M-HOTEL): Date-range Booking representation remains in Calendar; dedicated occupancy, arrival/departure execution and daily-care workflows are planned
+   - Hotel / Boarding (M-HOTEL): Calendar keeps date-range Booking planning while `/business/hotel` executes Pet-specific Stays, continuous room/zone occupancy, guarded assignments/moves, arrivals/departures, pickup readiness, lightweight daily care and attention for Hotel-enabled Branches
    - Daycare (M-DAYCARE): Daytime playgroup attendance, hourly capacity, observation notes
    - Future modules: Training, Medical records, Transport
 
@@ -159,7 +159,7 @@ The three contracts never inherit each other's permissions.
 - **Inbox & Customer Communication Foundation (BF-4)**: Business-wide Customer conversation reuse, readable desktop split/mobile task layouts, compact search/filters, Pet/Booking/Branch context, unread state, browser-local text, three default quick replies with remembered visibility, and one structured add-service request prototype at `/business/inbox`. Real delivery/read state, attachments, notifications, full Consumer Inbox, and Booking/Charge effects are not implemented.
 - **Shared Intake & Scanner (Phase E)**: Camera scan, manual code entry, QR type validation, consent checks, belongings logging, check-in completion.
 - **Grooming Operations Foundation (BF-5)**: Capability-aware `/business/grooming` execution board for distinct Pet-specific Grooming Service Jobs. It reuses Booking planning, Customer/Pet, Resource, Intake, Inbox and Home references; lifecycle, actual timing, assignments, Business notes and lightweight recent-service history remain separate from Booking, Charge, Payment and CareProof.
-- **Hotel / Boarding Operations**: Planned and not started. Shared Calendar retains date-range Hotel Booking representation, while the dedicated operations route, occupancy, room assignment/moves, daily care, Stay state and Hotel-specific Intake handoff will be designed in a future milestone. The Business menu keeps a disabled planned button; no `/business/hotel` route exists.
+- **Hotel / Boarding Operations Foundation (BF-6)**: Capability-gated `/business/hotel` projects each shared Hotel Booking into one Pet-specific Stay without copying Booking, Customer or Pet records. It provides Today arrivals/departures/current guests, continuous room/zone occupancy and capacity, guarded assignment/moves with history, Stay lifecycle, ready-for-pickup, authorized lightweight daily care, Business notes and lightweight incident attention. Check-in reuses the Shared Business Intake Engine through an explicit `hotelStayId`; Home, Calendar, Customer detail and Inbox consume the same shared state and identities.
 - **Consumer web prototype (CURRENT / FROZEN)**: Anonymous create flow, 6 passport themes, My Pets, Public Safety, Lost flow, Temporary Business Sharing. Existing routes remain implemented and tested; no Consumer expansion is authorized.
 - **LINE-first Guardian experience (TARGET / NOT IMPLEMENTED)**: LINE entry, LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking are not implemented.
 
@@ -168,4 +168,4 @@ The three contracts never inherit each other's permissions.
 - **Daycare Operations**: Attendance, playgroup safety and hourly capacity (Planned; not started).
 - **Multi-Service Checkout, Billing & Payments**: Charges, payment settlement, invoice/refund/accounting rules (Planned; not started).
 - **Full CareProof / Service History**: Guardian-returned evidence, certificates and record policy (Planned; not started).
-- **Full Hotel policy/workforce systems**: Overbooking authority, room-sharing policy, waitlist, housekeeping workforce scheduling, cross-Branch transfer, medical management, incident management and hardware integrations (Open or not implemented).
+- **Full Hotel policy/workforce systems**: Overbooking authority, room-sharing policy, waitlist, housekeeping workforce scheduling, cross-Branch transfer, medical management, full Incident Management and hardware integrations (Open or not implemented).

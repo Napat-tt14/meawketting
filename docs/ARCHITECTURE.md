@@ -46,9 +46,9 @@ Business ── has ──> Branch ── enables ──> Service Module
                               │
               ┌───────────────┴────────────────┐
               │                                │
-  links Pet-specific Grooming Service Job(s)   retains date-range Hotel Booking data
+  links Pet-specific Grooming Service Job(s)   links Pet-specific Hotel Stay(s)
               │                                │
-     Grooming execution (BF-5)         Hotel execution remains planned
+     Grooming execution (BF-5)          Hotel execution (BF-6)
               └───────────────┬────────────────┘
                               │
                   uses shared Resource(s) at Branch
@@ -74,7 +74,7 @@ CareProof / Service Record ── records permitted evidence across module execu
 | **Pet** | Shared Pet identity across services | Never duplicated as Grooming/Hotel/Daycare Pet; the Business-local relationship can exist without a Passport link, while Passport authority remains with Guardian |
 | **Visit / Order** | Parent for related service work, operational timeline and combined checkout | Working term; may contain several Pets/jobs subject to open policy |
 | **Booking** | Planned activity for one or more Pets and linked module execution records | Supports appointment, date-range and day models; Branch, estimate, planning status and required/assigned resources—not always a one-hour appointment. It is not an execution-status field. |
-| **Service Job** | Shared direction for a unit of work executed for one Pet inside a Booking/Visit | Module extensions may include Grooming Job, future Hotel Stay, Daycare Visit, or Training Session. BF-5 locally implements a Grooming Service Job; other execution records remain future module work. |
+| **Service Job / execution record** | Shared direction for a unit of work executed for one Pet inside a Booking/Visit | BF-5 locally implements Grooming Service Job and BF-6 implements Hotel Stay as distinct module records. Future extensions may include Daycare Visit or Training Session; neither execution lifecycle is a Booking status. |
 | **Resource** | Internal schedulable/capacity entity required for work | Use user-facing words such as ช่าง, จุดบริการ, ห้อง or โซน rather than exposing `Resource` blindly |
 | **Conversation** | Contextual communication and workflow thread | Can link Customer, Pet, Booking, Visit, Service Job and Branch; future modules reuse shared context rather than creating isolated identity threads |
 | **Charge** | What is owed for service, add-on or retail line item | Separate from payment; several modules may combine under one Visit checkout |
@@ -92,6 +92,7 @@ Root Homepage (/) [Business Landing] ───> Business Login (/business/login)
           │                                     │
           │                                     ├─ Shared Calendar & Bookings (/business/calendar)
           │                                     ├─ Grooming Operations (/business/grooming, capability-aware)
+          │                                     ├─ Hotel Operations (/business/hotel, capability-aware)
           │                                     └─ Shared Scanner & Intake (/business/scan)
           │
           └─── Secondary link for Pet Owners ──> Consumer Portal (/my-pets, /create-passport)
@@ -117,18 +118,23 @@ Add Meawketting LINE
 
 This flow is conceptual and has no repository route contract yet. Do not invent LINE Mini App routes, imply that LINE integration exists, or treat LINE identity as proof of Pet ownership or consent. Future production linking must establish the Person ↔ Guardian relationship and consent authority separately.
 
-## BF-4–BF-5 local Conversation architecture
+## BF-4–BF-6 local Conversation architecture
 
-- The implemented prototype uses one ongoing Conversation per `Business + Customer` relationship. It stores IDs for Customer and optional Pet/Booking/Branch/Grooming Service Job context. Display identity is resolved from the shared Business Customer/Booking source.
+- The implemented prototype uses one ongoing Conversation per `Business + Customer` relationship. It stores IDs for Customer and optional Pet/Booking/Branch/Grooming Service Job context. Hotel launches reuse the Customer/Pet/Booking context rather than creating a Stay-specific thread. Display identity is resolved from the shared Business Customer/Booking source.
 - `/business/inbox?conversation=<id>` is the local recovery contract. Customer/Pet/Booking launch parameters reuse or create the relationship and then normalize to this query; no dynamic Conversation route is required for the current split/mobile task model.
 - Conversation is Business-wide so switching Branch does not duplicate it. A linked Booking retains Branch attribution, and the active Branch does not gain another Branch's Passport consent or protected data.
 - Structured add-service approval is a message/request state. Business can send/cancel but cannot approve; only the explicitly labeled local Guardian-response simulator may approve/decline. A linked approved Grooming request idempotently updates the shared Grooming Service Job's add-on and estimated duration only. It has no Booking, Charge, Payment, settlement, delivery-proof, or production Guardian-identity effect.
+- Hotel Business notes, care instructions and incident notes remain internal Stay fields. They are never copied into a Customer message automatically.
 
-## Hotel / Boarding planned architecture
+## BF-6 local Hotel / Boarding architecture
 
-- Shared Calendar retains date-range Hotel Booking representation as planning data.
-- A dedicated Hotel operations route, Hotel Stay execution record, occupancy board, room assignment/move workflow, daily-care state and Hotel-specific Intake handoff have not started.
-- The Business shell keeps a disabled `โรงแรม` menu button labeled `ยังไม่เปิดใช้` so the future capability is visible without implying a working surface.
+- Shared Calendar owns date-range Hotel Booking planning. `/business/hotel` owns arrival/departure execution, occupancy and care; it does not create or edit another Booking model.
+- One Hotel Booking projects one `PrototypeHotelStay` per Pet. A Stay references shared Booking, Business, Branch, Customer and Pet IDs and keeps its independent `จองไว้ → รับเข้า → พักอยู่ → พร้อมรับกลับ → เช็กเอาต์ → เสร็จสิ้น` lifecycle, plus guarded cancelled/no-show terminal states.
+- Branch room/zone Resources are reused for operational capacity. Date-bounded room assignments preserve movement history; assignment, move, drag and date changes pass the same capacity/conflict evaluator before persistence, so an invalid commit leaves the original room/date state intact.
+- Shared Intake receives an explicit `hotelStayId` from the Arrival action. It never guesses a Stay from free-text purpose or the first matching Pet. Intake completion records the handoff; Hotel performs the guarded room-required check-in transition.
+- Daily Care is deliberately lightweight: food, water, activity, notes and completion state. Medication can exist only with explicit instructions and a matching `customer-confirmed-intake` authorization; no medication or health fact is inferred from Pet Passport access.
+- Incident/note tracking is an internal lightweight attention list, not a medical record or full Incident Management system. Business notes remain distinct from Inbox messages.
+- Navigation, Command Palette and direct-route content all check the active Branch's Hotel capability. Home, Customer Detail and Inbox resolve the same Stay/Customer/Booking state without duplicating identities or conversations.
 
 ## BF-5 local Grooming Service Job architecture
 
@@ -148,10 +154,10 @@ Temporary Business QR
 → create Business-owned intake facts or correction suggestion
 → resolve required Guardian decision
 → review and receive/check in
-→ create or attach the appropriate module Service Job
+→ create or attach the appropriate module execution record
 ```
 
-In the BF-5 local Grooming case, a valid known Customer/Pet relationship and matching active-Branch Grooming Job are attached at receive/check-in and the Job takes its guarded intake transition. The prototype does not infer work from arbitrary free text or create a duplicate Customer/Pet/Booking. Quick Passport QR and Public Safety QR can never enter this engine.
+In the BF-5 local Grooming case, a valid known Customer/Pet relationship and matching active-Branch Grooming Job are attached at receive/check-in and the Job takes its guarded intake transition. In BF-6, an Arrival action supplies one explicit Hotel Stay target; Intake records that target only when Business, Branch, Customer and Pet all match, then Hotel performs the room-required Stay check-in. The prototype does not infer work from arbitrary free text or create a duplicate Customer/Pet/Booking. Quick Passport QR and Public Safety QR can never enter this engine.
 
 ## Authority and data boundaries
 

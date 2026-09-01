@@ -81,10 +81,10 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Business Home uses an operational banner with explicit previous/next arrows. It advances every six seconds, pauses during hover/focus, and stops for reduced-motion. Images stay mounted in one transform-only track so transitions slide without replacement flicker. Desktop uses a 50:50 hero split with square media capped at 400×400px beside add Booking / scan intake / find Customer; tablet uses a compact 2:1 crop; mobile uses a square composition before the same actions. Unsupported revenue is not shown.
 - The compact header keeps the active Business and Branch visible. Role remains inspectable in the user menu; top-right controls align to the same 44px grid and the account click-away layer never blurs the page. The prototype switcher changes browser-local context only.
 - The logged-in Header may inherit the public Warm White/glass visual DNA, but compact operational usability, Branch context, Scanner access, User Menu and mobile safe areas take priority over a marketing pill treatment.
-- Changing Branch updates Home values and the visible module menu together. Grooming is a live service destination only when its active Branch capability is enabled; Hotel and Daycare remain visible as planned/disabled rows, and modules not enabled for the Branch remain absent.
+- Changing Branch updates Home values and the visible module menu together. Grooming and Hotel are live service destinations only when the active Branch enables the matching capability; modules not enabled for the Branch remain absent.
 - Desktop navigation has live Home, Calendar, Customers & Pets, and Messages plus a prominent Scanner action in the header. Mobile has exactly Home, Calendar, Scan, Messages and More; Customers & Pets is live inside More.
-- Planned navigation remains visible to communicate Product architecture: live Grooming appears under `งานบริการ`; Hotel, Daycare and Finance, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`.
-- Planned destinations use native disabled semantics plus `aria-disabled`, reduced emphasis, and no `href`; Mobile More mirrors the same planned groups without adding navigation behavior.
+- Service navigation under `งานบริการ` contains live capability-enabled Grooming and Hotel destinations. Daycare, Finance, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`.
+- Planned destinations use native disabled semantics plus `aria-disabled`, reduced emphasis, and no `href`; Mobile More mirrors live Branch-enabled services and the same planned groups without adding fake navigation behavior.
 
 ## Shared Booking & Calendar rules (BF-2 Live)
 
@@ -115,11 +115,17 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Business may send or cancel an add-service request but **cannot self-approve**. A local Guardian-response helper exists only in fixture/state tests; it is not a staff-facing control. Test approval updates only the linked Job add-on and estimated duration, not Booking, Charge, Payment, discount, refund, or settlement state.
 - Completed Jobs contribute a lightweight shared recent-service item. That item is not Full CareProof and has no photo proof, certificate, or Guardian-returned service-record claim.
 
-## Hotel / Boarding planned rules
+## Hotel / Boarding Operations rules (BF-6 Live Local Prototype)
 
-- Calendar may represent a Hotel Booking as a date-range plan. It does not imply an implemented Hotel execution workflow.
-- Hotel / Boarding has no operational route, Stay state, occupancy board, room assignment/move controls, daily-care workflow or Hotel-specific Intake path yet.
-- The Business sidebar and mobile More menu keep `โรงแรม` as a native disabled button with `aria-disabled` and no `href`, labeled `ยังไม่เปิดใช้`. Future Hotel design must define its states, permissions and recovery before implementation.
+- Calendar plans a shared date-range **Booking**; Hotel Operations executes one distinct Pet-specific **Hotel Stay** per booked Pet. Booking planning status and Stay execution status must never be merged or treated as synonyms.
+- `/business/hotel`, desktop/mobile navigation and the command-palette destination are live only for Hotel-enabled Branches. A non-enabled Branch receives an unavailable direct-route state and no live service link.
+- The local lifecycle covers booked/reserved, expected, checked-in, staying, ready-for-pickup/checkout, checked-out, completed, cancelled and no-show foundations. Transitions preserve operational history and never create Billing or CareProof state.
+- Desktop/tablet occupancy uses continuous Stay spans grouped by room/zone with occupied, reserved and available capacity. Mobile uses grouped Today/Stay tabs and lists; it never squeezes the desktop board into narrow columns.
+- Assigning or moving a room validates the requested date interval, room/zone capability and capacity before commit. A valid move appends date-bounded assignment/movement history; a conflict preserves the current room and provides calm rollback feedback.
+- Desktop room drag is an acceleration only. The Stay detail room selector is the keyboard/touch/mobile alternative; no Hotel task depends on dragging. Motion obeys the canonical settle/rollback scale and reduced-motion fallback.
+- Daily care is lightweight: food, water, activity, cleaning/check, note and completion state. Medication requires explicit instructions and Customer-confirmed Intake authorization linked to the same Stay; Passport presence or free-text notes never authorize medication.
+- Business notes, care notes and lightweight incident/attention notes remain internal. A Customer message must use the existing Business+Customer Inbox Conversation with Pet/Booking context; no per-Stay Conversation is created.
+- Hotel Stay detail groups shared Customer/Pet contact, dates, lifecycle, room, care, internal notes/incidents, Inbox action and movement history. It does not expose non-consented Passport data or become a medical/full incident system.
 
 ## Customers & Pets rules (BF-3 Live Local Prototype)
 
@@ -130,12 +136,12 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Search supports Customer name, Pet name, and phone with one visible input boundary. Results are clickable Customer rows—not a spreadsheet table—and show short labeled Customer, Pet, next Booking/activity and tag information. Passport connected/not-connected is context on the record, not a list filter.
 - Connection and access remain separate. The list gives only the compact connection state; expiry, source, allowed-data and no-additional-access detail uses progressive disclosure on Customer/Pet detail. Protected values remain hidden and never become editable Business data.
 - Business notes and tags are Business-owned local records. Important source labels distinguish `ข้อมูลที่ลูกค้าแจ้ง`, `ข้อมูลของร้าน`, and Guardian-controlled Passport data. Correction remains a suggestion, not an overwrite.
-- A Customer detail opens with the Customer header and actions, then separates Pets, Booking history and Business notes/tags without a repeated explanatory overview. Multiple Pets may use a horizontal snap/peek strip on mobile. It can start the existing Booking Editor with Customer/Pet preselected; Calendar keeps its own capacity/Branch validation and uses shared relationship names where practical.
+- A Customer detail opens with the Customer header and actions, then separates Pets, Booking history, current/recent Hotel Stays and Business notes/tags without a repeated explanatory overview. Multiple Pets may use a horizontal snap/peek strip on mobile. It can start the existing Booking Editor with Customer/Pet preselected; Calendar keeps its own capacity/Branch validation and uses shared relationship names where practical.
 - A valid Temporary Business QR may reconnect an explicit, already-known local relationship after consent validation. An unknown QR never auto-creates a permanent Customer.
 
 ## Inbox & Customer Communication rules (BF-4 Live Local Prototype)
 
-- The default prototype identity is one ongoing Conversation per Business + Customer relationship. Pet, Booking, Branch, and future Service Job are contextual references; opening from Customer or Booking reuses that relationship rather than creating per-Pet or per-Booking threads.
+- The default prototype identity is one ongoing Conversation per Business + Customer relationship. Pet, Booking, Branch, Service Job and Stay are contextual references; opening from Customer, Booking, Grooming Job or Hotel Stay reuses that relationship rather than creating per-Pet, per-Booking, per-Job or per-Stay threads.
 - Search is browser-local, has one visible boundary, and is limited to Customer name, Pet name, current service, and message text. Filters appear only when the fixture/state supports them honestly: all, unread, and active service; supporting labels may use the 14px supporting scale while message content remains at the 16px body scale.
 - Opening a Conversation marks its incoming fixture messages read only in the current browser session. Navigation and Home use this same unread state; no server delivery/read synchronization is claimed.
 - Message send and quick replies are local text prototypes. Quick replies show three defaults without numbering plus a dashed circular add control; collapse/expand is remembered in a cookie. Delivery labels explicitly say `ในเบราว์เซอร์`; no socket, notification, upload, email, SMS, or LINE behavior is implied.
@@ -152,7 +158,7 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - `ข้อมูลที่ร้านได้รับ` shows consented fields only with source/expiry context.
 - `ข้อมูลรับเข้า` creates Business facts and correction suggestions without mutating the Pet Passport.
 - Required Guardian decision blocks receive/check-in; mid-flow revoke/expiry hides protected data.
-- Final receive/check-in is explicit, duplicate-safe, and names the responsibility transition. A valid matching Grooming Booking may attach its shared Grooming Service Job. The current intake flow does not target Hotel execution state or create a Hotel Stay.
+- Final receive/check-in is explicit, duplicate-safe, and names the responsibility transition. A valid Grooming launch may attach its shared Grooming Service Job; a valid Hotel launch carries an explicit `hotelStayId` and hands back to that same Stay. Intake never infers a Stay from Pet/free text or creates a second Job, Stay, Customer, Pet or Booking.
 
 ## Responsive composition and horizontal interaction
 

@@ -6,6 +6,15 @@ export const metadata: Metadata = {
   description: "สแกน QR ชั่วคราวและตรวจสิทธิ์ก่อนรับน้องเข้าร้าน",
 };
 
-export default function BusinessScanPage() {
-  return <main id="main-content" className="page business-page business-scan-page"><BusinessScanner /></main>;
+type BusinessScanPageProps = {
+  searchParams: Promise<{ hotelStayId?: string | string[] }>;
+};
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+export default async function BusinessScanPage({ searchParams }: BusinessScanPageProps) {
+  const params = await searchParams;
+  return <main id="main-content" className="page business-page business-scan-page"><BusinessScanner hotelStayId={firstQueryValue(params.hotelStayId)} /></main>;
 }

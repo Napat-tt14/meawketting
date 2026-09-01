@@ -166,7 +166,7 @@ Service identity is a secondary classification system and never replaces status:
 ## Business navigation architecture
 
 - Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, and `ข้อความ`; the Inbox uses the same unread source as Home and mobile navigation.
-- The Sidebar exposes Grooming as a live `งานบริการ` destination when the active Branch enables it. Hotel remains a native disabled planned row labeled `ยังไม่เปิดใช้`, followed by Daycare and management rows under the same planned grouping. Mobile More mirrors this state.
+- The Sidebar exposes Grooming and Hotel as live `งานบริการ` destinations only when the active Branch enables the matching capability. Daycare and management rows remain under the planned grouping. Mobile More mirrors the same Branch capability state.
 - Planned rows are native disabled buttons with `aria-disabled`, reduced emphasis, and no `href` or fake route. Mobile More mirrors the live Customers and capability-enabled service links, plus the same Branch-enabled planned/service-management groups.
 
 ## Operational focal points and schedules
@@ -182,7 +182,11 @@ Service identity is a secondary classification system and never replaces status:
 - A Grooming Job card uses the permitted Pet photo/avatar as its visual scan anchor, then keeps Pet/time on the left, workflow status on the right, and groomer/attention context in separate rows. Coral/Scissors provide module recognition only.
 - Grooming board drag gives the card a pointer-following preview and the destination a valid/invalid highlight. Status movement is reversible, and settle/rollback and status/detail drawer transitions use the canonical 160/220/300ms motion scale; bounce, confetti, color-only success, and drag-only mobile workflows are prohibited.
 - Grooming detail is a focus-managed right drawer on larger screens and a sheet/task surface on smaller screens. It uses compact section hierarchy for identity/contact, service/timing, status, resources, add-ons, internal notes, messages, and history rather than a long text modal.
-- Hotel / Boarding operations has not started. Future design will define the execution surface, occupancy, room assignment, daily care and Stay detail patterns; the current UI keeps only the shared Calendar date-range Booking treatment and the disabled planned menu row. Hotel/Bed/Sky remains a classification cue for future work, while semantic status and alert color remain independent.
+- Hotel / Boarding uses Bed + Sky/Blue for module recognition only; lifecycle, success, warning and incident states continue to use semantic status tokens. Brand Yellow remains the primary CTA instead of turning Sky into the main action color.
+- On desktop/tablet, Hotel Operations presents each room/zone as a capacity row across a continuous date range. Occupied, reserved and available values use text plus surface/border treatment, and multi-day Stay spans preserve start/continuation/end semantics without becoming a second Calendar.
+- Hotel Stay detail is a focus-managed right drawer at larger widths and a bottom sheet/task surface on mobile. Identity/contact, dates, lifecycle, room, care, internal notes/incidents, messages and movement history remain grouped and scannable rather than nested into cards.
+- At mobile widths the desktop occupancy board is hidden in favor of grouped Today/Stay tabs and lists. Room selection and lifecycle controls are explicit non-drag alternatives; the desktop board must never be compressed into unreadable columns.
+- Desktop room drag previews valid/invalid capacity before commit, settles smoothly when accepted, and rolls back without losing the current room when rejected. These transitions use the canonical motion scale and obey `prefers-reduced-motion`.
 
 ## Business landing imagery
 
@@ -197,7 +201,7 @@ Service identity is a secondary classification system and never replaces status:
 - It contains the real Meawketting brand, compact navigation to implemented anchors/routes and one primary Business CTA. It contains no theme toggle, Design System badge, Emoji or dead/planned link.
 - The logged-in Business Header inherits Warm White, brand Yellow, refined radius and subtle interaction while remaining compact. Active Business/Branch context, Branch switcher, Scanner action, mock Ctrl/Cmd+K Command Palette, User Menu and mobile navigation preserve the current operational architecture; the top-right icon controls share a 44px alignment grid and opening the account menu does not blur the work behind it.
 - The public Footer is a centered, rounded Warm White/white surface with a thin warm border, controlled spacing, optional SVG/art decoration and only real destinations/actions. Privacy, Terms, Pricing and Support are not invented as links.
-- Marketing Footer rendering is restricted to public/marketing surfaces. It is absent from `/business/home`, `/business/calendar`, `/business/grooming`, `/business/customers`, `/business/inbox`, `/business/scan`, `/business/intake/*` and every other logged-in operational route.
+- Marketing Footer rendering is restricted to public/marketing surfaces. It is absent from `/business/home`, `/business/calendar`, `/business/grooming`, `/business/hotel`, `/business/customers`, `/business/inbox`, `/business/scan`, `/business/intake/*` and every other logged-in operational route.
 
 ## Cards and Bento
 

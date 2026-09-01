@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getEnabledBusinessModules } from "../../_prototype/businessState";
 import { Search, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
+import { useBusinessContext } from "./useBusinessContext";
 
 type BusinessCommand = {
   label: string;
@@ -19,11 +21,18 @@ const BUSINESS_COMMANDS: readonly BusinessCommand[] = [
   { label: "สแกนรับเข้า", detail: "ตรวจสิทธิ์ก่อนเปิดข้อมูล", href: "/business/scan" },
 ];
 
+const BUSINESS_HOTEL_COMMAND: BusinessCommand = {
+  label: "โรงแรม",
+  detail: "จัดการการเข้าพัก ห้อง และงานดูแล",
+  href: "/business/hotel",
+};
+
 function normalize(value: string) {
   return value.trim().toLocaleLowerCase("th-TH");
 }
 
 export function BusinessCommandPalette() {
+  const { context } = useBusinessContext();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -31,11 +40,18 @@ export function BusinessCommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
+  const commands = useMemo(
+    () => getEnabledBusinessModules(context).includes("hotel")
+      ? [...BUSINESS_COMMANDS, BUSINESS_HOTEL_COMMAND]
+      : BUSINESS_COMMANDS,
+    [context],
+  );
+
   const visibleCommands = useMemo(() => {
     const search = normalize(query);
-    if (!search) return BUSINESS_COMMANDS;
-    return BUSINESS_COMMANDS.filter((command) => normalize(`${command.label} ${command.detail}`).includes(search));
-  }, [query]);
+    if (!search) return commands;
+    return commands.filter((command) => normalize(`${command.label} ${command.detail}`).includes(search));
+  }, [commands, query]);
 
   const closePalette = useCallback(() => {
     setOpen(false);

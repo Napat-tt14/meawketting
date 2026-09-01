@@ -1,44 +1,42 @@
 # Validation
 
-Status: **HOTEL OPERATIONS ROLLBACK — PASS (LOCAL PROTOTYPE)**
-Validation date: 2026-08-30
+Status: **BF-6 HOTEL / BOARDING OPERATIONS FOUNDATION — PASS (LOCAL PROTOTYPE)**
+
+Validation date: 2026-08-31
 Owner: Engineering / QA
 
-This document owns current test evidence. A passing build is not a production-readiness claim.
+This document owns current test evidence. A passing local build is not a production-readiness claim.
 
-This rollback is browser-local implementation evidence only. It is not a production-readiness claim, and it does not add backend, database, payment, LINE transport, Consumer, Daycare, CareProof, Incident, or deployment work.
+BF-6 adds browser-local Hotel execution on top of BF1–BF5. It does not add Backend, Database, Billing, Payment, LINE transport, Consumer work, full medical/care, full Incident Management, deployment, or BF7.
 
-## Business UX/UI + responsive system reset — PASS
+## Final command evidence
 
-| Check | Result | Evidence |
+| Command | Result | Evidence |
 |---|---|---|
-| Repository / route audit | **PASS** | Audited `/`, `/business/login`, Business shell/navigation, Home, Calendar and Booking overlays, Customers/detail, Inbox, Scanner/Intake and Grooming; confirmed Hotel has no dedicated route after rollback |
-| Text reduction / progressive disclosure | **PASS** | Removed redundant Customers and Inbox overview panels, unsupported Home revenue, repeated detail explanations and staff-facing development controls; Calendar/Grooming guidance moved into optional disclosure |
-| Design-system reset | **PASS** | Computed Business body is 16px; supporting text is 14px; page titles use 24–30px; shared 4px spacing rhythm, semantic color/status, 44px touch controls and 160/220/300ms + 280ms navigation motion tokens are active |
-| Mobile composition | **PASS** | 320/375/390/430px checks cover all core Business routes with Agenda Calendar, Grooming grouped status-list, mobile Customer Pet snap/peek and full-screen Booking sheet; no accidental document overflow |
-| Tablet composition | **PASS** | 768/820/1024px checks cover compact Home banner/actions, touch-safe Calendar spans/handles, adaptive Customer/detail, Inbox split behavior and contained Grooming workflow board |
-| Desktop composition | **PASS** | 1200/1440px checks retain persistent navigation, Home banner/action rail, operational rows, Inbox split pane and Calendar planning density without reducing body text |
-| Horizontal interaction | **PASS** | Scrolling is limited to filters/tabs, multiple-Pet snap/peek and contained board/timeline surfaces; Customer lists, messages, forms, detail copy, alerts and dialogs have no document-level horizontal overflow |
-| Accessibility | **PASS** | Settled routes expose one meaningful H1; audited mobile controls are at least 44px; icon controls are labelled; service/status uses text plus non-color cues; Booking sheet is labelled/modal, moves focus inside and closes cleanly |
-| Browser console | **PASS** | In-app Browser diagnostics across the route/breakpoint sweep contain no warning/error entries; only Vite debug connection/HMR and React DevTools information messages were present |
-| Product / privacy regression | **PASS** | 75 executable contracts pass; BF1–BF5, Customer != Guardian, Business never owns Passport, consent/access boundaries, planned navigation and drag alternatives remain intact |
-| Boundary audit | **PASS** | Consumer/Guardian and `/workfiledesign` have no diff entries; no feature phase, backend, database, LINE API, commit, push or deploy was started |
 | `npm run lint` | **PASS** | ESLint exited 0 |
-| `npm test` | **PASS — 75 tests, 75 passed** | Includes the successful Vinext production build and `node --test tests/rendered-html.test.mjs` |
-| `npm run build` | **PASS** | Vinext build completed with 28 route entries |
+| `npm test` | **PASS — 76 tests, 76 passed** | Runs the Vinext production build and `node --test tests/rendered-html.test.mjs` |
+| `npm run build` | **PASS** | Vinext production build completed and emitted `/business/hotel` |
+| Route audit | **PASS** | 29 `page.tsx` route entries = 25 active local routes + 3 compatibility redirects + 1 legacy QR demo |
 
-## Hotel / Boarding rollback validation — PASS
+The first sandboxed build attempt could not write Vite's generated file under `node_modules/.vite-temp` (`EPERM`). The same build was rerun with the required workspace write permission and passed. This was an execution-environment permission issue, not a source failure.
 
-| Check | Rollback result | Required evidence before marking complete |
+## BF-6 Hotel operations evidence
+
+| Contract | Result | Evidence |
 |---|---|---|
-| Hotel route and operational files | **PASS** | No `/business/hotel` route or Hotel operations/Stay implementation files remain; the route audit reports 28 entries |
-| Menu visibility | **PASS** | Desktop Sidebar and mobile More retain a native disabled `โรงแรม` button labeled `ยังไม่เปิดใช้`, with no `href` or fake route |
-| Shared planning boundary | **PASS** | Calendar retains date-range Hotel Booking representation and related planning visuals; no Hotel execution state is created |
-| Related integrations | **PASS** | Home, Customers, Intake, command palette and live navigation contain no Hotel operations links or Stay/state handoffs |
-| Documentation boundary | **PASS** | Canonical docs describe Hotel / Boarding as planned/not started; no document claims a live Hotel page or completed Hotel operations |
-| `npm run lint` | **PASS** | ESLint exited 0 |
-| `npm test` | **PASS — 75 tests, 75 passed** | Production build plus `node --test tests/rendered-html.test.mjs` |
-| `npm run build` | **PASS** | Vinext build completed with 28 `page.tsx` route entries |
+| Branch capability gate | **PASS** | Hotel navigation, mobile destination, command-palette command, and operational route are live only when the active Branch enables Hotel. A non-Hotel Branch sees no live Hotel destination and the direct route renders the unavailable state. |
+| Booking → Stay | **PASS** | Shared Hotel date-range Bookings project to one Pet-specific Hotel Stay per booked Pet. Booking remains planning state; Stay remains execution state. |
+| Shared Intake → check-in | **PASS** | Scanner and the Shared Business Intake Engine carry an explicit `hotelStayId`; successful Intake hands off to the same Stay. No second Intake, Customer, Pet, or Booking flow exists. |
+| Stay lifecycle | **PASS** | Reserved/booked, expected, checked-in, staying, ready for pickup/checkout, checked-out, completed, cancelled, and no-show states exist with guarded operational actions. |
+| Continuous occupancy | **PASS** | Multi-day Stays render as continuous date spans. The board reports occupied, reserved, and available capacity per room/zone and for the Branch. |
+| Room/zone moves | **PASS** | Assign and move validate the requested date interval and capacity before commit. Valid moves retain dated assignment/movement history; invalid moves preserve the original room and show rollback feedback. |
+| Daily care | **PASS** | Food, water, activity, cleaning/check, note, and lightweight completion state are supported. Medication requires explicit instructions plus Customer-confirmed Intake authorization linked to the same Stay. |
+| Today operations | **PASS** | Arrivals, departures, currently staying, care due, unresolved attention/incident notes, and ready-for-pickup work derive from Hotel Stay state. Processed arrivals/departures remain visible for today's operational history. |
+| Calendar integration | **PASS** | Calendar remains the shared planning surface and preserves continuous Hotel Booking spans plus guarded move/resize. Hotel Operations consumes those dates for execution/occupancy without duplicating Calendar logic. |
+| Home integration | **PASS** | Today's arrivals, departures, occupied/capacity, reserved/available, and attention counts derive from the same Branch Hotel Stay state. |
+| Customer/Pet integration | **PASS** | Current and historical Stays appear on the existing Customer detail, using shared Customer and Pet identities. |
+| Inbox integration | **PASS** | Stay launches the existing Business+Customer conversation with Pet/Booking context. Business notes, care notes, and incident notes remain internal and are not Conversation messages. |
+| Privacy | **PASS** | Customer is not treated as Guardian; Business does not own Passport authority; unknown QR data does not create identities; protected medication action requires explicit Intake authorization. |
 
 ## Business font replacement
 
@@ -64,70 +62,50 @@ This rollback is browser-local implementation evidence only. It is not a product
 | LINE identity vs Pet ownership | **PASS** | Architecture and decisions preserve `Person → Guardian relationship → Pet`; LINE is only an entry/authentication channel. |
 | Consumer regression coverage | **PASS** | Existing Consumer automated contracts remain listed and are preserved until a future migration explicitly replaces them. |
 
-## Automated test results — Hotel rollback evidence
+## Browser and responsive evidence
 
-| Command | Actual result | Notes |
+| Surface | Result | Evidence |
 |---|---|---|
-| `npm run lint` | **PASS** | ESLint exited 0 |
-| `npm test` | **PASS — 75 tests, 75 passed** | Runs the production build plus `node --test tests/rendered-html.test.mjs` |
-| `npm run build` | **PASS** | Vinext build completes with 28 `page.tsx` route entries and no `/business/hotel` route |
+| Desktop Hotel board | **PASS — in-app browser** | At the 1294px desktop preview width, Today metrics, the continuous room/zone board, per-room capacity, operational groups, and Stay detail rendered without document-level horizontal overflow. |
+| Mobile Hotel operations | **PASS — 390×844** | Desktop occupancy is replaced by grouped tabs/lists; Stay detail becomes a bottom sheet; room selection provides a non-drag alternative; fixed navigation does not cover sheet content. |
+| Capability switch | **PASS — in-app browser** | Switching from Hotel-enabled Ari to non-Hotel Thonglor removed the live Hotel navigation and command. Switching back restored both. |
+| Capacity rollback | **PASS — in-app browser** | Attempting to move active Stay Luna from A01 into reserved B03 reported the conflict and retained A01. |
+| Ready-for-pickup span | **PASS — in-app browser** | Hotel Operations presents pickup-day occupancy as an operational marker while Calendar keeps checkout-exclusive planning semantics. |
+| Motion/accessibility | **PASS — source and executable contracts** | Labeled controls, semantic text alongside color, 44px mobile controls, reduced-motion fallback, and non-drag room/status actions are retained. This is not device-lab certification. |
 
-## Documentation rebase checks — Hotel rollback audit
+## Documentation and design-system checks
 
-| Check | Current status |
+| Check | Result |
 |---|---|
-| Canonical Markdown owner documents and README router | **PASS** | Canonical documents and README route summary describe the pre-Hotel-page state; derived manual is aligned |
-| Hybrid `Person → Business → Branch → Enabled Service Modules` model and Product/privacy boundaries preserved | **PASS** |
-| Implemented vs planned Business scope separated; Grooming is local, while Hotel/Daycare/Billing/CareProof remain not started | **PASS** |
-| BF-3 Customer/Guardian/Passport, BF-4 Inbox and BF-5 Grooming Job boundaries preserved; Hotel execution remains absent | **PASS — automated regression** |
-| Business visual reference mapped into semantic tokens; no runtime dependency on attached files | **PASS** |
-| LINE Seed Sans TH scoped to Business/public Business; Consumer typography/visual system unchanged | **PASS** |
-| Exact Warm White/Primary/status/feature tokens and service/status separation | **PASS** |
-| Light / Warm White only; no Business dark attributes, tokens or theme toggle | **PASS** |
-| No Emoji/Dingbat UI icons; Lucide wrapper retained | **PASS** |
-| Rainbow CTA absent; multi-accent progress limited to structural loading | **PASS** |
-| Planned Business navigation architecture retained with native disabled/no-fake-route semantics | **PASS** |
-| Public floating glass Header, rounded Footer, real links only, and no operational marketing Footer | **PASS** |
-| Forms, badges, dialogs, alerts, structural loading, motion and reduced-motion contracts | **PASS** |
-| Tables | **PASS — shared Business table contract retained; no current non-tabular surface was forced into a table** |
+| Canonical Markdown owners | **PASS** — Product, Architecture, Module Map, Routes, User Flows, Design System, UX Rules, Decisions, Current Implementation, Roadmap, and Validation describe BF6 consistently. |
+| Derived HTML manual | **PASS** — updated after canonical Markdown and final BF6 evidence. |
 | Broken relative Markdown links | **PASS — automated/source audit** |
-| Stale legacy references and active visual assumptions | **PASS — old Business values superseded; Consumer-only rules retained** |
-| Derived HTML manual aligned | **PASS — updated after canonical docs and validation** | It preserves the planned Hotel menu note without inventing an operations route |
-| `/workfiledesign` boundary respected | **PASS — no status/diff entries** |
-| Consumer visual redesign paused; expected Consumer visual files changed: none | **PASS — no Consumer-specific implementation files changed** |
+| Stale legacy references | **PASS — active Hotel rollback/planned wording removed; explicitly historical decisions remain historical** |
+| Business visual system | **PASS** — Warm White/light only; Hotel uses Sky/Blue classification; Brand Yellow remains the primary CTA; semantic status colors remain independent. |
+| Icon and theme boundary | **PASS** — Lucide wrappers remain; no Emoji/Dingbat UI icons and no Business dark theme/toggle were added. |
+| Shared Business Intake Engine | **PASS** — reused by Grooming and Hotel with explicit target identity; no parallel Hotel Intake flow. |
+| Hybrid identity model | **PASS** — `Person → Business → Branch → Enabled Service Modules`; Customer/Guardian/Pet/Passport boundaries remain unchanged. |
+| `/workfiledesign` boundary | **PASS — untouched** — no status or diff entry is present. |
+| Platform wording | **PASS** — Cloudflare is the target platform direction; production remains **NOT DEPLOYED / NOT VERIFIED**. |
 
-## Business-First Product Direction verification — Hotel rollback audit
+## Regression and boundary evidence
 
-| Check | Current status | Evidence |
-|---|---|---|
-| **Root Homepage (`/`) Business-first content and real links** | **PASS** | One Business H1, `/business/login` primary CTA, secondary Guardian bridge, floating glass Header and rounded real-link Footer |
-| **`/business` Compatibility Redirect** | **PASS** | Redirect remains `/business` → `/` |
-| **Warm White / Pastel Yellow Business system** | **PASS** | `#F4C95D` with `#3D2B00` (**8.65:1**), `#FFFDF9` with `#2B2B2B`, semantic status separation and scoped LINE Seed Sans TH |
-| **Responsive source contract** | **PASS** | 16px Business body/form text, approximately 1280px public shell, workflow-appropriate Calendar width, safe-area navigation and 44px touch controls |
-| **Visual browser QA** | **NOT RUN** | This source rollback does not require a new Hotel page QA pass; shared Calendar/planned-menu behavior is covered by source contracts and the final local build/test pass. |
-| **Business navigation runtime** | **PASS — local production preview** | Upgraded to `vinext@1.0.0-beta.8` with its compatible `@vitejs/plugin-rsc@0.5.34`. Native Business document navigation remains intentional; Home → Customers was reverified in production preview with one rendered page H1 and zero RSC prefetch/client-navigation errors. Deployment itself was not run in this task. |
-| **Planned-vs-implemented honesty** | **PASS** | Grooming is the local execution foundation; Hotel is planned/not started, and Finance, Reports, team management, Daycare, CareProof, Backend and deployment remain unimplemented/planned |
-| **Consumer Development Freeze** | **PASS** | Existing Consumer web prototype, routes, and visual system remain unchanged/frozen; no Consumer-specific implementation files changed |
-| **BF-2 Shared Booking & Calendar** | **PASS** | Sunday-first Day/Week/Month/Custom via shared Segmented Control, remembered view, prominent “วันนี้” control, readable mobile agenda, date-range Hotel Booking spans, mouse/pen/touch pointer move plus leading/trailing resize, copy shortcuts, mutation guards, capacity checks, stable Booking drawer and embedded Customer/Pet creation preserved |
-| **BF-3 Customers & Pets** | **PASS** | Readable desktop rows, shared search field, 14px Segmented Control filters, responsive detail hierarchy, relationships, privacy/access disclosure and Booking preselection preserved |
-| **BF-4 Inbox & Customer Communication** | **PASS** | Responsive list/split tasks, shared search field, 14px Segmented Control filters, context, unread, local send, three default quick replies with remembered visibility, and structured-request boundary preserved |
-| **BF-5 Grooming Operations Foundation** | **PASS — LOCAL PROTOTYPE** | Capability-aware route/navigation, centered componentized lane headers, aligned Pet-first Today cards with full-surface status colors, reversible guarded Service Job lifecycle/timing, pointer-following drag preview, shared Resource conflict guard, grouped mobile list/detail alternative, internal notes, lightweight history, and capability/Privacy regressions |
-| **Hotel / Boarding Operations** | **PASS — PLANNED / NOT STARTED** | No dedicated route, Hotel Stay, occupancy board, room workflow, daily-care state or Hotel-specific Intake target remains; Sidebar and mobile More retain only the disabled planned menu item |
-| **Shared Business Intake Engine** | **PASS** | Camera/manual recovery, QR rejection, consent, belongings and check-in preserved; only a matching known Grooming Job can attach, with no Hotel execution target |
-| **Canonical Documentation Rebase** | **PASS** | Canonical docs, Guardian direction wording, active visual wording and derived HTML manual reconciled |
-
-## Required browser QA evidence — current Business routes
-
-| Viewport | Evidence |
+| Boundary | Result |
 |---|---|
-| 320 / 375 / 390 / 430px | **NOT RUN** — shared source contracts cover grouped lists, Calendar agenda, planned menu semantics and no document-level Hotel surface |
-| 768 / 820 / 1024px | **NOT RUN** — shared source contracts cover touch-first Calendar/Grooming workflows and the disabled planned Hotel row |
-| 1200px | **NOT RUN** — persistent navigation and operational boards remain scoped to implemented routes |
-| 1440px | **NOT RUN** — Home action rail and implemented operational boards remain scannable at 16px body text |
-| Focus / hover / active / disabled / error / empty / loading / reduced motion | **PASS — browser interaction plus automated/source contracts** |
-| Navigation | **PASS** — native Business links remain the local fallback; Hotel is a disabled planned button with no `href` |
+| BF1–BF5 regression | **PASS** — Home, Calendar/Booking, Customers/Pets, Inbox, Shared Intake, and Grooming executable contracts remain green. |
+| Grooming lifecycle | **PASS** — BF5 reversible guarded status behavior and actual completion timing remain intact. |
+| Consumer development | **PAUSED / unchanged** — existing Consumer routes and Noto Sans Thai visual system remain frozen; no LINE Mini App or Consumer Inbox was started. |
+| Billing / Payment / accounting | **NOT STARTED** |
+| Backend / Database / production auth | **NOT STARTED** |
+| Advanced room/dynamic pricing and full inventory | **NOT STARTED** |
+| Full medical/care, full Incident Management, and full CareProof | **NOT STARTED** — BF6 contains only authorized lightweight care and internal attention notes. |
+| BF7 | **NOT STARTED** |
 
-## Automated test suite contracts (rollback contract refresh pending)
+## Planning versus execution boundary
+
+Calendar owns Booking dates, planning availability, continuous spans, move, and resize. Hotel Operations owns occupancy, room assignment/movement, Stay lifecycle, care, attention, and pickup execution. Customer/Pet identity, Branch Resources, Shared Intake, and Inbox Conversation remain shared records; no Hotel-specific copies were created.
+
+## Automated test suite contracts
 
 1. Root Business Operating Platform landing page (`/`) copy, one Business H1, CTAs, product preview, multi-service story, trust, and metadata.
 2. Homepage component composition, honest status wording, real Header anchors, floating glass direction, rounded Footer, Warm White/Pastel Yellow tokens, reduced motion, and responsive CSS contract.
@@ -156,8 +134,8 @@ This rollback is browser-local implementation evidence only. It is not a product
 25. BF-5 capability-aware Grooming route/navigation, aligned full-surface status Pet cards, pointer-following reversible desktop/touch drag, touch drop/swipe, grouped mobile status alternative, protected-data absence, reduced motion, and responsive board containment.
 26. BF-5 pure Grooming Service Job selectors/reducer: Booking remains distinct, guarded valid/invalid lifecycle, actual timing, completed history, enabled-Branch behavior, and shared Resource collision detection.
 27. BF-5 Calendar/Intake/Inbox/Customer/Home integration: one shared Job identity, Guardian-only approved add-on affecting only Job duration/add-ons, and no Booking/Charge/Payment mutation.
-28. Hotel rollback contract: no `/business/hotel` route or Hotel operations/state files, no Hotel execution links or handoffs, shared date-range Booking support remains, and the disabled planned menu item is visible without an `href`.
-29. BF1–BF5 Business content-density contracts: shared optional Page Header, no obsolete operational eyebrow/heading stacks, one-title Booking editor, responsive Customer table/card hierarchy, and no repeated record-level demo suffixes.
+28. BF6 capability-aware Hotel route/navigation, Booking-to-Pet-specific-Stay projection, multi-day occupancy, capacity collision and rollback, movement history, lifecycle, authorized care completion, Today summary math, internal-note privacy, and Home/Calendar/Customer/Inbox/Shared Intake integration.
+29. BF1–BF6 Business content-density contracts: shared optional Page Header, no obsolete operational eyebrow/heading stacks, one-title Booking editor, responsive Customer table/card hierarchy, responsive Hotel desktop-board/mobile-list split, and no repeated record-level demo suffixes.
 30. Calm operational Business styling, scoped LINE Seed Sans TH, exact semantic tokens, Lucide wrappers, forms/badges/overlays/loading, responsive behavior and reduced motion.
 31. Cloudflare direction / Vercel supersession documentation and absence of a production-deployment claim.
 32. Absence of scattered raw color values and Emoji in component source; no Business dark theme/toggle, no active Rainbow CTA, and loading-only multi-accent indeterminate progress.
@@ -171,6 +149,10 @@ This rollback is browser-local implementation evidence only. It is not a product
 - Native mobile camera hardware permissions.
 - Real messaging transport, sockets, delivery/read synchronization, attachment storage, notifications, full Consumer Inbox, retention/deletion policy, and production Guardian response identity.
 - LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking; these are future Consumer-phase work and are not represented by repository routes.
-- Cloudflare is the target platform direction; production runtime/storage architecture, hosting, SSL certificates, custom domain deployment, and deployment verification remain not started.
+- Cloudflare is the target platform direction; production runtime/storage architecture, custom domain deployment, and production verification remain not started.
 - Local browser QA is not a production device-lab, native camera-hardware, screen-reader, or assistive-technology certification.
-- The in-app browser controller did not synthesize a native desktop drag gesture. Grooming native/pointer handlers, pointer-following preview, valid/invalid drop source contracts, reversible guarded lifecycle/rollback behavior, and the mobile grouped-list/detail alternative are covered by executable tests/browser checks; this is not a device-lab certification.
+- The in-app browser controller did not synthesize a native Hotel desktop drag gesture. Native drag/drop handlers, capacity preview, rollback source contracts, and the mobile room selector are covered by executable tests plus direct conflict interaction; this is not a device-lab certification.
+
+## Stop condition
+
+BF-6 is complete as a local Hotel / Boarding Operations Foundation. Consumer remains **PAUSED**. No Billing, Backend, Database, production deployment, or BF7 work was started.

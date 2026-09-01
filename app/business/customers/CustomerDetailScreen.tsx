@@ -4,9 +4,14 @@ import { type FormEvent, useEffect, useState, useSyncExternalStore } from "react
 import {
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
+  getHotelRooms,
+  getPrototypeHotelStayRoomId,
+  HOTEL_STAY_STATUS_LABELS,
   listCompletedPrototypeGroomingServiceJobs,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
+  listPrototypeHotelStayFixtures,
+  listPrototypeHotelStays,
   readPrototypeCustomer,
   readPrototypeCustomerFixture,
   resolvePrototypeBookingRelationship,
@@ -76,6 +81,18 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
     .sort((first, second) => second.start.localeCompare(first.start) || second.updatedAt.localeCompare(first.updatedAt))
     .slice(0, 3);
   const completedGroomingJobs = listCompletedPrototypeGroomingServiceJobs(customer.id, !relationshipStateReady).slice(0, 3);
+  // Hotel execution stays Branch-scoped even though Customer identity is shared
+  // across the Business. This avoids exposing another Branch's live operations.
+  const hotelStays = relationshipStateReady
+    ? listPrototypeHotelStays(context, { includeClosed: true })
+    : listPrototypeHotelStayFixtures(context, { includeClosed: true });
+  const currentHotelStays = hotelStays
+    .filter((stay) => stay.customerId === customer.id && ["checked-in", "in-stay", "ready-for-checkout"].includes(stay.status))
+    .sort((first, second) => first.scheduledCheckOut.localeCompare(second.scheduledCheckOut));
+  const completedHotelStays = hotelStays
+    .filter((stay) => stay.customerId === customer.id && ["checked-out", "completed"].includes(stay.status))
+    .sort((first, second) => (second.actualCheckOutAt ?? second.updatedAt).localeCompare(first.actualCheckOutAt ?? first.updatedAt))
+    .slice(0, 3);
 
   function updateTags(nextTags: readonly string[]) {
     const updated = updatePrototypeCustomerTags(resolvedCustomer.id, nextTags);
@@ -161,6 +178,25 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             )}
           </section>
 
+          {currentHotelStays.length > 0 ? (
+            <section className="customer-detail-section customer-detail-section--hotel" aria-labelledby="customer-hotel-title">
+              <header><div><h2 id="customer-hotel-title">กำลังเข้าพัก</h2><p>ข้อมูลปฏิบัติการของสาขาปัจจุบัน</p></div><BusinessServiceIcon module="hotel" size={21} /></header>
+              <ol className="customer-booking-list customer-booking-list--hotel">
+                {currentHotelStays.map((stay) => {
+                  const pet = customer.pets.find((item) => item.id === stay.petId);
+                  const roomId = getPrototypeHotelStayRoomId(stay);
+                  const room = roomId ? getHotelRooms(context).find((item) => item.id === roomId) ?? null : null;
+                  return (
+                    <li key={stay.hotelStayId}>
+                      <div className="customer-booking-list__identity"><BusinessServiceIcon module="hotel" size={18} /><span><strong>{pet?.name ?? "น้อง"}</strong><small>{HOTEL_STAY_STATUS_LABELS[stay.status]} · {room?.label ?? "ยังไม่ระบุห้อง"}</small></span></div>
+                      <div className="customer-booking-list__when"><strong>{calendarDateLabel(stay.scheduledCheckIn, { day: "numeric", month: "short" })} – {calendarDateLabel(stay.scheduledCheckOut, { day: "numeric", month: "short" })}</strong><Link href={`/business/hotel?stayId=${encodeURIComponent(stay.hotelStayId)}`}>เปิดรายการเข้าพัก</Link></div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ) : null}
+
           <section className="customer-detail-section customer-detail-section--upcoming" aria-labelledby="customer-upcoming-title">
             <header><div><h2 id="customer-upcoming-title">นัดหมายที่กำลังจะมาถึง</h2></div><CalendarDays size={22} /></header>
             {upcomingBookings.length > 0 ? (
@@ -176,13 +212,18 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
 
           <section className="customer-detail-section customer-detail-section--recent" aria-labelledby="customer-recent-title">
             <header><div><h2 id="customer-recent-title">การใช้บริการล่าสุด</h2></div></header>
-            {completedGroomingJobs.length > 0 ? (
+            {completedGroomingJobs.length > 0 || completedHotelStays.length > 0 ? (
               <ol className="customer-booking-list customer-booking-list--recent">
                 {completedGroomingJobs.map((job) => {
                   const pet = customer.pets.find((item) => item.id === job.petId);
                   const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(job.businessId, job.branchId)).branch;
                   const completedDate = job.actualCompletedAt?.slice(0, 10) ?? job.scheduledStart.slice(0, 10);
                   return <li key={job.serviceJobId}><div className="customer-booking-list__identity"><BusinessServiceIcon module="grooming" size={18} /><span><strong>อาบน้ำ / ตัดขน</strong><small>{pet?.name ?? "น้อง"} · งานเสร็จแล้ว</small></span></div><div className="customer-booking-list__when"><strong>{calendarDateLabel(completedDate, { day: "numeric", month: "short" })}</strong><small>{branch?.name ?? "สาขานี้"}</small></div></li>;
+                })}
+                {completedHotelStays.map((stay) => {
+                  const pet = customer.pets.find((item) => item.id === stay.petId);
+                  const completedDate = stay.actualCheckOutAt?.slice(0, 10) ?? stay.scheduledCheckOut;
+                  return <li key={stay.hotelStayId}><div className="customer-booking-list__identity"><BusinessServiceIcon module="hotel" size={18} /><span><strong>เข้าพักโรงแรม</strong><small>{pet?.name ?? "น้อง"} · {HOTEL_STAY_STATUS_LABELS[stay.status]}</small></span></div><div className="customer-booking-list__when"><strong>{calendarDateLabel(completedDate, { day: "numeric", month: "short" })}</strong><Link href={`/business/hotel?stayId=${encodeURIComponent(stay.hotelStayId)}`}>ดูรายละเอียด</Link></div></li>;
                 })}
               </ol>
             ) : recentBookings.length > 0 ? (

@@ -7,6 +7,7 @@ import {
   getDemoBusinessContextDetails,
   getEnabledBusinessModules,
   getGroomingServiceJobSummary,
+  getPrototypeHotelStaySummary,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
   resolvePrototypeBookingRelationship,
@@ -62,6 +63,8 @@ export function BusinessHome() {
   const unreadMessageCount = getPrototypeInboxUnreadCount(context, !businessStateReady);
   const groomingSummary = getGroomingServiceJobSummary(context, BOOKING_DEMO_DATE, !businessStateReady);
   const groomingEnabled = enabledModules.includes("grooming");
+  const hotelEnabled = enabledModules.includes("hotel");
+  const hotelSummary = getPrototypeHotelStaySummary(context, BOOKING_DEMO_DATE, !businessStateReady);
   const attentionItems = [
     ...demo.attention.filter((item) => !(groomingEnabled && item.id === "pickup")),
     ...(groomingEnabled && groomingSummary.readyForPickup > 0 ? [{
@@ -69,6 +72,14 @@ export function BusinessHome() {
       tone: "ready" as const,
       title: `มีน้องพร้อมรับกลับ ${groomingSummary.readyForPickup} ตัว`,
       detail: "เปิดงานอาบน้ำ / ตัดขนเพื่อตรวจสถานะก่อนส่งมอบ",
+    }] : []),
+    ...(hotelEnabled && hotelSummary.attention > 0 ? [{
+      id: "hotel-attention",
+      tone: "waiting" as const,
+      title: `โรงแรมมีงานต้องจัดการ ${hotelSummary.attention} รายการ`,
+      detail: hotelSummary.unassignedArrivals > 0
+        ? `มีน้องเข้าพักวันนี้ ${hotelSummary.unassignedArrivals} ตัวที่ยังไม่ระบุห้อง`
+        : `งานดูแลค้าง ${hotelSummary.careDue} งาน · ออกวันนี้ ${hotelSummary.departures} ตัว`,
     }] : []),
     ...(unreadMessageCount > 0 ? [{
       id: "messages",
@@ -86,7 +97,8 @@ export function BusinessHome() {
   const todaySummary = {
     waitingIntake: demo.today.waitingIntake,
     bookingsToday: branchBookings.filter(bookingIsOnDemoDay).length,
-    readyForPickup: groomingEnabled ? groomingSummary.readyForPickup : demo.today.readyForPickup ?? 0,
+    readyForPickup: (groomingEnabled ? groomingSummary.readyForPickup : demo.today.readyForPickup ?? 0)
+      + (hotelEnabled ? hotelSummary.readyForPickup : 0),
     newMessages: unreadMessageCount,
   };
   return (
@@ -114,9 +126,9 @@ export function BusinessHome() {
             <ul className="business-attention__list">
               {attentionItems.map((item) => (
                 <li key={item.id} className={`business-attention__item business-attention__item--${item.tone}`}>
-                  {item.id === "messages" ? (
-                    <a href="/business/inbox">
-                      <span className="business-attention__cue"><MessageCircle size={20} /></span>
+                  {item.id === "messages" || item.id === "hotel-attention" ? (
+                    <a href={item.id === "messages" ? "/business/inbox" : "/business/hotel?filter=attention"}>
+                      <span className="business-attention__cue">{item.id === "messages" ? <MessageCircle size={20} /> : <BusinessServiceIcon module="hotel" size={20} />}</span>
                       <span><strong>{item.title}</strong><small>{item.detail}</small></span>
                     </a>
                   ) : (
@@ -160,6 +172,7 @@ export function BusinessHome() {
               {todayItems.map((item) => (
                 <div key={item.key}><dt>{item.label}</dt><dd>{todaySummary[item.key]}</dd></div>
               ))}
+              {hotelEnabled ? <><div><dt>เข้าพักวันนี้</dt><dd>{hotelSummary.arrivals}</dd></div><div><dt>กลับวันนี้</dt><dd>{hotelSummary.departures}</dd></div></> : null}
             </dl>
           </section>
 
@@ -171,12 +184,17 @@ export function BusinessHome() {
               {enabledModules.map((module) => {
                 const summary = module === "grooming" && groomingEnabled
                   ? { value: `${groomingSummary.total} งานวันนี้`, detail: groomingSummary.readyForPickup > 0 ? `พร้อมรับกลับ ${groomingSummary.readyForPickup}` : "ดูสถานะงานจริง" }
+                  : module === "hotel" && hotelEnabled
+                    ? {
+                      value: `${hotelSummary.occupied} / ${hotelSummary.capacity} ตัวกำลังพัก`,
+                      detail: `ว่าง ${hotelSummary.available} · จองไว้ ${hotelSummary.reserved} · ต้องดู ${hotelSummary.attention}`,
+                    }
                   : demo.moduleSummaries[module];
                 if (!summary) return null;
                 return (
                   <li key={module}>
                     <BusinessServiceIcon module={module} size={20} />
-                    <div><strong>{BUSINESS_SERVICE_MODULES[module].label}</strong><b>{summary.value}</b></div>
+                    <div><strong>{BUSINESS_SERVICE_MODULES[module].label}</strong><b>{summary.value}</b><small>{summary.detail}</small></div>
                   </li>
                 );
               })}

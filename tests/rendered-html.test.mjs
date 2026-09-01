@@ -944,13 +944,13 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.match(model, /href:\s*"\/business\/inbox"/);
   assert.match(model, /BUSINESS_GROOMING_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/grooming"/);
-  assert.doesNotMatch(model, /BUSINESS_HOTEL_DESTINATION/);
-  assert.doesNotMatch(model, /href:\s*"\/business\/hotel"/);
+  assert.match(model, /BUSINESS_HOTEL_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/hotel"/);
   assert.match(desktopNav + mobileNav, /module === "grooming"/);
+  assert.match(desktopNav + mobileNav, /module === "hotel"/);
   assert.match(desktopNav + mobileNav, /PlannedBusinessModule key=\{module\} module=\{module\}/);
   assert.match(desktopNav + mobileNav, /BUSINESS_GROOMING_DESTINATION/);
-  assert.doesNotMatch(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
-  assert.doesNotMatch(desktopNav + mobileNav, /href="\/business\/hotel"/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
   assert.match(mobileNav, /BUSINESS_CUSTOMERS_DESTINATION\.href/);
   assert.match(mobileNav, /BUSINESS_MESSAGES_DESTINATION\.href/);
   assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/(?:daycare|finance|reports|team|settings)/);
@@ -1162,7 +1162,7 @@ test("keeps one shared Booking foundation for appointment, stay, and day work", 
   assert.match(hotel, /วันเช็กอิน/);
   assert.match(hotel, /วันเช็กเอาต์/);
   assert.match(hotel, /พื้นที่พักตามเงื่อนไข/);
-  assert.match(hotel, /รายละเอียดห้องหรือโซนจริงจะออกแบบในขั้นตอน Hotel ภายหลัง/);
+  assert.match(hotel, /จัดห้องหรือโซนจริงใน Hotel Operations หลังยืนยันการจอง/);
   assert.match(daycare, /วันที่ใช้บริการ/);
   assert.match(daycare, /โซนดูแล/);
 });
@@ -1247,7 +1247,7 @@ test("supports local Booking create, edit, cancellation history, and safe recove
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?booking-editor/);
 });
 
-test("keeps shared Business Core routes live while Hotel remains planned", async () => {
+test("keeps shared Business Core routes live with capability-aware Grooming and Hotel operations", async () => {
   const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
   const routePaths = routes
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
@@ -1258,7 +1258,7 @@ test("keeps shared Business Core routes live while Hotel remains planned", async
   assert.equal(routePaths.some((path) => /business\/customers\/\[customerId\]$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/inbox$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/grooming$/.test(path)), true);
-  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), false);
+  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/(?:bookings|daycare|finance|reports|team|settings)(?:\/|$)/.test(path)), false);
   assert.equal(routePaths.some((path) => /business\/pets(?:\/|$)/.test(path)), false);
 });
@@ -1310,12 +1310,17 @@ test("renders BF-5 Grooming as a visual, capability-aware execution board with a
   assert.doesNotMatch(desktopNav + mobileNav, /href="\/business\/daycare"/);
 });
 
-test("keeps Hotel explicitly planned without an operations route", async () => {
+test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-care foundation", async () => {
   const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
   const routePaths = routes
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
     .map((entry) => entry.parentPath.replaceAll("\\", "/"));
-  const [desktopNav, mobileNav, model, command, home, scanner, intake, customerDetail, state, css, calendar] = await Promise.all([
+  const [html, page, operations, detail, presentation, desktopNav, mobileNav, model, command, home, scanner, intake, customerDetail, state, inboxState, css, calendar] = await Promise.all([
+    htmlFor("/business/hotel"),
+    readFile(new URL("business/hotel/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/hotel/HotelOperations.tsx", appRoot), "utf8"),
+    readFile(new URL("business/hotel/HotelStayDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/hotel/hotelPresentation.ts", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/businessNavigationModel.ts", appRoot), "utf8"),
@@ -1325,20 +1330,154 @@ test("keeps Hotel explicitly planned without an operations route", async () => {
     readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("_prototype/inboxState.ts", appRoot), "utf8"),
     readFile(businessCssUrl, "utf8"),
     readFile(new URL("business/calendar/HotelBookingFields.tsx", appRoot), "utf8"),
   ]);
 
-  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), false);
-  assert.doesNotMatch(desktopNav + mobileNav + model + command + home + scanner + intake + customerDetail, /\/business\/hotel/);
-  assert.doesNotMatch(desktopNav + mobileNav + model + command, /BUSINESS_HOTEL_DESTINATION/);
+  assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), true);
+  assert.match(html, /<h1[^>]*>โรงแรม<\/h1>/);
+  for (const label of ["เข้าพักวันนี้", "ออกวันนี้", "การใช้พื้นที่", "ต้องดูแล", "ต้องจัดการ", "ห้องและโซน", "การเข้าพัก"]) assert.match(html, new RegExp(label));
+  assert.match(html, /Luna/);
+  assert.match(html, /ห้อง A01/);
+  assert.match(page, /HotelOperations/);
+  assert.match(operations, /getEnabledBusinessModules\(context\)\.includes\("hotel"\)/);
+  assert.match(operations, /getPrototypeHotelRoomOccupancySummary/);
+  assert.match(operations, /hotel-occupancy-span--\$\{span\.stay\.status\}/);
+  assert.match(operations, /onDragStart/);
+  assert.match(operations, /onDrop=/);
+  assert.match(operations, /evaluatePrototypeHotelStayRoomAvailability/);
+  assert.match(operations, /รายการกลับอยู่ห้องเดิมแล้ว/);
+  assert.match(operations, /ready-for-checkout[\s\S]*?operationalEnd/);
+  assert.match(operations, /hotel-mobile-view-tabs/);
+  assert.doesNotMatch(operations, /hotel-occupancy-mobile/);
+  assert.match(detail, /checkInPrototypeHotelStay/);
+  assert.match(detail, /transitionPrototypeHotelStay/);
+  assert.match(detail, /"completed"/);
+  assert.match(detail, /assignPrototypeHotelStayRoom/);
+  assert.match(detail, /movePrototypeHotelStayRoom/);
+  assert.match(detail, /roomMoveHistory/);
+  assert.match(detail, /completePrototypeHotelCareTask/);
+  assert.match(detail, /รายการยาแสดงได้เฉพาะเมื่อมีคำแนะนำและการยืนยันจาก Intake/);
+  assert.match(detail, /Incident \/ note ที่ต้องติดตาม/);
+  assert.match(detail, /หมายเหตุของร้าน/);
+  assert.match(detail, /\/business\/inbox\?customerId=/);
+  assert.match(detail, /ร้านส่งคำขอเพิ่มบริการผ่าน Inbox ได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้/);
+  assert.match(presentation, /HOTEL_LIST_FILTERS/);
+  assert.match(desktopNav + mobileNav + model, /BUSINESS_HOTEL_DESTINATION/);
+  assert.match(command, /getEnabledBusinessModules\(context\)\.includes\("hotel"\)/);
   assert.match(desktopNav + mobileNav, /PlannedBusinessModule/);
   assert.match(desktopNav + mobileNav, /ยังไม่เปิดใช้/);
-  assert.match(model, /hotel: "โรงแรม"/);
-  assert.match(calendar, /hotelRole/);
-  assert.doesNotMatch(state, /PrototypeHotelStay|hotelStayId|hotelStays|dailyCareTasks|roomMoveHistory|synchronizePrototypeHotelStaysForBooking/);
-  assert.doesNotMatch(scanner + intake + customerDetail + home, /HotelStay|hotelStayId|\/business\/hotel/);
-  assert.doesNotMatch(css, /business-hotel|hotel-occupancy|hotel-stay|hotel-toolbar/);
+  assert.match(state, /export type PrototypeHotelStay/);
+  assert.match(state, /hotelStays: Record<string, PrototypeHotelStay>/);
+  assert.match(state, /synchronizePrototypeHotelStaysForBooking/);
+  assert.match(state, /getPrototypeHotelRoomOccupancySummary/);
+  assert.match(state, /buildPrototypeHotelCareTaskCompletion/);
+  assert.match(state, /source: "customer-confirmed-intake"/);
+  assert.match(state, /incidentNotes/);
+  assert.match(scanner, /hotelStayId/);
+  assert.match(intake, /\/business\/hotel\?stayId=/);
+  assert.match(customerDetail, /listPrototypeHotelStays/);
+  assert.match(customerDetail, /\/business\/hotel\?stayId=/);
+  assert.match(home, /getPrototypeHotelStaySummary/);
+  assert.match(home, /hotelSummary\.occupied/);
+  assert.match(calendar, /Hotel Operations หลังยืนยันการจอง/);
+  assert.doesNotMatch(inboxState, /guardianCareInstruction|incidentNotes|dailyCareTasks|PrototypeHotelStay/);
+  assert.match(css, /\.hotel-occupancy-board-wrap\s*\{[^}]*overflow-x: auto/);
+  assert.match(css, /\.hotel-occupancy-row\.is-drop-valid/);
+  assert.match(css, /\.hotel-occupancy-row\.is-drop-invalid/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.hotel-occupancy \{ display: none/);
+  assert.match(css, /data-mobile-view="staying"/);
+  assert.match(css, /\.hotel-stay-detail__content \{ padding-bottom: calc\(6rem \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.hotel-occupancy-span/);
+  assert.equal(routePaths.some((path) => /business\/(?:billing|finance|backend)(?:\/|$)/.test(path)), false);
+});
+
+test("keeps BF-6 Hotel state linked, capacity-safe, immutable, and privacy-bounded", async () => {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-hotel-test-"));
+  const vite = await createServer({
+    root: projectRoot,
+    configFile: false,
+    cacheDir: cacheDirectory,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "silent",
+  });
+
+  try {
+    const state = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    const ari = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-ari-frontdesk");
+    const groomingOnly = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-thonglor-frontdesk");
+    const onnut = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "paw-partner-onnut");
+    assert.ok(ari);
+    assert.ok(groomingOnly);
+    assert.ok(onnut);
+    assert.equal(state.getEnabledBusinessModules(ari).includes("hotel"), true);
+    assert.equal(state.getEnabledBusinessModules(onnut).includes("hotel"), true);
+    assert.equal(state.getEnabledBusinessModules(groomingOnly).includes("hotel"), false);
+
+    const bookings = state.listPrototypeBookingFixtures(ari, { includeCancelled: true });
+    const hotelBookings = bookings.filter((booking) => booking.serviceModule === "hotel" && booking.status !== "cancelled");
+    const stays = state.listPrototypeHotelStayFixtures(ari, { includeClosed: true });
+    for (const booking of hotelBookings) {
+      for (const pet of booking.pets) {
+        const linked = stays.filter((stay) => stay.bookingId === booking.bookingId && stay.petId === pet.id);
+        assert.equal(linked.length, 1);
+        assert.equal(linked[0].customerId, booking.customer.id);
+      }
+    }
+
+    const luna = stays.find((stay) => stay.hotelStayId === "hotel-stay-fixture-luna");
+    const biscuit = stays.find((stay) => stay.hotelStayId === "hotel-stay-fixture-biscuit-checkout");
+    const milo = stays.find((stay) => stay.hotelStayId === "hotel-stay-fixture-milo");
+    assert.ok(luna);
+    assert.ok(biscuit);
+    assert.ok(milo);
+    assert.equal(state.hotelStayOccursOnDate(luna, "2026-08-18"), true);
+    assert.equal(state.hotelStayOccursOnDate(luna, "2026-08-20"), true);
+    assert.equal(state.hotelStayOccursOnDate(luna, "2026-08-21"), false);
+    assert.equal(biscuit.roomMoveHistory.length > 0, true);
+    assert.equal(biscuit.roomMoveHistory.at(-1).toRoomId, "ari-hotel-room-a02");
+
+    const roomSummary = state.getPrototypeHotelRoomOccupancySummary(stays, ari, "ari-hotel-room-a01", state.BOOKING_DEMO_DATE);
+    assert.deepEqual(roomSummary, { occupied: 1, reserved: 0, capacity: 1, available: 0 });
+    const collisionCandidate = { ...milo, hotelStayId: "hotel-stay-capacity-check", scheduledCheckIn: "2026-08-18", scheduledCheckOut: "2026-08-20", roomAssignments: [] };
+    const collision = state.evaluatePrototypeHotelStayRoomAvailability(collisionCandidate, "ari-hotel-room-a01", "2026-08-18", "2026-08-20", ari, stays);
+    assert.equal(collision.available, false);
+    assert.equal(collision.conflicts.some((conflict) => conflict.stayIds.includes(luna.hotelStayId)), true);
+    const available = state.evaluatePrototypeHotelStayRoomAvailability(collisionCandidate, "ari-hotel-room-b03", "2026-08-18", "2026-08-19", ari, stays);
+    assert.equal(available.available, true);
+
+    for (const [from, to] of [["booked", "checked-in"], ["checked-in", "in-stay"], ["in-stay", "ready-for-checkout"], ["ready-for-checkout", "checked-out"], ["checked-out", "completed"], ["booked", "cancelled"]]) {
+      assert.equal(state.hotelStayCanTransition(from, to), true);
+    }
+    assert.equal(state.hotelStayCanTransition("completed", "in-stay"), false);
+
+    const water = luna.dailyCareTasks.find((task) => task.kind === "water");
+    const medication = luna.dailyCareTasks.find((task) => task.kind === "medication");
+    assert.ok(water);
+    assert.ok(medication);
+    assert.equal(state.prototypeHotelCareTaskIsAuthorized(medication), true);
+    assert.equal(state.prototypeHotelCareTaskIsAuthorized({ ...medication, authorization: null }), false);
+    const completed = state.buildPrototypeHotelCareTaskCompletion(luna, water.id, "2026-08-18T12:05:00.000Z", "ทีมทดสอบ");
+    assert.ok(completed);
+    assert.equal(luna.dailyCareTasks.find((task) => task.id === water.id).state, "pending");
+    assert.equal(completed.dailyCareTasks.find((task) => task.id === water.id).state, "completed");
+    assert.equal(completed.history.at(-1).type, "care");
+
+    const ariSummary = state.summarizePrototypeHotelStays(stays, ari, state.BOOKING_DEMO_DATE);
+    assert.equal(ariSummary.arrivals, 1);
+    assert.equal(ariSummary.departures, 1);
+    assert.equal(ariSummary.capacity, state.getHotelRooms(ari).reduce((total, room) => total + room.capacity, 0));
+    assert.equal(ariSummary.occupied + ariSummary.reserved + ariSummary.available, ariSummary.capacity);
+    assert.equal(ariSummary.incidents, 1);
+    const onnutSummary = state.getPrototypeHotelStaySummary(onnut, state.BOOKING_DEMO_DATE, true);
+    assert.equal(onnutSummary.arrivals, 1);
+    assert.equal(onnutSummary.reserved, 1);
+  } finally {
+    await vite.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+  }
 });
 
 test("keeps Grooming Service Jobs distinct from Bookings with verified lifecycle, timing, history, and resource conflict rules", async () => {
@@ -2056,10 +2195,10 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   }
 
   assert.match(html, /Person → Business → Branch → Enabled Service Modules/);
-  assert.match(overviewPanel, /BF1–BF5 Operational Foundation/);
+  assert.match(overviewPanel, /BF1–BF6 Operational Foundation/);
   assert.match(overviewPanel, /\/business\/customers/);
   assert.match(overviewPanel, /\/business\/grooming/);
-  assert.doesNotMatch(overviewPanel, /\/business\/hotel/);
+  assert.match(overviewPanel, /\/business\/hotel/);
   assert.match(overviewPanel, /Cloudflare/);
   assert.match(modelPanel, /Customer/);
   assert.match(modelPanel, /Visit \/ Order/);
@@ -2078,7 +2217,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(modulePanel, /Grooming \/ Bathing/);
   assert.match(modulePanel, /BF-5 LOCAL/);
   assert.match(modulePanel, /Hotel \/ Boarding/);
-  assert.match(modulePanel, /PLANNED \/ NOT STARTED/);
+  assert.match(modulePanel, /BF-6 LOCAL/);
   assert.match(modulePanel, /Daycare/);
   assert.match(modulePanel, /date-range Hotel Booking/);
   assert.equal((scenarioPanel.match(/class="scenario"/g) ?? []).length, 5);
@@ -2116,7 +2255,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.doesNotMatch(designPanel, /Deep Teal/);
   assert.match(designPanel, /16px/);
   assert.match(designPanel, /180–300ms/);
-  assert.match(designPanel, /Grooming = Scissors \+ peach/);
+  assert.match(designPanel, /Grooming = Scissors \+ Coral/);
   assert.match(designPanel, /Custom ใช้ 28\/35\/42 วัน/);
   assert.match(roadmapPanel, /Shared Business Intake Engine/);
   assert.match(roadmapPanel, /BF-1/);
@@ -2124,12 +2263,12 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(roadmapPanel, /BF-4/);
   assert.match(roadmapPanel, /Cloudflare/);
   assert.match(roadmapPanel, /BF-5 Grooming implemented locally/);
-  assert.match(roadmapPanel, /Hotel \/ Boarding planned/);
+  assert.match(roadmapPanel, /BF-6 Hotel \/ Boarding implemented locally/);
   assert.match(roadmapPanel, /Daycare operations/);
 
   assert.match(validation, /# Validation/);
-  assert.match(validation, /Hotel rollback/);
-  assert.match(validation, /28 `page\.tsx` route entries/);
+  assert.match(validation, /BF-6 HOTEL \/ BOARDING OPERATIONS FOUNDATION/);
+  assert.match(validation, /29 `page\.tsx` route entries/);
   assert.match(validation, /Cloudflare is the target platform direction/);
   assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
   assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
@@ -2220,7 +2359,7 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /\.quick-passport\.is-flipped \.quick-passport__inner[\s\S]*?transform:\s*none !important/);
   assert.match(css, /\.passport-flip\.is-flipped \.passport-flip__back[\s\S]*?opacity:\s*1/);
-  assert.match(css, /@view-transition/);
+  assert.doesNotMatch(css, /@view-transition|::view-transition-(?:old|new)\(root\)|meaw-page-(?:in|out)/);
   assert.match(css, /meaw-pop-in/);
   assert.match(css, /meaw-icon-hop/);
   assert.match(packageJson, /react-icons/);

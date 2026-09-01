@@ -1,7 +1,7 @@
 # Routes
 
 Status: **CURRENT REPOSITORY AUDIT (BUSINESS-FIRST REBASE)**  
-Audit date: 2026-08-28
+Audit date: 2026-08-31
 Owner: Product Architecture / Front-end
 
 This file owns URLs and navigation destinations only. Wizard steps, tabs, task states, boards, modals and reusable errors are not routes by default.
@@ -20,7 +20,7 @@ No LINE Mini App route is created in this audit. The future LINE channel is an e
 ## Route count summary
 
 ```text
-CURRENT ROUTE AUDIT: 28 route entries / 24 active local routes / 3 compatibility redirects / 1 legacy demo route
+CURRENT ROUTE AUDIT: 29 route entries / 25 active local routes / 3 compatibility redirects / 1 legacy demo route
 ```
 
 The route table below is the canonical route contract. Matching build/test evidence is recorded in [VALIDATION](./VALIDATION.md).
@@ -34,6 +34,7 @@ The route table below is the canonical route contract. Matching build/test evide
 | `/business/home` | Branch-aware Business Home with square three-image carousel, arrow/click navigation, touch swipe and operational overview | LIVE LOCAL PROTOTYPE |
 | `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, guarded move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE LOCAL PROTOTYPE |
 | `/business/grooming` | Capability-aware Grooming Today execution board for linked Pet-specific Service Jobs; aligned status cards, pointer-following reversible drag or swipe, no date/job filter rail, and mobile grouped status-list/detail alternative | LIVE LOCAL PROTOTYPE only when the active Branch enables Grooming; Calendar remains Booking planning, not execution |
+| `/business/hotel` | Capability-aware Hotel Today operations and continuous room/zone occupancy for Pet-specific Stays linked to shared date-range Bookings; guarded room assignment/moves, lightweight care, notes/incidents and mobile grouped alternatives | LIVE LOCAL PROTOTYPE only when the active Branch enables Hotel; Calendar remains Booking planning, not occupancy execution |
 | `/business/customers` | Search and browse Business-level Customer relationships and linked local Pets in responsive desktop table/mobile cards; filters are booking-based only | LIVE LOCAL PROTOTYPE |
 | `/business/customers/[customerId]` | Stable responsive Customer relationship detail with clearer Pets, Booking context, tags, Business notes and primary actions | LIVE LOCAL PROTOTYPE |
 | `/business/inbox` | Business-wide Customer conversations with readable split/mobile layouts, compact search/filters, Pet/Booking context, unread state, local send, three default quick replies with remembered visibility, and structured add-service request prototype | LIVE LOCAL PROTOTYPE; `?conversation=`, `?customerId=`, `?petId=`, and `?bookingId=` provide local recovery/context; no real delivery |
@@ -83,7 +84,6 @@ This is conceptual and **NOT IMPLEMENTED**. Do not add `/line/*`, Mini App paths
 | Concept | Target Milestone | Purpose |
 |---|---|---|
 | Daycare Operations | M-DAYCARE | Daycare Attendance; no route has been created |
-| Hotel / Boarding Operations | Future Hotel milestone | Dedicated operations, occupancy, room assignment and daily-care workflows; no route has been created. The Business menu keeps a disabled planned button. |
 | Billing & Checkout | Future Billing | Combined invoice, multi-service charges, payment status (`/business/billing`) |
 | Business Onboarding | Multi-branch setup | Resumable business setup wizard (`/business/onboarding`) |
 

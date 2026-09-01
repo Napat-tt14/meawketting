@@ -54,15 +54,15 @@ Business Core provides the shared operational spine across all services:
 | Capability | Product outcome | Implementation state |
 |---|---|---|
 | **Business Landing (`/`)** | Commercial landing, service overview, Guardian trust differentiator | **LIVE** at `/` |
-| **Business Shell (BF-1/BF-5)** | Branch context switcher, Warm White / Pastel Yellow visual system, capability-aware Grooming live navigation, architecture-visible planned/disabled service and management navigation including Hotel | **LIVE** across `/business/*` |
-| **Home / Today (BF-1/BF-5)** | Three-image auto-rotating Spotlight with arrows, desktop banner/action split, direct work actions, arrivals, departures, waiting intake, Grooming Service Job-derived summary, service summaries and revenue boundary | **LIVE** at `/business/home` |
+| **Business Shell (BF-1/BF-6)** | Branch context switcher, Warm White / Pastel Yellow visual system, capability-aware Grooming and Hotel live navigation, plus architecture-visible planned/disabled management navigation | **LIVE** across `/business/*` |
+| **Home / Today (BF-1/BF-6)** | Three-image auto-rotating Spotlight with arrows, desktop banner/action split, direct work actions, waiting Intake, Grooming Service Job summary, and Hotel Stay-derived arrivals/departures/occupancy/attention | **LIVE** at `/business/home` |
 | **Booking Engine (BF-2)** | Multi-service booking creation, editing, cancellation, capacity checks, conflict recovery | **LIVE** at `/business/calendar` |
 | **Calendar (BF-2)** | Sunday-first Day/Week/Month/Custom scheduling through one view component, continuous Hotel spans, guarded move/both-edge resize, spreadsheet-like copy/paste/undo/Delete/navigation keys, Today focus, touch handlers, compact bottom guide, module/status filters and mobile Agenda | **LIVE** at `/business/calendar` |
-| **Scan / Intake (Phase E)** | Camera scan, manual code entry, QR validation, consent review, belongings logging | **LIVE** at `/business/scan` |
+| **Scan / Intake (Phase E/BF-6 reuse)** | Camera scan, manual code entry, QR validation, consent review, belongings logging, Grooming handoff and explicit Hotel Stay target handoff | **LIVE** at `/business/scan`; no duplicate Hotel Intake flow |
 | **Customers & Pets (BF-3)** | One Business-level customer relationship, readable desktop table/mobile cards, responsive detail hierarchy, booking-based filters, linked local Pets, connection/access presentation, tags, notes, and Booking context | **LIVE LOCAL PROTOTYPE** at `/business/customers` and `/business/customers/[customerId]` |
 | **Inbox & Customer Communication (BF-4)** | Business-wide Customer conversations with readable desktop split view, compact search/filters, Pet/Booking/Branch context, local text, three default quick replies with remembered visibility, unread state, and one structured add-service approval prototype | **LIVE LOCAL PROTOTYPE** at `/business/inbox`; no real delivery, attachments, notifications, or Consumer Inbox |
 | **Grooming Operations Foundation (BF-5)** | Today execution board for linked Grooming Service Jobs, legal lifecycle transition, Pet visual scan anchor, staff/resource assignment with existing conflict evaluator, Intake handoff, Guardian-only add-on approval integration, internal notes, and lightweight completed-service history | **LIVE LOCAL PROTOTYPE** at `/business/grooming` only when the active Branch enables Grooming |
-| **Hotel / Boarding Operations** | Shared Calendar date-range Hotel Bookings remain available; dedicated operations, occupancy, room assignment, daily-care and Stay workflows are deferred | **PLANNED / NOT STARTED**; disabled menu entry, no `/business/hotel` route |
+| **Hotel / Boarding Operations Foundation (BF-6)** | Today arrivals/departures/current stays, continuous room/zone occupancy and capacity, Stay lifecycle, guarded assignment/moves, lightweight daily care/incidents/notes and shared Intake/Inbox/Customer/Home integration | **LIVE LOCAL PROTOTYPE** at `/business/hotel` only when the active Branch enables Hotel |
 | **Billing & Payments**| Charges, line items, service bundles, payment status, receipts | **PLANNED** |
 | **CareProof Foundation** | Verifiable evidence, photos, checklists, return to Guardian | **PLANNED** |
 | **Team & Branches** | Role permissions, staff schedules, branch service configuration | **PLANNED** |
@@ -72,16 +72,20 @@ Business Core provides the shared operational spine across all services:
 Service Modules plug into Business Core for specific workflows:
 
 ### 1. Grooming / Bathing Module (M-GROOM)
-- **Status**: **LIVE LOCAL PROTOTYPE** for Grooming-enabled Branches at `/business/grooming`; Hotel / Boarding and Daycare remain visibly planned/disabled.
+- **Status**: **LIVE LOCAL PROTOTYPE** for Grooming-enabled Branches at `/business/grooming`; Daycare remains planned/disabled.
 - **Planning / execution split**: Calendar owns the Booking and its booking-status model. Grooming owns a distinct Pet-specific Service Job linked to the Booking; it owns the execution lifecycle and actual timing.
 - **Workflow**: Appointment-oriented work with service duration, groomer/station/dryer assignment, internal notes, an attention state, Inbox-linked add-on request, and pickup readiness. Styling preferences, bath logs, staff scheduling, inventory, and customer notification are not implemented.
 - **Lifecycle**: `รอรับเข้า (booked) → รับเข้าแล้ว (checked-in) → รอเริ่ม (waiting) → กำลังทำ (in-service) → พร้อมรับกลับ (ready-for-pickup) → เสร็จแล้ว (completed)`; `cancelled` is terminal. The permitted transition graph is enforced locally, so a Job cannot jump from Booked straight to Completed.
 - **Shared foundation**: Customer/Pet identities are referenced from Business Core, existing Resource objects remain the source of staff/station/dryer assignment and conflict checks, and Scan/Intake attaches a matching Grooming Job when the valid local context supports it.
 
 ### 2. Hotel / Boarding Module (M-HOTEL)
-- **Status**: **PLANNED / NOT STARTED**. Shared Calendar retains date-range Hotel Booking representation; no dedicated `/business/hotel` route exists.
-- The Business sidebar and mobile More menu keep a disabled `โรงแรม` button labeled `ยังไม่เปิดใช้` so the planned capability remains discoverable.
-- Occupancy, arrivals/departures execution, room assignment/moves, daily care, Hotel Stay state and Hotel-specific Intake handoff will be designed in a future milestone.
+- **Status**: **LIVE LOCAL PROTOTYPE** for Hotel-enabled Branches at `/business/hotel`; a non-capable Branch receives a calm unavailable state and no live navigation/Command Palette entry.
+- **Planning / execution split**: Calendar owns the shared date-range Booking and continuous planning span. Hotel owns one Pet-specific Stay per Booking Pet, Today operations, occupancy, room/zone assignment and execution status.
+- **Lifecycle**: `จองไว้ → รับเข้า → พักอยู่ → พร้อมรับกลับ → เช็กเอาต์ → เสร็จสิ้น`, with guarded `cancelled`/`no-show` terminal states. Check-in requires the Shared Intake target and a valid room/zone assignment.
+- **Occupancy and movement**: Branch room/zone Resources provide capacity. Assignment, drag, manual move and Stay date edits validate conflicts before commit; successful moves retain date-bounded assignment and movement history, while invalid changes roll back.
+- **Daily Care**: lightweight food, water, activity, note and completion state. Medication appears/completes only with explicit instructions and matching customer-confirmed Intake authorization; no Passport health data is inferred.
+- **Attention and communication**: Today surfaces care due, pickup readiness, unresolved lightweight incident/note and waiting Inbox request cues. Business notes/incidents remain internal; `ส่งข้อความ` reuses the Business + Customer conversation.
+- **Not included**: Billing/payment, pricing, inventory, medical/veterinary workflows, full Incident Management, full CareProof, Backend/Database, Consumer or LINE work.
 
 ### 3. Daycare Module (M-DAYCARE)
 - **Status**: Booking representation LIVE in BF-2; attendance & playgroup board PLANNED.
@@ -93,9 +97,9 @@ Service Modules plug into Business Core for specific workflows:
 
 ## Capability boundaries
 
-- Calendar (BF-2) is shared planning infrastructure. It represents appointments, continuous multi-day Hotel Booking spans, and day bookings together. Grooming `/business/grooming` is the only service execution surface currently implemented; Hotel / Boarding remains planned and does not duplicate any execution state. Daycare attendance remains unimplemented.
-- Shared Business Intake Engine (Phase E) verifies QR consent and may target an eligible linked Grooming Job at check-in rather than creating another intake flow. It never grants Passport data beyond active Business/Branch/scope/duration consent.
+- Calendar (BF-2) is shared planning infrastructure. It represents appointments, continuous multi-day Hotel Booking spans, and day bookings together. Grooming `/business/grooming` and Hotel `/business/hotel` are separate module execution surfaces linked to the same Booking foundation; Daycare attendance remains unimplemented.
+- Shared Business Intake Engine (Phase E) verifies QR consent and may target an eligible linked Grooming Job or one explicit matching Hotel Stay rather than creating another intake flow. It never grants Passport data beyond active Business/Branch/scope/duration consent.
 - Customer & Pet identity is shared across all modules; adding a service never duplicates customer profiles.
-- BF-4 keeps one ongoing conversation per Business + Customer relationship in this prototype. Pet, Booking, Branch and Grooming Service Job are context references rather than new identity records or automatic per-Pet/per-Booking threads. Future Hotel work will reuse the same shared context.
-- A Conversation never grants Pet Passport scope. Expired/revoked Branch consent still hides protected values. The local Guardian-only structured response may update the linked Grooming Job add-ons and estimated duration, but never creates a Charge or mutates a Booking. No future Hotel transport or execution behavior is implied.
+- BF-4 keeps one ongoing conversation per Business + Customer relationship in this prototype. Pet, Booking, Branch and Grooming Service Job are context references rather than new identity records or automatic per-Pet/per-Booking/Stay threads. Hotel launches reuse Customer/Pet/Booking context.
+- A Conversation never grants Pet Passport scope. Expired/revoked Branch consent still hides protected values. The local Guardian-only structured response may update the linked Grooming Job add-ons and estimated duration, but never creates a Charge or mutates a Booking. Hotel Business notes, care and incident data never become messages automatically.
 - Business Core and Service Modules use the Warm White / Pastel Yellow operational visual system.

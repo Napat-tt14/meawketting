@@ -426,7 +426,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
         </>
       )}
 
-      {selectedJob ? <GroomingJobDetail key={`${selectedJob.serviceJobId}:${selectedJob.updatedAt}`} job={selectedJob} context={context} onClose={closeJob} onTransition={transitionFromDetail} onAssign={assignResources} onSaveNote={saveNote} /> : null}
+      {selectedJob ? <GroomingJobDetail key={selectedJob.serviceJobId} job={selectedJob} context={context} onClose={closeJob} onTransition={transitionFromDetail} onAssign={assignResources} onSaveNote={saveNote} /> : null}
     </div>
   );
 }

@@ -33,6 +33,7 @@ import {
   Scan,
   Scissors,
   UserRound,
+  Wallet,
   X,
 } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
@@ -240,6 +241,7 @@ export function HotelStayDetail({
   }
 
   const action = lifecycleAction();
+  const checkoutAvailable = stay.status === "ready-for-checkout" || stay.status === "checked-out" || stay.status === "completed";
   const intakeHref = `/business/scan?hotelStayId=${encodeURIComponent(stay.hotelStayId)}`;
   const inboxHref = `/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(stay.bookingId)}`;
 
@@ -296,8 +298,10 @@ export function HotelStayDetail({
               <span><Clock size={16} />{hotelStatusLabel(stay.status)}</span>
               {stay.status === "booked" || stay.status === "expected-today" ? <a href={intakeHref}><Scan size={17} />{stay.intakeId ? "ดู Intake" : "ทำ Intake"}</a> : null}
               {action ? <button type="button" onClick={(stay.status === "booked" || stay.status === "expected-today") && !stay.intakeId ? () => { window.location.href = intakeHref; } : advanceLifecycle}>{action.icon === "scan" ? <Scan size={17} /> : <CheckCircle size={17} />}{action.label}</button> : null}
+              {checkoutAvailable ? <a className="hotel-detail-lifecycle__billing" href={`/business/billing?hotelStayId=${encodeURIComponent(stay.hotelStayId)}`}><Wallet size={17} />ตรวจยอด / รับชำระ</a> : null}
+              {stay.status === "checked-out" || stay.status === "completed" ? <p className="hotel-detail-section__hint hotel-detail-service-record"><CheckCircle size={16} />บันทึกประวัติบริการแล้ว · เปิดดูได้จากหน้าลูกค้าและสัตว์เลี้ยง</p> : null}
             </div>
-            <p className="hotel-detail-section__hint"><CheckCircle size={16} />ก่อนเช็กเอาต์ ระบบตรวจงานดูแลที่ยังค้างอยู่แบบ lightweight โดยไม่ผูกกับการชำระเงิน</p>
+            <p className="hotel-detail-section__hint"><CheckCircle size={16} />ก่อนเช็กเอาต์ ระบบตรวจงานดูแลที่ยังค้างอยู่แบบ lightweight · การชำระเงินทำผ่าน Checkout แยกต่างหาก</p>
           </section>
 
           <section className="hotel-detail-section" aria-labelledby="hotel-care-title">

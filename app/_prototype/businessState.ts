@@ -35,6 +35,9 @@ export const GROOMING_DEMO_NOW = "2026-08-18T12:20" as const;
 // Hotel uses the same fixed operational day as Calendar and Grooming so
 // browser-local fixture behaviour remains deterministic during visual QA.
 export const HOTEL_DEMO_NOW = "2026-08-18T12:20" as const;
+// Billing follows the same fixed local operational day as Calendar, Grooming,
+// and Hotel so receipt/revenue examples remain deterministic during QA.
+export const BILLING_DEMO_NOW = "2026-08-18T12:20:00.000Z" as const;
 
 export type BookingTimeModel = "appointment" | "date-range" | "day";
 export type BookingStatus = "pending" | "confirmed" | "arrived" | "cancelled";
@@ -351,6 +354,199 @@ export type PrototypeHotelStay = {
   cancelledAt: string | null;
 };
 
+// BF-7 keeps what the customer owes distinct from how and when it is paid.
+// Amounts use whole Thai Baht in the local prototype so the UI never implies
+// an accounting, tax, or payment-provider precision contract.
+export type PrototypeChargeLineKind = "base-service" | "add-on" | "manual-adjustment" | "discount";
+export type PrototypeChargeStatus = "unpaid" | "partial" | "paid" | "cancelled";
+export type PrototypePaymentMethod = "cash" | "bank-transfer" | "other";
+
+export type PrototypeChargeLine = {
+  id: string;
+  kind: PrototypeChargeLineKind;
+  label: string;
+  amount: number;
+  reason: string | null;
+  sourceRequestId: string | null;
+  serviceJobId: string | null;
+  hotelStayId: string | null;
+  createdAt: string;
+};
+
+export type PrototypeChargeHistoryItem = {
+  id: string;
+  at: string;
+  type: "created" | "adjusted" | "cancelled";
+  summary: string;
+};
+
+export type PrototypeCharge = {
+  chargeId: string;
+  businessId: string;
+  branchId: string;
+  customerId: string;
+  // A Booking can cover several Pets. Keeping this nullable lets one
+  // booking-level base Charge represent its total without duplicating it per
+  // Grooming Job or Hotel Stay.
+  petId: string | null;
+  bookingId: string;
+  serviceJobId: string | null;
+  hotelStayId: string | null;
+  serviceModule: BusinessServiceModule;
+  serviceLabel: string;
+  lineItems: PrototypeChargeLine[];
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  history: PrototypeChargeHistoryItem[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PrototypePaymentAllocation = {
+  chargeId: string;
+  amount: number;
+};
+
+export type PrototypePayment = {
+  paymentId: string;
+  businessId: string;
+  branchId: string;
+  customerId: string;
+  method: PrototypePaymentMethod;
+  amount: number;
+  allocations: PrototypePaymentAllocation[];
+  note: string;
+  // A local request key guards repeated clicks in this browser-only model.
+  requestKey: string;
+  recordedAt: string;
+};
+
+export type PrototypeChargeBalance = {
+  charge: PrototypeCharge;
+  total: number;
+  paid: number;
+  remaining: number;
+  status: PrototypeChargeStatus;
+  paymentCount: number;
+};
+
+// BF-8 records what the Business completed for one Pet-specific execution
+// source. It is a Business service record, not a receipt and never becomes a
+// Pet Passport or a copy of Guardian-controlled data.
+export type PrototypeServiceRecordSource = "grooming-job" | "hotel-stay";
+export type PrototypeServiceRecordActivityKind = "service" | "add-on" | "care" | "room";
+export type PrototypeServiceRecordCorrectionField = "summary" | "business-note";
+export type PrototypeServiceRecordPaymentStatus = PrototypeChargeStatus | "no-charge";
+export type PrototypeServiceRecordHandoverStatus = "pending" | "handed-over";
+
+export type PrototypeServiceRecordDetail = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+export type PrototypeServiceRecordActivity = {
+  id: string;
+  kind: PrototypeServiceRecordActivityKind;
+  label: string;
+  occurredAt: string | null;
+  detail: string | null;
+};
+
+// This is a local metadata foundation only. BF-8 deliberately ships no
+// uploader, cloud object store, public share URL, or copied Passport photo.
+export type PrototypeServiceRecordPhoto = {
+  id: string;
+  phase: "before" | "after";
+  label: string;
+  localAssetRef: string | null;
+  createdAt: string;
+};
+
+export type PrototypeServiceRecordCorrection = {
+  id: string;
+  at: string;
+  field: PrototypeServiceRecordCorrectionField;
+  previousValue: string;
+  nextValue: string;
+  reason: string;
+  correctedBy: string;
+  requestKey: string;
+};
+
+// When a completed Grooming Job is deliberately reopened and completed again,
+// retain its former safe service snapshot before refreshing the one shared
+// Service Record. This is an audit trail, not a second record.
+export type PrototypeServiceRecordSourceRevision = {
+  id: string;
+  at: string;
+  completedAt: string;
+  summary: string;
+  details: PrototypeServiceRecordDetail[];
+  activities: PrototypeServiceRecordActivity[];
+  staffResourceLabels: string[];
+  businessNote: string;
+  photos: PrototypeServiceRecordPhoto[];
+  reason: "source-recompleted";
+};
+
+// Legacy compatibility metadata from the superseded standalone handover
+// experience. Existing browser records may still contain it; the current UI
+// never starts or advances this workflow.
+export type PrototypeServiceRecordHandoverEvent = {
+  id: string;
+  at: string;
+  type: "ready" | "handed-over";
+  summary: string;
+  paymentStatus: PrototypeServiceRecordPaymentStatus | null;
+};
+
+export type PrototypeServiceRecordHandover = {
+  status: PrototypeServiceRecordHandoverStatus;
+  handedOverAt: string | null;
+  handedOverBy: string | null;
+  note: string;
+  paymentStatusAtHandover: PrototypeServiceRecordPaymentStatus | null;
+  history: PrototypeServiceRecordHandoverEvent[];
+};
+
+export type PrototypeServiceRecord = {
+  serviceRecordId: string;
+  source: PrototypeServiceRecordSource;
+  serviceJobId: string | null;
+  hotelStayId: string | null;
+  bookingId: string;
+  businessId: string;
+  branchId: string;
+  customerId: string;
+  petId: string;
+  serviceModule: "grooming" | "hotel";
+  serviceLabel: string;
+  completedAt: string;
+  summary: string;
+  details: PrototypeServiceRecordDetail[];
+  activities: PrototypeServiceRecordActivity[];
+  staffResourceLabels: string[];
+  // A Business-local note snapshot. It is never sourced from Passport,
+  // Guardian instructions, medication authorization, or incident content.
+  businessNote: string;
+  photos: PrototypeServiceRecordPhoto[];
+  sourceRevisions: PrototypeServiceRecordSourceRevision[];
+  corrections: PrototypeServiceRecordCorrection[];
+  handover: PrototypeServiceRecordHandover;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PrototypeServiceRecordPaymentReference = {
+  chargeId: string | null;
+  status: PrototypeServiceRecordPaymentStatus;
+  total: number;
+  paid: number;
+  remaining: number;
+  source: "source" | "booking" | "none";
+};
+
 export type HotelRoomAvailabilityConflict = {
   roomId: string;
   roomLabel: string;
@@ -452,7 +648,6 @@ export type BusinessHomeDemo = {
     detail: string;
   }[];
   moduleSummaries: Partial<Record<BusinessServiceModule, { value: string; detail: string }>>;
-  revenueToday: number;
 };
 
 // Phase E reuses the Phase D Business/Branch fixtures. These are browser-local
@@ -1369,6 +1564,149 @@ export const DEMO_HOTEL_STAY_FIXTURES: readonly PrototypeHotelStay[] = [
   },
 ] as const;
 
+// BF-7 financial fixtures intentionally live beside Booking/Job/Stay fixtures
+// and are consumed through the same selectors as local mutations. They are
+// not a second revenue fixture for Home.
+const BILLING_FIXTURE_CREATED_AT = "2026-08-18T09:10:00.000Z";
+
+export const DEMO_BILLING_CHARGE_FIXTURES: readonly PrototypeCharge[] = [
+  {
+    chargeId: "charge-fixture-ari-biscuit-grooming",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-biscuit",
+    bookingId: "booking-fixture-ari-grooming-biscuit",
+    serviceJobId: "grooming-job-fixture-biscuit",
+    hotelStayId: null,
+    serviceModule: "grooming",
+    serviceLabel: "อาบน้ำ / ตัดขน",
+    lineItems: [{ id: "charge-line-biscuit-base", kind: "base-service", label: "อาบน้ำ / ตัดขน", amount: 850, reason: null, sourceRequestId: null, serviceJobId: "grooming-job-fixture-biscuit", hotelStayId: null, createdAt: BILLING_FIXTURE_CREATED_AT }],
+    cancelledAt: null,
+    cancellationReason: null,
+    history: [{ id: "charge-history-biscuit-created", at: BILLING_FIXTURE_CREATED_AT, type: "created", summary: "สร้างยอดจากรายการบริการ" }],
+    createdAt: BILLING_FIXTURE_CREATED_AT,
+    updatedAt: BILLING_FIXTURE_CREATED_AT,
+  },
+  {
+    chargeId: "charge-fixture-ari-milo-grooming",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-milo",
+    bookingId: "booking-fixture-ari-grooming-milo",
+    serviceJobId: "grooming-job-fixture-milo",
+    hotelStayId: null,
+    serviceModule: "grooming",
+    serviceLabel: "อาบน้ำ / ตัดขน",
+    lineItems: [
+      { id: "charge-line-milo-base", kind: "base-service", label: "อาบน้ำ / ตัดขน", amount: 850, reason: null, sourceRequestId: null, serviceJobId: "grooming-job-fixture-milo", hotelStayId: null, createdAt: BILLING_FIXTURE_CREATED_AT },
+      { id: "charge-line-milo-deshed", kind: "add-on", label: "แกะสางขน", amount: 300, reason: "บริการเพิ่มเติมที่อนุมัติแล้ว", sourceRequestId: "fixture-addon-milo-deshed", serviceJobId: "grooming-job-fixture-milo", hotelStayId: null, createdAt: BILLING_FIXTURE_CREATED_AT },
+    ],
+    cancelledAt: null,
+    cancellationReason: null,
+    history: [
+      { id: "charge-history-milo-created", at: BILLING_FIXTURE_CREATED_AT, type: "created", summary: "สร้างยอดจากรายการบริการ" },
+      { id: "charge-history-milo-addon", at: "2026-08-18T13:39:00.000Z", type: "adjusted", summary: "เพิ่มบริการแกะสางขนที่อนุมัติแล้ว" },
+    ],
+    createdAt: BILLING_FIXTURE_CREATED_AT,
+    updatedAt: "2026-08-18T13:39:00.000Z",
+  },
+  {
+    chargeId: "charge-fixture-ari-biscuit-hotel",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    petId: "booking-pet-biscuit",
+    bookingId: "booking-fixture-ari-hotel-biscuit-checkout",
+    serviceJobId: null,
+    hotelStayId: "hotel-stay-fixture-biscuit-checkout",
+    serviceModule: "hotel",
+    serviceLabel: "เข้าพักโรงแรม",
+    lineItems: [{ id: "charge-line-biscuit-hotel-base", kind: "base-service", label: "เข้าพักโรงแรม 2 คืน", amount: 2400, reason: null, sourceRequestId: null, serviceJobId: null, hotelStayId: "hotel-stay-fixture-biscuit-checkout", createdAt: "2026-08-18T09:20:00.000Z" }],
+    cancelledAt: null,
+    cancellationReason: null,
+    history: [{ id: "charge-history-biscuit-hotel-created", at: "2026-08-18T09:20:00.000Z", type: "created", summary: "สร้างยอดจากรายการเข้าพัก" }],
+    createdAt: "2026-08-18T09:20:00.000Z",
+    updatedAt: "2026-08-18T09:20:00.000Z",
+  },
+  {
+    chargeId: "charge-fixture-thonglor-tofu-grooming",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-thonglor",
+    customerId: "booking-contact-pim",
+    petId: "booking-pet-tofu",
+    bookingId: "booking-fixture-thonglor-grooming",
+    serviceJobId: null,
+    hotelStayId: null,
+    serviceModule: "grooming",
+    serviceLabel: "อาบน้ำและตัดเล็บ",
+    lineItems: [{ id: "charge-line-thonglor-tofu-base", kind: "base-service", label: "อาบน้ำและตัดเล็บ", amount: 650, reason: null, sourceRequestId: null, serviceJobId: null, hotelStayId: null, createdAt: "2026-08-18T11:48:00.000Z" }],
+    cancelledAt: null,
+    cancellationReason: null,
+    history: [{ id: "charge-history-thonglor-tofu-created", at: "2026-08-18T11:48:00.000Z", type: "created", summary: "สร้างยอดจากรายการบริการ" }],
+    createdAt: "2026-08-18T11:48:00.000Z",
+    updatedAt: "2026-08-18T11:48:00.000Z",
+  },
+  {
+    chargeId: "charge-fixture-onnut-leo-hotel",
+    businessId: "business-paw-partner",
+    branchId: "partner-onnut",
+    customerId: "booking-contact-onnut-lee",
+    petId: "booking-pet-leo",
+    bookingId: "booking-fixture-onnut-hotel-leo",
+    serviceJobId: null,
+    hotelStayId: "hotel-stay-fixture-leo",
+    serviceModule: "hotel",
+    serviceLabel: "เข้าพักโรงแรม",
+    lineItems: [{ id: "charge-line-onnut-leo-base", kind: "base-service", label: "เข้าพักโรงแรม 2 คืน", amount: 2000, reason: null, sourceRequestId: null, serviceJobId: null, hotelStayId: "hotel-stay-fixture-leo", createdAt: "2026-08-18T09:25:00.000Z" }],
+    cancelledAt: null,
+    cancellationReason: null,
+    history: [{ id: "charge-history-onnut-leo-created", at: "2026-08-18T09:25:00.000Z", type: "created", summary: "สร้างยอดจากรายการเข้าพัก" }],
+    createdAt: "2026-08-18T09:25:00.000Z",
+    updatedAt: "2026-08-18T09:25:00.000Z",
+  },
+] as const;
+
+export const DEMO_BILLING_PAYMENT_FIXTURES: readonly PrototypePayment[] = [
+  {
+    paymentId: "payment-fixture-ari-biscuit-cash",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    method: "cash",
+    amount: 850,
+    allocations: [{ chargeId: "charge-fixture-ari-biscuit-grooming", amount: 850 }],
+    note: "รับชำระหน้าร้าน",
+    requestKey: "fixture-payment-ari-biscuit-cash",
+    recordedAt: "2026-08-18T09:16:00.000Z",
+  },
+  {
+    paymentId: "payment-fixture-ari-milo-transfer",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-ari",
+    customerId: "booking-contact-nalin",
+    method: "bank-transfer",
+    amount: 500,
+    allocations: [{ chargeId: "charge-fixture-ari-milo-grooming", amount: 500 }],
+    note: "ชำระบางส่วน",
+    requestKey: "fixture-payment-ari-milo-transfer",
+    recordedAt: "2026-08-18T13:45:00.000Z",
+  },
+  {
+    paymentId: "payment-fixture-thonglor-tofu-cash",
+    businessId: "business-whisker-rest",
+    branchId: "whisker-thonglor",
+    customerId: "booking-contact-pim",
+    method: "cash",
+    amount: 650,
+    allocations: [{ chargeId: "charge-fixture-thonglor-tofu-grooming", amount: 650 }],
+    note: "รับชำระหน้าร้าน",
+    requestKey: "fixture-payment-thonglor-tofu-cash",
+    recordedAt: "2026-08-18T11:52:00.000Z",
+  },
+] as const;
+
 const DEMO_BUSINESS_HOME: Record<string, BusinessHomeDemo> = {
   "whisker-ari-frontdesk": {
     today: { waitingIntake: 3 },
@@ -1376,7 +1714,6 @@ const DEMO_BUSINESS_HOME: Record<string, BusinessHomeDemo> = {
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 2 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
     ],
     moduleSummaries: {},
-    revenueToday: 12450,
   },
   "whisker-thonglor-frontdesk": {
     today: { waitingIntake: 2 },
@@ -1384,7 +1721,6 @@ const DEMO_BUSINESS_HOME: Record<string, BusinessHomeDemo> = {
       { id: "approval", tone: "waiting", title: "รอเจ้าของอนุมัติข้อมูล 1 รายการ", detail: "ต้องได้รับคำตอบก่อนยืนยันรับเข้า" },
     ],
     moduleSummaries: {},
-    revenueToday: 7200,
   },
   "paw-partner-onnut": {
     today: { waitingIntake: 1, readyForPickup: 3 },
@@ -1395,7 +1731,6 @@ const DEMO_BUSINESS_HOME: Record<string, BusinessHomeDemo> = {
     moduleSummaries: {
       daycare: { value: "7 / 12 ตัวในพื้นที่ดูแล", detail: "ภาพรวมความจุ" },
     },
-    revenueToday: 9800,
   },
 };
 
@@ -1459,6 +1794,11 @@ type BusinessStore = {
   serviceJobs: Record<string, PrototypeServiceJob>;
   hotelStays: Record<string, PrototypeHotelStay>;
   customers: Record<string, PrototypeCustomer>;
+  charges: Record<string, PrototypeCharge>;
+  payments: Record<string, PrototypePayment>;
+  // BF-8 extends the same local envelope; Service Records are not a separate
+  // Customer, Inbox, Billing, or Pet Passport store.
+  serviceRecords: Record<string, PrototypeServiceRecord>;
 };
 
 export type QrContractType = "quick-passport" | "public-safety" | "temporary-business" | "unknown";
@@ -1474,6 +1814,9 @@ const emptyStore = (): BusinessStore => ({
   serviceJobs: {},
   hotelStays: {},
   customers: {},
+  charges: {},
+  payments: {},
+  serviceRecords: {},
 });
 
 function readStore(): BusinessStore {
@@ -1497,6 +1840,13 @@ function readStore(): BusinessStore {
       // BF-3 preserves the same storage envelope so a Customer/Pet relationship
       // can be shared with Bookings without introducing a disconnected store.
       customers: parsed.customers && typeof parsed.customers === "object" && !Array.isArray(parsed.customers) ? parsed.customers : {},
+      // BF-7 keeps financial records in the same local envelope. Older tabs
+      // remain readable until their first Billing mutation.
+      charges: parsed.charges && typeof parsed.charges === "object" && !Array.isArray(parsed.charges) ? parsed.charges : {},
+      payments: parsed.payments && typeof parsed.payments === "object" && !Array.isArray(parsed.payments) ? parsed.payments : {},
+      // BF-8 is an additive Service Record slice. BF-1–BF-7 browser sessions
+      // keep their existing local state when no record exists yet.
+      serviceRecords: parsed.serviceRecords && typeof parsed.serviceRecords === "object" && !Array.isArray(parsed.serviceRecords) ? parsed.serviceRecords : {},
     };
   } catch {
     return emptyStore();
@@ -2073,8 +2423,8 @@ export function evaluateBookingAvailability(
   if (draft.customer && (!contact || draft.pets.some((pet) => !contact.pets.some((candidate) => candidate.id === pet.id)))) {
     conflicts.push(conflict("invalid-pet-selection", "สัตว์เลี้ยงที่เลือกไม่อยู่ในข้อมูลของลูกค้ารายนี้", "return-to-edit"));
   }
-  if (draft.estimate !== null && (!Number.isFinite(draft.estimate) || draft.estimate < 0)) {
-    conflicts.push(conflict("invalid-estimate", "ราคาประมาณต้องเป็นจำนวนเงินที่ถูกต้อง", "return-to-edit"));
+  if (draft.estimate !== null && (!Number.isFinite(draft.estimate) || !Number.isInteger(draft.estimate) || draft.estimate < 0)) {
+    conflicts.push(conflict("invalid-estimate", "ราคาประมาณต้องเป็นจำนวนเต็มบาท", "return-to-edit"));
   }
 
   const interval = getBookingInterval(service.timeModel, draft.start, draft.end || null);
@@ -2572,7 +2922,17 @@ export function transitionPrototypeGroomingServiceJob(
 
   const next = buildPrototypeGroomingServiceJobTransition(job, nextStatus, new Date().toISOString());
   if (!next) return { ok: false, reason: "invalid-transition", job: clonePrototypeServiceJob(job) };
+  // A fixture-derived or previously completed proof must be persisted before
+  // this source leaves completed, otherwise a reopen could make its history
+  // disappear on the next selector read.
+  if (job.status === "completed" && next.status !== "completed") {
+    ensurePrototypeServiceRecordForGroomingJobInStore(store, job);
+  }
   store.serviceJobs[next.serviceJobId] = next;
+  // Completion creates one source-keyed Service Record in the same local
+  // transaction. Re-completion refreshes that same record and preserves the
+  // prior safe snapshot as audit history; there is no post-completion workflow.
+  if (next.status === "completed") refreshPrototypeServiceRecordForGroomingJobInStore(store, next);
   if (!writeStore(store)) return { ok: false, reason: "storage", job: clonePrototypeServiceJob(job) };
   return { ok: true, job: clonePrototypeServiceJob(next), duplicate: false };
 }
@@ -2673,6 +3033,7 @@ export function applyPrototypeApprovedGroomingAddOn(input: {
   additionalMinutes: number;
   approvedAt: string;
 }) {
+  if (!isWholeBaht(input.additionalPrice) || input.additionalPrice < 0) return null;
   const store = readStore();
   const job = (input.serviceJobId
     ? mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === input.serviceJobId)
@@ -2685,7 +3046,7 @@ export function applyPrototypeApprovedGroomingAddOn(input: {
     id: `service-job-addon-${input.sourceRequestId}`,
     sourceRequestId: input.sourceRequestId,
     label: input.serviceName.trim(),
-    additionalPrice: Math.round(input.additionalPrice),
+    additionalPrice: input.additionalPrice,
     additionalMinutes: Math.round(input.additionalMinutes),
     approvedAt: now,
   };
@@ -3267,6 +3628,9 @@ export function transitionPrototypeHotelStay(
 
   const next = transitionHotelStayValue(stay, nextStatus, new Date().toISOString());
   store.hotelStays[next.hotelStayId] = next;
+  // A Hotel Service Record is only available after genuine checkout. The
+  // summary never pulls guardianCareInstruction, Intake, or medical details.
+  if (next.status === "checked-out" || next.status === "completed") ensurePrototypeServiceRecordForHotelStayInStore(store, next);
   if (!writeStore(store)) return { ok: false, reason: "storage", stay: clonePrototypeHotelStay(stay) };
   return { ok: true, stay: clonePrototypeHotelStay(next), duplicate: false };
 }
@@ -3554,6 +3918,1183 @@ export function listPrototypeHotelLinkedGroomingJobs(stay: PrototypeHotelStay, f
     && job.scheduledStart.slice(0, 10) >= stay.scheduledCheckIn
     && job.scheduledStart.slice(0, 10) <= stay.scheduledCheckOut
   ));
+}
+
+// ---------------------------------------------------------------------------
+// BF-7 Billing / Payments / Revenue foundation
+// ---------------------------------------------------------------------------
+
+function clonePrototypeChargeLine(line: PrototypeChargeLine): PrototypeChargeLine {
+  return { ...line };
+}
+
+function clonePrototypeCharge(charge: PrototypeCharge): PrototypeCharge {
+  return {
+    ...charge,
+    lineItems: charge.lineItems.map(clonePrototypeChargeLine),
+    history: charge.history.map((item) => ({ ...item })),
+  };
+}
+
+function clonePrototypePayment(payment: PrototypePayment): PrototypePayment {
+  return {
+    ...payment,
+    allocations: payment.allocations.map((allocation) => ({ ...allocation })),
+  };
+}
+
+function isWholeBaht(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value);
+}
+
+function isPrototypeChargeLineKind(value: unknown): value is PrototypeChargeLineKind {
+  return value === "base-service" || value === "add-on" || value === "manual-adjustment" || value === "discount";
+}
+
+function isPrototypePaymentMethod(value: unknown): value is PrototypePaymentMethod {
+  return value === "cash" || value === "bank-transfer" || value === "other";
+}
+
+function isPrototypeChargeLine(value: unknown): value is PrototypeChargeLine {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const line = value as Partial<PrototypeChargeLine>;
+  return typeof line.id === "string"
+    && isPrototypeChargeLineKind(line.kind)
+    && typeof line.label === "string"
+    && isWholeBaht(line.amount)
+    && (typeof line.reason === "string" || line.reason === null)
+    && (typeof line.sourceRequestId === "string" || line.sourceRequestId === null)
+    && (typeof line.serviceJobId === "string" || line.serviceJobId === null)
+    && (typeof line.hotelStayId === "string" || line.hotelStayId === null)
+    && typeof line.createdAt === "string";
+}
+
+function isPrototypeChargeHistoryItem(value: unknown): value is PrototypeChargeHistoryItem {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const item = value as Partial<PrototypeChargeHistoryItem>;
+  return typeof item.id === "string"
+    && typeof item.at === "string"
+    && (item.type === "created" || item.type === "adjusted" || item.type === "cancelled")
+    && typeof item.summary === "string";
+}
+
+function isPrototypeCharge(value: unknown): value is PrototypeCharge {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const charge = value as Partial<PrototypeCharge>;
+  return typeof charge.chargeId === "string"
+    && typeof charge.businessId === "string"
+    && typeof charge.branchId === "string"
+    && typeof charge.customerId === "string"
+    && (typeof charge.petId === "string" || charge.petId === null)
+    && typeof charge.bookingId === "string"
+    && (typeof charge.serviceJobId === "string" || charge.serviceJobId === null)
+    && (typeof charge.hotelStayId === "string" || charge.hotelStayId === null)
+    && (charge.serviceModule === "grooming" || charge.serviceModule === "hotel" || charge.serviceModule === "daycare")
+    && typeof charge.serviceLabel === "string"
+    && Array.isArray(charge.lineItems)
+    && charge.lineItems.every(isPrototypeChargeLine)
+    && (typeof charge.cancelledAt === "string" || charge.cancelledAt === null)
+    && (typeof charge.cancellationReason === "string" || charge.cancellationReason === null)
+    && Array.isArray(charge.history)
+    && charge.history.every(isPrototypeChargeHistoryItem)
+    && typeof charge.createdAt === "string"
+    && typeof charge.updatedAt === "string";
+}
+
+function isPrototypePaymentAllocation(value: unknown): value is PrototypePaymentAllocation {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const allocation = value as Partial<PrototypePaymentAllocation>;
+  return typeof allocation.chargeId === "string" && isWholeBaht(allocation.amount) && allocation.amount > 0;
+}
+
+function isPrototypePayment(value: unknown): value is PrototypePayment {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const payment = value as Partial<PrototypePayment>;
+  const allocationTotal = Array.isArray(payment.allocations)
+    ? payment.allocations.reduce<number>((total, allocation) => total + (isPrototypePaymentAllocation(allocation) ? allocation.amount : 0), 0)
+    : -1;
+  return typeof payment.paymentId === "string"
+    && typeof payment.businessId === "string"
+    && typeof payment.branchId === "string"
+    && typeof payment.customerId === "string"
+    && isPrototypePaymentMethod(payment.method)
+    && isWholeBaht(payment.amount)
+    && payment.amount > 0
+    && Array.isArray(payment.allocations)
+    && payment.allocations.every(isPrototypePaymentAllocation)
+    && allocationTotal === payment.amount
+    && typeof payment.note === "string"
+    && typeof payment.requestKey === "string"
+    && typeof payment.recordedAt === "string";
+}
+
+function mergedPrototypeCharges(store: BusinessStore) {
+  const charges = new Map<string, PrototypeCharge>();
+  for (const fixture of DEMO_BILLING_CHARGE_FIXTURES) charges.set(fixture.chargeId, clonePrototypeCharge(fixture));
+  for (const stored of Object.values(store.charges)) {
+    if (isPrototypeCharge(stored)) charges.set(stored.chargeId, clonePrototypeCharge(stored));
+  }
+  return [...charges.values()];
+}
+
+function mergedPrototypePayments(store: BusinessStore) {
+  const payments = new Map<string, PrototypePayment>();
+  for (const fixture of DEMO_BILLING_PAYMENT_FIXTURES) payments.set(fixture.paymentId, clonePrototypePayment(fixture));
+  for (const stored of Object.values(store.payments)) {
+    if (isPrototypePayment(stored)) payments.set(stored.paymentId, clonePrototypePayment(stored));
+  }
+  return [...payments.values()];
+}
+
+function chargeMatchesContext(charge: PrototypeCharge, context?: DemoBusinessContext | null) {
+  return !context || (charge.businessId === context.businessId && charge.branchId === context.branchId);
+}
+
+function paymentMatchesContext(payment: PrototypePayment, context?: DemoBusinessContext | null) {
+  return !context || (payment.businessId === context.businessId && payment.branchId === context.branchId);
+}
+
+function sortPrototypeCharges(charges: readonly PrototypeCharge[], context?: DemoBusinessContext | null) {
+  return charges
+    .filter((charge) => chargeMatchesContext(charge, context))
+    .map(clonePrototypeCharge)
+    .sort((first, second) => second.updatedAt.localeCompare(first.updatedAt) || second.createdAt.localeCompare(first.createdAt) || first.chargeId.localeCompare(second.chargeId));
+}
+
+function sortPrototypePayments(payments: readonly PrototypePayment[], context?: DemoBusinessContext | null) {
+  return payments
+    .filter((payment) => paymentMatchesContext(payment, context))
+    .map(clonePrototypePayment)
+    .sort((first, second) => second.recordedAt.localeCompare(first.recordedAt) || first.paymentId.localeCompare(second.paymentId));
+}
+
+export function listPrototypeChargeFixtures(context?: DemoBusinessContext | null) {
+  return sortPrototypeCharges(mergedPrototypeCharges(emptyStore()), context);
+}
+
+export function listPrototypeCharges(context?: DemoBusinessContext | null) {
+  return sortPrototypeCharges(mergedPrototypeCharges(readStore()), context);
+}
+
+export function readPrototypeCharge(chargeId: string) {
+  return listPrototypeCharges(null).find((charge) => charge.chargeId === chargeId) ?? null;
+}
+
+export function listPrototypePaymentFixtures(context?: DemoBusinessContext | null) {
+  return sortPrototypePayments(mergedPrototypePayments(emptyStore()), context);
+}
+
+export function listPrototypePayments(context?: DemoBusinessContext | null) {
+  return sortPrototypePayments(mergedPrototypePayments(readStore()), context);
+}
+
+function allocatedPaymentAmountForCharge(chargeId: string, payments: readonly PrototypePayment[]) {
+  return payments.reduce((sum, payment) => sum + payment.allocations
+    .filter((allocation) => allocation.chargeId === chargeId)
+    .reduce((allocationSum, allocation) => allocationSum + allocation.amount, 0), 0);
+}
+
+export function getPrototypeChargeBalance(
+  charge: PrototypeCharge,
+  payments: readonly PrototypePayment[] = listPrototypePayments(null),
+): PrototypeChargeBalance {
+  const total = Math.max(0, charge.lineItems.reduce((sum, line) => sum + line.amount, 0));
+  const paid = Math.min(total, allocatedPaymentAmountForCharge(charge.chargeId, payments));
+  const remaining = charge.cancelledAt ? 0 : Math.max(0, total - paid);
+  const paymentCount = payments.filter((payment) => payment.allocations.some((allocation) => allocation.chargeId === charge.chargeId)).length;
+  const status: PrototypeChargeStatus = charge.cancelledAt
+    ? "cancelled"
+    : remaining === 0
+      ? "paid"
+      : paid > 0
+        ? "partial"
+        : "unpaid";
+  return { charge: clonePrototypeCharge(charge), total, paid, remaining, status, paymentCount };
+}
+
+export function listPrototypeChargeBalances(context: DemoBusinessContext, fixtureOnly = false) {
+  const charges = fixtureOnly ? listPrototypeChargeFixtures(context) : listPrototypeCharges(context);
+  const payments = fixtureOnly ? listPrototypePaymentFixtures(context) : listPrototypePayments(context);
+  return charges.map((charge) => getPrototypeChargeBalance(charge, payments));
+}
+
+export type PrototypeRevenueBreakdown = {
+  module: BusinessServiceModule;
+  revenue: number;
+  paymentCount: number;
+};
+
+export type PrototypeRevenueSummary = {
+  revenueToday: number;
+  paymentCountToday: number;
+  unpaidBalance: number;
+  unpaidCount: number;
+  partialCount: number;
+  breakdown: PrototypeRevenueBreakdown[];
+};
+
+export function getPrototypeRevenueSummary(
+  context: DemoBusinessContext,
+  date = BOOKING_DEMO_DATE,
+  fixtureOnly = false,
+): PrototypeRevenueSummary {
+  const charges = fixtureOnly ? listPrototypeChargeFixtures(context) : listPrototypeCharges(context);
+  const payments = fixtureOnly ? listPrototypePaymentFixtures(context) : listPrototypePayments(context);
+  const balances = charges.map((charge) => getPrototypeChargeBalance(charge, payments));
+  const chargesById = new Map(charges.map((charge) => [charge.chargeId, charge]));
+  const paymentsToday = payments.filter((payment) => payment.recordedAt.slice(0, 10) === date);
+  const breakdownByModule = new Map<BusinessServiceModule, PrototypeRevenueBreakdown>();
+  for (const payment of paymentsToday) {
+    for (const allocation of payment.allocations) {
+      const charge = chargesById.get(allocation.chargeId);
+      if (!charge) continue;
+      const current = breakdownByModule.get(charge.serviceModule) ?? { module: charge.serviceModule, revenue: 0, paymentCount: 0 };
+      current.revenue += allocation.amount;
+      current.paymentCount += 1;
+      breakdownByModule.set(charge.serviceModule, current);
+    }
+  }
+  return {
+    revenueToday: paymentsToday.reduce((sum, payment) => sum + payment.amount, 0),
+    paymentCountToday: paymentsToday.length,
+    unpaidBalance: balances.filter((balance) => balance.status === "unpaid" || balance.status === "partial").reduce((sum, balance) => sum + balance.remaining, 0),
+    unpaidCount: balances.filter((balance) => balance.status === "unpaid").length,
+    partialCount: balances.filter((balance) => balance.status === "partial").length,
+    breakdown: [...breakdownByModule.values()].sort((first, second) => second.revenue - first.revenue || first.module.localeCompare(second.module)),
+  };
+}
+
+function generatedPrototypeBillingId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function chargeHistoryId(type: PrototypeChargeHistoryItem["type"]) {
+  return generatedPrototypeBillingId(`charge-${type}`);
+}
+
+function chargeIdForBooking(bookingId: string) {
+  return `charge-booking-${bookingId}`;
+}
+
+function baseChargeLine(booking: PrototypeBooking, serviceJobId: string | null, hotelStayId: string | null, at: string): PrototypeChargeLine {
+  return {
+    id: generatedPrototypeBillingId("charge-line-base"),
+    kind: "base-service",
+    label: booking.service.label,
+    amount: Math.max(0, booking.estimate ?? 0),
+    reason: null,
+    sourceRequestId: null,
+    serviceJobId,
+    hotelStayId,
+    createdAt: at,
+  };
+}
+
+function createChargeForBooking(
+  booking: PrototypeBooking,
+  source: { serviceJobId: string | null; hotelStayId: string | null; petId: string | null },
+  at: string,
+) {
+  const singlePet = booking.pets.length === 1;
+  const chargeId = chargeIdForBooking(booking.bookingId);
+  return {
+    chargeId,
+    businessId: booking.businessId,
+    branchId: booking.branchId,
+    customerId: booking.customer.id,
+    petId: singlePet ? source.petId : null,
+    bookingId: booking.bookingId,
+    serviceJobId: singlePet ? source.serviceJobId : null,
+    hotelStayId: singlePet ? source.hotelStayId : null,
+    serviceModule: booking.serviceModule,
+    serviceLabel: booking.service.label,
+    lineItems: [baseChargeLine(booking, singlePet ? source.serviceJobId : null, singlePet ? source.hotelStayId : null, at)],
+    cancelledAt: null,
+    cancellationReason: null,
+    history: [{ id: chargeHistoryId("created"), at, type: "created", summary: "สร้างยอดจากรายการบริการ" }],
+    createdAt: at,
+    updatedAt: at,
+  } satisfies PrototypeCharge;
+}
+
+function reconcileGroomingAddOnsIntoCharge(charge: PrototypeCharge, job: PrototypeServiceJob, at: string) {
+  if (charge.cancelledAt || job.addOns.length === 0) return clonePrototypeCharge(charge);
+  const missing = job.addOns.filter((addOn) => {
+    const sourceKey = addOn.sourceRequestId ?? addOn.id;
+    return !charge.lineItems.some((line) => line.kind === "add-on" && line.serviceJobId === job.serviceJobId && (line.sourceRequestId ?? line.id) === sourceKey);
+  });
+  if (missing.length === 0) return clonePrototypeCharge(charge);
+  const newLines = missing.map((addOn) => ({
+    id: `charge-line-addon-${addOn.id}`,
+    kind: "add-on" as const,
+    label: addOn.label,
+    amount: addOn.additionalPrice,
+    reason: "บริการเพิ่มเติมที่อนุมัติแล้ว",
+    sourceRequestId: addOn.sourceRequestId,
+    serviceJobId: job.serviceJobId,
+    hotelStayId: null,
+    createdAt: addOn.approvedAt || at,
+  }));
+  return {
+    ...clonePrototypeCharge(charge),
+    lineItems: [...charge.lineItems.map(clonePrototypeChargeLine), ...newLines],
+    history: [...charge.history.map((item) => ({ ...item })), { id: chargeHistoryId("adjusted"), at, type: "adjusted", summary: "เพิ่มบริการเพิ่มเติมที่อนุมัติแล้วในยอด" }],
+    updatedAt: at,
+  } satisfies PrototypeCharge;
+}
+
+export type GetOrCreatePrototypeChargeResult =
+  | { ok: true; charge: PrototypeCharge; created: boolean; reconciled: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "cancelled" | "invalid-amount" | "storage" };
+
+function saveOrReturnCharge(
+  store: BusinessStore,
+  charge: PrototypeCharge,
+  created: boolean,
+  reconciled: boolean,
+): GetOrCreatePrototypeChargeResult {
+  if (!created && !reconciled) return { ok: true, charge: clonePrototypeCharge(charge), created: false, reconciled: false };
+  store.charges[charge.chargeId] = charge;
+  if (!writeStore(store)) return { ok: false, reason: "storage" };
+  return { ok: true, charge: clonePrototypeCharge(charge), created, reconciled };
+}
+
+export function getOrCreatePrototypeChargeForGroomingJob(
+  serviceJobId: string,
+  context: DemoBusinessContext,
+): GetOrCreatePrototypeChargeResult {
+  const store = readStore();
+  const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === serviceJobId) ?? null;
+  if (!job) return { ok: false, reason: "missing" };
+  if (!groomJobMatchesContext(job, context)) return { ok: false, reason: "wrong-context" };
+  if (job.status === "cancelled") return { ok: false, reason: "cancelled" };
+  const booking = mergedPrototypeBookings(store).find((item) => item.bookingId === job.bookingId) ?? null;
+  if (!booking || booking.status === "cancelled") return { ok: false, reason: "cancelled" };
+  if (!isWholeBaht(booking.estimate) || booking.estimate < 0 || job.addOns.some((addOn) => !isWholeBaht(addOn.additionalPrice) || addOn.additionalPrice < 0)) return { ok: false, reason: "invalid-amount" };
+  const existing = mergedPrototypeCharges(store).find((charge) => charge.bookingId === booking.bookingId) ?? null;
+  if (existing?.cancelledAt) return { ok: true, charge: clonePrototypeCharge(existing), created: false, reconciled: false };
+  const now = BILLING_DEMO_NOW;
+  const base = existing ?? createChargeForBooking(booking, { serviceJobId: job.serviceJobId, hotelStayId: null, petId: job.petId }, now);
+  const reconciled = reconcileGroomingAddOnsIntoCharge(base, job, now);
+  const didReconcile = reconciled.lineItems.length !== base.lineItems.length;
+  return saveOrReturnCharge(store, reconciled, !existing, didReconcile);
+}
+
+export function getOrCreatePrototypeChargeForHotelStay(
+  hotelStayId: string,
+  context: DemoBusinessContext,
+): GetOrCreatePrototypeChargeResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context" };
+  if (stay.status === "cancelled" || stay.status === "no-show") return { ok: false, reason: "cancelled" };
+  const booking = mergedPrototypeBookings(store).find((item) => item.bookingId === stay.bookingId) ?? null;
+  if (!booking || booking.status === "cancelled") return { ok: false, reason: "cancelled" };
+  if (!isWholeBaht(booking.estimate) || booking.estimate < 0) return { ok: false, reason: "invalid-amount" };
+  const existing = mergedPrototypeCharges(store).find((charge) => charge.bookingId === booking.bookingId) ?? null;
+  if (existing) return { ok: true, charge: clonePrototypeCharge(existing), created: false, reconciled: false };
+  const charge = createChargeForBooking(booking, { serviceJobId: null, hotelStayId: stay.hotelStayId, petId: stay.petId }, BILLING_DEMO_NOW);
+  return saveOrReturnCharge(store, charge, true, false);
+}
+
+export type AddPrototypeChargeAdjustmentResult =
+  | { ok: true; charge: PrototypeCharge }
+  | { ok: false; reason: "missing" | "wrong-context" | "cancelled" | "invalid" | "invalid-total" | "storage" };
+
+export function addPrototypeChargeAdjustment(input: {
+  chargeId: string;
+  context: DemoBusinessContext;
+  kind: "manual-adjustment" | "discount";
+  label: string;
+  amount: number;
+  reason: string;
+}) : AddPrototypeChargeAdjustmentResult {
+  const label = input.label.trim();
+  const reason = input.reason.trim();
+  const normalizedAmount = Math.round(input.amount);
+  if (!label || !reason || !Number.isFinite(input.amount) || normalizedAmount <= 0 || !Number.isInteger(input.amount)) return { ok: false, reason: "invalid" };
+  const store = readStore();
+  const charge = mergedPrototypeCharges(store).find((item) => item.chargeId === input.chargeId) ?? null;
+  if (!charge) return { ok: false, reason: "missing" };
+  if (!chargeMatchesContext(charge, input.context)) return { ok: false, reason: "wrong-context" };
+  if (charge.cancelledAt) return { ok: false, reason: "cancelled" };
+  const signedAmount = input.kind === "discount" ? -normalizedAmount : normalizedAmount;
+  const projectedTotal = charge.lineItems.reduce((sum, line) => sum + line.amount, 0) + signedAmount;
+  if (projectedTotal < 0 || projectedTotal < allocatedPaymentAmountForCharge(charge.chargeId, mergedPrototypePayments(store))) return { ok: false, reason: "invalid-total" };
+  const now = BILLING_DEMO_NOW;
+  const next: PrototypeCharge = {
+    ...clonePrototypeCharge(charge),
+    lineItems: [...charge.lineItems.map(clonePrototypeChargeLine), {
+      id: generatedPrototypeBillingId("charge-line-adjustment"),
+      kind: input.kind,
+      label,
+      amount: signedAmount,
+      reason,
+      sourceRequestId: null,
+      serviceJobId: null,
+      hotelStayId: null,
+      createdAt: now,
+    }],
+    history: [...charge.history.map((item) => ({ ...item })), { id: chargeHistoryId("adjusted"), at: now, type: "adjusted", summary: input.kind === "discount" ? "เพิ่มส่วนลดในยอด" : "ปรับยอดด้วยเหตุผล" }],
+    updatedAt: now,
+  };
+  store.charges[next.chargeId] = next;
+  return writeStore(store) ? { ok: true, charge: clonePrototypeCharge(next) } : { ok: false, reason: "storage" };
+}
+
+export type CancelPrototypeChargeResult =
+  | { ok: true; charge: PrototypeCharge; duplicate: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "has-payments" | "invalid" | "storage" };
+
+export function cancelPrototypeCharge(
+  chargeId: string,
+  reason: string,
+  context: DemoBusinessContext,
+): CancelPrototypeChargeResult {
+  const normalizedReason = reason.trim();
+  if (!normalizedReason) return { ok: false, reason: "invalid" };
+  const store = readStore();
+  const charge = mergedPrototypeCharges(store).find((item) => item.chargeId === chargeId) ?? null;
+  if (!charge) return { ok: false, reason: "missing" };
+  if (!chargeMatchesContext(charge, context)) return { ok: false, reason: "wrong-context" };
+  if (charge.cancelledAt) return { ok: true, charge: clonePrototypeCharge(charge), duplicate: true };
+  if (allocatedPaymentAmountForCharge(charge.chargeId, mergedPrototypePayments(store)) > 0) return { ok: false, reason: "has-payments" };
+  const now = BILLING_DEMO_NOW;
+  const next: PrototypeCharge = {
+    ...clonePrototypeCharge(charge),
+    cancelledAt: now,
+    cancellationReason: normalizedReason,
+    history: [...charge.history.map((item) => ({ ...item })), { id: chargeHistoryId("cancelled"), at: now, type: "cancelled", summary: "ยกเลิกยอดใน local prototype" }],
+    updatedAt: now,
+  };
+  store.charges[next.chargeId] = next;
+  return writeStore(store) ? { ok: true, charge: clonePrototypeCharge(next), duplicate: false } : { ok: false, reason: "storage" };
+}
+
+export type RecordPrototypePaymentResult =
+  | { ok: true; payment: PrototypePayment; duplicate: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "cancelled" | "invalid" | "overpayment" | "storage" };
+
+export function recordPrototypePayment(input: {
+  chargeId: string;
+  context: DemoBusinessContext;
+  amount: number;
+  method: PrototypePaymentMethod;
+  note?: string;
+  requestKey: string;
+  recordedAt?: string;
+}): RecordPrototypePaymentResult {
+  const requestKey = input.requestKey.trim();
+  const amount = Math.round(input.amount);
+  if (!requestKey || !isPrototypePaymentMethod(input.method) || !Number.isFinite(input.amount) || !Number.isInteger(input.amount) || amount <= 0) return { ok: false, reason: "invalid" };
+  const store = readStore();
+  const payments = mergedPrototypePayments(store);
+  const charge = mergedPrototypeCharges(store).find((item) => item.chargeId === input.chargeId) ?? null;
+  if (!charge) return { ok: false, reason: "missing" };
+  if (!chargeMatchesContext(charge, input.context)) return { ok: false, reason: "wrong-context" };
+  if (charge.cancelledAt) return { ok: false, reason: "cancelled" };
+  const duplicate = payments.find((payment) => payment.requestKey === requestKey) ?? null;
+  if (duplicate) {
+    if (!duplicate.allocations.some((allocation) => allocation.chargeId === charge.chargeId)) return { ok: false, reason: "invalid" };
+    return { ok: true, payment: clonePrototypePayment(duplicate), duplicate: true };
+  }
+  const balance = getPrototypeChargeBalance(charge, payments);
+  if (amount > balance.remaining) return { ok: false, reason: "overpayment" };
+  const payment: PrototypePayment = {
+    paymentId: generatedPrototypeBillingId("payment"),
+    businessId: charge.businessId,
+    branchId: charge.branchId,
+    customerId: charge.customerId,
+    method: input.method,
+    amount,
+    allocations: [{ chargeId: charge.chargeId, amount }],
+    note: input.note?.trim() ?? "",
+    requestKey,
+    recordedAt: input.recordedAt ?? BILLING_DEMO_NOW,
+  };
+  store.payments[payment.paymentId] = payment;
+  return writeStore(store) ? { ok: true, payment: clonePrototypePayment(payment), duplicate: false } : { ok: false, reason: "storage" };
+}
+
+// ---------------------------------------------------------------------------
+// BF-8 shared Service Record foundation
+// ---------------------------------------------------------------------------
+
+function serviceRecordIdForGroomingJob(serviceJobId: string) {
+  return `service-record-grooming-${serviceJobId}`;
+}
+
+function serviceRecordIdForHotelStay(hotelStayId: string) {
+  return `service-record-hotel-${hotelStayId}`;
+}
+
+function generatedPrototypeServiceRecordId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function clonePrototypeServiceRecordSourceRevision(revision: PrototypeServiceRecordSourceRevision): PrototypeServiceRecordSourceRevision {
+  return {
+    ...revision,
+    details: revision.details.map((detail) => ({ ...detail })),
+    activities: revision.activities.map((activity) => ({ ...activity })),
+    staffResourceLabels: [...revision.staffResourceLabels],
+    photos: revision.photos.map((photo) => ({ ...photo })),
+  };
+}
+
+function clonePrototypeServiceRecord(record: PrototypeServiceRecord): PrototypeServiceRecord {
+  return {
+    ...record,
+    details: record.details.map((detail) => ({ ...detail })),
+    activities: record.activities.map((activity) => ({ ...activity })),
+    staffResourceLabels: [...record.staffResourceLabels],
+    photos: record.photos.map((photo) => ({ ...photo })),
+    // Existing BF-8 browser sessions predate sourceRevisions. Treat their
+    // already-valid Service Records as having no prior source revisions.
+    sourceRevisions: (record.sourceRevisions ?? []).map(clonePrototypeServiceRecordSourceRevision),
+    corrections: record.corrections.map((correction) => ({ ...correction })),
+    handover: {
+      ...record.handover,
+      history: record.handover.history.map((event) => ({ ...event })),
+    },
+  };
+}
+
+function nextPrototypeServiceRecordAuditTimestamp(record: PrototypeServiceRecord) {
+  const timestamps = [
+    record.completedAt,
+    record.createdAt,
+    record.updatedAt,
+    ...record.corrections.map((correction) => correction.at),
+    ...record.handover.history.map((event) => event.at),
+    ...(record.sourceRevisions ?? []).map((revision) => revision.at),
+  ];
+  const latest = timestamps.reduce((maximum, timestamp) => {
+    const value = Date.parse(timestamp);
+    return Number.isFinite(value) ? Math.max(maximum, value) : maximum;
+  }, 0);
+  return new Date(Math.max(Date.now(), latest + 1)).toISOString();
+}
+
+function isPrototypeServiceRecordSource(value: unknown): value is PrototypeServiceRecordSource {
+  return value === "grooming-job" || value === "hotel-stay";
+}
+
+function isPrototypeServiceRecordActivityKind(value: unknown): value is PrototypeServiceRecordActivityKind {
+  return value === "service" || value === "add-on" || value === "care" || value === "room";
+}
+
+function isPrototypeServiceRecordCorrectionField(value: unknown): value is PrototypeServiceRecordCorrectionField {
+  return value === "summary" || value === "business-note";
+}
+
+function isPrototypeServiceRecordPaymentStatus(value: unknown): value is PrototypeServiceRecordPaymentStatus {
+  return value === "unpaid" || value === "partial" || value === "paid" || value === "cancelled" || value === "no-charge";
+}
+
+function isPrototypeServiceRecordHandoverStatus(value: unknown): value is PrototypeServiceRecordHandoverStatus {
+  return value === "pending" || value === "handed-over";
+}
+
+function isPrototypeServiceRecordDetail(value: unknown): value is PrototypeServiceRecordDetail {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const detail = value as Partial<PrototypeServiceRecordDetail>;
+  return typeof detail.id === "string" && typeof detail.label === "string" && typeof detail.value === "string";
+}
+
+function isPrototypeServiceRecordActivity(value: unknown): value is PrototypeServiceRecordActivity {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const activity = value as Partial<PrototypeServiceRecordActivity>;
+  return typeof activity.id === "string"
+    && isPrototypeServiceRecordActivityKind(activity.kind)
+    && typeof activity.label === "string"
+    && (typeof activity.occurredAt === "string" || activity.occurredAt === null)
+    && (typeof activity.detail === "string" || activity.detail === null);
+}
+
+function isPrototypeServiceRecordPhoto(value: unknown): value is PrototypeServiceRecordPhoto {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const photo = value as Partial<PrototypeServiceRecordPhoto>;
+  return typeof photo.id === "string"
+    && (photo.phase === "before" || photo.phase === "after")
+    && typeof photo.label === "string"
+    && (typeof photo.localAssetRef === "string" || photo.localAssetRef === null)
+    && typeof photo.createdAt === "string";
+}
+
+function isPrototypeServiceRecordSourceRevision(value: unknown): value is PrototypeServiceRecordSourceRevision {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const revision = value as Partial<PrototypeServiceRecordSourceRevision>;
+  return typeof revision.id === "string"
+    && typeof revision.at === "string"
+    && typeof revision.completedAt === "string"
+    && typeof revision.summary === "string"
+    && Array.isArray(revision.details)
+    && revision.details.every(isPrototypeServiceRecordDetail)
+    && Array.isArray(revision.activities)
+    && revision.activities.every(isPrototypeServiceRecordActivity)
+    && Array.isArray(revision.staffResourceLabels)
+    && revision.staffResourceLabels.every((label) => typeof label === "string")
+    && typeof revision.businessNote === "string"
+    && Array.isArray(revision.photos)
+    && revision.photos.every(isPrototypeServiceRecordPhoto)
+    && revision.reason === "source-recompleted";
+}
+
+function isPrototypeServiceRecordCorrection(value: unknown): value is PrototypeServiceRecordCorrection {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const correction = value as Partial<PrototypeServiceRecordCorrection>;
+  return typeof correction.id === "string"
+    && typeof correction.at === "string"
+    && isPrototypeServiceRecordCorrectionField(correction.field)
+    && typeof correction.previousValue === "string"
+    && typeof correction.nextValue === "string"
+    && typeof correction.reason === "string"
+    && typeof correction.correctedBy === "string"
+    && typeof correction.requestKey === "string";
+}
+
+function isPrototypeServiceRecordHandoverEvent(value: unknown): value is PrototypeServiceRecordHandoverEvent {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const event = value as Partial<PrototypeServiceRecordHandoverEvent>;
+  return typeof event.id === "string"
+    && typeof event.at === "string"
+    && (event.type === "ready" || event.type === "handed-over")
+    && typeof event.summary === "string"
+    && (event.paymentStatus === null || isPrototypeServiceRecordPaymentStatus(event.paymentStatus));
+}
+
+function isPrototypeServiceRecordHandover(value: unknown): value is PrototypeServiceRecordHandover {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const handover = value as Partial<PrototypeServiceRecordHandover>;
+  return isPrototypeServiceRecordHandoverStatus(handover.status)
+    && (typeof handover.handedOverAt === "string" || handover.handedOverAt === null)
+    && (typeof handover.handedOverBy === "string" || handover.handedOverBy === null)
+    && typeof handover.note === "string"
+    && (handover.paymentStatusAtHandover === null || isPrototypeServiceRecordPaymentStatus(handover.paymentStatusAtHandover))
+    && Array.isArray(handover.history)
+    && handover.history.every(isPrototypeServiceRecordHandoverEvent);
+}
+
+function isPrototypeServiceRecord(value: unknown): value is PrototypeServiceRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Partial<PrototypeServiceRecord>;
+  const sourceIdsAreCoherent = record.source === "grooming-job"
+    ? typeof record.serviceJobId === "string" && record.hotelStayId === null
+    : record.source === "hotel-stay"
+      ? typeof record.hotelStayId === "string" && record.serviceJobId === null
+      : false;
+  return typeof record.serviceRecordId === "string"
+    && isPrototypeServiceRecordSource(record.source)
+    && sourceIdsAreCoherent
+    && typeof record.bookingId === "string"
+    && typeof record.businessId === "string"
+    && typeof record.branchId === "string"
+    && typeof record.customerId === "string"
+    && typeof record.petId === "string"
+    && (record.serviceModule === "grooming" || record.serviceModule === "hotel")
+    && typeof record.serviceLabel === "string"
+    && typeof record.completedAt === "string"
+    && typeof record.summary === "string"
+    && Array.isArray(record.details)
+    && record.details.every(isPrototypeServiceRecordDetail)
+    && Array.isArray(record.activities)
+    && record.activities.every(isPrototypeServiceRecordActivity)
+    && Array.isArray(record.staffResourceLabels)
+    && record.staffResourceLabels.every((label) => typeof label === "string")
+    && typeof record.businessNote === "string"
+    && Array.isArray(record.photos)
+    && record.photos.every(isPrototypeServiceRecordPhoto)
+    && (record.sourceRevisions === undefined || (Array.isArray(record.sourceRevisions) && record.sourceRevisions.every(isPrototypeServiceRecordSourceRevision)))
+    && Array.isArray(record.corrections)
+    && record.corrections.every(isPrototypeServiceRecordCorrection)
+    && isPrototypeServiceRecordHandover(record.handover)
+    && typeof record.createdAt === "string"
+    && typeof record.updatedAt === "string";
+}
+
+function initialPrototypeServiceRecordHandover(serviceRecordId: string, at: string): PrototypeServiceRecordHandover {
+  return {
+    status: "pending",
+    handedOverAt: null,
+    handedOverBy: null,
+    note: "",
+    paymentStatusAtHandover: null,
+    history: [{
+      id: `${serviceRecordId}-handover-ready`,
+      at,
+      type: "ready",
+      // Keep the legacy event shape for old persisted records without
+      // presenting a new handover task in the current product.
+      summary: "บันทึก Service Record จากงานที่เสร็จแล้ว",
+      paymentStatus: null,
+    }],
+  };
+}
+
+function recordResourceLabels(job: PrototypeServiceJob) {
+  const context = getDemoBusinessContextForBranch(job.businessId, job.branchId);
+  const resources = getBookingResources(context, job.baseServiceId);
+  const labels = job.assignedResourceIds
+    .map((resourceId) => resources.find((resource) => resource.id === resourceId)?.label ?? null)
+    .filter((label): label is string => Boolean(label));
+  return [...new Set(labels)];
+}
+
+function roomLabelsForStay(stay: PrototypeHotelStay) {
+  const context = getDemoBusinessContextForBranch(stay.businessId, stay.branchId);
+  const rooms = getHotelRooms(context);
+  return [...new Set(stay.roomAssignments
+    .map((assignment) => rooms.find((room) => room.id === assignment.roomId)?.label ?? null)
+    .filter((label): label is string => Boolean(label)))];
+}
+
+function buildPrototypeServiceRecordFromGroomingJob(
+  job: PrototypeServiceJob,
+  booking: PrototypeBooking,
+): PrototypeServiceRecord | null {
+  if (job.status !== "completed" || !job.actualCompletedAt) return null;
+  const serviceRecordId = serviceRecordIdForGroomingJob(job.serviceJobId);
+  const resourceLabels = recordResourceLabels(job);
+  const addOnLabels = job.addOns.map((addOn) => addOn.label).filter(Boolean);
+  const details: PrototypeServiceRecordDetail[] = [
+    { id: `${serviceRecordId}-detail-base`, label: "บริการหลัก", value: booking.service.label },
+    { id: `${serviceRecordId}-detail-addon`, label: "บริการเพิ่มเติม", value: addOnLabels.length > 0 ? addOnLabels.join(" · ") : "ไม่มี" },
+    { id: `${serviceRecordId}-detail-team`, label: "ทีม / ทรัพยากร", value: resourceLabels.length > 0 ? resourceLabels.join(" · ") : "ยังไม่ระบุ" },
+  ];
+  const activities: PrototypeServiceRecordActivity[] = [
+    {
+      id: `${serviceRecordId}-activity-service`,
+      kind: "service",
+      label: booking.service.label,
+      occurredAt: job.actualCompletedAt,
+      detail: "บริการหลักเสร็จแล้ว",
+    },
+    ...job.addOns.map((addOn) => ({
+      id: `${serviceRecordId}-activity-addon-${addOn.id}`,
+      kind: "add-on" as const,
+      label: addOn.label,
+      occurredAt: addOn.approvedAt,
+      detail: "บริการเพิ่มเติมที่อนุมัติแล้ว",
+    })),
+  ];
+  return {
+    serviceRecordId,
+    source: "grooming-job",
+    serviceJobId: job.serviceJobId,
+    hotelStayId: null,
+    bookingId: job.bookingId,
+    businessId: job.businessId,
+    branchId: job.branchId,
+    customerId: job.customerId,
+    petId: job.petId,
+    serviceModule: "grooming",
+    serviceLabel: booking.service.label,
+    completedAt: job.actualCompletedAt,
+    summary: `${booking.service.label} เสร็จแล้ว`,
+    details,
+    activities,
+    staffResourceLabels: resourceLabels,
+    businessNote: job.businessNote,
+    photos: [],
+    sourceRevisions: [],
+    corrections: [],
+    handover: initialPrototypeServiceRecordHandover(serviceRecordId, job.actualCompletedAt),
+    createdAt: job.actualCompletedAt,
+    updatedAt: job.actualCompletedAt,
+  };
+}
+
+function buildPrototypeServiceRecordFromHotelStay(
+  stay: PrototypeHotelStay,
+  booking: PrototypeBooking,
+): PrototypeServiceRecord | null {
+  if ((stay.status !== "checked-out" && stay.status !== "completed") || !stay.actualCheckOutAt) return null;
+  const serviceRecordId = serviceRecordIdForHotelStay(stay.hotelStayId);
+  const roomLabels = roomLabelsForStay(stay);
+  // Service Record intentionally summarizes ordinary daily care only. It excludes
+  // guardianCareInstruction, Intake, medication instructions/authorization,
+  // and incident details so it cannot become a medical or Passport record.
+  const nonMedicalTasks = stay.dailyCareTasks.filter((task) => task.kind !== "medication");
+  const completedCare = nonMedicalTasks.filter((task) => task.state === "completed");
+  const completedCareLabels = completedCare.map((task) => task.label).filter(Boolean);
+  const staffLabels = [...new Set(completedCare
+    .map((task) => task.completedBy)
+    .filter((label): label is string => Boolean(label)))];
+  const details: PrototypeServiceRecordDetail[] = [
+    { id: `${serviceRecordId}-detail-stay`, label: "ช่วงเข้าพัก", value: `${stay.scheduledCheckIn} – ${stay.scheduledCheckOut}` },
+    { id: `${serviceRecordId}-detail-room`, label: "ห้อง / โซน", value: roomLabels.length > 0 ? roomLabels.join(" · ") : "ยังไม่ระบุ" },
+    { id: `${serviceRecordId}-detail-care`, label: "งานดูแลทั่วไป", value: `${completedCare.length}/${nonMedicalTasks.length} รายการเสร็จแล้ว` },
+  ];
+  const activities: PrototypeServiceRecordActivity[] = [
+    {
+      id: `${serviceRecordId}-activity-stay`,
+      kind: "service",
+      label: booking.service.label,
+      occurredAt: stay.actualCheckOutAt,
+      detail: `เข้าพัก ${stay.scheduledCheckIn} – ${stay.scheduledCheckOut}`,
+    },
+    ...(roomLabels.length > 0 ? [{
+      id: `${serviceRecordId}-activity-room`,
+      kind: "room" as const,
+      label: `ห้อง / โซน ${roomLabels.join(" · ")}`,
+      occurredAt: stay.actualCheckOutAt,
+      detail: stay.roomMoveHistory.length > 0 ? `มีการย้ายห้อง ${stay.roomMoveHistory.length} ครั้ง` : "ไม่มีการย้ายห้องที่บันทึกไว้",
+    }] : []),
+    {
+      id: `${serviceRecordId}-activity-care`,
+      kind: "care",
+      label: `งานดูแลทั่วไปเสร็จ ${completedCare.length}/${nonMedicalTasks.length}`,
+      occurredAt: stay.actualCheckOutAt,
+      detail: completedCareLabels.length > 0 ? completedCareLabels.join(" · ") : "ไม่มีรายการดูแลทั่วไปที่ทำเสร็จ",
+    },
+  ];
+  return {
+    serviceRecordId,
+    source: "hotel-stay",
+    serviceJobId: null,
+    hotelStayId: stay.hotelStayId,
+    bookingId: stay.bookingId,
+    businessId: stay.businessId,
+    branchId: stay.branchId,
+    customerId: stay.customerId,
+    petId: stay.petId,
+    serviceModule: "hotel",
+    serviceLabel: booking.service.label,
+    completedAt: stay.actualCheckOutAt,
+    summary: `${booking.service.label} เช็กเอาต์แล้ว`,
+    details,
+    activities,
+    staffResourceLabels: staffLabels,
+    businessNote: stay.businessNote,
+    photos: [],
+    sourceRevisions: [],
+    corrections: [],
+    handover: initialPrototypeServiceRecordHandover(serviceRecordId, stay.actualCheckOutAt),
+    createdAt: stay.actualCheckOutAt,
+    updatedAt: stay.actualCheckOutAt,
+  };
+}
+
+function mergedPrototypeServiceRecords(store: BusinessStore) {
+  const records = new Map<string, PrototypeServiceRecord>();
+  for (const stored of Object.values(store.serviceRecords)) {
+    if (isPrototypeServiceRecord(stored)) records.set(stored.serviceRecordId, clonePrototypeServiceRecord(stored));
+  }
+  const bookings = new Map(mergedPrototypeBookings(store).map((booking) => [booking.bookingId, booking]));
+  for (const job of mergedPrototypeServiceJobs(store)) {
+    const recordId = serviceRecordIdForGroomingJob(job.serviceJobId);
+    if (records.has(recordId)) continue;
+    const booking = bookings.get(job.bookingId);
+    const record = booking ? buildPrototypeServiceRecordFromGroomingJob(job, booking) : null;
+    if (record) records.set(record.serviceRecordId, record);
+  }
+  for (const stay of mergedPrototypeHotelStays(store)) {
+    const recordId = serviceRecordIdForHotelStay(stay.hotelStayId);
+    if (records.has(recordId)) continue;
+    const booking = bookings.get(stay.bookingId);
+    const record = booking ? buildPrototypeServiceRecordFromHotelStay(stay, booking) : null;
+    if (record) records.set(record.serviceRecordId, record);
+  }
+  return [...records.values()];
+}
+
+function serviceRecordMatchesContext(record: PrototypeServiceRecord, context?: DemoBusinessContext | null) {
+  return !context || (record.businessId === context.businessId && record.branchId === context.branchId);
+}
+
+function sortPrototypeServiceRecords(records: readonly PrototypeServiceRecord[], context?: DemoBusinessContext | null) {
+  return records
+    .filter((record) => serviceRecordMatchesContext(record, context))
+    .map(clonePrototypeServiceRecord)
+    .sort((first, second) => second.completedAt.localeCompare(first.completedAt) || second.updatedAt.localeCompare(first.updatedAt) || first.serviceRecordId.localeCompare(second.serviceRecordId));
+}
+
+export function listPrototypeServiceRecordFixtures(context?: DemoBusinessContext | null) {
+  return sortPrototypeServiceRecords(mergedPrototypeServiceRecords(emptyStore()), context);
+}
+
+export function listPrototypeServiceRecords(context?: DemoBusinessContext | null) {
+  return sortPrototypeServiceRecords(mergedPrototypeServiceRecords(readStore()), context);
+}
+
+export function listPrototypeServiceRecordsForCustomer(
+  customerId: string,
+  context?: DemoBusinessContext | null,
+  fixtureOnly = false,
+) {
+  const records = fixtureOnly ? listPrototypeServiceRecordFixtures(context) : listPrototypeServiceRecords(context);
+  return records.filter((record) => record.customerId === customerId);
+}
+
+export function readPrototypeServiceRecord(serviceRecordId: string) {
+  return listPrototypeServiceRecords(null).find((record) => record.serviceRecordId === serviceRecordId) ?? null;
+}
+
+function sourceIsCompleteForServiceRecord(record: PrototypeServiceRecord, store: BusinessStore) {
+  if (record.source === "grooming-job" && record.serviceJobId) {
+    const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === record.serviceJobId) ?? null;
+    return Boolean(job?.status === "completed" && job.actualCompletedAt);
+  }
+  if (record.source === "hotel-stay" && record.hotelStayId) {
+    const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === record.hotelStayId) ?? null;
+    return Boolean(stay && ["checked-out", "completed"].includes(stay.status) && stay.actualCheckOutAt);
+  }
+  return false;
+}
+
+function ensurePrototypeServiceRecordForGroomingJobInStore(
+  store: BusinessStore,
+  job: PrototypeServiceJob,
+) {
+  const serviceRecordId = serviceRecordIdForGroomingJob(job.serviceJobId);
+  const existing = store.serviceRecords[serviceRecordId];
+  if (isPrototypeServiceRecord(existing)) return clonePrototypeServiceRecord(existing);
+  const booking = mergedPrototypeBookings(store).find((item) => item.bookingId === job.bookingId) ?? null;
+  const record = booking ? buildPrototypeServiceRecordFromGroomingJob(job, booking) : null;
+  if (!record) return null;
+  store.serviceRecords[record.serviceRecordId] = record;
+  return clonePrototypeServiceRecord(record);
+}
+
+function serviceRecordSourceSnapshotKey(record: PrototypeServiceRecord) {
+  return JSON.stringify({
+    completedAt: record.completedAt,
+    serviceLabel: record.serviceLabel,
+    summary: record.summary,
+    details: record.details,
+    activities: record.activities,
+    staffResourceLabels: record.staffResourceLabels,
+    businessNote: record.businessNote,
+    photos: record.photos,
+  });
+}
+
+function sourceRevisionFromPrototypeServiceRecord(record: PrototypeServiceRecord, at: string): PrototypeServiceRecordSourceRevision {
+  return {
+    id: generatedPrototypeServiceRecordId("service-record-source-revision"),
+    at,
+    completedAt: record.completedAt,
+    summary: record.summary,
+    details: record.details.map((detail) => ({ ...detail })),
+    activities: record.activities.map((activity) => ({ ...activity })),
+    staffResourceLabels: [...record.staffResourceLabels],
+    businessNote: record.businessNote,
+    photos: record.photos.map((photo) => ({ ...photo })),
+    reason: "source-recompleted",
+  };
+}
+
+function refreshPrototypeServiceRecordForGroomingJobInStore(
+  store: BusinessStore,
+  job: PrototypeServiceJob,
+) {
+  const serviceRecordId = serviceRecordIdForGroomingJob(job.serviceJobId);
+  const existing = store.serviceRecords[serviceRecordId];
+  if (!isPrototypeServiceRecord(existing)) return ensurePrototypeServiceRecordForGroomingJobInStore(store, job);
+  const current = clonePrototypeServiceRecord(existing);
+  const booking = mergedPrototypeBookings(store).find((item) => item.bookingId === job.bookingId) ?? null;
+  const fresh = booking ? buildPrototypeServiceRecordFromGroomingJob(job, booking) : null;
+  if (!fresh) return current;
+
+  // An operator-entered lightweight correction remains intentional even when
+  // the source Job is completed again. Refresh the execution-derived facts,
+  // but retain those explicitly corrected text fields and local photo metadata.
+  const refreshed: PrototypeServiceRecord = {
+    ...fresh,
+    summary: current.corrections.some((correction) => correction.field === "summary") ? current.summary : fresh.summary,
+    businessNote: current.corrections.some((correction) => correction.field === "business-note") ? current.businessNote : fresh.businessNote,
+    photos: current.photos.map((photo) => ({ ...photo })),
+    sourceRevisions: current.sourceRevisions.map(clonePrototypeServiceRecordSourceRevision),
+    corrections: current.corrections.map((correction) => ({ ...correction })),
+    handover: {
+      ...current.handover,
+      history: current.handover.history.map((event) => ({ ...event })),
+    },
+    createdAt: current.createdAt,
+    updatedAt: current.updatedAt,
+  };
+  if (serviceRecordSourceSnapshotKey(current) === serviceRecordSourceSnapshotKey(refreshed)) return current;
+
+  const at = nextPrototypeServiceRecordAuditTimestamp(current);
+  const next: PrototypeServiceRecord = {
+    ...refreshed,
+    sourceRevisions: [...refreshed.sourceRevisions, sourceRevisionFromPrototypeServiceRecord(current, at)],
+    updatedAt: at,
+  };
+  store.serviceRecords[next.serviceRecordId] = next;
+  return clonePrototypeServiceRecord(next);
+}
+
+function ensurePrototypeServiceRecordForHotelStayInStore(
+  store: BusinessStore,
+  stay: PrototypeHotelStay,
+) {
+  const serviceRecordId = serviceRecordIdForHotelStay(stay.hotelStayId);
+  const existing = store.serviceRecords[serviceRecordId];
+  if (isPrototypeServiceRecord(existing)) return clonePrototypeServiceRecord(existing);
+  const booking = mergedPrototypeBookings(store).find((item) => item.bookingId === stay.bookingId) ?? null;
+  const record = booking ? buildPrototypeServiceRecordFromHotelStay(stay, booking) : null;
+  if (!record) return null;
+  store.serviceRecords[record.serviceRecordId] = record;
+  return clonePrototypeServiceRecord(record);
+}
+
+export type GetOrCreatePrototypeServiceRecordResult =
+  | { ok: true; record: PrototypeServiceRecord; created: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "not-completed" | "storage" };
+
+export function getOrCreatePrototypeServiceRecordForGroomingJob(
+  serviceJobId: string,
+  context: DemoBusinessContext,
+): GetOrCreatePrototypeServiceRecordResult {
+  const store = readStore();
+  const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === serviceJobId) ?? null;
+  if (!job) return { ok: false, reason: "missing" };
+  if (!groomJobMatchesContext(job, context)) return { ok: false, reason: "wrong-context" };
+  const existing = store.serviceRecords[serviceRecordIdForGroomingJob(job.serviceJobId)];
+  if (isPrototypeServiceRecord(existing)) return { ok: true, record: clonePrototypeServiceRecord(existing), created: false };
+  const record = ensurePrototypeServiceRecordForGroomingJobInStore(store, job);
+  if (!record) return { ok: false, reason: "not-completed" };
+  return writeStore(store) ? { ok: true, record, created: true } : { ok: false, reason: "storage" };
+}
+
+export function getOrCreatePrototypeServiceRecordForHotelStay(
+  hotelStayId: string,
+  context: DemoBusinessContext,
+): GetOrCreatePrototypeServiceRecordResult {
+  const store = readStore();
+  const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
+  if (!stay) return { ok: false, reason: "missing" };
+  if (!hotelStayMatchesContext(stay, context)) return { ok: false, reason: "wrong-context" };
+  const existing = store.serviceRecords[serviceRecordIdForHotelStay(stay.hotelStayId)];
+  if (isPrototypeServiceRecord(existing)) return { ok: true, record: clonePrototypeServiceRecord(existing), created: false };
+  const record = ensurePrototypeServiceRecordForHotelStayInStore(store, stay);
+  if (!record) return { ok: false, reason: "not-completed" };
+  return writeStore(store) ? { ok: true, record, created: true } : { ok: false, reason: "storage" };
+}
+
+function paymentReferenceForServiceRecord(
+  record: PrototypeServiceRecord,
+  charges: readonly PrototypeCharge[],
+  payments: readonly PrototypePayment[],
+): PrototypeServiceRecordPaymentReference {
+  const sourceCharges = charges.filter((charge) => (
+    (record.serviceJobId && charge.serviceJobId === record.serviceJobId)
+    || (record.hotelStayId && charge.hotelStayId === record.hotelStayId)
+  ));
+  const bookingCharges = charges.filter((charge) => charge.bookingId === record.bookingId);
+  const charge = sourceCharges[0] ?? bookingCharges[0] ?? null;
+  if (!charge) return { chargeId: null, status: "no-charge", total: 0, paid: 0, remaining: 0, source: "none" };
+  const balance = getPrototypeChargeBalance(charge, payments);
+  return {
+    chargeId: charge.chargeId,
+    status: balance.status,
+    total: balance.total,
+    paid: balance.paid,
+    remaining: balance.remaining,
+    source: sourceCharges.length > 0 ? "source" : "booking",
+  };
+}
+
+export function getPrototypeServiceRecordPaymentReference(
+  record: PrototypeServiceRecord,
+  context: DemoBusinessContext,
+  fixtureOnly = false,
+) {
+  if (!serviceRecordMatchesContext(record, context)) return { chargeId: null, status: "no-charge", total: 0, paid: 0, remaining: 0, source: "none" } satisfies PrototypeServiceRecordPaymentReference;
+  const charges = fixtureOnly ? listPrototypeChargeFixtures(context) : listPrototypeCharges(context);
+  const payments = fixtureOnly ? listPrototypePaymentFixtures(context) : listPrototypePayments(context);
+  return paymentReferenceForServiceRecord(record, charges, payments);
+}
+
+export type CorrectPrototypeServiceRecordResult =
+  | { ok: true; record: PrototypeServiceRecord; duplicate: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "invalid" | "storage" };
+
+export function correctPrototypeServiceRecord(input: {
+  serviceRecordId: string;
+  context: DemoBusinessContext;
+  field: PrototypeServiceRecordCorrectionField;
+  nextValue: string;
+  reason: string;
+  requestKey: string;
+}): CorrectPrototypeServiceRecordResult {
+  const nextValue = input.nextValue.trim();
+  const reason = input.reason.trim();
+  const requestKey = input.requestKey.trim();
+  if (!isPrototypeServiceRecordCorrectionField(input.field) || !nextValue || !reason || !requestKey) return { ok: false, reason: "invalid" };
+  const store = readStore();
+  const record = mergedPrototypeServiceRecords(store).find((item) => item.serviceRecordId === input.serviceRecordId) ?? null;
+  if (!record) return { ok: false, reason: "missing" };
+  if (!serviceRecordMatchesContext(record, input.context)) return { ok: false, reason: "wrong-context" };
+  const duplicate = record.corrections.find((correction) => correction.requestKey === requestKey) ?? null;
+  if (duplicate) return { ok: true, record: clonePrototypeServiceRecord(record), duplicate: true };
+  const previousValue = input.field === "summary" ? record.summary : record.businessNote;
+  if (previousValue === nextValue) return { ok: false, reason: "invalid" };
+  const now = nextPrototypeServiceRecordAuditTimestamp(record);
+  const correction: PrototypeServiceRecordCorrection = {
+    id: generatedPrototypeServiceRecordId("service-record-correction"),
+    at: now,
+    field: input.field,
+    previousValue,
+    nextValue,
+    reason,
+    correctedBy: input.context.memberLabel,
+    requestKey,
+  };
+  const next: PrototypeServiceRecord = {
+    ...clonePrototypeServiceRecord(record),
+    summary: input.field === "summary" ? nextValue : record.summary,
+    businessNote: input.field === "business-note" ? nextValue : record.businessNote,
+    corrections: [...record.corrections.map((item) => ({ ...item })), correction],
+    updatedAt: now,
+  };
+  store.serviceRecords[next.serviceRecordId] = next;
+  return writeStore(store) ? { ok: true, record: clonePrototypeServiceRecord(next), duplicate: false } : { ok: false, reason: "storage" };
+}
+
+export type CompletePrototypeServiceRecordHandoverResult =
+  | { ok: true; record: PrototypeServiceRecord; duplicate: boolean }
+  | { ok: false; reason: "missing" | "wrong-context" | "source-not-complete" | "review-required" | "storage" };
+
+export function completePrototypeServiceRecordHandover(input: {
+  serviceRecordId: string;
+  context: DemoBusinessContext;
+  note?: string;
+  paymentReviewed: boolean;
+}): CompletePrototypeServiceRecordHandoverResult {
+  if (!input.paymentReviewed) return { ok: false, reason: "review-required" };
+  const store = readStore();
+  const record = mergedPrototypeServiceRecords(store).find((item) => item.serviceRecordId === input.serviceRecordId) ?? null;
+  if (!record) return { ok: false, reason: "missing" };
+  if (!serviceRecordMatchesContext(record, input.context)) return { ok: false, reason: "wrong-context" };
+  if (record.handover.status === "handed-over") return { ok: true, record: clonePrototypeServiceRecord(record), duplicate: true };
+  if (!sourceIsCompleteForServiceRecord(record, store)) return { ok: false, reason: "source-not-complete" };
+  const paymentReference = paymentReferenceForServiceRecord(record, mergedPrototypeCharges(store), mergedPrototypePayments(store));
+  const now = nextPrototypeServiceRecordAuditTimestamp(record);
+  const next: PrototypeServiceRecord = {
+    ...clonePrototypeServiceRecord(record),
+    handover: {
+      ...record.handover,
+      status: "handed-over",
+      handedOverAt: now,
+      handedOverBy: input.context.memberLabel,
+      note: input.note?.trim() ?? "",
+      paymentStatusAtHandover: paymentReference.status,
+      history: [...record.handover.history.map((event) => ({ ...event })), {
+        id: generatedPrototypeServiceRecordId("service-record-handover"),
+        at: now,
+        type: "handed-over",
+        summary: "ส่งมอบให้ลูกค้าแล้ว",
+        paymentStatus: paymentReference.status,
+      }],
+    },
+    updatedAt: now,
+  };
+  store.serviceRecords[next.serviceRecordId] = next;
+  return writeStore(store) ? { ok: true, record: clonePrototypeServiceRecord(next), duplicate: false } : { ok: false, reason: "storage" };
 }
 
 function synchronizePrototypeHotelStaysForBooking(store: BusinessStore, booking: PrototypeBooking, now: string) {

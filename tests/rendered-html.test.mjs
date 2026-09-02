@@ -836,7 +836,7 @@ test("keeps Business Login visually separate while reusing the Google behavior p
   assert.doesNotMatch(businessLogin, /DRAFT_PASSPORT_STORAGE_KEY|prototypeClaimed/);
 });
 
-test("renders Business Home as a priority-first local prototype with booking-derived work", async () => {
+test("renders Business Home as a priority-first local prototype with booking-derived work and shared revenue", async () => {
   const [html, source, spotlight, serviceVisual, state, businessCss] = await Promise.all([
     htmlFor("/business/home"),
     readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
@@ -853,7 +853,10 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(html, /งานถัดไป/);
   assert.match(html, /อาบน้ำ \/ ตัดขน/);
   assert.match(html, /โรงแรม/);
-  assert.doesNotMatch(html, /รายรับวันนี้|ยังไม่เชื่อมระบบการเงินจริง/);
+  assert.match(html, /รายรับวันนี้/);
+  assert.match(html, /รับชำระแล้ว/);
+  assert.match(html, /ยอดค้างชำระ/);
+  assert.match(html, /href="\/business\/billing"/);
   assert.doesNotMatch(html, /เริ่มจาก 3 เรื่องที่ต้องจัดการ|ภาพรวมงานสำคัญของร้าน|ข้อมูลตัวอย่าง/);
   assert.match(html, /href="\/business\/scan"/);
   assert.match(html, /href="\/business\/calendar\?new=1"/);
@@ -870,7 +873,9 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(state, /"whisker-ari-frontdesk": \["grooming", "hotel"\]/);
   assert.match(state, /"whisker-thonglor-frontdesk": \["grooming"\]/);
   assert.match(state, /"paw-partner-onnut": \["hotel", "daycare"\]/);
-  assert.doesNotMatch(source, /รายรับวันนี้|ยังไม่เชื่อมระบบการเงินจริง/);
+  assert.match(source, /getPrototypeRevenueSummary\(context/);
+  assert.match(source, /revenueSummary\.revenueToday/);
+  assert.match(source, /รายรับวันนี้/);
   assert.match(source, /BusinessHomeSpotlight/);
   assert.match(source, /BusinessServiceIcon/);
   assert.equal((spotlight.match(/\/images\/business\/business-banner-[^"']+\.png/g) ?? []).length, 3);
@@ -904,7 +909,7 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.doesNotMatch(state, /nextWork:\s*\[/);
 });
 
-test("builds one Branch-aware Business shell with live Calendar, Customers, Inbox, and capability-aware operations", async () => {
+test("builds one Branch-aware Business shell with live Calendar, Customers, Inbox, Billing, and capability-aware operations", async () => {
   const [layout, frame, desktopNav, mobileNav, model, header, menu, documentLink, state] = await Promise.all([
     readFile(new URL("business/layout.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessPortalFrame.tsx", appRoot), "utf8"),
@@ -946,11 +951,14 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.match(model, /href:\s*"\/business\/grooming"/);
   assert.match(model, /BUSINESS_HOTEL_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/hotel"/);
+  assert.match(model, /BUSINESS_BILLING_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/billing"/);
   assert.match(desktopNav + mobileNav, /module === "grooming"/);
   assert.match(desktopNav + mobileNav, /module === "hotel"/);
   assert.match(desktopNav + mobileNav, /PlannedBusinessModule key=\{module\} module=\{module\}/);
   assert.match(desktopNav + mobileNav, /BUSINESS_GROOMING_DESTINATION/);
   assert.match(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_BILLING_DESTINATION/);
   assert.match(mobileNav, /BUSINESS_CUSTOMERS_DESTINATION\.href/);
   assert.match(mobileNav, /BUSINESS_MESSAGES_DESTINATION\.href/);
   assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/(?:daycare|finance|reports|team|settings)/);
@@ -1259,6 +1267,7 @@ test("keeps shared Business Core routes live with capability-aware Grooming and 
   assert.equal(routePaths.some((path) => /business\/inbox$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/grooming$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/billing$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/(?:bookings|daycare|finance|reports|team|settings)(?:\/|$)/.test(path)), false);
   assert.equal(routePaths.some((path) => /business\/pets(?:\/|$)/.test(path)), false);
 });
@@ -1363,6 +1372,8 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
   assert.match(detail, /หมายเหตุของร้าน/);
   assert.match(detail, /\/business\/inbox\?customerId=/);
   assert.match(detail, /ร้านส่งคำขอเพิ่มบริการผ่าน Inbox ได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้/);
+  assert.match(detail, /\/business\/billing\?hotelStayId=/);
+  assert.match(detail, /การชำระเงินทำผ่าน Checkout แยกต่างหาก/);
   assert.match(presentation, /HOTEL_LIST_FILTERS/);
   assert.match(desktopNav + mobileNav + model, /BUSINESS_HOTEL_DESTINATION/);
   assert.match(command, /getEnabledBusinessModules\(context\)\.includes\("hotel"\)/);
@@ -1390,7 +1401,8 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
   assert.match(css, /data-mobile-view="staying"/);
   assert.match(css, /\.hotel-stay-detail__content \{ padding-bottom: calc\(6rem \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.hotel-occupancy-span/);
-  assert.equal(routePaths.some((path) => /business\/(?:billing|finance|backend)(?:\/|$)/.test(path)), false);
+  assert.equal(routePaths.some((path) => /business\/billing(?:\/|$)/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/(?:finance|backend)(?:\/|$)/.test(path)), false);
 });
 
 test("keeps BF-6 Hotel state linked, capacity-safe, immutable, and privacy-bounded", async () => {
@@ -1544,6 +1556,513 @@ test("keeps Grooming Service Jobs distinct from Bookings with verified lifecycle
   }
 });
 
+test("renders BF-7 Billing as a branch-scoped Charge, Payment, and shared revenue foundation", async () => {
+  const [html, page, screen, state, home, customerDetail, groomingDetail, hotelDetail, desktopNav, mobileNav, command, inboxState, css, contextHook, bookingEditor] = await Promise.all([
+    htmlFor("/business/billing"),
+    readFile(new URL("business/billing/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/billing/BillingScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/grooming/GroomingJobDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/hotel/HotelStayDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessCommandPalette.tsx", appRoot), "utf8"),
+    readFile(new URL("_prototype/inboxState.ts", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+    readFile(new URL("business/_components/useBusinessContext.ts", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+  ]);
+
+  assert.match(html, /<h1[^>]*>การเงิน<\/h1>/);
+  assert.match(html, /รายรับวันนี้/);
+  assert.match(html, /Charge และสถานะการชำระ/);
+  assert.match(html, /การสร้างยอดยังไม่เท่ากับรับชำระเงิน/);
+  for (const status of ["ยังไม่ชำระ", "ชำระบางส่วน", "ชำระแล้ว"]) assert.match(html, new RegExp(status));
+  assert.equal(countRenderedElements(html, "h1"), 1);
+  assert.match(page, /serviceJobId/);
+  assert.match(page, /hotelStayId/);
+  assert.match(screen, /BusinessDataTable/);
+  assert.match(screen, /billing-charge-cards/);
+  assert.match(screen, /BusinessModal/);
+  assert.match(screen, /STATUS_ICON/);
+  assert.match(screen, /recordPrototypePayment/);
+  assert.match(screen, /addPrototypeChargeAdjustment/);
+  assert.match(screen, /cancelPrototypeCharge/);
+  assert.match(screen, /getOrCreatePrototypeChargeForGroomingJob/);
+  assert.match(screen, /getOrCreatePrototypeChargeForHotelStay/);
+  assert.match(screen, /ensurePrototypeConversation/);
+  assert.match(screen, /sendPrototypeTextMessage/);
+  assert.match(screen, /billingReady/);
+  assert.match(contextHook, /isContextReady/);
+  assert.match(screen, /function ChargeCard/);
+  const chargeCardSource = screen.match(/function ChargeCard[\s\S]*?\n}\n\nexport function BillingScreen/)?.[0] ?? "";
+  assert.match(chargeCardSource, /billing-charge-card__source/);
+  assert.doesNotMatch(chargeCardSource.match(/<button[\s\S]*?<\/button>/)?.[0] ?? "", /<Link/);
+  assert.match(screen, /Local prototype/);
+  assert.doesNotMatch(screen, /LINE (?:Mini App|Login|messaging|notification)|Stripe|payment gateway/i);
+  assert.match(state, /charges: Record<string, PrototypeCharge>/);
+  assert.match(state, /payments: Record<string, PrototypePayment>/);
+  assert.match(state, /getPrototypeRevenueSummary/);
+  assert.match(state, /whole Thai Baht/);
+  assert.match(state, /allocatedPaymentAmountForCharge/);
+  assert.match(state, /projectedTotal < allocatedPaymentAmountForCharge/);
+  assert.doesNotMatch(state, /Math\.round\(booking\.estimate/);
+  assert.match(bookingEditor, /step="1"/);
+  assert.match(bookingEditor, /inputMode="numeric"/);
+  assert.match(home, /getPrototypeRevenueSummary\(context/);
+  assert.match(home, /href="\/business\/billing"/);
+  assert.doesNotMatch(home, /DEMO_BUSINESS_HOME\.revenueToday/);
+  assert.match(customerDetail, /ยอดและการชำระ/);
+  assert.match(customerDetail, /listPrototypeChargeBalances/);
+  assert.match(customerDetail, /listPrototypePayments/);
+  assert.match(groomingDetail, /\/business\/billing\?serviceJobId=/);
+  assert.match(groomingDetail, /สถานะงานและการชำระเงินแยกกัน/);
+  assert.match(hotelDetail, /\/business\/billing\?hotelStayId=/);
+  assert.match(hotelDetail, /การชำระเงินทำผ่าน Checkout แยกต่างหาก/);
+  assert.match(desktopNav + mobileNav + command, /BUSINESS_BILLING_DESTINATION|href: "\/business\/billing"/);
+  assert.doesNotMatch(inboxState, /recordPrototypePayment|addPrototypeChargeAdjustment|cancelPrototypeCharge|PrototypePayment/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.billing-charge-table \{ display: none; \}[\s\S]*?\.billing-charge-cards \{ display: grid/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.billing-charge-card/);
+});
+
+test("collapses BF-8 into shared Service Record history without a standalone CareProof UI", async () => {
+  const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
+  const routePaths = routes
+    .filter((entry) => entry.isFile() && entry.name === "page.tsx")
+    .map((entry) => entry.parentPath.replaceAll("\\", "/"));
+  const [html, state, customerDetail, groomingDetail, hotelDetail, desktopNav, mobileNav, command, model, css] = await Promise.all([
+    htmlFor("/business/customers/booking-contact-pim"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/grooming/GroomingJobDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/hotel/HotelStayDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessCommandPalette.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/businessNavigationModel.ts", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+  ]);
+
+  assert.equal(countRenderedElements(html, "h1"), 1);
+  assert.match(html, /ประวัติบริการ/);
+  assert.equal(routePaths.some((path) => /business\/careproof/i.test(path)), false);
+  assert.match(state, /serviceRecords: Record<string, PrototypeServiceRecord>/);
+  assert.match(state, /serviceRecordIdForGroomingJob/);
+  assert.match(state, /serviceRecordIdForHotelStay/);
+  assert.match(state, /getPrototypeServiceRecordPaymentReference/);
+  assert.match(state, /correctPrototypeServiceRecord/);
+  assert.match(state, /guardianCareInstruction, Intake, or medical details/);
+  assert.match(customerDetail, /ServiceRecordHistoryItem/);
+  assert.match(customerDetail, /ประวัติบริการ/);
+  assert.match(customerDetail, /<details className="customer-service-record">/);
+  assert.match(customerDetail, /getPrototypeServiceRecordPaymentReference/);
+  assert.match(customerDetail, /ไม่ใช่ Pet Passport หรือข้อมูลสุขภาพ/);
+  assert.doesNotMatch(customerDetail, /business\/careproof|CareProof ล่าสุด|customer-detail-section--careproof/);
+  assert.match(groomingDetail, /บันทึกประวัติบริการแล้ว/);
+  assert.match(hotelDetail, /บันทึกประวัติบริการแล้ว/);
+  assert.doesNotMatch(groomingDetail + hotelDetail, /business\/careproof|grooming-detail-careproof|hotel-detail-lifecycle__careproof/);
+  assert.doesNotMatch(desktopNav + mobileNav + command + model, /BUSINESS_CAREPROOF_DESTINATION|business\/careproof|careproof/i);
+  assert.match(css, /\.customer-service-record/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.customer-service-record__body/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.customer-service-record/);
+  assert.doesNotMatch(css, /\.careproof[-_]/i);
+});
+
+test("keeps BF-7 Charge and Payment records separate, branch-safe, idempotent, and checkout-linked", async () => {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-billing-test-"));
+  const previousWindow = globalThis.window;
+  const previousCustomEvent = globalThis.CustomEvent;
+  const storage = new Map();
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: (key) => storage.delete(key),
+      clear: () => storage.clear(),
+    },
+    dispatchEvent: () => true,
+  };
+  if (typeof globalThis.CustomEvent !== "function") {
+    globalThis.CustomEvent = class CustomEvent {
+      constructor(type) {
+        this.type = type;
+      }
+    };
+  }
+
+  const vite = await createServer({
+    root: projectRoot,
+    configFile: false,
+    cacheDir: cacheDirectory,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "silent",
+  });
+
+  try {
+    const state = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    const ari = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-ari-frontdesk");
+    const thonglor = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-thonglor-frontdesk");
+    assert.ok(ari);
+    assert.ok(thonglor);
+
+    const fixtureRevenue = state.getPrototypeRevenueSummary(ari, state.BOOKING_DEMO_DATE, true);
+    assert.deepEqual(
+      { revenueToday: fixtureRevenue.revenueToday, paymentCountToday: fixtureRevenue.paymentCountToday, unpaidBalance: fixtureRevenue.unpaidBalance, unpaidCount: fixtureRevenue.unpaidCount, partialCount: fixtureRevenue.partialCount },
+      { revenueToday: 1350, paymentCountToday: 2, unpaidBalance: 3050, unpaidCount: 1, partialCount: 1 },
+    );
+    assert.deepEqual(state.getPrototypeRevenueSummary(thonglor, state.BOOKING_DEMO_DATE, true).revenueToday, 650);
+
+    assert.equal(state.applyPrototypeApprovedGroomingAddOn({
+      serviceJobId: "grooming-job-fixture-mochi",
+      bookingId: "booking-fixture-ari-grooming-1030",
+      sourceRequestId: "bf7-test-mochi-fractional",
+      serviceName: "ค่าบริการทศนิยม",
+      additionalPrice: 99.5,
+      additionalMinutes: 10,
+      approvedAt: state.BILLING_DEMO_NOW,
+    }), null);
+    const approvedAddOn = state.applyPrototypeApprovedGroomingAddOn({
+      serviceJobId: "grooming-job-fixture-mochi",
+      bookingId: "booking-fixture-ari-grooming-1030",
+      sourceRequestId: "bf7-test-mochi-deshed",
+      serviceName: "แกะสางขน",
+      additionalPrice: 300,
+      additionalMinutes: 20,
+      approvedAt: state.BILLING_DEMO_NOW,
+    });
+    assert.equal(approvedAddOn?.duplicate, false);
+
+    const groomingCheckout = state.getOrCreatePrototypeChargeForGroomingJob("grooming-job-fixture-mochi", ari);
+    assert.equal(groomingCheckout.ok, true);
+    assert.equal(groomingCheckout.created, true);
+    assert.equal(groomingCheckout.reconciled, true);
+    assert.equal(groomingCheckout.charge.lineItems.filter((line) => line.kind === "add-on").length, 1);
+    assert.equal(state.getPrototypeChargeBalance(groomingCheckout.charge).total, 1150);
+    const repeatedCheckout = state.getOrCreatePrototypeChargeForGroomingJob("grooming-job-fixture-mochi", ari);
+    assert.equal(repeatedCheckout.ok, true);
+    assert.equal(repeatedCheckout.created, false);
+    assert.equal(repeatedCheckout.charge.lineItems.length, groomingCheckout.charge.lineItems.length);
+
+    const payment = state.recordPrototypePayment({
+      chargeId: groomingCheckout.charge.chargeId,
+      context: ari,
+      amount: 500,
+      method: "cash",
+      note: "รับที่หน้าเคาน์เตอร์",
+      requestKey: "bf7-test-mochi-payment",
+      recordedAt: state.BILLING_DEMO_NOW,
+    });
+    assert.equal(payment.ok, true);
+    assert.equal(payment.duplicate, false);
+    const duplicatedPayment = state.recordPrototypePayment({
+      chargeId: groomingCheckout.charge.chargeId,
+      context: ari,
+      amount: 500,
+      method: "cash",
+      requestKey: "bf7-test-mochi-payment",
+      recordedAt: state.BILLING_DEMO_NOW,
+    });
+    assert.equal(duplicatedPayment.ok, true);
+    assert.equal(duplicatedPayment.duplicate, true);
+    assert.equal(duplicatedPayment.payment.paymentId, payment.payment.paymentId);
+    const partialBalance = state.getPrototypeChargeBalance(state.readPrototypeCharge(groomingCheckout.charge.chargeId));
+    assert.deepEqual({ total: partialBalance.total, paid: partialBalance.paid, remaining: partialBalance.remaining, status: partialBalance.status }, { total: 1150, paid: 500, remaining: 650, status: "partial" });
+    assert.deepEqual(
+      state.recordPrototypePayment({ chargeId: groomingCheckout.charge.chargeId, context: ari, amount: 651, method: "cash", requestKey: "bf7-test-mochi-overpayment" }),
+      { ok: false, reason: "overpayment" },
+    );
+    assert.deepEqual(
+      state.recordPrototypePayment({ chargeId: groomingCheckout.charge.chargeId, context: thonglor, amount: 1, method: "cash", requestKey: "bf7-test-mochi-payment" }),
+      { ok: false, reason: "wrong-context" },
+    );
+    assert.deepEqual(
+      state.addPrototypeChargeAdjustment({
+        chargeId: groomingCheckout.charge.chargeId,
+        context: ari,
+        kind: "discount",
+        label: "ส่วนลดเกินยอดที่รับแล้ว",
+        amount: 700,
+        reason: "ต้องไม่ซ่อนยอดรับชำระ",
+      }),
+      { ok: false, reason: "invalid-total" },
+    );
+
+    const discount = state.addPrototypeChargeAdjustment({
+      chargeId: groomingCheckout.charge.chargeId,
+      context: ari,
+      kind: "discount",
+      label: "ส่วนลดทดสอบ",
+      amount: 100,
+      reason: "แก้ไขยอดตามนโยบายร้าน",
+    });
+    assert.equal(discount.ok, true);
+    const discountedBalance = state.getPrototypeChargeBalance(state.readPrototypeCharge(groomingCheckout.charge.chargeId));
+    assert.deepEqual({ total: discountedBalance.total, remaining: discountedBalance.remaining, status: discountedBalance.status }, { total: 1050, remaining: 550, status: "partial" });
+
+    const hotelCheckout = state.getOrCreatePrototypeChargeForHotelStay("hotel-stay-fixture-luna", ari);
+    assert.equal(hotelCheckout.ok, true);
+    assert.equal(hotelCheckout.created, true);
+    const hotelStay = state.listPrototypeHotelStays(ari, { includeClosed: true }).find((stay) => stay.hotelStayId === "hotel-stay-fixture-luna");
+    assert.equal(hotelStay.status, "in-stay");
+    assert.deepEqual(
+      { total: state.getPrototypeChargeBalance(hotelCheckout.charge).total, status: state.getPrototypeChargeBalance(hotelCheckout.charge).status },
+      { total: 3600, status: "unpaid" },
+    );
+    const cancelledHotelCharge = state.cancelPrototypeCharge(hotelCheckout.charge.chargeId, "ยกเลิกรายการทดสอบ", ari);
+    assert.equal(cancelledHotelCharge.ok, true);
+    assert.deepEqual(
+      (() => {
+        const balance = state.getPrototypeChargeBalance(state.readPrototypeCharge(hotelCheckout.charge.chargeId));
+        return { status: balance.status, paid: balance.paid, remaining: balance.remaining };
+      })(),
+      { status: "cancelled", paid: 0, remaining: 0 },
+    );
+    assert.deepEqual(
+      state.recordPrototypePayment({ chargeId: hotelCheckout.charge.chargeId, context: ari, amount: 100, method: "other", requestKey: "bf7-test-cancelled" }),
+      { ok: false, reason: "cancelled" },
+    );
+
+    const pairFirst = state.getOrCreatePrototypeChargeForHotelStay("hotel-stay-fixture-mochi-pair", ari);
+    const pairSecond = state.getOrCreatePrototypeChargeForHotelStay("hotel-stay-fixture-biscuit-pair", ari);
+    assert.equal(pairFirst.ok, true);
+    assert.equal(pairSecond.ok, true);
+    assert.equal(pairFirst.created, true);
+    assert.equal(pairSecond.created, false);
+    assert.equal(pairFirst.charge.chargeId, pairSecond.charge.chargeId);
+    assert.deepEqual(
+      { petId: pairFirst.charge.petId, hotelStayId: pairFirst.charge.hotelStayId, total: state.getPrototypeChargeBalance(pairFirst.charge).total },
+      { petId: null, hotelStayId: null, total: 4800 },
+    );
+
+    const nalinBalances = state.listPrototypeChargeBalances(ari).filter((balance) => balance.charge.customerId === "booking-contact-nalin");
+    assert.equal(nalinBalances.some((balance) => balance.charge.chargeId === groomingCheckout.charge.chargeId && balance.status === "partial"), true);
+    assert.equal(state.listPrototypeChargeBalances(thonglor).some((balance) => balance.charge.chargeId === groomingCheckout.charge.chargeId), false);
+    const revenueAfterPayment = state.getPrototypeRevenueSummary(ari, state.BOOKING_DEMO_DATE);
+    assert.equal(revenueAfterPayment.revenueToday, fixtureRevenue.revenueToday + 500);
+    assert.equal(revenueAfterPayment.paymentCountToday, fixtureRevenue.paymentCountToday + 1);
+  } finally {
+    await vite.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = previousCustomEvent;
+  }
+});
+
+test("keeps BF-8 Service Records source-keyed, private, correction-safe, and separate from BF-7 Payment", async () => {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-service-record-test-"));
+  const previousWindow = globalThis.window;
+  const previousCustomEvent = globalThis.CustomEvent;
+  const storage = new Map();
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: (key) => storage.delete(key),
+      clear: () => storage.clear(),
+    },
+    dispatchEvent: () => true,
+  };
+  if (typeof globalThis.CustomEvent !== "function") {
+    globalThis.CustomEvent = class CustomEvent {
+      constructor(type) {
+        this.type = type;
+      }
+    };
+  }
+
+  const vite = await createServer({
+    root: projectRoot,
+    configFile: false,
+    cacheDir: cacheDirectory,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "silent",
+  });
+
+  try {
+    const state = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    const ari = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-ari-frontdesk");
+    const thonglor = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-thonglor-frontdesk");
+    assert.ok(ari);
+    assert.ok(thonglor);
+
+    const biscuitBeforeReopen = state.readPrototypeServiceRecord("service-record-grooming-grooming-job-fixture-biscuit");
+    assert.ok(biscuitBeforeReopen);
+    assert.equal(biscuitBeforeReopen.completedAt, "2026-08-18T09:08:00.000Z");
+    // The first visible record is fixture-derived. Reopening the source must
+    // persist that snapshot before it disappears, then record a revision on
+    // re-completion instead of creating a second Service Record.
+    const biscuitReopened = state.transitionPrototypeGroomingServiceJob("grooming-job-fixture-biscuit", "in-service", ari);
+    assert.equal(biscuitReopened.ok, true);
+    const biscuitPersistedBeforeRecompletion = state.readPrototypeServiceRecord("service-record-grooming-grooming-job-fixture-biscuit");
+    assert.ok(biscuitPersistedBeforeRecompletion);
+    assert.equal(biscuitPersistedBeforeRecompletion.completedAt, biscuitBeforeReopen.completedAt);
+    assert.equal(state.updatePrototypeGroomingServiceJobNote("grooming-job-fixture-biscuit", "ตรวจขนบริเวณหูเพิ่มก่อนส่งมอบ", ari).businessNote, "ตรวจขนบริเวณหูเพิ่มก่อนส่งมอบ");
+    const biscuitRecompleted = state.transitionPrototypeGroomingServiceJob("grooming-job-fixture-biscuit", "completed", ari);
+    assert.equal(biscuitRecompleted.ok, true);
+    const biscuit = state.getOrCreatePrototypeServiceRecordForGroomingJob("grooming-job-fixture-biscuit", ari);
+    assert.equal(biscuit.ok, true);
+    assert.equal(biscuit.created, false);
+    assert.deepEqual(
+      {
+        source: biscuit.record.source,
+        serviceJobId: biscuit.record.serviceJobId,
+        hotelStayId: biscuit.record.hotelStayId,
+        customerId: biscuit.record.customerId,
+        petId: biscuit.record.petId,
+      },
+      {
+        source: "grooming-job",
+        serviceJobId: "grooming-job-fixture-biscuit",
+        hotelStayId: null,
+        customerId: "booking-contact-nalin",
+        petId: "booking-pet-biscuit",
+      },
+    );
+    assert.notEqual(biscuit.record.completedAt, biscuitBeforeReopen.completedAt);
+    assert.equal(biscuit.record.details.some((detail) => detail.label === "บริการหลัก"), true);
+    assert.equal(biscuit.record.staffResourceLabels.length > 0, true);
+    assert.deepEqual(biscuit.record.photos, []);
+    assert.equal(biscuit.record.businessNote, "ตรวจขนบริเวณหูเพิ่มก่อนส่งมอบ");
+    assert.equal(biscuit.record.sourceRevisions.length, 1);
+    assert.equal(biscuit.record.sourceRevisions[0].completedAt, biscuitBeforeReopen.completedAt);
+    assert.ok(Date.parse(biscuit.record.sourceRevisions[0].at) >= Date.parse(biscuit.record.completedAt));
+    const biscuitRepeat = state.getOrCreatePrototypeServiceRecordForGroomingJob("grooming-job-fixture-biscuit", ari);
+    assert.equal(biscuitRepeat.ok, true);
+    assert.equal(biscuitRepeat.created, false);
+    assert.equal(biscuitRepeat.record.serviceRecordId, biscuit.record.serviceRecordId);
+    assert.equal(state.listPrototypeServiceRecords(ari).filter((record) => record.serviceJobId === "grooming-job-fixture-biscuit").length, 1);
+
+    assert.deepEqual(
+      state.getOrCreatePrototypeServiceRecordForGroomingJob("grooming-job-fixture-mochi", ari),
+      { ok: false, reason: "not-completed" },
+    );
+    const mochiCompletion = state.transitionPrototypeGroomingServiceJob("grooming-job-fixture-mochi", "completed", ari);
+    assert.equal(mochiCompletion.ok, true);
+    const mochiRecord = state.readPrototypeServiceRecord("service-record-grooming-grooming-job-fixture-mochi");
+    assert.ok(mochiRecord);
+    const mochiCharge = state.getOrCreatePrototypeChargeForGroomingJob("grooming-job-fixture-mochi", ari);
+    assert.equal(mochiCharge.ok, true);
+    const mochiPayment = state.recordPrototypePayment({
+      chargeId: mochiCharge.charge.chargeId,
+      context: ari,
+      amount: 200,
+      method: "cash",
+      requestKey: "bf8-mochi-payment",
+      recordedAt: state.BILLING_DEMO_NOW,
+    });
+    assert.equal(mochiPayment.ok, true);
+    assert.equal(state.getPrototypeServiceRecordPaymentReference(mochiRecord, ari).status, "partial");
+    const mochiReopened = state.transitionPrototypeGroomingServiceJob("grooming-job-fixture-mochi", "in-service", ari);
+    assert.equal(mochiReopened.ok, true);
+    assert.equal(state.readPrototypeServiceRecord(mochiRecord.serviceRecordId).serviceRecordId, mochiRecord.serviceRecordId);
+    assert.equal(state.updatePrototypeGroomingServiceJobNote("grooming-job-fixture-mochi", "แก้หมายเหตุของงานต้นทาง", ari).businessNote, "แก้หมายเหตุของงานต้นทาง");
+    assert.notEqual(state.readPrototypeServiceRecord(mochiRecord.serviceRecordId).businessNote, "แก้หมายเหตุของงานต้นทาง");
+
+    const correction = state.correctPrototypeServiceRecord({
+      serviceRecordId: biscuit.record.serviceRecordId,
+      context: ari,
+      field: "summary",
+      nextValue: "อาบน้ำและตัดขนเรียบร้อย",
+      reason: "ปรับถ้อยคำให้ตรงกับการบริการจริง",
+      requestKey: "bf8-biscuit-summary-correction",
+    });
+    assert.equal(correction.ok, true);
+    assert.equal(correction.duplicate, false);
+    assert.equal(correction.record.corrections.length, 1);
+    assert.equal(correction.record.corrections[0].previousValue, "อาบน้ำ / ตัดขน เสร็จแล้ว");
+    assert.ok(Date.parse(correction.record.corrections[0].at) >= Date.parse(correction.record.completedAt));
+    const correctionRepeat = state.correctPrototypeServiceRecord({
+      serviceRecordId: biscuit.record.serviceRecordId,
+      context: ari,
+      field: "summary",
+      nextValue: "อาบน้ำและตัดขนเรียบร้อย",
+      reason: "ปรับถ้อยคำให้ตรงกับการบริการจริง",
+      requestKey: "bf8-biscuit-summary-correction",
+    });
+    assert.equal(correctionRepeat.ok, true);
+    assert.equal(correctionRepeat.duplicate, true);
+    assert.equal(correctionRepeat.record.corrections.length, 1);
+    assert.deepEqual(
+      state.correctPrototypeServiceRecord({
+        serviceRecordId: biscuit.record.serviceRecordId,
+        context: thonglor,
+        field: "summary",
+        nextValue: "ห้ามแก้ข้ามสาขา",
+        reason: "ทดสอบสิทธิ์สาขา",
+        requestKey: "bf8-wrong-branch-correction",
+      }),
+      { ok: false, reason: "wrong-context" },
+    );
+
+    const biscuitPayment = state.getPrototypeServiceRecordPaymentReference(state.readPrototypeServiceRecord(biscuit.record.serviceRecordId), ari);
+    assert.equal(biscuitPayment.status, "paid");
+    // Billing remains a read-only reference in history. A paid Charge does
+    // not create a second record or start a handover workflow, and execution
+    // can still be corrected through the source lifecycle.
+    const reopenAfterPayment = state.transitionPrototypeGroomingServiceJob("grooming-job-fixture-biscuit", "in-service", ari);
+    assert.equal(reopenAfterPayment.ok, true);
+    assert.equal(state.readPrototypeServiceRecord(biscuit.record.serviceRecordId).serviceRecordId, biscuit.record.serviceRecordId);
+
+    const biscuitHotelCare = state.completePrototypeHotelCareTask("hotel-stay-fixture-biscuit-checkout", "hotel-care-biscuit-check", ari);
+    assert.ok(biscuitHotelCare);
+    const biscuitHotelCheckout = state.transitionPrototypeHotelStay("hotel-stay-fixture-biscuit-checkout", "checked-out", ari);
+    assert.equal(biscuitHotelCheckout.ok, true);
+    const biscuitHotelRecord = state.readPrototypeServiceRecord("service-record-hotel-hotel-stay-fixture-biscuit-checkout");
+    assert.ok(biscuitHotelRecord);
+    assert.equal(biscuitHotelRecord.source, "hotel-stay");
+    assert.equal(biscuitHotelRecord.details.some((detail) => detail.label === "ช่วงเข้าพัก"), true);
+    assert.equal(biscuitHotelRecord.details.some((detail) => detail.label === "ห้อง / โซน"), true);
+    const biscuitHotelRepeat = state.getOrCreatePrototypeServiceRecordForHotelStay("hotel-stay-fixture-biscuit-checkout", ari);
+    assert.equal(biscuitHotelRepeat.ok, true);
+    assert.equal(biscuitHotelRepeat.created, false);
+    assert.equal(biscuitHotelRepeat.record.serviceRecordId, biscuitHotelRecord.serviceRecordId);
+
+    const luna = state.readPrototypeHotelStay("hotel-stay-fixture-luna");
+    assert.ok(luna);
+    for (const task of luna.dailyCareTasks.filter((task) => task.state !== "completed")) {
+      assert.ok(state.completePrototypeHotelCareTask(luna.hotelStayId, task.id, ari));
+    }
+    assert.equal(state.transitionPrototypeHotelStay(luna.hotelStayId, "ready-for-checkout", ari).ok, true);
+    assert.equal(state.transitionPrototypeHotelStay(luna.hotelStayId, "checked-out", ari).ok, true);
+    const lunaRecord = state.readPrototypeServiceRecord("service-record-hotel-hotel-stay-fixture-luna");
+    assert.ok(lunaRecord);
+    const lunaJson = JSON.stringify(lunaRecord);
+    for (const protectedValue of [
+      "guardianCareInstruction",
+      "ให้อาหารตามตารางที่ลูกค้าแจ้ง",
+      "customer-confirmed-intake",
+      "prototype-intake-hotel-luna",
+      "ทำตามคำแนะนำที่ลูกค้ายืนยัน",
+      "medication",
+      "incidentNotes",
+      "passportSlug",
+      "demo-luna",
+    ]) assert.doesNotMatch(lunaJson, new RegExp(protectedValue));
+
+    const nalinHistory = state.listPrototypeServiceRecordsForCustomer("booking-contact-nalin", ari);
+    assert.equal(nalinHistory.some((record) => record.serviceRecordId === biscuit.record.serviceRecordId && record.petId === "booking-pet-biscuit"), true);
+    assert.equal(state.listPrototypeServiceRecords(thonglor).some((record) => record.serviceRecordId === biscuit.record.serviceRecordId), false);
+
+    const persisted = JSON.parse(storage.get(state.BUSINESS_STORAGE_KEY));
+    assert.ok(persisted.serviceRecords[biscuit.record.serviceRecordId]);
+    assert.ok(persisted.charges[mochiCharge.charge.chargeId]);
+    assert.ok(persisted.payments[mochiPayment.payment.paymentId]);
+  } finally {
+    await vite.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = previousCustomEvent;
+  }
+});
+
 test("renders a searchable Customers & Pets route for Business frontdesk work", async () => {
   const [html, page, screen, avatars, state, desktopNav, mobileNav, css] = await Promise.all([
     htmlFor("/business/customers"),
@@ -1602,7 +2121,7 @@ test("renders stable Customer detail with Pets, Bookings, local notes, and Passp
   assert.match(html, /Tofu/);
   assert.match(html, /หมายเหตุของร้าน/);
   assert.match(html, /Passport และสิทธิ์เข้าถึง/);
-  assert.match(html, /การใช้บริการล่าสุด/);
+  assert.match(html, /ประวัติบริการ/);
   assert.match(html, /href="\/business\/calendar\?customerId=booking-contact-pim"/);
   assert.match(html, /href="\/business\/inbox\?customerId=booking-contact-pim"/);
   assert.match(page, /CustomerDetailScreen/);
@@ -1855,7 +2374,8 @@ test("connects Calendar, Intake, Inbox, Customer history, and Home through the s
   assert.match(businessState, /รับเข้าแล้วจาก Intake/);
   assert.match(calendarEditor, /\/business\/grooming\?jobId=/);
   assert.match(intake, /\/business\/grooming\?jobId=/);
-  assert.match(customerDetail, /listCompletedPrototypeGroomingServiceJobs/);
+  assert.match(customerDetail, /listPrototypeServiceRecords/);
+  assert.match(customerDetail, /ServiceRecordHistoryItem/);
   assert.match(home, /getGroomingServiceJobSummary/);
   assert.match(home, /groomingSummary\.total/);
   assert.doesNotMatch(home, /grooming:\s*\{ value: "(?:8|5) งานวันนี้/);
@@ -2131,7 +2651,7 @@ test("supports awaiting consent while keeping owner-decision and interruption co
   assert.match(businessState, /setPrototypeAccessInterruption/);
 });
 
-test("revalidates and de-duplicates receiving then stops before Service Session UI", async () => {
+test("revalidates and de-duplicates receiving without adding a Service Session UI", async () => {
   const [source, businessState, routes] = await Promise.all([
     readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
@@ -2147,7 +2667,8 @@ test("revalidates and de-duplicates receiving then stops before Service Session 
   assert.match(businessState, /evaluateTemporaryAccess\(access, record\.businessId, record\.branchId\)/);
   assert.match(businessState, /prototypeSessionReference/);
   const routeFiles = routes.filter((entry) => entry.isFile() && entry.name === "page.tsx").map((entry) => entry.parentPath.replaceAll("\\", "/"));
-  assert.equal(routeFiles.some((path) => /business\/sessions|careproof/i.test(path)), false);
+  assert.equal(routeFiles.some((path) => /business\/sessions/i.test(path)), false);
+  assert.equal(routeFiles.some((path) => /business\/careproof/i.test(path)), false);
 });
 
 test("keeps Phase E responsive, accessible, and free of Marketing Footer", async () => {
@@ -2195,10 +2716,13 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   }
 
   assert.match(html, /Person → Business → Branch → Enabled Service Modules/);
-  assert.match(overviewPanel, /BF1–BF6 Operational Foundation/);
+  assert.match(overviewPanel, /BF1–BF8 Operational Foundation/);
   assert.match(overviewPanel, /\/business\/customers/);
   assert.match(overviewPanel, /\/business\/grooming/);
   assert.match(overviewPanel, /\/business\/hotel/);
+  assert.match(overviewPanel, /\/business\/billing/);
+  assert.match(overviewPanel, /ประวัติบริการ/);
+  assert.doesNotMatch(overviewPanel, /\/business\/careproof/);
   assert.match(overviewPanel, /Cloudflare/);
   assert.match(modelPanel, /Customer/);
   assert.match(modelPanel, /Visit \/ Order/);
@@ -2214,16 +2738,22 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(corePanel, /Inbox/);
   assert.match(corePanel, /Hotel \/ Boarding/);
   assert.match(corePanel, /Billing/);
+  assert.match(corePanel, /Charge/);
+  assert.match(corePanel, /Payment/);
+  assert.match(corePanel, /Service Record history/);
+  assert.doesNotMatch(corePanel, /\/business\/careproof/);
   assert.match(modulePanel, /Grooming \/ Bathing/);
   assert.match(modulePanel, /BF-5 LOCAL/);
   assert.match(modulePanel, /Hotel \/ Boarding/);
   assert.match(modulePanel, /BF-6 LOCAL/);
+  assert.match(modulePanel, /explicit checkout/);
   assert.match(modulePanel, /Daycare/);
   assert.match(modulePanel, /date-range Hotel Booking/);
-  assert.equal((scenarioPanel.match(/class="scenario"/g) ?? []).length, 5);
+  assert.equal((scenarioPanel.match(/class="scenario"/g) ?? []).length, 6);
   assert.match(scenarioPanel, /Hotel Booking \+ Grooming/);
   assert.match(scenarioPanel, /Guardian approval เพิ่มเฉพาะ add-on และเวลา/);
   assert.match(scenarioPanel, /Branch transfer/);
+  assert.match(scenarioPanel, /ประวัติบริการจากงานที่เสร็จแล้ว/);
 
   assert.match(html, /Noto Sans Thai/);
   assert.match(html, /LINE Seed Sans TH/);
@@ -2256,6 +2786,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(designPanel, /16px/);
   assert.match(designPanel, /180–300ms/);
   assert.match(designPanel, /Grooming = Scissors \+ Coral/);
+  assert.match(designPanel, /Billing \/ Payment/);
   assert.match(designPanel, /Custom ใช้ 28\/35\/42 วัน/);
   assert.match(roadmapPanel, /Shared Business Intake Engine/);
   assert.match(roadmapPanel, /BF-1/);
@@ -2264,15 +2795,19 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(roadmapPanel, /Cloudflare/);
   assert.match(roadmapPanel, /BF-5 Grooming implemented locally/);
   assert.match(roadmapPanel, /BF-6 Hotel \/ Boarding implemented locally/);
+  assert.match(roadmapPanel, /BF-7 Billing, Payments/);
+  assert.match(roadmapPanel, /BF-8 Shared Service Record/);
+  assert.match(roadmapPanel, /Stop after BF-8/);
   assert.match(roadmapPanel, /Daycare operations/);
 
   assert.match(validation, /# Validation/);
-  assert.match(validation, /BF-6 HOTEL \/ BOARDING OPERATIONS FOUNDATION/);
-  assert.match(validation, /29 `page\.tsx` route entries/);
+  assert.match(validation, /BF-8 SHARED SERVICE RECORD FOUNDATION/);
+  assert.match(validation, /30 `page\.tsx` route entries/);
   assert.match(validation, /Cloudflare is the target platform direction/);
   assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
   assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
   assert.match(decisions, /Cloudflare replaces Vercel as the target production platform direction/);
+  assert.match(decisions, /D-132/);
   assert.match(decisions, /SUPERSEDED/);
   assert.match(validation, /Broken relative Markdown links/);
   assert.match(validation, /Stale legacy references/);

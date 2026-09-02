@@ -32,7 +32,7 @@ export function HybridBusinessSection() {
           <ArrowRight size={20} aria-hidden="true" />
           <span><Scissors size={22} /><small>02</small><strong>อาบน้ำก่อนรับกลับ</strong><em>นัดหมายต่อเนื่อง</em></span>
           <ArrowRight size={20} aria-hidden="true" />
-          <span><CheckCircle size={22} /><small>03</small><strong>ประวัติยังเชื่อมกัน</strong><em>ส่งต่อ CareProof</em></span>
+          <span><CheckCircle size={22} /><small>03</small><strong>ประวัติยังเชื่อมกัน</strong><em>บันทึก Service Record</em></span>
         </div>
       </div>
     </section>

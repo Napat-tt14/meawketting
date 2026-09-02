@@ -411,7 +411,7 @@ export function BookingEditor({
               <div className="booking-form-grid booking-financial-fields">
                 <label className="booking-field booking-estimate-field">
                   <span>ราคาโดยประมาณ</span>
-                  <input type="number" min="0" inputMode="decimal" value={draft.estimate ?? ""} onInput={(event) => updateDraft({ ...draft, estimate: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) })} aria-describedby={availabilityId} />
+                  <input type="number" min="0" step="1" inputMode="numeric" value={draft.estimate ?? ""} onInput={(event) => updateDraft({ ...draft, estimate: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) })} aria-describedby={availabilityId} />
                 </label>
                 <label className="booking-field booking-notes-field">
                   <span>หมายเหตุของร้าน</span>

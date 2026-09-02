@@ -568,8 +568,10 @@ body:has(.business-loading) :is(.business-header, .business-loading) {
   color: var(--segmented-fg);
   background: transparent;
   font: inherit;
-  font-size: 0.875rem;
+  font-family: "LINE Seed Sans TH", var(--font-body), sans-serif;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.25;
   cursor: pointer;
   transition: color var(--duration-fast) var(--ease-premium), background-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-base) var(--ease-premium), transform var(--duration-fast) var(--ease-premium);
 }
@@ -7240,7 +7242,6 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 
 .business-customer-detail .customer-detail-section--pets { border-top-color: var(--feature-coral); }
 .business-customer-detail .customer-detail-section--upcoming { border-top-color: var(--feature-mint); }
-.business-customer-detail .customer-detail-section--recent { border-top-color: var(--feature-grape); }
 .business-customer-detail .customer-team-card { border-top-color: var(--primary); }
 
 .business-customer-detail .customer-detail-section > header {
@@ -8525,6 +8526,189 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
   }
 }
 
+/* Service Record history is rendered in Customer/Pet detail; no standalone module. */
+
+/* BF-7 Billing / Payments / Revenue ------------------------------------------------ */
+.business-billing { display: grid; gap: 1rem; padding-block: 1.5rem calc(3rem + env(safe-area-inset-bottom)); }
+.business-billing__notice { margin: 0; }
+.billing-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.billing-summary article { min-width: 0; display: grid; gap: 0.3rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
+.billing-summary article>span { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--muted-foreground); font-size: 0.8125rem; font-weight: 700; }
+.billing-summary article>span svg { color: var(--primary); }
+.billing-summary article>strong { overflow: hidden; color: var(--foreground); font-size: clamp(1.35rem, 2.2vw, 2rem); font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.billing-summary article>small { min-height: 2.4em; color: var(--muted-foreground); font-size: 0.75rem; line-height: 1.45; }
+.billing-list-section { display: grid; gap: 0.875rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
+.billing-list-section__header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.billing-list-section__header>div { min-width: 0; display: grid; gap: 0.15rem; }
+.billing-list-section__header>div>span { color: var(--muted-foreground); font-size: 0.75rem; font-weight: 700; }
+.billing-list-section__header h2 { font-size: 1.125rem; font-weight: 700; }
+.billing-list-section__header p { margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
+.billing-filter { flex: 0 1 auto; }
+.billing-charge-table { margin: 0; }
+.billing-charge-table th { white-space: nowrap; }
+.billing-charge-table td { vertical-align: middle; }
+.billing-charge-table td:last-child { width: 1%; white-space: nowrap; }
+.billing-number { color: var(--foreground); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.billing-charge-facts { min-width: 11rem; display: grid; gap: 0.2rem; }
+.billing-charge-facts>span { min-width: 0; display: grid; gap: 0.08rem; }
+.billing-charge-facts strong { overflow: hidden; font-size: 0.875rem; text-overflow: ellipsis; white-space: nowrap; }
+.billing-charge-facts small { overflow: hidden; color: var(--muted-foreground); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.billing-charge-facts a { width: max-content; max-width: 100%; color: var(--status-info); font-size: 0.75rem; font-weight: 700; text-decoration: underline; text-underline-offset: 0.15em; }
+.billing-status { width: max-content; min-height: 28px; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border: 1px solid transparent; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.billing-status--unpaid { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 32%, var(--border)); background: var(--status-warning-soft); }
+.billing-status--partial { color: var(--status-info); border-color: color-mix(in srgb, var(--status-info) 32%, var(--border)); background: var(--status-info-soft); }
+.billing-status--paid { color: var(--status-success); border-color: color-mix(in srgb, var(--status-success) 32%, var(--border)); background: var(--status-success-soft); }
+.billing-status--cancelled { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 32%, var(--border)); background: var(--status-critical-soft); }
+.billing-open-charge { min-height: 40px; }
+.billing-charge-cards { display: none; }
+.billing-empty { min-height: 8rem; display: grid; place-items: center; align-content: center; gap: 0.5rem; color: var(--muted-foreground); text-align: center; }
+.billing-empty p { margin: 0; font-size: 0.875rem; }
+.billing-modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+.billing-checkout-overview { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 0.875rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--background); }
+.billing-checkout-overview>div { min-width: 0; display: grid; gap: 0.2rem; }
+.billing-checkout-overview>div>span { color: var(--muted-foreground); font-size: 0.75rem; font-weight: 700; }
+.billing-checkout-overview h3 { font-size: 1rem; font-weight: 700; }
+.billing-breakdown,
+.billing-payment-history { display: grid; gap: 0.65rem; padding: 0.875rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.billing-breakdown>header,
+.billing-payment-history>header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.billing-breakdown h3,
+.billing-payment-history h3 { font-size: 0.9375rem; font-weight: 700; }
+.billing-breakdown header small,
+.billing-payment-history header small { color: var(--muted-foreground); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.billing-breakdown ul,
+.billing-payment-history ol { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.billing-breakdown li,
+.billing-payment-history li { min-width: 0; display: flex; align-items: start; justify-content: space-between; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.billing-breakdown li>span,
+.billing-payment-history li>span { min-width: 0; display: grid; gap: 0.08rem; }
+.billing-breakdown li strong,
+.billing-payment-history li strong { overflow: hidden; font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+.billing-breakdown li small,
+.billing-payment-history li small { color: var(--muted-foreground); font-size: 0.7rem; }
+.billing-breakdown li b,
+.billing-payment-history li b,
+.billing-breakdown dd { flex: 0 0 auto; color: var(--foreground); font-size: 0.8125rem; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.billing-breakdown li b.is-discount { color: var(--status-success); }
+.billing-breakdown dl { display: grid; gap: 0.35rem; margin: 0; padding-top: 0.65rem; border-top: 1px solid var(--border); }
+.billing-breakdown dl>div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.billing-breakdown dt { color: var(--muted-foreground); font-size: 0.8125rem; }
+.billing-breakdown dd { margin: 0; }
+.billing-payment-history>p { margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
+.billing-form { display: grid; gap: 0.75rem; }
+.billing-form>p { margin: 0; padding: 0.65rem; border-radius: var(--radius-button); color: var(--muted-foreground); background: var(--background); font-size: 0.8125rem; line-height: 1.45; }
+.billing-form label { display: grid; gap: 0.35rem; }
+.billing-form label>span { color: var(--muted-foreground); font-size: 0.75rem; font-weight: 700; }
+.billing-form label>span small { font-weight: 500; }
+.billing-form :is(input, select, textarea) { width: 100%; min-height: 44px; font-variant-numeric: tabular-nums; }
+.billing-form textarea { min-height: 6rem; resize: vertical; }
+.billing-form>button { justify-self: end; min-height: 44px; }
+.billing-form--cancel>p { color: var(--status-critical); background: var(--status-critical-soft); }
+.business-billing :is(button, a, input, select, textarea):focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 28%, transparent), var(--shadow-card); }
+
+@media (max-width: 1023px) {
+  .business-app-frame .business-billing { width: min(100% - 2rem, 1440px); padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
+  .billing-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .billing-summary article:last-child { grid-column: 1 / -1; }
+  .billing-list-section__header { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 767px) {
+  .business-app-frame .business-billing { width: min(100% - 1.5rem, 1440px); gap: 0.75rem; padding-block: 1.25rem calc(6.5rem + env(safe-area-inset-bottom)); }
+  .business-billing .business-page-header { align-items: flex-start; gap: 0.75rem; }
+  .business-billing .business-page-header__actions .button { min-height: 44px; padding-inline: 0.75rem; white-space: nowrap; }
+  .billing-summary { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(12rem, 82%); overflow-x: auto; padding: 0.15rem; scroll-padding-inline: 0.15rem; scroll-snap-type: inline mandatory; scrollbar-width: none; }
+  .billing-summary::-webkit-scrollbar { display: none; }
+  .billing-summary article { scroll-snap-align: start; }
+  .billing-list-section { padding: 0.8rem; }
+  .billing-list-section__header { gap: 0.75rem; }
+  .billing-filter { width: 100%; overflow-x: auto; }
+  .billing-charge-table { display: none; }
+  .billing-charge-cards { display: grid; gap: 0.5rem; }
+  .billing-charge-card { display: grid; gap: 0; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--background); overflow: clip; }
+  .billing-charge-card__review { width: 100%; display: grid; gap: 0.65rem; padding: 0.75rem; border: 0; color: var(--foreground); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+  .billing-charge-card__top { min-width: 0; display: flex; align-items: start; justify-content: space-between; gap: 0.5rem; }
+  .billing-charge-card__top .billing-charge-facts { min-width: 0; }
+  .billing-charge-card__amounts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .billing-charge-card__amounts>span { display: grid; gap: 0.08rem; padding: 0.55rem; border-radius: var(--radius-button); background: var(--surface); }
+  .billing-charge-card__amounts small { color: var(--muted-foreground); font-size: 0.7rem; }
+  .billing-charge-card__amounts strong { overflow: hidden; color: var(--foreground); font-size: 0.875rem; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+  .billing-charge-card__description { color: var(--muted-foreground); font-size: 0.75rem; line-height: 1.4; }
+  .billing-charge-card__source { min-height: 44px; display: inline-flex; align-items: center; padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--status-info); font-size: 0.75rem; font-weight: 700; text-decoration: underline; text-underline-offset: 0.15em; }
+  .billing-modal-actions { justify-content: stretch; }
+  .billing-modal-actions .button { flex: 1 1 8rem; }
+  .billing-checkout-overview { align-items: stretch; flex-direction: column; }
+  .billing-checkout-overview>.billing-status { align-self: flex-start; }
+  .billing-form>button { width: 100%; justify-self: stretch; }
+}
+
+@media (max-width: 390px) {
+  .business-billing .business-page-header__copy h1 { font-size: 1.375rem; }
+  .business-billing .business-page-header__context { font-size: 0.8125rem; }
+  .billing-summary { grid-auto-columns: 88%; }
+  .billing-charge-card__top { display: grid; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .billing-charge-card { transition: none !important; }
+}
+
+.grooming-detail-checkout { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; padding: 0.65rem; border: 1px solid color-mix(in srgb, var(--primary) 50%, var(--border)); border-radius: var(--radius-button); background: color-mix(in srgb, var(--primary) 12%, var(--surface)); }
+.grooming-detail-checkout>span { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 0.35rem; align-items: center; }
+.grooming-detail-checkout>span svg { grid-row: 1 / 3; color: var(--primary-foreground); }
+.grooming-detail-checkout strong { overflow: hidden; font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+.grooming-detail-checkout small { overflow: hidden; color: var(--muted-foreground); font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
+.grooming-detail-checkout>a { min-height: 44px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.65rem; border-radius: var(--radius-button); font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.hotel-detail-lifecycle__billing { border-color: color-mix(in srgb, var(--primary) 54%, var(--border)) !important; color: var(--primary-foreground) !important; background: var(--primary) !important; }
+.business-home-revenue { display: grid; gap: 0.65rem; }
+.business-home-revenue .business-home-section__heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.business-home-revenue .business-home-section__heading a { min-height: 36px; display: inline-flex; align-items: center; color: var(--status-info); font-size: 0.75rem; font-weight: 700; text-decoration: underline; text-underline-offset: 0.15em; }
+.business-home-revenue dl { display: grid; gap: 0.4rem; margin: 0; }
+.business-home-revenue dl>div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.business-home-revenue dt { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted-foreground); font-size: 0.8125rem; }
+.business-home-revenue dt svg { color: var(--primary); }
+.business-home-revenue dd { margin: 0; color: var(--foreground); font-size: 0.875rem; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.business-home-revenue p { margin: 0; padding-top: 0.55rem; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 0.75rem; line-height: 1.45; }
+.customer-detail-section--billing { display: grid; gap: 0.75rem; }
+.customer-detail-section--billing>header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.customer-detail-section--billing>header>div { display: grid; gap: 0.12rem; }
+.customer-detail-section--billing>header p { margin: 0; color: var(--muted-foreground); font-size: 0.75rem; }
+.customer-detail-section--billing>header>svg { color: var(--primary); }
+.customer-financial-summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.7rem; border-radius: var(--radius-button); background: color-mix(in srgb, var(--primary) 12%, var(--surface)); }
+.customer-financial-summary>span { display: grid; gap: 0.08rem; }
+.customer-financial-summary small { color: var(--muted-foreground); font-size: 0.7rem; }
+.customer-financial-summary strong { font-size: 1rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+.customer-financial-summary>a { min-height: 44px; display: inline-flex; align-items: center; color: var(--status-info); font-size: 0.75rem; font-weight: 700; text-decoration: underline; text-underline-offset: 0.15em; }
+.customer-financial-list,
+.customer-payment-history ol { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.customer-financial-list li { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 0.55rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--background); }
+.customer-financial-list li>div { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.4rem; align-items: center; }
+.customer-financial-list li>div>svg { color: var(--feature-sky); }
+.customer-financial-list li>div>span,
+.customer-financial-list li>span { min-width: 0; display: grid; gap: 0.12rem; }
+.customer-financial-list strong { overflow: hidden; font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+.customer-financial-list small { overflow: hidden; color: var(--muted-foreground); font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
+.customer-financial-list li>span { justify-items: end; }
+.customer-financial-list a { color: var(--status-info); font-size: 0.7rem; font-weight: 700; text-decoration: underline; text-underline-offset: 0.15em; }
+.customer-financial-status { min-height: 26px; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.4rem; border: 1px solid transparent; border-radius: var(--radius-pill); font-size: 0.6875rem; font-weight: 700; white-space: nowrap; }
+.customer-financial-status--unpaid { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 32%, var(--border)); background: var(--status-warning-soft); }
+.customer-financial-status--partial { color: var(--status-info); border-color: color-mix(in srgb, var(--status-info) 32%, var(--border)); background: var(--status-info-soft); }
+.customer-financial-status--paid { color: var(--status-success); border-color: color-mix(in srgb, var(--status-success) 32%, var(--border)); background: var(--status-success-soft); }
+.customer-financial-status--cancelled { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 32%, var(--border)); background: var(--status-critical-soft); }
+.customer-payment-history { display: grid; gap: 0.45rem; padding-top: 0.65rem; border-top: 1px solid var(--border); }
+.customer-payment-history h3 { font-size: 0.8125rem; font-weight: 700; }
+.customer-payment-history li { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.customer-payment-history li>span { min-width: 0; display: grid; gap: 0.08rem; }
+.customer-payment-history strong { font-size: 0.75rem; }
+.customer-payment-history small,
+.customer-payment-history>p { margin: 0; color: var(--muted-foreground); font-size: 0.7rem; }
+.customer-payment-history b { font-size: 0.75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 430px) {
+  .grooming-detail-checkout { align-items: stretch; flex-direction: column; }
+  .grooming-detail-checkout>a { width: 100%; }
+}
+
 /* Pointer drag previews follow the cursor while the source card remains as a
    quiet placeholder in its original lane. */
 :is(.business-calendar__drag-preview, .business-grooming__drag-preview) {
@@ -8785,83 +8969,100 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 
 .hotel-today-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0;
-  padding: 0.5rem;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
   overflow: hidden;
   border: 1px solid var(--border);
+  border-top: 3px solid var(--feature-sky);
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }
 
-.hotel-today-summary article {
+.hotel-today-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hotel-today-summary__header > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.hotel-today-summary__header span {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hotel-today-summary__header h2 {
+  color: var(--foreground);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.hotel-today-summary__header > svg {
+  color: var(--feature-sky);
+}
+
+.hotel-today-summary__stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+}
+
+.hotel-today-summary__stats article {
   min-width: 0;
   display: grid;
   align-content: start;
   gap: 0.4rem;
-  padding: 0.9rem;
-  border: 0;
-  border-left: 1px solid var(--border);
+  padding: 0.85rem 1rem 0.1rem;
+  border-right: 1px solid var(--border);
   background: transparent;
 }
 
-.hotel-today-summary article:first-child { border-left: 0; }
+.hotel-today-summary__stats article:first-child { padding-left: 0; }
+.hotel-today-summary__stats article:last-child { padding-right: 0; border-right: 0; }
 
-.hotel-today-summary article>span,
-.hotel-today-summary article>small {
+.hotel-summary-card--arrivals,
+.hotel-summary-card--departures,
+.hotel-summary-card--occupancy,
+.hotel-summary-card--care { --summary-accent: var(--feature-sky); }
+.hotel-summary-card--attention { --summary-accent: var(--status-warning); }
+
+.hotel-today-summary__stats article>span,
+.hotel-today-summary__stats article>small {
   color: var(--muted-foreground);
   font-size: 0.75rem;
 }
 
-.hotel-today-summary article>span {
+.hotel-today-summary__stats article>span {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: color-mix(in srgb, var(--status-info) 82%, var(--foreground));
-  font-weight: 700;
+  color: var(--muted-foreground);
+  font-weight: 600;
 }
 
-.hotel-today-summary article>strong {
+.hotel-today-summary__stats article>span svg { color: var(--summary-accent); }
+
+.hotel-today-summary__stats article>strong {
   color: var(--foreground);
-  font-size: 1.65rem;
+  font-size: 1.55rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-.hotel-section-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-}
-
 .hotel-mobile-view-tabs { display: none; }
-
-.hotel-section-links a {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding-inline: 0.85rem;
-  border-radius: var(--radius-pill);
-  color: var(--muted-foreground);
-  font-size: 0.8125rem;
-  font-weight: 700;
-}
-
-.hotel-section-links a:hover,
-.hotel-section-links a:focus-visible {
-  color: var(--foreground);
-  background: var(--feature-sky-soft);
-}
 
 .hotel-toolbar {
   display: grid;
-  grid-template-columns: auto auto auto minmax(14rem, 1fr) auto;
+  grid-template-columns: auto auto max-content minmax(14rem, 1fr);
   align-items: end;
   gap: 0.5rem;
   padding: 0.75rem;
@@ -8873,7 +9074,6 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 
 .hotel-toolbar__date,
 .hotel-toolbar__search,
-.hotel-toolbar__filter,
 .hotel-toolbar__range {
   min-width: 0;
   display: grid;
@@ -8881,15 +9081,14 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 }
 
 .hotel-toolbar__date>span,
-.hotel-toolbar__range legend {
+.hotel-toolbar__range-label {
   padding: 0;
   color: var(--muted-foreground);
   font-size: 0.6875rem;
   font-weight: 700;
 }
 
-.hotel-toolbar input,
-.hotel-toolbar select {
+.hotel-toolbar input {
   min-height: 44px;
 }
 
@@ -8910,49 +9109,49 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 }
 
 .hotel-toolbar__range {
-  grid-auto-flow: column;
-  grid-template-columns: repeat(3, auto);
   align-items: end;
+  gap: 0.3rem;
+  min-width: 13rem;
   padding: 0;
-  border: 0;
 }
 
-.hotel-toolbar__range legend { grid-column: 1 / -1; }
-
-.hotel-toolbar__range button {
-  min-width: 3.15rem;
-  min-height: 44px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-button);
-  color: var(--muted-foreground);
-  background: var(--background);
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 700;
+.hotel-toolbar__range-control {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.hotel-toolbar__range button[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--feature-sky) 66%, var(--border));
-  color: color-mix(in srgb, var(--status-info) 82%, var(--foreground));
+.hotel-toolbar__range-control::-webkit-scrollbar,
+.hotel-stays__filters::-webkit-scrollbar { display: none; }
+
+.hotel-toolbar__range-control>button {
+  min-width: max-content;
+  flex: 0 0 auto;
+  padding-inline: 0.8rem;
+  white-space: nowrap;
+}
+
+.hotel-toolbar__range-control>button[aria-selected="true"] {
+  color: var(--foreground);
   background: var(--feature-sky-soft);
 }
 
-.hotel-toolbar__search,
-.hotel-toolbar__filter {
+.hotel-toolbar__search {
   position: relative;
   align-items: center;
 }
 
-.hotel-toolbar__search svg,
-.hotel-toolbar__filter svg {
+.hotel-toolbar__search svg {
   position: absolute;
   left: 0.7rem;
   color: var(--muted-foreground);
   pointer-events: none;
 }
 
-.hotel-toolbar__search input,
-.hotel-toolbar__filter select { padding-left: 2.25rem; }
+.hotel-toolbar__search input { padding-left: 2.25rem; }
 
 .business-hotel__notice,
 .hotel-stay-detail__notice {
@@ -8990,6 +9189,15 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
   background: color-mix(in srgb, var(--status-warning-soft) 42%, var(--surface));
 }
 
+.business-hotel .hotel-occupancy { --hotel-section-accent: var(--feature-sky); }
+.business-hotel .hotel-stays { --hotel-section-accent: var(--feature-coral); }
+.business-hotel .hotel-arrivals { --hotel-section-accent: var(--feature-grape); }
+.business-hotel .hotel-departures { --hotel-section-accent: var(--feature-sky); }
+.business-hotel .hotel-daily-care { --hotel-section-accent: var(--feature-mint); }
+.business-hotel :is(.hotel-occupancy, .hotel-stays, .hotel-arrivals, .hotel-departures, .hotel-daily-care) {
+  border-top: 3px solid var(--hotel-section-accent);
+}
+
 .hotel-attention>header,
 .hotel-section-heading,
 .hotel-attention__list button,
@@ -9024,7 +9232,7 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 .hotel-section-heading h2 { color: var(--foreground); font-size: 1.1rem; font-weight: 700; }
 .hotel-section-heading p { margin: 0; color: var(--muted-foreground); font-size: 0.8125rem; }
 .hotel-attention>header>svg { color: var(--status-warning); }
-.hotel-section-heading>svg { color: var(--feature-sky); }
+.hotel-section-heading>svg { color: var(--hotel-section-accent, var(--feature-sky)); }
 
 .hotel-attention__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.5rem; }
 
@@ -9111,10 +9319,29 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 .hotel-occupancy-mobile { display: none; }
 
 .hotel-stays { scroll-margin-top: 1rem; }
-.hotel-stays__filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.hotel-stays__filters button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.7rem; border: 1px solid var(--border); border-radius: var(--radius-pill); color: var(--muted-foreground); background: var(--background); font: inherit; font-size: 0.75rem; font-weight: 700; }
-.hotel-stays__filters button[aria-selected="true"] { border-color: color-mix(in srgb, var(--feature-sky) 62%, var(--border)); color: color-mix(in srgb, var(--status-info) 82%, var(--foreground)); background: var(--feature-sky-soft); }
-.hotel-stays__filters button span { min-width: 1.15rem; display: grid; place-items: center; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--primary) 18%, transparent); font-size: 0.6875rem; }
+.hotel-stays__filters {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.hotel-stays__filters>button {
+  min-width: max-content;
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding-inline: 0.8rem;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.hotel-stays__filters>button[aria-selected="true"] {
+  color: var(--foreground);
+  background: var(--feature-sky-soft);
+}
 .hotel-stay-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr)); gap: 0.65rem; }
 .hotel-stay-card { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0.55rem; padding: 0.8rem; border: 1px solid color-mix(in srgb, var(--feature-sky) 40%, var(--border)); border-radius: var(--radius-panel); color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-card); font: inherit; text-align: left; transition: transform var(--duration-fast) var(--ease-premium), border-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium); }
 .hotel-stay-card.has-attention { border-color: color-mix(in srgb, var(--status-warning) 54%, var(--border)); }
@@ -9265,9 +9492,20 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 
 @media (max-width: 1199px) {
   .business-app-frame .business-hotel { width: min(100% - 2rem, 1440px); padding-block: 1.5rem calc(6.5rem + env(safe-area-inset-bottom)); }
-  .hotel-today-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 0.5rem; }
-  .hotel-today-summary article:nth-child(4) { border-left: 0; }
-  .hotel-toolbar { grid-template-columns: auto auto minmax(11rem, 1fr) auto; }
+  .hotel-today-summary__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .hotel-today-summary__stats article,
+  .hotel-today-summary__stats article:first-child,
+  .hotel-today-summary__stats article:last-child {
+    padding: 0.85rem;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .hotel-today-summary__stats article:nth-child(3n),
+  .hotel-today-summary__stats article:last-child { border-right: 0; }
+  .hotel-today-summary__stats article:nth-last-child(-n + 3) { border-bottom: 0; }
+  .hotel-toolbar { grid-template-columns: auto auto minmax(11rem, 1fr); }
   .hotel-toolbar__range { grid-column: 1 / 3; }
 }
 
@@ -9291,18 +9529,17 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
   .hotel-mobile-view-tabs button { min-width: max-content; min-height: 44px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; padding-inline: 0.8rem; border: 0; border-radius: var(--radius-pill); color: var(--muted-foreground); background: transparent; font: inherit; font-size: 0.8125rem; font-weight: 700; scroll-snap-align: start; }
   .hotel-mobile-view-tabs button[aria-selected="true"] { color: var(--foreground); background: var(--feature-sky-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--feature-sky) 44%, var(--border)); }
   .hotel-mobile-view-tabs button span { min-width: 1.25rem; display: grid; place-items: center; padding-inline: 0.25rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--primary) 18%, transparent); font-size: 0.6875rem; }
-  .hotel-today-summary { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(9.75rem, 76%); gap: 0.5rem; overflow-x: auto; padding: 0.5rem; scroll-padding-inline: 0.5rem; scroll-snap-type: inline mandatory; }
-  .hotel-today-summary { scrollbar-width: none; }
-  .hotel-today-summary::-webkit-scrollbar { display: none; }
-  .hotel-today-summary article { border: 1px solid var(--border); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--feature-sky-soft) 42%, var(--surface)); scroll-snap-align: start; }
-  .hotel-today-summary article:first-child { border-left: 1px solid var(--border); }
-  .hotel-section-links { display: none; }
+  .hotel-today-summary { gap: 0.75rem; padding: 0.9rem 1rem 1rem; }
+  .hotel-today-summary__stats { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(9.75rem, 76%); overflow-x: auto; margin-inline: -0.1rem; scroll-padding-inline: 0.1rem; scroll-snap-type: inline mandatory; scrollbar-width: none; }
+  .hotel-today-summary__stats::-webkit-scrollbar { display: none; }
+  .hotel-today-summary__stats article,
+  .hotel-today-summary__stats article:first-child,
+  .hotel-today-summary__stats article:last-child { padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); scroll-snap-align: start; }
   .hotel-toolbar { grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding: 0.625rem; }
   .hotel-toolbar__date { min-width: 0; }
   .hotel-toolbar__range { display: none; }
-  .hotel-toolbar__search,
-  .hotel-toolbar__filter { display: none; grid-column: 1 / -1; }
-  .business-hotel[data-mobile-view="staying"] :is(.hotel-toolbar__search, .hotel-toolbar__filter) { display: grid; }
+  .hotel-toolbar__search { display: none; grid-column: 1 / -1; }
+  .business-hotel[data-mobile-view="staying"] .hotel-toolbar__search { display: grid; }
   .hotel-attention,
   .hotel-occupancy,
   .hotel-stays,
@@ -9311,9 +9548,7 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
   .hotel-daily-care { padding: 0.8rem; }
   .hotel-attention__list { grid-template-columns: 1fr; }
   .hotel-occupancy { display: none; }
-  .hotel-stays__filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.2rem; scrollbar-width: none; }
-  .hotel-stays__filters::-webkit-scrollbar { display: none; }
-  .hotel-stays__filters button { flex: 0 0 auto; }
+  .hotel-stays__filters { padding-bottom: 0.2rem; }
   .hotel-stay-cards { grid-template-columns: 1fr; }
   .hotel-daily-columns { display: contents; }
   .business-hotel:not([data-mobile-view="today"]) .hotel-today-summary,
@@ -9338,8 +9573,8 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
 }
 
 @media (max-width: 430px) {
-  .hotel-today-summary article { padding: 0.75rem; }
-  .hotel-today-summary article>strong { font-size: 1.4rem; }
+  .hotel-today-summary__stats article { padding: 0.75rem; }
+  .hotel-today-summary__stats article>strong { font-size: 1.4rem; }
   .hotel-compact-list article { align-items: flex-start; }
   .hotel-compact-list :is(a, button) { min-width: 38px; padding-inline: 0.45rem; }
   .hotel-detail-date-fields { grid-template-columns: 1fr; }
@@ -9374,4 +9609,705 @@ body:has(.business-app-frame) .business-app-frame :is(h1, h2, h3, h4, p, strong,
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Shared Service Record history -------------------------------------------------- */
+.business-customer-detail .customer-detail-section--service-history { border-top-color: var(--feature-grape); }
+.customer-service-history { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.customer-service-history__item { min-width: 0; padding: 0; border-top: 1px solid var(--border); }
+.customer-service-history__item:first-child { border-top: 0; }
+.customer-service-record { min-width: 0; }
+.customer-service-record > summary { min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--foreground); cursor: pointer; list-style: none; }
+.customer-service-record > summary::-webkit-details-marker { display: none; }
+.customer-service-record > summary::after { width: 1.5rem; height: 1.5rem; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--muted-foreground); content: "+"; font-size: 1rem; line-height: 1; }
+.customer-service-record[open] > summary::after { content: "–"; }
+.customer-service-record > summary:focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 28%, transparent); border-radius: var(--radius-button); }
+.customer-service-record__identity { min-width: 0; display: flex; align-items: center; gap: 0.55rem; }
+.customer-service-record__identity > span { min-width: 0; display: grid; gap: 0.08rem; }
+.customer-service-record__identity strong { overflow: hidden; font-size: 0.875rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.customer-service-record__identity small { overflow: hidden; color: var(--muted-foreground); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.customer-service-record__meta { min-width: 0; display: grid; justify-items: end; gap: 0.08rem; text-align: right; }
+.customer-service-record__meta time,
+.customer-service-record__meta small { color: var(--muted-foreground); font-size: 0.7rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.customer-service-record__payment { min-height: 24px; display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.1rem 0.4rem; border: 1px solid var(--border); border-radius: var(--radius-pill); font-size: 0.6875rem; font-weight: 700; white-space: nowrap; }
+.customer-service-record__payment--paid { color: var(--status-success); border-color: color-mix(in srgb, var(--status-success) 32%, var(--border)); background: var(--status-success-soft); }
+.customer-service-record__payment--partial { color: var(--status-info); border-color: color-mix(in srgb, var(--status-info) 32%, var(--border)); background: var(--status-info-soft); }
+.customer-service-record__payment--unpaid { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 32%, var(--border)); background: var(--status-warning-soft); }
+.customer-service-record__payment--cancelled,
+.customer-service-record__payment--no-charge { color: var(--muted-foreground); background: var(--muted); }
+.customer-service-record__body { display: grid; gap: 0.75rem; padding: 0 0 0.875rem 3.15rem; }
+.customer-service-record__headline { margin: 0; color: var(--foreground); font-size: 0.9rem; font-weight: 700; line-height: 1.45; }
+.customer-service-record__facts,
+.customer-service-record__details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin: 0; }
+.customer-service-record__facts > div,
+.customer-service-record__details > div { min-width: 0; display: grid; gap: 0.12rem; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--surface); }
+.customer-service-record__facts dt,
+.customer-service-record__details dt { color: var(--muted-foreground); font-size: 0.6875rem; font-weight: 700; }
+.customer-service-record__facts dd,
+.customer-service-record__details dd { margin: 0; color: var(--foreground); font-size: 0.75rem; font-weight: 650; line-height: 1.4; }
+.customer-service-record__activities { display: grid; gap: 0.45rem; }
+.customer-service-record__activities h3,
+.customer-service-record__photos h3 { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--foreground); font-size: 0.8125rem; font-weight: 700; }
+.customer-service-record__activities ol,
+.customer-service-record__photos ul,
+.customer-service-record__audit ol { display: grid; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.customer-service-record__activities li { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0.45rem; padding-top: 0.45rem; border-top: 1px solid var(--border); }
+.customer-service-record__activities li > svg { flex: 0 0 auto; margin-top: 0.1rem; color: var(--status-success); }
+.customer-service-record__activities li > span,
+.customer-service-record__audit li > span { min-width: 0; display: grid; gap: 0.08rem; }
+.customer-service-record__activities strong,
+.customer-service-record__audit strong { overflow: hidden; color: var(--foreground); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.customer-service-record__activities small,
+.customer-service-record__audit small,
+.customer-service-record__audit em { color: var(--muted-foreground); font-size: 0.7rem; line-height: 1.4; }
+.customer-service-record__activities time,
+.customer-service-record__audit time { color: var(--muted-foreground); font-size: 0.6875rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.customer-service-record__staff,
+.customer-service-record__note { display: grid; gap: 0.1rem; margin: 0; padding: 0.6rem; border-radius: var(--radius-button); color: var(--foreground); background: color-mix(in srgb, var(--feature-grape-soft) 30%, var(--surface)); font-size: 0.75rem; line-height: 1.45; }
+.customer-service-record__staff strong,
+.customer-service-record__note strong { color: var(--muted-foreground); font-size: 0.6875rem; }
+.customer-service-record__photos { display: grid; gap: 0.45rem; }
+.customer-service-record__photos ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.customer-service-record__photos li { min-width: 0; display: flex; align-items: center; gap: 0.35rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--surface); }
+.customer-service-record__photos li > svg { flex: 0 0 auto; color: var(--feature-grape); }
+.customer-service-record__photos li > span { min-width: 0; display: grid; gap: 0.05rem; overflow: hidden; font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.customer-service-record__photos li small { color: var(--muted-foreground); font-size: 0.6875rem; }
+.customer-service-record__audit { display: grid; gap: 0.45rem; }
+.customer-service-record__audit > summary { min-height: 36px; display: inline-flex; align-items: center; color: var(--status-info); font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+.customer-service-record__audit li { display: grid; grid-template-columns: minmax(6rem, auto) minmax(0, 1fr); gap: 0.45rem; padding-top: 0.45rem; border-top: 1px solid var(--border); }
+.customer-service-record__audit em { font-style: normal; }
+.customer-service-record__boundary { margin: 0; padding-top: 0.5rem; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 0.6875rem; line-height: 1.45; }
+.grooming-detail-service-record,
+.hotel-detail-service-record { color: var(--status-success); }
+
+@media (max-width: 767px) {
+  .customer-service-record > summary { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .customer-service-record__meta { max-width: 8.5rem; }
+  .customer-service-record__body { padding-left: 0; }
+  .customer-service-record__facts,
+  .customer-service-record__details { grid-template-columns: 1fr; }
+  .customer-service-record__activities li { grid-template-columns: auto minmax(0, 1fr); }
+  .customer-service-record__activities time { grid-column: 2 / 3; }
+}
+
+@media (max-width: 430px) {
+  .customer-service-record > summary { gap: 0.45rem; }
+  .customer-service-record__identity strong { font-size: 0.8125rem; }
+  .customer-service-record__meta time,
+  .customer-service-record__meta small { white-space: normal; }
+  .customer-service-record__photos ul { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-service-record > summary { transition: none !important; }
+}
+
+/* Large-screen calendar display mode shows only a fit-to-viewport month board. */
+.business-calendar:fullscreen,
+.business-calendar.is-calendar-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(0.75rem, 1.5vw, 1.5rem);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--background);
+}
+
+.business-calendar:fullscreen > .business-page-header,
+.business-calendar.is-calendar-fullscreen > .business-page-header,
+.business-calendar:fullscreen > .calendar-toolbar,
+.business-calendar.is-calendar-fullscreen > .calendar-toolbar,
+.business-calendar:fullscreen > .business-calendar__confirmation,
+.business-calendar.is-calendar-fullscreen > .business-calendar__confirmation,
+.business-calendar:fullscreen > .calendar-interaction-conflict,
+.business-calendar.is-calendar-fullscreen > .calendar-interaction-conflict,
+.business-calendar:fullscreen > .calendar-interaction-guide,
+.business-calendar.is-calendar-fullscreen > .calendar-interaction-guide {
+  display: none !important;
+}
+
+.business-calendar:fullscreen .business-calendar__desktop-view,
+.business-calendar.is-calendar-fullscreen .business-calendar__desktop-view {
+  display: block !important;
+  min-height: 0;
+  height: 100%;
+}
+
+.business-calendar:fullscreen .business-calendar__mobile-view,
+.business-calendar.is-calendar-fullscreen .business-calendar__mobile-view,
+.business-calendar:fullscreen .calendar-toolbar__view-control,
+.business-calendar.is-calendar-fullscreen .calendar-toolbar__view-control {
+  display: none !important;
+}
+
+.business-calendar:fullscreen .business-calendar__surface,
+.business-calendar.is-calendar-fullscreen .business-calendar__surface {
+  grid-row: 1;
+  height: 100%;
+  max-height: none !important;
+  min-height: 0;
+  overflow: hidden !important;
+  border: 0;
+  border-radius: var(--radius-panel);
+  box-shadow: none;
+}
+
+.business-calendar:fullscreen .calendar-planning-board--month,
+.business-calendar.is-calendar-fullscreen .calendar-planning-board--month {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+}
+
+.business-calendar:fullscreen .calendar-planning-week,
+.business-calendar.is-calendar-fullscreen .calendar-planning-week {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.business-calendar:fullscreen .calendar-planning-week__headers,
+.business-calendar.is-calendar-fullscreen .calendar-planning-week__headers {
+  min-height: 0;
+}
+
+.business-calendar:fullscreen .calendar-planning-week__headers > header,
+.business-calendar.is-calendar-fullscreen .calendar-planning-week__headers > header {
+  min-height: 0;
+  padding: 0.35rem 0.6rem;
+}
+
+.business-calendar:fullscreen .calendar-planning-week__body,
+.business-calendar.is-calendar-fullscreen .calendar-planning-week__body {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding-block: 0;
+  grid-template-rows: repeat(var(--calendar-lane-count, 0), minmax(0, 1.5rem)) minmax(0, 1fr) !important;
+}
+
+.business-calendar:fullscreen .calendar-planning-day-stack,
+.business-calendar.is-calendar-fullscreen .calendar-planning-day-stack {
+  min-height: 0;
+  gap: 0.25rem;
+  padding: 0.25rem 0.35rem 0.35rem;
+  overflow: hidden;
+}
+
+.business-calendar:fullscreen .calendar-stay-span,
+.business-calendar.is-calendar-fullscreen .calendar-stay-span,
+.business-calendar:fullscreen .booking-item,
+.business-calendar.is-calendar-fullscreen .booking-item {
+  min-height: 0;
+}
+
+.calendar-fullscreen-exit {
+  display: none;
+}
+
+.business-calendar:fullscreen .calendar-fullscreen-exit,
+.business-calendar.is-calendar-fullscreen .calendar-fullscreen-exit {
+  position: fixed !important;
+  inset: 0.75rem 0.75rem auto auto;
+  z-index: 4;
+  width: 2.75rem;
+  min-height: 2.75rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow-card);
+  font: inherit;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.business-calendar:fullscreen .calendar-fullscreen-exit:hover,
+.business-calendar:fullscreen .calendar-fullscreen-exit:focus-visible,
+.business-calendar.is-calendar-fullscreen .calendar-fullscreen-exit:hover,
+.business-calendar.is-calendar-fullscreen .calendar-fullscreen-exit:focus-visible {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--accent);
+}
+
+.business-calendar .calendar-fullscreen-toggle {
+  min-height: 44px;
+}
+
+.business-calendar .calendar-fullscreen-toggle.is-active {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--accent);
+}
+
+/* The detail sheet is viewport-level UI. The route-entry animation must not
+   leave a transformed containing block that traps the fixed sheet below the
+   sticky Business header. */
+.business-route-stage > .business-page > .business-grooming {
+  animation: none;
+}
+
+/* Grooming status is a one-tap choice in the detail sheet, not a select menu. */
+.grooming-status-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.grooming-status-option {
+  --status-option-accent: var(--border);
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  gap: 0.15rem;
+  padding: 0.625rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--status-option-accent) 58%, var(--border));
+  border-radius: var(--radius-button);
+  color: var(--foreground);
+  background: var(--surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-premium), background-color var(--duration-fast) var(--ease-premium), box-shadow var(--duration-fast) var(--ease-premium), transform var(--duration-fast) var(--ease-premium);
+}
+
+.grooming-status-option > span {
+  overflow: hidden;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grooming-status-option > small {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+}
+
+.grooming-status-option--booked,
+.grooming-status-option--checked-in { --status-option-accent: var(--status-info); }
+.grooming-status-option--waiting { --status-option-accent: var(--status-warning); }
+.grooming-status-option--in-service { --status-option-accent: var(--feature-sky); }
+.grooming-status-option--ready-for-pickup,
+.grooming-status-option--completed { --status-option-accent: var(--status-success); }
+.grooming-status-option--cancelled { --status-option-accent: var(--status-critical); }
+
+.grooming-status-option[aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--primary);
+  cursor: default;
+}
+
+.grooming-status-option:disabled:not([aria-pressed="true"]) {
+  color: var(--muted-foreground);
+  background: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grooming-status-option:not(:disabled):hover {
+    border-color: var(--status-option-accent);
+    background: color-mix(in srgb, var(--status-option-accent) 9%, var(--surface));
+    box-shadow: var(--shadow-card);
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grooming-status-option { transition: none !important; }
+}
+
+/* Billing stays readable on narrow screens: summary cards stack, filters own
+   their horizontal scroll, and modal actions keep a stable tap target. */
+.business-billing,
+.business-billing > :where(header, section, div, aside) {
+  min-width: 0;
+}
+
+.business-billing > :where(header, section, div, aside) {
+  max-width: 100%;
+}
+
+.billing-list-section__filter {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.billing-list-section__filter-label {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.business-billing .billing-filter {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.business-billing .billing-filter::-webkit-scrollbar { display: none; }
+
+.business-billing .billing-filter > button {
+  min-width: max-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  body:has(.business-billing .business-modal__backdrop) .business-header--app,
+  body:has(.business-billing .business-modal__backdrop) .business-mobile-navigation {
+    z-index: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .business-billing .billing-summary {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    gap: 0.6rem;
+    overflow: visible;
+    padding: 0;
+    scroll-padding-inline: 0;
+    scroll-snap-type: none;
+  }
+
+  .business-billing .billing-summary article {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.75rem;
+    padding: 0.8rem;
+  }
+
+  .business-billing .billing-summary article > span {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .business-billing .billing-summary article > strong {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 1.35rem;
+  }
+
+  .business-billing .billing-summary article > small {
+    grid-column: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .business-billing .billing-list-section {
+    min-width: 0;
+    padding: 0.75rem;
+  }
+
+  .business-billing .billing-list-section__header {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.7rem;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .business-billing .billing-list-section__header > div:first-child {
+    min-width: 0;
+  }
+
+  .business-billing .billing-list-section__header h2 {
+    font-size: 1rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .business-billing .billing-list-section__header p {
+    line-height: 1.4;
+  }
+
+  .business-billing .billing-list-section__filter {
+    width: 100%;
+  }
+
+  .business-billing .billing-filter {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0.25rem;
+    border-radius: var(--radius-panel);
+    overflow: visible;
+  }
+
+  .business-billing .billing-filter > button {
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 0.35rem;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .business-billing .billing-charge-card {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .business-billing .billing-charge-card__review {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .business-billing .billing-charge-card__top {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .business-billing .billing-charge-card__top .billing-charge-facts,
+  .business-billing .billing-charge-card__top .billing-status {
+    min-width: 0;
+  }
+
+  .business-billing .billing-charge-card__top .billing-charge-facts strong,
+  .business-billing .billing-charge-card__top .billing-charge-facts small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .business-billing .billing-charge-card__amounts {
+    min-width: 0;
+  }
+
+  .business-billing .billing-charge-card__amounts > span {
+    min-width: 0;
+  }
+
+  .business-billing .billing-charge-card__amounts strong {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.8125rem;
+  }
+
+  .business-billing .billing-charge-card__description {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .business-billing .billing-charge-card__source {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+  }
+
+  .business-billing .business-modal__backdrop {
+    place-items: stretch;
+    padding: 0.75rem;
+    z-index: 200;
+  }
+
+  .business-billing .business-modal {
+    width: 100%;
+    max-height: calc(100dvh - 1.5rem);
+    border-radius: var(--radius-panel);
+  }
+
+  .business-billing .business-modal__header {
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .business-billing .business-modal__header > div {
+    min-width: 0;
+  }
+
+  .business-billing .business-modal__header h2 {
+    font-size: 1rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .business-billing .business-modal__header p {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .business-billing .business-modal__content {
+    min-width: 0;
+    padding: 0.75rem;
+    overflow-x: hidden;
+  }
+
+  .business-billing .business-modal__footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .business-billing .business-modal__footer > .button {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .business-billing .billing-modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .business-billing .billing-modal-actions > .button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0.5rem;
+    justify-content: center;
+    white-space: normal;
+  }
+
+  .business-billing .billing-modal-actions__primary {
+    grid-column: 1 / -1;
+  }
+
+  .business-billing .billing-checkout-overview,
+  .business-billing .billing-checkout-overview > div,
+  .business-billing .billing-checkout-overview .billing-charge-facts {
+    min-width: 0;
+  }
+
+  .business-billing .billing-checkout-overview .billing-charge-facts strong,
+  .business-billing .billing-checkout-overview .billing-charge-facts small,
+  .business-billing .billing-breakdown li strong,
+  .business-billing .billing-payment-history li strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .business-billing .billing-breakdown li,
+  .business-billing .billing-payment-history li {
+    min-width: 0;
+  }
+
+  .business-billing .billing-breakdown li > span,
+  .business-billing .billing-payment-history li > span {
+    min-width: 0;
+  }
+
+  .business-billing .billing-breakdown li small,
+  .business-billing .billing-payment-history li small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 359px) {
+  .business-billing .billing-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .business-billing .billing-modal-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .business-billing .billing-modal-actions__primary {
+    grid-column: auto;
+  }
+}
+
+/* BusinessSegmentedControl is one visual component. Page-specific classes
+   may still own width, wrapping and scroll behavior, but they must not add a
+   second frame or change the control's typography/selected treatment. */
+.business-page .business-segmented-control {
+  box-sizing: border-box;
+  gap: 0.25rem !important;
+  padding: 0.25rem !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-pill) !important;
+  background: var(--segmented-bg) !important;
+}
+
+main.business-page .business-segmented-control.business-segmented-control > button {
+  min-height: 44px !important;
+  border: 0 !important;
+  border-radius: var(--radius-pill) !important;
+  color: var(--segmented-fg) !important;
+  background: transparent !important;
+  font-family: "LINE Seed Sans TH", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.25;
+}
+
+main.business-page .business-segmented-control.business-segmented-control > button:hover:not(:disabled),
+main.business-page .business-segmented-control.business-segmented-control > button:focus-visible:not(:disabled) {
+  color: var(--foreground) !important;
+  background: color-mix(in srgb, var(--segmented-active-bg) 72%, var(--segmented-bg)) !important;
+}
+
+main.business-page .business-segmented-control.business-segmented-control > button[aria-selected="true"] {
+  color: var(--segmented-active-fg) !important;
+  background: var(--segmented-active-bg) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+@media (min-width: 768px) {
+  /* Desktop Calendar renders its four view choices through the shared
+     component; restore the component's inline pill layout after the legacy
+     Calendar toolbar rules. */
+  .business-calendar .calendar-toolbar__view.business-segmented-control {
+    width: fit-content;
+    min-width: 0;
+    display: inline-flex;
+    grid-auto-flow: initial;
+    align-self: end;
+    justify-self: end;
+  }
+}
+
+/* Inbox filters use the full list-tools width so each of the three choices
+   remains an equal, easy-to-scan segment instead of hugging its label. */
+.business-inbox .inbox-filter-group {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+}
+
+.business-inbox .inbox-filter-group > button {
+  min-width: 0;
+  flex: 1 1 0;
 }

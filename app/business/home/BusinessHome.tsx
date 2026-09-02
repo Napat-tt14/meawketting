@@ -8,6 +8,7 @@ import {
   getEnabledBusinessModules,
   getGroomingServiceJobSummary,
   getPrototypeHotelStaySummary,
+  getPrototypeRevenueSummary,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
   resolvePrototypeBookingRelationship,
@@ -21,11 +22,13 @@ import {
   Plus,
   Scan,
   Search,
+  Wallet,
 } from "../../_components/icons";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { BusinessHomeSpotlight } from "./BusinessHomeSpotlight";
+import { formatBusinessMoney } from "../billing/billingPresentation";
 
 const todayItems = [
   { key: "waitingIntake", label: "รอรับเข้า" },
@@ -65,6 +68,7 @@ export function BusinessHome() {
   const groomingEnabled = enabledModules.includes("grooming");
   const hotelEnabled = enabledModules.includes("hotel");
   const hotelSummary = getPrototypeHotelStaySummary(context, BOOKING_DEMO_DATE, !businessStateReady);
+  const revenueSummary = getPrototypeRevenueSummary(context, BOOKING_DEMO_DATE, !businessStateReady);
   const attentionItems = [
     ...demo.attention.filter((item) => !(groomingEnabled && item.id === "pickup")),
     ...(groomingEnabled && groomingSummary.readyForPickup > 0 ? [{
@@ -199,6 +203,19 @@ export function BusinessHome() {
                 );
               })}
             </ul>
+          </section>
+
+          <section className="business-home-section business-home-revenue" aria-labelledby="business-home-revenue-title">
+            <div className="business-home-section__heading">
+              <h2 id="business-home-revenue-title">รายรับวันนี้</h2>
+              <Link href="/business/billing">เปิดการเงิน</Link>
+            </div>
+            <dl>
+              <div><dt><Wallet size={16} />รับชำระแล้ว</dt><dd>{formatBusinessMoney(revenueSummary.revenueToday)}</dd></div>
+              <div><dt>Payment วันนี้</dt><dd>{revenueSummary.paymentCountToday} รายการ</dd></div>
+              <div><dt>ยอดค้างชำระ</dt><dd>{formatBusinessMoney(revenueSummary.unpaidBalance)}</dd></div>
+            </dl>
+            <p>ใช้ข้อมูล Charge และ Payment เดียวกับหน้าการเงิน · ไม่รวมยอดที่ยังไม่รับชำระเป็นรายรับ</p>
           </section>
 
         </aside>

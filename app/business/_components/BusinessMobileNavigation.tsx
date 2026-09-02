@@ -4,10 +4,11 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDemoBusinessContextDetails, getEnabledBusinessModules } from "../../_prototype/businessState";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
-import { BedDouble, CalendarDays, House, List, MessageCircle, Scan, Scissors, UsersRound, X } from "../../_components/icons";
+import { BedDouble, CalendarDays, House, List, MessageCircle, Scan, Scissors, UsersRound, Wallet, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import {
   BUSINESS_CALENDAR_DESTINATION,
+  BUSINESS_BILLING_DESTINATION,
   BUSINESS_CUSTOMERS_DESTINATION,
   BUSINESS_GROOMING_DESTINATION,
   BUSINESS_HOTEL_DESTINATION,
@@ -114,6 +115,15 @@ export function BusinessMobileNavigation() {
               >
                 <UsersRound size={19} />
                 <span>{BUSINESS_CUSTOMERS_DESTINATION.label}</span>
+              </Link>
+              <Link
+                className={`business-nav-item business-nav-item--sheet${pathname === BUSINESS_BILLING_DESTINATION.href ? " is-active" : ""}`}
+                href={BUSINESS_BILLING_DESTINATION.href}
+                aria-current={pathname === BUSINESS_BILLING_DESTINATION.href ? "page" : undefined}
+                onClick={close}
+              >
+                <Wallet size={19} />
+                <span>{BUSINESS_BILLING_DESTINATION.label}</span>
               </Link>
               <div className="business-more-sheet__group">
                 <p>งานบริการ</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getBookingResources,
   readPrototypeBooking,
@@ -24,11 +24,13 @@ import {
   Save,
   Scissors,
   UserRound,
+  Wallet,
   X,
 } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { AddServiceRequestDialog } from "../inbox/AddServiceRequestDialog";
 import {
+  GROOMING_WORKFLOW_STATUSES,
   groomingDurationLabel,
   groomingScheduleLabel,
   groomingStatusLabel,
@@ -66,17 +68,26 @@ export function GroomingJobDetail({
   const [assignments, setAssignments] = useState<string[]>([...job.assignedResourceIds]);
   const [notice, setNotice] = useState<string | null>(null);
   const [requestOpen, setRequestOpen] = useState<{ conversationId: string; bookingId: string; serviceLabel: string } | null>(null);
+  const onCloseRef = useRef(onClose);
   const customer = readPrototypeCustomer(job.customerId);
   const pet = customer?.pets.find((item) => item.id === job.petId) ?? null;
   const booking = readPrototypeBooking(job.bookingId);
   const resources = getBookingResources(context, job.baseServiceId);
   const availableTransitions = statusOptionsForGroomingJob(job.status);
+  const statusChoices = job.status === "cancelled"
+    ? ["cancelled" as ServiceJobStatus]
+    : [...GROOMING_WORKFLOW_STATUSES, ...(availableTransitions.includes("cancelled") ? ["cancelled" as ServiceJobStatus] : [])];
+  const checkoutAvailable = job.status === "ready-for-pickup" || job.status === "completed";
   const addOnRequests = useMemo(() => listPrototypeConversations(context)
     .flatMap((conversation) => conversation.messages)
     .filter((message): message is PrototypeAddServiceRequestMessage => message.kind === "add-service-request")
     .filter((message) => message.serviceJobId === job.serviceJobId || (!message.serviceJobId && message.bookingId === job.bookingId)), [context, job.bookingId, job.serviceJobId]);
 
-  const close = useCallback(() => onClose(), [onClose]);
+  const close = useCallback(() => onCloseRef.current(), []);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -119,12 +130,10 @@ export function GroomingJobDetail({
     return resources.find((resource) => resource.kind === kind && assignments.includes(resource.id))?.id ?? "";
   }
 
-  function changeStatus(event: ChangeEvent<HTMLSelectElement>) {
-    const nextStatus = event.currentTarget.value as ServiceJobStatus;
-    if (!nextStatus || nextStatus === job.status) return;
+  function changeStatus(nextStatus: ServiceJobStatus) {
+    if (nextStatus === job.status || !availableTransitions.includes(nextStatus)) return;
     const result = onTransition(job.serviceJobId, nextStatus);
     setNotice(result.notice);
-    event.currentTarget.value = "";
   }
 
   function saveAssignments() {
@@ -204,14 +213,27 @@ export function GroomingJobDetail({
 
           <section className="grooming-detail-section" aria-labelledby="grooming-status-title">
             <header><h3 id="grooming-status-title">สถานะงาน</h3></header>
-            <label className="grooming-status-control">
-              <span>เปลี่ยนสถานะ</span>
-              <select aria-label="เปลี่ยนสถานะงาน" value="" onChange={changeStatus} disabled={availableTransitions.length === 0}>
-                <option value="">{availableTransitions.length > 0 ? `ปัจจุบัน: ${groomingStatusLabel(job.status)}` : groomingStatusLabel(job.status)}</option>
-                {availableTransitions.map((status) => <option key={status} value={status}>{groomingStatusLabel(status)}</option>)}
-              </select>
-            </label>
-            <p className="grooming-detail-section__hint"><CheckCircle size={16} />ย้ายไปสถานะก่อนหน้าหรือถัดไปได้ · ใช้ได้แทนการลากบนมือถือ</p>
+            <div className="grooming-status-options" role="group" aria-label="เปลี่ยนสถานะงาน">
+              {statusChoices.map((status) => {
+                const isCurrent = status === job.status;
+                const isAvailable = isCurrent || availableTransitions.includes(status);
+                return (
+                  <button
+                    key={status}
+                    className={`grooming-status-option grooming-status-option--${status}${isCurrent ? " is-current" : ""}`}
+                    type="button"
+                    aria-pressed={isCurrent}
+                    disabled={isCurrent || !isAvailable}
+                    onClick={() => changeStatus(status)}
+                  >
+                    <span>{groomingStatusLabel(status)}</span>
+                    {isCurrent ? <small>สถานะปัจจุบัน</small> : null}
+                  </button>
+                );
+              })}
+            </div>
+            {checkoutAvailable ? <div className="grooming-detail-checkout"><span><Wallet size={17} /><strong>พร้อมตรวจยอด</strong><small>สถานะงานและการชำระเงินแยกกัน</small></span><a className="button button--business" href={`/business/billing?serviceJobId=${encodeURIComponent(job.serviceJobId)}`}><Wallet size={17} />ไปชำระเงิน</a></div> : null}
+            {job.status === "completed" ? <p className="grooming-detail-section__hint grooming-detail-service-record"><CheckCircle size={16} />บันทึกประวัติบริการแล้ว · เปิดดูได้จากหน้าลูกค้าและสัตว์เลี้ยง</p> : null}
           </section>
 
           <section className="grooming-detail-section" aria-labelledby="grooming-resource-title">

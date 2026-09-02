@@ -15,7 +15,7 @@ export const GROOMING_BOARD_LANES: readonly { key: GroomingBoardLane; label: str
   { key: "completed", label: "เสร็จแล้ว", statuses: ["completed"] },
 ];
 
-const GROOMING_WORKFLOW_STATUSES: readonly ServiceJobStatus[] = [
+export const GROOMING_WORKFLOW_STATUSES: readonly ServiceJobStatus[] = [
   "booked",
   "checked-in",
   "waiting",

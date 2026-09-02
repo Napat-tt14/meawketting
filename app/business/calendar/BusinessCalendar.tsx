@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, type PointerEvent as ReactPointerEvent, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
+import { type DragEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import type { BookingStatus, BusinessServiceModule, PrototypeBooking } from "../../_prototype/businessState";
 import {
   BOOKING_DEMO_DATE,
@@ -13,7 +13,7 @@ import {
   readPrototypeBooking,
   savePrototypeBooking,
 } from "../../_prototype/businessState";
-import { ArrowLeft, ArrowRight, CalendarDays, Plus } from "../../_components/icons";
+import { ArrowLeft, ArrowRight, CalendarDays, Maximize2, Minimize2, Plus } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { BusinessAlert } from "../_components/BusinessFeedback";
@@ -101,6 +101,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const launchBookingId = launchRequest?.bookingId ?? null;
   const [selectedDate, setSelectedDate] = useState<string>(BOOKING_DEMO_DATE);
   const [view, setView] = useState<CalendarView>("week");
+  const [isFullscreenMode, setIsFullscreenMode] = useState(false);
   const [customRangeDays, setCustomRangeDays] = useState<CustomRangeDays>(28);
   const [moduleFilter, setModuleFilter] = useState<"all" | BusinessServiceModule>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
@@ -126,6 +127,9 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const suppressSelectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiedBookingRef = useRef<PrototypeBooking | null>(null);
   const undoStackRef = useRef<CalendarUndoAction[]>([]);
+  const fullscreenFrameRef = useRef<HTMLDivElement>(null);
+  const fullscreenFallbackRef = useRef(false);
+  const viewBeforeFullscreenRef = useRef<CalendarView | null>(null);
   const calendarSurfaceRef = useRef<HTMLDivElement>(null);
   const bookingStateReady = useIsClient();
   const viewPreferenceName = calendarViewCookieName(context.businessId, context.branchId);
@@ -143,12 +147,43 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     return () => window.cancelAnimationFrame(frame);
   }, [viewPreferenceName]);
 
+  const restoreViewAfterFullscreen = useCallback(() => {
+    const previousView = viewBeforeFullscreenRef.current;
+    if (!previousView) return;
+    viewBeforeFullscreenRef.current = null;
+    setView(previousView);
+    writeCalendarViewPreference(viewPreferenceName, previousView);
+  }, [viewPreferenceName]);
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      const nativeFullscreen = document.fullscreenElement === fullscreenFrameRef.current;
+      const active = nativeFullscreen || fullscreenFallbackRef.current;
+      setIsFullscreenMode(active);
+      if (!active) restoreViewAfterFullscreen();
+    };
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    syncFullscreen();
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, [restoreViewAfterFullscreen]);
+
   useEffect(() => () => {
     pointerDragRef.current?.dispose();
     if (settledTimerRef.current) clearTimeout(settledTimerRef.current);
     if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
     if (suppressSelectTimerRef.current) clearTimeout(suppressSelectTimerRef.current);
+    if (document.fullscreenElement === fullscreenFrameRef.current) void document.exitFullscreen();
+    fullscreenFallbackRef.current = false;
   }, []);
+
+  useEffect(() => {
+    if (!isFullscreenMode) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFullscreenMode]);
 
   useEffect(() => {
     if (!launchKey) {
@@ -204,8 +239,45 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   function chooseView(nextView: CalendarView) {
+    if (isFullscreenMode && nextView !== "month") return;
     setView(nextView);
     writeCalendarViewPreference(viewPreferenceName, nextView);
+  }
+
+  async function toggleFullscreenMode() {
+    const frame = fullscreenFrameRef.current;
+    if (!frame) return;
+
+    if (isFullscreenMode) {
+      fullscreenFallbackRef.current = false;
+      if (document.fullscreenElement === frame && typeof document.exitFullscreen === "function") {
+        try {
+          await document.exitFullscreen();
+        } catch {
+          setIsFullscreenMode(false);
+          restoreViewAfterFullscreen();
+        }
+      } else {
+        setIsFullscreenMode(false);
+        restoreViewAfterFullscreen();
+      }
+      return;
+    }
+
+    viewBeforeFullscreenRef.current = view;
+    chooseView("month");
+    if (document.fullscreenEnabled && typeof frame.requestFullscreen === "function") {
+      try {
+        await frame.requestFullscreen();
+        setIsFullscreenMode(true);
+        return;
+      } catch {
+        // Some embedded browsers expose the API but reject the request. The
+        // fixed fallback still gives the shop a usable large-screen mode.
+      }
+    }
+    fullscreenFallbackRef.current = true;
+    setIsFullscreenMode(true);
   }
 
   function suppressNextSelect() {
@@ -527,6 +599,10 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
 
     if (event.key === "Escape") {
       event.preventDefault();
+      if (isFullscreenMode) {
+        void toggleFullscreenMode();
+        return;
+      }
       pointerDragRef.current?.dispose();
       copiedBookingRef.current = null;
       setSelectedBookingId(null);
@@ -590,12 +666,38 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     : dragState?.operation === "resize-start" ? "ปรับวันเริ่ม" : "ปรับวันสิ้นสุด";
 
   return (
-    <div className={`business-calendar shell${dragState ? " is-dragging" : ""}`} aria-keyshortcuts="Control+C Control+V Control+Z Meta+C Meta+V Meta+Z Delete Escape ArrowLeft ArrowRight ArrowUp ArrowDown">
+    <div ref={fullscreenFrameRef} className={`business-calendar shell${dragState ? " is-dragging" : ""}${isFullscreenMode ? " is-calendar-fullscreen" : ""}`} aria-keyshortcuts="Control+C Control+V Control+Z Meta+C Meta+V Meta+Z Delete Escape ArrowLeft ArrowRight ArrowUp ArrowDown">
+      {isFullscreenMode ? (
+        <button
+          className="calendar-fullscreen-exit"
+          type="button"
+          aria-label="ออกจากมุมมองสำหรับจอภาพ"
+          title="ออกจากมุมมองสำหรับจอภาพ"
+          onClick={() => void toggleFullscreenMode()}
+        >
+          <Minimize2 size={18} />
+          <span className="sr-only">ออกจากมุมมองสำหรับจอภาพ</span>
+        </button>
+      ) : null}
       <BusinessPageHeader
         title="ปฏิทิน"
-        actions={<button className="button button--business business-signature-sweep business-calendar__add" type="button" onClick={() => { setConfirmation(null); setEditor({ kind: "new" }); }}>
-          <Plus size={19} /><span>เพิ่มการจอง</span>
-        </button>}
+        actions={(
+          <>
+            <button
+              className={`button button--business-ghost calendar-fullscreen-toggle${isFullscreenMode ? " is-active" : ""}`}
+              type="button"
+              aria-pressed={isFullscreenMode}
+              aria-label={isFullscreenMode ? "ออกจากมุมมองสำหรับจอภาพ" : "เปิดมุมมองสำหรับจอภาพ ดูปฏิทินรายเดือน"}
+              onClick={toggleFullscreenMode}
+            >
+              {isFullscreenMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              <span>{isFullscreenMode ? "ออกจากจอภาพ" : "สำหรับจอภาพ"}</span>
+            </button>
+            <button className="button button--business business-signature-sweep business-calendar__add" type="button" onClick={() => { setConfirmation(null); setEditor({ kind: "new" }); }}>
+              <Plus size={19} /><span>เพิ่มการจอง</span>
+            </button>
+          </>
+        )}
       />
 
       {dragState && dragPointer ? (

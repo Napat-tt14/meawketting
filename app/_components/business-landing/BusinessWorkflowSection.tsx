@@ -7,7 +7,7 @@ const workflow = [
   { icon: Scan, title: "รับน้องเข้าร้าน" },
   { icon: Scissors, title: "ให้บริการ" },
   { icon: MessageCircle, title: "แจ้งเจ้าของ" },
-  { icon: CheckCircle, title: "ส่งมอบ / CareProof" },
+  { icon: CheckCircle, title: "บันทึกประวัติบริการ" },
 ] as const;
 
 export function BusinessWorkflowSection() {
@@ -59,4 +59,3 @@ export function BusinessWorkflowSection() {
     </section>
   );
 }
-

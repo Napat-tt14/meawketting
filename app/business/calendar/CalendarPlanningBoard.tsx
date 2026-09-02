@@ -89,7 +89,8 @@ export function CalendarPlanningBoard({
         const laneCount = Math.max(0, ...stays.map(({ lane }) => lane + 1));
         const bodyStyle = {
           gridTemplateRows: `${laneCount > 0 ? `repeat(${laneCount}, 34px) ` : ""}minmax(${variant === "week" ? "112px" : "76px"}, auto)`,
-        } satisfies CSSProperties;
+          "--calendar-lane-count": String(laneCount),
+        } as CSSProperties;
 
         return (
           <section className="calendar-planning-week" key={weekStart} aria-label={`สัปดาห์ ${calendarDateLabel(weekStart)}`}>

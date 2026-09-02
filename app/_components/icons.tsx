@@ -39,7 +39,9 @@ import {
   LuMapPin,
   LuMegaphone,
   LuMessageCircle,
+  LuMaximize2,
   LuMenu,
+  LuMinimize2,
   LuPlus,
   LuPalette,
   LuPawPrint,
@@ -139,8 +141,10 @@ export const LockKey = meawIcon(LuLockKeyhole);
 export const LogIn = meawIcon(LuLogIn);
 export const LogOut = meawIcon(LuLogOut);
 export const MapPin = meawIcon(LuMapPin);
+export const Maximize2 = meawIcon(LuMaximize2);
 export const Megaphone = meawIcon(LuMegaphone);
 export const MessageCircle = meawIcon(LuMessageCircle);
+export const Minimize2 = meawIcon(LuMinimize2);
 export const Palette = meawIcon(LuPalette);
 export const PawPrint = meawIcon(LuPawPrint);
 export const Pencil = meawIcon(LuPencil);

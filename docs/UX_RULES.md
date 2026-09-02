@@ -13,7 +13,7 @@ Visual treatment is owned by [DESIGN_SYSTEM](./DESIGN_SYSTEM.md); domain objects
 4. **Sensitive data hidden by default.** Public, Business and Admin see only what current authority requires.
 5. **Trust through evidence and limits.** Show source, actor, time, audience and uncertainty; never imply unsupported medical/legal/security certainty.
 6. **Operational speed with context.** Keep Business, Branch, Pet/work state and next action visible without forcing needless screens.
-7. **Prefer reversible and traceable action.** Suggestion is not overwrite; Charge is not Payment; room move and Branch transfer retain history.
+7. **Prefer reversible and traceable action.** Suggestion is not overwrite; Charge is not Payment; service completion is not Paid; room move, Service Record correction and Branch transfer retain history.
 8. **One Person, explicit contexts.** Consumer, Business/Branch and Admin authorization never blend silently.
 9. **Visual hierarchy before explanation.** Identity, grouping, icon, state and next action should make a screen understandable before supporting copy is read.
 10. **Adaptive composition, stable behavior.** Mobile, tablet and desktop may present the same data differently; domain state, authority and recovery behavior do not change with the layout.
@@ -60,6 +60,13 @@ Use natural Thai for normal staff work. Established Brand/protocol nouns may rem
 | Availability | `เวลาว่าง` or `พร้อมให้บริการ` when the context is clear |
 | Conflict | Explain the specific `เวลาชน` / `ไม่ว่าง`; never expose an internal error code |
 | Estimated price | `ราคาประมาณ` |
+| Charge | `ยอดเรียกเก็บ` or `รายการที่ต้องชำระ`; do not call it a payment |
+| Payment | `การรับชำระ` or `บันทึกรับชำระ` |
+| Outstanding balance | `ยอดคงเหลือ` |
+| Partially paid | `ชำระบางส่วน` |
+| Paid | `ชำระแล้ว` |
+| Cancelled Charge | `ยกเลิกรายการ` with its reason |
+| Service Record | `ประวัติบริการ` or `Service Record`; never label it as a receipt or Pet Passport |
 
 Do not mix internal technical nouns into ordinary Thai instructions without a real comprehension benefit.
 
@@ -78,12 +85,12 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 
 - Mock Business Login enters `/business/home` by default.
 - Business Home prioritizes attention and next work before compact summaries. The shell labels the page context as demo once; unavailable real integrations are named only where their limitation matters.
-- Business Home uses an operational banner with explicit previous/next arrows. It advances every six seconds, pauses during hover/focus, and stops for reduced-motion. Images stay mounted in one transform-only track so transitions slide without replacement flicker. Desktop uses a 50:50 hero split with square media capped at 400×400px beside add Booking / scan intake / find Customer; tablet uses a compact 2:1 crop; mobile uses a square composition before the same actions. Unsupported revenue is not shown.
+- Business Home uses an operational banner with explicit previous/next arrows. It advances every six seconds, pauses during hover/focus, and stops for reduced-motion. Images stay mounted in one transform-only track so transitions slide without replacement flicker. Desktop uses a 50:50 hero split with square media capped at 400×400px beside add Booking / scan intake / find Customer; tablet uses a compact 2:1 crop; mobile uses a square composition before the same actions. BF-7 revenue/current outstanding values use the same recorded local Payment/Charge data as Billing; no separate revenue fixture is shown.
 - The compact header keeps the active Business and Branch visible. Role remains inspectable in the user menu; top-right controls align to the same 44px grid and the account click-away layer never blurs the page. The prototype switcher changes browser-local context only.
 - The logged-in Header may inherit the public Warm White/glass visual DNA, but compact operational usability, Branch context, Scanner access, User Menu and mobile safe areas take priority over a marketing pill treatment.
 - Changing Branch updates Home values and the visible module menu together. Grooming and Hotel are live service destinations only when the active Branch enables the matching capability; modules not enabled for the Branch remain absent.
-- Desktop navigation has live Home, Calendar, Customers & Pets, and Messages plus a prominent Scanner action in the header. Mobile has exactly Home, Calendar, Scan, Messages and More; Customers & Pets is live inside More.
-- Service navigation under `งานบริการ` contains live capability-enabled Grooming and Hotel destinations. Daycare, Finance, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`.
+- Desktop navigation has live Home, Calendar, Customers & Pets, Messages and Finance plus a prominent Scanner action in the header. Mobile has exactly Home, Calendar, Scan, Messages and More; Customers & Pets and Finance are live inside More. Service Record is shown in Customer/Pet detail, not navigation.
+- Service navigation under `งานบริการ` contains live capability-enabled Grooming and Hotel destinations. Daycare, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`; Finance is a live shared destination, while Service Record is shared context data rather than a module switch.
 - Planned destinations use native disabled semantics plus `aria-disabled`, reduced emphasis, and no `href`; Mobile More mirrors live Branch-enabled services and the same planned groups without adding fake navigation behavior.
 
 ## Shared Booking & Calendar rules (BF-2 Live)
@@ -113,19 +120,41 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Internal Business notes remain separate from Customer messages. The Inbox action opens/reuses the Business-wide Customer conversation; the note does not become a Customer-visible message or Passport write.
 - Intake reuses the existing consent-safe path. At check-in it may attach/activate only a valid matching Grooming Job; it does not introduce another scan/intake state machine.
 - Business may send or cancel an add-service request but **cannot self-approve**. A local Guardian-response helper exists only in fixture/state tests; it is not a staff-facing control. Test approval updates only the linked Job add-on and estimated duration, not Booking, Charge, Payment, discount, refund, or settlement state.
-- Completed Jobs contribute a lightweight shared recent-service item. That item is not Full CareProof and has no photo proof, certificate, or Guardian-returned service-record claim.
+- A completed Job creates/updates one Pet-specific BF8 Service Record with permitted service, approved add-on, staff/resource, local note, and actual-completion facts. Reopening and re-completion preserve the prior source snapshot as audit history rather than creating a duplicate record.
+- An explicit checkout action may open the linked Job in BF-7 Billing for separate Charge review and optional Payment recording. A completed Job remains an execution result, not a paid financial state; no post-completion handover workflow is required.
 
 ## Hotel / Boarding Operations rules (BF-6 Live Local Prototype)
 
 - Calendar plans a shared date-range **Booking**; Hotel Operations executes one distinct Pet-specific **Hotel Stay** per booked Pet. Booking planning status and Stay execution status must never be merged or treated as synonyms.
 - `/business/hotel`, desktop/mobile navigation and the command-palette destination are live only for Hotel-enabled Branches. A non-enabled Branch receives an unavailable direct-route state and no live service link.
-- The local lifecycle covers booked/reserved, expected, checked-in, staying, ready-for-pickup/checkout, checked-out, completed, cancelled and no-show foundations. Transitions preserve operational history and never create Billing or CareProof state.
+- The local lifecycle covers booked/reserved, expected, checked-in, staying, ready-for-pickup/checkout, checked-out, completed, cancelled and no-show foundations. Transitions preserve operational history and never create a Payment or change Charge status. A checked-out/completed Stay with an actual checkout creates/updates its one BF8 Service Record; an explicit checkout may open the linked Stay in BF-7 Billing for separate review.
 - Desktop/tablet occupancy uses continuous Stay spans grouped by room/zone with occupied, reserved and available capacity. Mobile uses grouped Today/Stay tabs and lists; it never squeezes the desktop board into narrow columns.
 - Assigning or moving a room validates the requested date interval, room/zone capability and capacity before commit. A valid move appends date-bounded assignment/movement history; a conflict preserves the current room and provides calm rollback feedback.
 - Desktop room drag is an acceleration only. The Stay detail room selector is the keyboard/touch/mobile alternative; no Hotel task depends on dragging. Motion obeys the canonical settle/rollback scale and reduced-motion fallback.
 - Daily care is lightweight: food, water, activity, cleaning/check, note and completion state. Medication requires explicit instructions and Customer-confirmed Intake authorization linked to the same Stay; Passport presence or free-text notes never authorize medication.
 - Business notes, care notes and lightweight incident/attention notes remain internal. A Customer message must use the existing Business+Customer Inbox Conversation with Pet/Booking context; no per-Stay Conversation is created.
 - Hotel Stay detail groups shared Customer/Pet contact, dates, lifecycle, room, care, internal notes/incidents, Inbox action and movement history. It does not expose non-consented Passport data or become a medical/full incident system.
+
+## Billing, Payments & Revenue rules (BF-7 Live Local Prototype)
+
+- `Service / Job / Stay → Charge → Payment` is the required visible mental model. A Charge records what is owed; a Payment records how and when funds were received. Staff must never be led to infer that creating a Charge, completing a Grooming Job, or completing a Hotel Stay means paid.
+- Amounts use whole Thai Baht integers as a **prototype assumption**. Show total, paid and remaining with tabular numerals and clear labels; do not imply VAT calculation, invoice compliance, exchange handling, gateway precision, or accounting policy.
+- Status is derived, not separately edited: unpaid, partial and paid come from recorded Payment allocations; cancelled comes from a valid Charge cancellation. Status always uses text and an icon/non-color cue as well as semantic color.
+- A Booking-level base amount is represented once. A multi-Pet Booking must not create one full base Charge per linked Grooming Job or Hotel Stay. An approved Grooming add-on remains a Job-only Inbox effect until explicit checkout reconciles it idempotently into the Charge.
+- Manual adjustment and discount entries require an explicit reason. Cancelling is allowed only for an unpaid Charge and also requires a reason. Cancellation does not automatically delete, reverse or refund an existing Payment.
+- Charge and Payment records preserve Branch attribution. Customer and Pet identity remain shared at Business level, while Billing and Home show the active Branch's financial scope. Cross-Branch checkout, payment and settlement rules remain open and must not be implied by the UI.
+- Finance uses a dense desktop table/row pattern only when comparison helps. At mobile widths it becomes labeled Charge/Payment rows or a task sheet; total, status, Branch and the next safe action remain visible without horizontal scrolling.
+- The available Payment methods are local Cash, bank-transfer and Other records. A duplicate-safe local submission guard prevents a repeated click from creating a duplicate payment effect. There is no real gateway, bank confirmation, receipt compliance, refund processor, General Ledger, tax or accounting export.
+
+## Shared Service Record rules (BF-8 local domain foundation)
+
+- Service Record is shared domain data, not a module. The visible flow stays in context: Grooming/Hotel execution → automatic record creation/update → Customer/Pet `ประวัติบริการ`. Do not add a CareProof dashboard, menu item, management page, duplicate summary page, standalone route or post-completion handover workflow.
+- One Service Record belongs to one completed Grooming Job or checked-out/completed Hotel Stay, scoped to the same Business and Branch. It reuses shared Customer, Pet, Booking, Job/Stay and Charge/Payment references; it never creates a duplicate history fixture, Customer/Pet identity, Invoice, Passport or medical record.
+- Grooming shows completed base service, approved add-ons, staff/resource labels, local Business note, completion time and photo metadata if present. Hotel shows stay dates, room/zone, ordinary daily-care summary, permitted local note and completion time. Hotel Service Record must never copy Guardian care instructions, Intake details, medication instructions/authorization or incident content.
+- Photo support is metadata-only. There is no upload, cloud/local object storage, public sharing URL, copied Passport image, print/certificate engine or real retention policy in BF8.
+- Correction is lightweight and append-only: summary or local Business note changes retain prior value, reason, staff, time and duplicate-safe request key. Source re-completion retains a safe prior source snapshot. No UI action silently destroys original history.
+- Customer/Pet detail uses one inline timeline/list. Pet photo/avatar is the visual anchor; expandable items reveal summary, service details, activities, staff/resources, permitted photo metadata, completion time and a short read-only BF7 payment reference. Payment state uses text plus icon/non-color cue and never changes Service Record state.
+- Guardian LINE visibility is **PLANNED** and Consumer work remains paused. Legacy handover metadata in old local records may remain for compatibility, but the current UI does not start or advance that workflow.
 
 ## Customers & Pets rules (BF-3 Live Local Prototype)
 
@@ -136,7 +165,7 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Search supports Customer name, Pet name, and phone with one visible input boundary. Results are clickable Customer rows—not a spreadsheet table—and show short labeled Customer, Pet, next Booking/activity and tag information. Passport connected/not-connected is context on the record, not a list filter.
 - Connection and access remain separate. The list gives only the compact connection state; expiry, source, allowed-data and no-additional-access detail uses progressive disclosure on Customer/Pet detail. Protected values remain hidden and never become editable Business data.
 - Business notes and tags are Business-owned local records. Important source labels distinguish `ข้อมูลที่ลูกค้าแจ้ง`, `ข้อมูลของร้าน`, and Guardian-controlled Passport data. Correction remains a suggestion, not an overwrite.
-- A Customer detail opens with the Customer header and actions, then separates Pets, Booking history, current/recent Hotel Stays and Business notes/tags without a repeated explanatory overview. Multiple Pets may use a horizontal snap/peek strip on mobile. It can start the existing Booking Editor with Customer/Pet preselected; Calendar keeps its own capacity/Branch validation and uses shared relationship names where practical.
+- A Customer detail opens with the Customer header and actions, then separates Pets, Booking history, current/recent Hotel Stays, one shared `ประวัติบริการ` timeline/list, compact Charge/Payment history with unpaid balance and Branch attribution, and Business notes/tags without a repeated explanatory overview. Multiple Pets may use a horizontal snap/peek strip on mobile. It can start the existing Booking Editor with Customer/Pet preselected; Calendar keeps its own capacity/Branch validation and uses shared relationship names where practical.
 - A valid Temporary Business QR may reconnect an explicit, already-known local relationship after consent validation. An unknown QR never auto-creates a permanent Customer.
 
 ## Inbox & Customer Communication rules (BF-4 Live Local Prototype)
@@ -147,6 +176,7 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Message send and quick replies are local text prototypes. Quick replies show three defaults without numbering plus a dashed circular add control; collapse/expand is remembered in a cookie. Delivery labels explicitly say `ในเบราว์เซอร์`; no socket, notification, upload, email, SMS, or LINE behavior is implied.
 - A structured add-service request is a separate message kind with service, demo amount, added time, optional note, and `รอเจ้าของตอบ`. Business may cancel but cannot approve for the Guardian.
 - The Guardian-response simulator remains an idempotent state/test helper and is never exposed in the staff-facing Inbox. A linked test approval may update only the local Service Job add-on and estimate; it does not alter Booking, create a Charge/Payment, or claim settlement.
+- Staff may explicitly send a local text about an amount due or a recorded payment using the same Conversation. That optional message does not mutate Charge/Payment/Service Record state and never claims a payment link, document share, delivery, notification, email, SMS or LINE transport.
 - Conversation history and Customer/Pet identity references do not create Passport permission. Protected Passport values are never snapshotted into Inbox messages/context; expiry/revoke keeps them hidden.
 - Conversations are Business-wide across Branch switching. Relevant Booking context retains Branch attribution, actions are withheld when the Booking is outside the active Branch, and another Branch never inherits protected consent scope.
 - Desktop may select the first conversation in split view. Mobile starts with the list, opens a full conversation task, moves focus to its heading, provides Back recovery, and retains the query deep link.
@@ -162,10 +192,10 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 
 ## Responsive composition and horizontal interaction
 
-- Mobile (320–430px) is task-first and low–medium density: one primary action, stacked summaries, Agenda/list/timeline content, bottom navigation and full-screen or sheet overlays. It is never a squeezed desktop table or board.
+- Mobile (320–430px) is task-first and low–medium density: one primary action, stacked summaries, Agenda/list/timeline content, labeled Billing and inline Service Record history, bottom navigation and full-screen or sheet overlays. It is never a squeezed desktop table or board.
 - Tablet (768/820/1024px) is a first-class touch surface with medium density, 44px controls, compact adaptive grids and contained workflow scrolling where an implemented board genuinely requires it.
 - Desktop (1200/1440px) uses medium–high density through columns, split panes and operational boards—not smaller body text or card walls.
-- Horizontal scrolling is allowed for filter chips, segmented controls, multiple-Pet snap/peek summaries, tablet Grooming columns and contained Calendar date-range spans. A partial next item should signal that more content is available.
+- Horizontal scrolling is allowed for filter chips, segmented controls, multiple-Pet snap/peek summaries, tablet Grooming columns and contained Calendar date-range spans. A partial next item should signal that more content is available. Billing uses its defined responsive table-to-row strategy; Service Record history stays inline and readable without document-level horizontal scrolling.
 - Body copy, forms, Customer lists, Inbox messages, detail sections, critical alerts and confirmation dialogs must never require horizontal scrolling.
 - Progressive disclosure owns advanced guidance, shortcut legends, access metadata, history and development context. The current task and required safety/recovery information remain visible.
 

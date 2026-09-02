@@ -17,6 +17,7 @@ const BUSINESS_COMMANDS: readonly BusinessCommand[] = [
   { label: "ปฏิทิน", detail: "ดูและจัดการการจอง", href: "/business/calendar" },
   { label: "ลูกค้าและสัตว์เลี้ยง", detail: "ค้นหาข้อมูลลูกค้า", href: "/business/customers" },
   { label: "ข้อความ", detail: "คุยกับเจ้าของสัตว์เลี้ยง", href: "/business/inbox" },
+  { label: "การเงิน", detail: "ตรวจยอด รับชำระ และดูรายรับ", href: "/business/billing" },
   { label: "อาบน้ำ / ตัดขน", detail: "จัดการงานบริการ", href: "/business/grooming" },
   { label: "สแกนรับเข้า", detail: "ตรวจสิทธิ์ก่อนเปิดข้อมูล", href: "/business/scan" },
 ];

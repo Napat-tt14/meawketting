@@ -41,6 +41,7 @@ export function BusinessPetAvatar({
 
 function petPhotoFor(pet: Pick<DemoBookingPet, "id" | "species">) {
   const photos: Record<string, { src: string; position: string }> = {
+    "booking-pet-biscuit": { src: "/images/business/business-banner-grooming.png", position: "46% 42%" },
     "booking-pet-mochi": { src: "/images/business/business-banner-care-lounge.png", position: "72% 48%" },
     "booking-pet-luna": { src: "/images/business/business-banner-hotel.png", position: "66% 43%" },
     "booking-pet-leo": { src: "/images/business/pet-business-services-photo.png", position: "52% 42%" },

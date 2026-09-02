@@ -131,7 +131,7 @@ export function BusinessLandingHero() {
             <QrCode size={14} /> สแกนรับเข้าไว
           </span>
           <span className="business-hero-pill">
-            <BadgeCheck size={14} /> CareProof บันทึกงาน
+            <BadgeCheck size={14} /> บันทึกประวัติบริการ
           </span>
         </div>
 
@@ -173,13 +173,13 @@ export function BusinessLandingHero() {
           <span className="hero-floating-glass__tag">Live</span>
         </aside>
 
-        <aside className="hero-floating-glass hero-floating-glass--careproof" aria-label="CareProof อัปเดต">
+        <aside className="hero-floating-glass hero-floating-glass--service-record" aria-label="ประวัติบริการล่าสุด">
           <div className="hero-floating-glass__icon hero-floating-glass__icon--amber">
             <Sparkle size={18} />
           </div>
           <div className="hero-floating-glass__text">
-            <strong>CareProof & Daily Log</strong>
-            <small>ส่งรายงานให้เจ้าของเรียบร้อย</small>
+            <strong>Service Record</strong>
+            <small>บันทึกงานบริการไว้ในประวัติลูกค้า</small>
           </div>
         </aside>
 

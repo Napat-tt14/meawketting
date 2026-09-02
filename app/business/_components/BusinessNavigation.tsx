@@ -22,6 +22,7 @@ import {
 import { BrandMark } from "../../_components/BrandMark";
 import {
   BUSINESS_MANAGEMENT_DESTINATIONS,
+  BUSINESS_BILLING_DESTINATION,
   BUSINESS_GROOMING_DESTINATION,
   BUSINESS_HOTEL_DESTINATION,
   BUSINESS_MODULE_LABELS,
@@ -40,7 +41,7 @@ const DESTINATION_ICONS: Record<BusinessDestinationKey, IconType> = {
   messages: MessageCircle,
   grooming: Scissors,
   hotel: BedDouble,
-  finance: Wallet,
+  billing: Wallet,
   reports: Chart,
   team: UserRoundCheck,
   settings: Settings,
@@ -148,7 +149,10 @@ export function BusinessNavigation() {
             badge={item.key === "messages" ? unreadCount : 0}
           />
         ))}
-
+        <LiveBusinessDestination
+          destination={BUSINESS_BILLING_DESTINATION}
+          active={pathname === BUSINESS_BILLING_DESTINATION.href}
+        />
         <div className="business-nav-group business-nav-group--services" aria-label="งานบริการ">
           <BusinessSidebarSectionHeader title="งานบริการ" />
           {enabledModules.map((module) => (

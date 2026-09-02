@@ -27,12 +27,12 @@ import {
   Plus,
   Scan,
   Search,
-  SlidersHorizontal,
   UserRound,
 } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
+import { BusinessSegmentedControl } from "../_components/BusinessSegmentedControl";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
 import { addCalendarDays, calendarDateLabel } from "../calendar/calendarPresentation";
 import { HotelStayDetail } from "./HotelStayDetail";
@@ -41,6 +41,12 @@ import { HOTEL_LIST_FILTERS, hasHotelStayAttention, hotelCareTaskStateLabel, hot
 type DragState = { stayId: string; sourceRoomId: string } | null;
 type DropTarget = { roomId: string; valid: boolean } | null;
 type HotelMobileView = "today" | "staying" | "arrivals" | "departures" | "care";
+
+const HOTEL_RANGE_OPTIONS = [
+  { value: "7", label: "7 วัน" },
+  { value: "14", label: "14 วัน" },
+  { value: "28", label: "28 วัน" },
+] as const;
 
 type HotelStayItem = {
   stay: PrototypeHotelStay;
@@ -162,6 +168,17 @@ export function HotelOperations({
     .filter((task) => task.scheduledDate === date && task.state === "pending")
     .map((task) => ({ item, task })));
   const attentionItems = items.filter((item) => hasHotelStayAttention(item.stay, date, Boolean(item.roomId)) || item.waitingApproval);
+  const hotelFilterCounts: Record<HotelListFilter, number> = {
+    all: items.length,
+    arrivals: arrivalItems.length,
+    current: currentItems.length,
+    departures: departureItems.length,
+    attention: attentionItems.length,
+  };
+  const hotelFilterOptions = HOTEL_LIST_FILTERS.map((option) => ({
+    value: option.key,
+    label: `${option.label} ${hotelFilterCounts[option.key]}`,
+  }));
   const selectedStay = stays.find((stay) => stay.hotelStayId === selectedStayId || stay.bookingId === selectedStayId) ?? null;
 
   function openStay(stay: PrototypeHotelStay, source?: HTMLElement) {
@@ -268,24 +285,37 @@ export function HotelOperations({
         ))}
       </div>
 
-      <section className="hotel-today-summary" aria-label="ภาพรวมโรงแรมวันนี้">
-        <article><span><CalendarDays size={20} />เข้าพักวันนี้</span><strong>{summary.arrivals}</strong><small>รอรับเข้า {summary.unassignedArrivals} ตัว</small></article>
-        <article><span><Clock size={20} />ออกวันนี้</span><strong>{summary.departures}</strong><small>เตรียมรับกลับตามรายการ</small></article>
-        <article><span><BedDouble size={20} />การใช้พื้นที่</span><strong>{summary.occupied} / {summary.capacity}</strong><small>จองไว้ {summary.reserved} · ว่าง {summary.available}</small></article>
-        <article><span><CheckCircle size={20} />ต้องดูแล</span><strong>{summary.careDue}</strong><small>งานดูแลที่ยังค้างวันนี้</small></article>
-        <article><span><CircleAlert size={20} />ต้องจัดการ</span><strong>{summary.attention}</strong><small>งานดูแล {summary.careDue} · incident {summary.incidents} · พร้อมกลับ {summary.readyForPickup}</small></article>
+      <section className="hotel-today-summary" aria-labelledby="hotel-today-summary-title">
+        <header className="hotel-today-summary__header">
+          <div>
+            <span>โรงแรม</span>
+            <h2 id="hotel-today-summary-title">ภาพรวมวันนี้</h2>
+          </div>
+          <BedDouble size={22} aria-hidden="true" />
+        </header>
+        <div className="hotel-today-summary__stats">
+          <article className="hotel-summary-card hotel-summary-card--arrivals"><span><CalendarDays size={18} />เข้าพักวันนี้</span><strong>{summary.arrivals}</strong><small>รอรับเข้า {summary.unassignedArrivals} ตัว</small></article>
+          <article className="hotel-summary-card hotel-summary-card--departures"><span><Clock size={18} />ออกวันนี้</span><strong>{summary.departures}</strong><small>เตรียมรับกลับตามรายการ</small></article>
+          <article className="hotel-summary-card hotel-summary-card--occupancy"><span><BedDouble size={18} />การใช้พื้นที่</span><strong>{summary.occupied} / {summary.capacity}</strong><small>จองไว้ {summary.reserved} · ว่าง {summary.available}</small></article>
+          <article className="hotel-summary-card hotel-summary-card--care"><span><CheckCircle size={18} />ต้องดูแล</span><strong>{summary.careDue}</strong><small>งานดูแลที่ยังค้างวันนี้</small></article>
+          <article className="hotel-summary-card hotel-summary-card--attention"><span><CircleAlert size={18} />ต้องจัดการ</span><strong>{summary.attention}</strong><small>งานดูแล {summary.careDue} · incident {summary.incidents} · พร้อมกลับ {summary.readyForPickup}</small></article>
+        </div>
       </section>
 
-      <nav className="hotel-section-links" aria-label="ข้ามไปส่วนการทำงานโรงแรม">
-        <a href="#hotel-occupancy">ห้องพัก</a><a href="#hotel-stays">การเข้าพัก</a><a href="#hotel-care">งานดูแล</a>
-      </nav>
-
-      <section className="hotel-toolbar" aria-label="เลือกวัน ช่วงแสดงผล ค้นหา และกรองการเข้าพัก">
+      <section className="hotel-toolbar" aria-label="เลือกวัน ช่วงแสดงผล และค้นหาการเข้าพัก">
         <label className="hotel-toolbar__date"><span>วันที่</span><input type="date" value={date} onChange={(event) => setDate(event.currentTarget.value)} /></label>
         <button type="button" onClick={() => setDate(BOOKING_DEMO_DATE)}><CalendarDays size={17} />วันนี้</button>
-        <fieldset className="hotel-toolbar__range"><legend>ช่วงแสดงผล</legend>{([7, 14, 28] as const).map((value) => <button key={value} type="button" aria-pressed={range === value} onClick={() => setRange(value)}>{value} วัน</button>)}</fieldset>
+        <div className="hotel-toolbar__range">
+          <span className="hotel-toolbar__range-label">ช่วงแสดงผล</span>
+          <BusinessSegmentedControl
+            className="hotel-toolbar__range-control"
+            value={String(range)}
+            options={HOTEL_RANGE_OPTIONS}
+            ariaLabel="ช่วงแสดงผล"
+            onChange={(value) => setRange(Number(value) as 7 | 14 | 28)}
+          />
+        </div>
         <label className="hotel-toolbar__search"><Search size={19} /><span className="sr-only">ค้นหาการเข้าพัก</span><input value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="ค้นหาน้อง ลูกค้า หรือห้อง" /></label>
-        <label className="hotel-toolbar__filter"><SlidersHorizontal size={18} /><span className="sr-only">กรองรายการ</span><select value={filter} onChange={(event) => setFilter(event.currentTarget.value as HotelListFilter)}>{HOTEL_LIST_FILTERS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>
       </section>
 
       {notice ? <p className="business-hotel__notice" role="status"><CircleAlert size={17} />{notice}</p> : null}
@@ -320,7 +350,7 @@ export function HotelOperations({
 
       <section id="hotel-stays" className="hotel-stays" aria-labelledby="hotel-stays-title">
         <header className="hotel-section-heading"><div><span>รายการ</span><h2 id="hotel-stays-title">การเข้าพัก</h2></div><UserRound size={24} /></header>
-        <div className="hotel-stays__filters" role="tablist" aria-label="กรองการเข้าพักบนมือถือ">{HOTEL_LIST_FILTERS.map((option) => <button key={option.key} type="button" role="tab" aria-selected={filter === option.key} onClick={() => setFilter(option.key)}>{option.label}<span>{option.key === "all" ? items.length : option.key === "arrivals" ? arrivalItems.length : option.key === "current" ? currentItems.length : option.key === "departures" ? departureItems.length : attentionItems.length}</span></button>)}</div>
+        <BusinessSegmentedControl className="hotel-stays__filters" value={filter} options={hotelFilterOptions} ariaLabel="กรองรายการการเข้าพัก" onChange={setFilter} />
         {visibleItems.length > 0 ? <div className="hotel-stay-cards">{visibleItems.map((item) => <HotelStayCard key={item.stay.hotelStayId} item={item} date={date} onOpen={openStay} />)}</div> : <div className="hotel-empty-inline"><Search size={22} /><p>ไม่พบการเข้าพักตามตัวกรองนี้</p></div>}
       </section>
 

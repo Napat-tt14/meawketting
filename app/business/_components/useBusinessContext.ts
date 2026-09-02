@@ -18,11 +18,13 @@ export function useBusinessStateReady() {
 export function useBusinessContext() {
   const [context, setContext] = useState(DEMO_BUSINESS_CONTEXTS[0]);
   const [revision, setRevision] = useState(0);
+  const [isContextReady, setIsContextReady] = useState(false);
 
   useEffect(() => {
     const sync = () => {
       setContext(readActiveBusinessContext());
       setRevision((current) => current + 1);
+      setIsContextReady(true);
     };
     const frame = window.requestAnimationFrame(sync);
     window.addEventListener("meawketting:business-state", sync);
@@ -36,8 +38,9 @@ export function useBusinessContext() {
     const next = writeActiveBusinessContext(contextKey);
     setContext(next);
     setRevision((current) => current + 1);
+    setIsContextReady(true);
     return next;
   }, []);
 
-  return { context, selectContext, revision };
+  return { context, selectContext, revision, isContextReady };
 }

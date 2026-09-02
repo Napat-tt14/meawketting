@@ -7,7 +7,12 @@ import {
   getHotelRooms,
   getPrototypeHotelStayRoomId,
   HOTEL_STAY_STATUS_LABELS,
-  listCompletedPrototypeGroomingServiceJobs,
+  listPrototypeChargeBalances,
+  listPrototypePaymentFixtures,
+  listPrototypePayments,
+  getPrototypeServiceRecordPaymentReference,
+  listPrototypeServiceRecordFixtures,
+  listPrototypeServiceRecords,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
   listPrototypeHotelStayFixtures,
@@ -16,9 +21,14 @@ import {
   readPrototypeCustomerFixture,
   resolvePrototypeBookingRelationship,
   updatePrototypeCustomerTags,
+  type DemoBusinessContext,
+  type PrototypeChargeStatus,
+  type PrototypeCustomer,
+  type PrototypeServiceRecord,
+  type PrototypeServiceRecordPaymentStatus,
 } from "../../_prototype/businessState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
-import { ArrowLeft, CalendarDays, CircleAlert, Info, MessageCircle, Pencil, Phone, Plus, X } from "../../_components/icons";
+import { ArrowLeft, CalendarDays, CheckCircle, CircleAlert, CircleDashed, CircleOff, Clock, FileImage, Info, MessageCircle, Pencil, Phone, Plus, Wallet, X } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { CustomerEditor } from "./CustomerEditor";
@@ -36,10 +46,77 @@ import {
   petSpeciesLabel,
 } from "./customerPresentation";
 import { calendarDateLabel } from "../calendar/calendarPresentation";
+import { chargeStatusLabel, formatBusinessMoney, paymentMethodLabel } from "../billing/billingPresentation";
 
 const emptySubscribe = () => () => {};
 function useIsClient() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
+
+function CustomerChargeStatus({ status }: { status: PrototypeChargeStatus }) {
+  const Icon = status === "paid" ? CheckCircle : status === "partial" ? CircleDashed : status === "cancelled" ? CircleOff : Clock;
+  return <span className={`customer-financial-status customer-financial-status--${status}`}><Icon size={16} />{chargeStatusLabel(status)}</span>;
+}
+
+function serviceRecordDateLabel(value: string) {
+  const date = calendarDateLabel(value.slice(0, 10), { day: "numeric", month: "short" });
+  const time = value.slice(11, 16);
+  return time ? `${date} · ${time}` : date;
+}
+
+function serviceRecordPaymentLabel(status: PrototypeServiceRecordPaymentStatus) {
+  return status === "no-charge" ? "ยังไม่มี Charge" : chargeStatusLabel(status);
+}
+
+function ServiceRecordHistoryItem({
+  record,
+  context,
+  fixtureOnly,
+  customer,
+}: {
+  record: PrototypeServiceRecord;
+  context: DemoBusinessContext;
+  fixtureOnly: boolean;
+  customer: PrototypeCustomer;
+}) {
+  const pet = customer.pets.find((item) => item.id === record.petId);
+  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(record.businessId, record.branchId)).branch;
+  const paymentReference = getPrototypeServiceRecordPaymentReference(record, context, fixtureOnly);
+  return (
+    <li className="customer-service-history__item">
+      <details className="customer-service-record">
+        <summary>
+          <span className="customer-service-record__identity">
+            {pet ? <BusinessPetAvatar pet={pet} size="medium" /> : <BusinessServiceIcon module={record.serviceModule} size={18} />}
+            <span><strong>{pet?.name ?? "น้อง"}</strong><small>{record.serviceLabel}</small></span>
+          </span>
+          <span className="customer-service-record__meta">
+            <time>{serviceRecordDateLabel(record.completedAt)}</time>
+            <small>{branch?.name ?? "สาขานี้"}</small>
+            <span className={`customer-service-record__payment customer-service-record__payment--${paymentReference.status}`}><Wallet size={14} />{serviceRecordPaymentLabel(paymentReference.status)}</span>
+          </span>
+        </summary>
+        <div className="customer-service-record__body">
+          <p className="customer-service-record__headline">{record.summary}</p>
+          <dl className="customer-service-record__facts">
+            <div><dt>บริการ</dt><dd>{record.serviceLabel}</dd></div>
+            <div><dt>เสร็จเมื่อ</dt><dd>{serviceRecordDateLabel(record.completedAt)}</dd></div>
+            <div><dt>สาขา</dt><dd>{branch?.name ?? "สาขานี้"}</dd></div>
+          </dl>
+          {record.details.length > 0 ? <dl className="customer-service-record__details">{record.details.map((detail) => <div key={detail.id}><dt>{detail.label}</dt><dd>{detail.value}</dd></div>)}</dl> : null}
+          <section className="customer-service-record__activities" aria-label={`รายการบริการของ ${pet?.name ?? "น้อง"}`}>
+            <h3>รายการที่ทำ</h3>
+            <ol>{record.activities.map((activity) => <li key={activity.id}><CheckCircle size={16} /><span><strong>{activity.label}</strong>{activity.detail ? <small>{activity.detail}</small> : null}</span>{activity.occurredAt ? <time>{serviceRecordDateLabel(activity.occurredAt)}</time> : null}</li>)}</ol>
+          </section>
+          {record.staffResourceLabels.length > 0 ? <p className="customer-service-record__staff"><strong>ทีม / ผู้เกี่ยวข้อง</strong>{record.staffResourceLabels.join(" · ")}</p> : null}
+          {record.businessNote ? <p className="customer-service-record__note"><strong>หมายเหตุของร้าน</strong>{record.businessNote}</p> : null}
+          {record.photos.length > 0 ? <section className="customer-service-record__photos" aria-label="รูปที่อนุญาตใน Service Record"><h3><FileImage size={16} />รูปที่อนุญาต</h3><ul>{record.photos.map((photo) => <li key={photo.id}><FileImage size={15} /><span>{photo.label}<small>{photo.phase === "before" ? "ก่อนบริการ" : "หลังบริการ"}</small></span></li>)}</ul></section> : null}
+          {record.corrections.length > 0 ? <details className="customer-service-record__audit"><summary>มีประวัติการแก้ไข {record.corrections.length} รายการ</summary><ol>{record.corrections.slice().reverse().map((correction) => <li key={correction.id}><time>{serviceRecordDateLabel(correction.at)}</time><span><strong>{correction.field === "summary" ? "สรุปบริการ" : "หมายเหตุของร้าน"}</strong><small>{correction.previousValue} → {correction.nextValue}</small><em>{correction.reason} · {correction.correctedBy}</em></span></li>)}</ol></details> : null}
+          <p className="customer-service-record__boundary">Service Record เป็นบันทึกบริการของร้านเท่านั้น · ไม่ใช่ Pet Passport หรือข้อมูลสุขภาพ</p>
+        </div>
+      </details>
+    </li>
+  );
 }
 
 export function CustomerDetailScreen({ customerId }: { customerId: string }) {
@@ -76,11 +153,6 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
 
   const relatedBookings = customerBookings(customer, bookings);
   const upcomingBookings = relatedBookings.filter(bookingOccursAfterDemoStart).slice(0, 3);
-  const recentBookings = [...relatedBookings]
-    .filter((booking) => booking.status !== "cancelled")
-    .sort((first, second) => second.start.localeCompare(first.start) || second.updatedAt.localeCompare(first.updatedAt))
-    .slice(0, 3);
-  const completedGroomingJobs = listCompletedPrototypeGroomingServiceJobs(customer.id, !relationshipStateReady).slice(0, 3);
   // Hotel execution stays Branch-scoped even though Customer identity is shared
   // across the Business. This avoids exposing another Branch's live operations.
   const hotelStays = relationshipStateReady
@@ -89,10 +161,21 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
   const currentHotelStays = hotelStays
     .filter((stay) => stay.customerId === customer.id && ["checked-in", "in-stay", "ready-for-checkout"].includes(stay.status))
     .sort((first, second) => first.scheduledCheckOut.localeCompare(second.scheduledCheckOut));
-  const completedHotelStays = hotelStays
-    .filter((stay) => stay.customerId === customer.id && ["checked-out", "completed"].includes(stay.status))
-    .sort((first, second) => (second.actualCheckOutAt ?? second.updatedAt).localeCompare(first.actualCheckOutAt ?? first.updatedAt))
+  const serviceRecords = relationshipStateReady
+    ? listPrototypeServiceRecords(context)
+    : listPrototypeServiceRecordFixtures(context);
+  const recentServiceRecords = serviceRecords
+    .filter((record) => record.customerId === customer.id)
+    .slice(0, 4);
+  const financialBalances = listPrototypeChargeBalances(context, !relationshipStateReady)
+    .filter((balance) => balance.charge.customerId === customer.id)
+    .slice(0, 4);
+  const financialPayments = (relationshipStateReady ? listPrototypePayments(context) : listPrototypePaymentFixtures(context))
+    .filter((payment) => payment.customerId === customer.id)
     .slice(0, 3);
+  const unpaidFinancialBalance = financialBalances
+    .filter((balance) => balance.status === "unpaid" || balance.status === "partial")
+    .reduce((total, balance) => total + balance.remaining, 0);
 
   function updateTags(nextTags: readonly string[]) {
     const updated = updatePrototypeCustomerTags(resolvedCustomer.id, nextTags);
@@ -210,31 +293,16 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             ) : <p className="customer-section-empty">ยังไม่มีนัดหมายของลูกค้ารายนี้</p>}
           </section>
 
-          <section className="customer-detail-section customer-detail-section--recent" aria-labelledby="customer-recent-title">
-            <header><div><h2 id="customer-recent-title">การใช้บริการล่าสุด</h2></div></header>
-            {completedGroomingJobs.length > 0 || completedHotelStays.length > 0 ? (
-              <ol className="customer-booking-list customer-booking-list--recent">
-                {completedGroomingJobs.map((job) => {
-                  const pet = customer.pets.find((item) => item.id === job.petId);
-                  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(job.businessId, job.branchId)).branch;
-                  const completedDate = job.actualCompletedAt?.slice(0, 10) ?? job.scheduledStart.slice(0, 10);
-                  return <li key={job.serviceJobId}><div className="customer-booking-list__identity"><BusinessServiceIcon module="grooming" size={18} /><span><strong>อาบน้ำ / ตัดขน</strong><small>{pet?.name ?? "น้อง"} · งานเสร็จแล้ว</small></span></div><div className="customer-booking-list__when"><strong>{calendarDateLabel(completedDate, { day: "numeric", month: "short" })}</strong><small>{branch?.name ?? "สาขานี้"}</small></div></li>;
-                })}
-                {completedHotelStays.map((stay) => {
-                  const pet = customer.pets.find((item) => item.id === stay.petId);
-                  const completedDate = stay.actualCheckOutAt?.slice(0, 10) ?? stay.scheduledCheckOut;
-                  return <li key={stay.hotelStayId}><div className="customer-booking-list__identity"><BusinessServiceIcon module="hotel" size={18} /><span><strong>เข้าพักโรงแรม</strong><small>{pet?.name ?? "น้อง"} · {HOTEL_STAY_STATUS_LABELS[stay.status]}</small></span></div><div className="customer-booking-list__when"><strong>{calendarDateLabel(completedDate, { day: "numeric", month: "short" })}</strong><Link href={`/business/hotel?stayId=${encodeURIComponent(stay.hotelStayId)}`}>ดูรายละเอียด</Link></div></li>;
-                })}
-              </ol>
-            ) : recentBookings.length > 0 ? (
-              <ol className="customer-booking-list customer-booking-list--recent">
-                {recentBookings.map((booking) => {
-                  const relationship = resolvePrototypeBookingRelationship(booking);
-                  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(booking.businessId, booking.branchId)).branch;
-                  return <li key={booking.bookingId}><div className="customer-booking-list__identity"><BusinessServiceIcon module={booking.serviceModule} size={18} /><span><strong>{booking.service.label}</strong><small>{relationship.pets.map((pet) => pet.name).join(", ") || "น้อง"}</small></span></div><div className="customer-booking-list__when"><strong>{bookingDateLabel(booking)}</strong><small>{branch?.name ?? "สาขานี้"}</small></div></li>;
-                })}
-              </ol>
-            ) : <p className="customer-section-empty">ยังไม่มีประวัติการใช้บริการที่แสดงได้</p>}
+          <section className="customer-detail-section customer-detail-section--service-history" aria-labelledby="customer-service-history-title">
+            <header><div><h2 id="customer-service-history-title">ประวัติบริการ</h2><p>บันทึกจากงาน Grooming และ Hotel ที่เสร็จแล้ว · เปิดรายละเอียดในรายการนี้</p></div><Clock size={22} /></header>
+            {recentServiceRecords.length > 0 ? <ol className="customer-service-history">{recentServiceRecords.map((record) => <ServiceRecordHistoryItem key={record.serviceRecordId} record={record} context={context} fixtureOnly={!relationshipStateReady} customer={customer} />)}</ol> : <p className="customer-section-empty">ยังไม่มีประวัติบริการที่เสร็จสมบูรณ์ของลูกค้ารายนี้ในสาขานี้</p>}
+          </section>
+
+          <section className="customer-detail-section customer-detail-section--billing" aria-labelledby="customer-billing-title">
+            <header><div><h2 id="customer-billing-title">ยอดและการชำระ</h2><p>ข้อมูลการเงินของสาขาปัจจุบัน</p></div><Wallet size={22} /></header>
+            <div className="customer-financial-summary"><span><small>ยอดค้างชำระ</small><strong>{formatBusinessMoney(unpaidFinancialBalance)}</strong></span><Link href="/business/billing">เปิดการเงิน</Link></div>
+            {financialBalances.length > 0 ? <ol className="customer-financial-list">{financialBalances.map((balance) => <li key={balance.charge.chargeId}><div><BusinessServiceIcon module={balance.charge.serviceModule} size={18} /><span><strong>{balance.charge.serviceLabel}</strong><small>{balance.charge.petId ? customer.pets.find((pet) => pet.id === balance.charge.petId)?.name ?? "น้อง" : "หลายตัวตามการจอง"} · คงเหลือ {formatBusinessMoney(balance.remaining)}</small></span></div><span><CustomerChargeStatus status={balance.status} /><Link href={`/business/billing?chargeId=${encodeURIComponent(balance.charge.chargeId)}`}>ตรวจยอด</Link></span></li>)}</ol> : <p className="customer-section-empty">ยังไม่มี Charge ของลูกค้ารายนี้ในสาขานี้</p>}
+            <div className="customer-payment-history"><h3>Payment ล่าสุด</h3>{financialPayments.length > 0 ? <ol>{financialPayments.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มี Payment record ในสาขานี้</p>}</div>
           </section>
         </div>
 

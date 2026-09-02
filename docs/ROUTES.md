@@ -1,7 +1,7 @@
 # Routes
 
 Status: **CURRENT REPOSITORY AUDIT (BUSINESS-FIRST REBASE)**  
-Audit date: 2026-08-31
+Audit date: 2026-09-02
 Owner: Product Architecture / Front-end
 
 This file owns URLs and navigation destinations only. Wizard steps, tabs, task states, boards, modals and reusable errors are not routes by default.
@@ -20,10 +20,12 @@ No LINE Mini App route is created in this audit. The future LINE channel is an e
 ## Route count summary
 
 ```text
-CURRENT ROUTE AUDIT: 29 route entries / 25 active local routes / 3 compatibility redirects / 1 legacy demo route
+CURRENT ROUTE AUDIT: 30 route entries / 26 active local routes / 3 compatibility redirects / 1 legacy demo route
 ```
 
 The route table below is the canonical route contract. Matching build/test evidence is recorded in [VALIDATION](./VALIDATION.md).
+
+Service Record is shared domain data created by Grooming/Hotel completion and shown in Customer/Pet detail. The former standalone CareProof route, menu and management experience are **SUPERSEDED**; no replacement route is created by BF-8.
 
 ## Active live local routes — current validated local count
 
@@ -35,9 +37,10 @@ The route table below is the canonical route contract. Matching build/test evide
 | `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, guarded move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE LOCAL PROTOTYPE |
 | `/business/grooming` | Capability-aware Grooming Today execution board for linked Pet-specific Service Jobs; aligned status cards, pointer-following reversible drag or swipe, no date/job filter rail, and mobile grouped status-list/detail alternative | LIVE LOCAL PROTOTYPE only when the active Branch enables Grooming; Calendar remains Booking planning, not execution |
 | `/business/hotel` | Capability-aware Hotel Today operations and continuous room/zone occupancy for Pet-specific Stays linked to shared date-range Bookings; guarded room assignment/moves, lightweight care, notes/incidents and mobile grouped alternatives | LIVE LOCAL PROTOTYPE only when the active Branch enables Hotel; Calendar remains Booking planning, not occupancy execution |
+| `/business/billing` | Branch-attributed local Charge review, Payment recording, derived unpaid/partial/paid/cancelled state, Revenue summary, and Grooming/Hotel checkout context | LIVE LOCAL PROTOTYPE; whole-THB prototype amounts only; no payment gateway, full accounting, tax, refund processor, or cross-Branch settlement |
 | `/business/customers` | Search and browse Business-level Customer relationships and linked local Pets in responsive desktop table/mobile cards; filters are booking-based only | LIVE LOCAL PROTOTYPE |
-| `/business/customers/[customerId]` | Stable responsive Customer relationship detail with clearer Pets, Booking context, tags, Business notes and primary actions | LIVE LOCAL PROTOTYPE |
-| `/business/inbox` | Business-wide Customer conversations with readable split/mobile layouts, compact search/filters, Pet/Booking context, unread state, local send, three default quick replies with remembered visibility, and structured add-service request prototype | LIVE LOCAL PROTOTYPE; `?conversation=`, `?customerId=`, `?petId=`, and `?bookingId=` provide local recovery/context; no real delivery |
+| `/business/customers/[customerId]` | Stable responsive Customer relationship detail with clearer Pets, Booking context, tags, Business notes, compact Branch-attributed Charge/Payment history, and one inline shared `ประวัติบริการ` timeline/list | LIVE LOCAL PROTOTYPE |
+| `/business/inbox` | Business-wide Customer conversations with readable split/mobile layouts, compact search/filters, Pet/Booking context, unread state, local send, three default quick replies with remembered visibility, structured add-service request prototype, and optional staff-triggered billing text | LIVE LOCAL PROTOTYPE; `?conversation=`, `?customerId=`, `?petId=`, and `?bookingId=` provide local recovery/context; no real delivery or LINE transport |
 | `/business/scan` | Temporary Business QR scan/manual validation | LIVE LOCAL MOCK |
 | `/business/intake/[intakeId]` | Allowed data, Intake, consent review, check-in | LIVE LOCAL MOCK |
 | `/login` | Consumer web-prototype mock login | LIVE MOCK — CURRENT WEB PROTOTYPE; not LINE Login |
@@ -71,7 +74,7 @@ The route table below is the canonical route contract. Matching build/test evide
 
 ## Target Guardian channel (No routes yet)
 
-The target is a LINE-first Guardian experience:
+The target is a LINE-first Guardian experience. Service Records are currently Business-side history only; future Guardian visibility remains a separate policy/channel decision:
 
 ```text
 Add Meawketting LINE → LINE Login → open LINE Mini App → My Pets → Add Pet → Pet Passport
@@ -84,7 +87,8 @@ This is conceptual and **NOT IMPLEMENTED**. Do not add `/line/*`, Mini App paths
 | Concept | Target Milestone | Purpose |
 |---|---|---|
 | Daycare Operations | M-DAYCARE | Daycare Attendance; no route has been created |
-| Billing & Checkout | Future Billing | Combined invoice, multi-service charges, payment status (`/business/billing`) |
+| Multi-Service Visit / Order checkout | Future checkout policy | Combined service grouping and checkout policy; no additional route is created by BF-7 |
+| Guardian Service Record visibility | Future Guardian phase | LINE Mini App service-record visibility/delivery; no Guardian route is created by BF-8 |
 | Business Onboarding | Multi-branch setup | Resumable business setup wizard (`/business/onboarding`) |
 
 ## Root homepage anchor destinations

@@ -103,6 +103,7 @@ Primitive value → Semantic token → Component styling
 - **Pastel Yellow (`#F4C95D`)** represents **Brand & Action**: primary buttons, active navigation, selected controls, scanner frames and focus/key highlights.
 - Status uses the semantic Success, Warning, Critical and Information palette above. Brand Yellow and feature accents never substitute for status.
 - Feature color classifies a service; it does not communicate progress, availability, approval or risk.
+- BF-7 financial and BF-8 Service Record references use visible text plus an icon or other non-color cue: paid, unpaid, partial, cancelled and no-charge must remain distinguishable even when semantic color is unavailable. A Grooming Coral or Hotel Sky cue still identifies service, never payment state.
 
 ### Service visual identity
 
@@ -165,8 +166,8 @@ Service identity is a secondary classification system and never replaces status:
 
 ## Business navigation architecture
 
-- Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, and `ข้อความ`; the Inbox uses the same unread source as Home and mobile navigation.
-- The Sidebar exposes Grooming and Hotel as live `งานบริการ` destinations only when the active Branch enables the matching capability. Daycare and management rows remain under the planned grouping. Mobile More mirrors the same Branch capability state.
+- Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, `ข้อความ`, and `การเงิน`; the Inbox uses the same unread source as Home and mobile navigation.
+- The Sidebar exposes Grooming and Hotel as live `งานบริการ` destinations only when the active Branch enables the matching capability, and Finance as the live shared BF-7 destination. Service Record is shown in Customer/Pet detail rather than as a navigation destination. Daycare, Reports, Team and Settings remain under the planned grouping. Mobile More mirrors the same Branch capability state plus Finance.
 - Planned rows are native disabled buttons with `aria-disabled`, reduced emphasis, and no `href` or fake route. Mobile More mirrors the live Customers and capability-enabled service links, plus the same Branch-enabled planned/service-management groups.
 
 ## Operational focal points and schedules
@@ -187,6 +188,7 @@ Service identity is a secondary classification system and never replaces status:
 - Hotel Stay detail is a focus-managed right drawer at larger widths and a bottom sheet/task surface on mobile. Identity/contact, dates, lifecycle, room, care, internal notes/incidents, messages and movement history remain grouped and scannable rather than nested into cards.
 - At mobile widths the desktop occupancy board is hidden in favor of grouped Today/Stay tabs and lists. Room selection and lifecycle controls are explicit non-drag alternatives; the desktop board must never be compressed into unreadable columns.
 - Desktop room drag previews valid/invalid capacity before commit, settles smoothly when accepted, and rolls back without losing the current room when rejected. These transitions use the canonical motion scale and obey `prefers-reduced-motion`.
+- Billing uses amount-first hierarchy: a clearly labeled total, paid and remaining values use tabular numerals; Charge lines and Payment records are dense desktop rows only where comparison benefits staff. Mobile changes them to labeled card-rows while preserving Charge status, Branch attribution and the primary payment action.
 
 ## Business landing imagery
 
@@ -248,8 +250,8 @@ All primitives consume the existing three-layer Business token model. The refere
 ## Data tables
 
 - Tables use LINE Seed Sans TH, tabular numerals where needed, warm borders, restrained headers, readable row spacing and a clear hover/focus treatment.
-- Use tables only for genuinely tabular Billing, Reports, Team, inventory-like or financial data. Customers & Pets remains a scan-friendly row hierarchy rather than an awkward CRM spreadsheet.
-- Every responsive table has an explicit mobile strategy: priority-column reduction, stacked labeled rows or controlled horizontal scrolling with the primary action/identity retained.
+- Use tables only for genuinely tabular BF-7 Billing, Reports, Team, inventory-like or financial data. Service Record history belongs to the Customer/Pet timeline context rather than a standalone table.
+- Every responsive table has an explicit mobile strategy: priority-column reduction, stacked labeled rows or controlled horizontal scrolling with the primary action/identity retained. Customer/Pet Service Record history keeps the Pet visual anchor and text-plus-icon payment reference in its inline detail pattern.
 
 ## Modal, alert, toast and feedback surfaces
 
@@ -295,9 +297,9 @@ All primitives consume the existing three-layer Business token model. The refere
 
 | Viewport | Range | Behavior |
 |---|---|---|
-| Mobile | 320–767px | Low–medium density; bottom navigation and full-screen/sheet tasks; Calendar is Agenda-first; Grooming is a grouped status list; Customer Pets may use a snap/peek strip |
-| Tablet | 768–1023px | Medium density; touch-first adaptive grids; compact Home banner/actions; Calendar day/week hybrid; Grooming boards remain contained and horizontally navigable only inside the workflow surface |
-| Desktop | 1024px+ | Medium–high density without smaller body text; persistent navigation; split panes, operational rows and Calendar planning use the available width |
+| Mobile | 320–767px | Low–medium density; bottom navigation and full-screen/sheet tasks; Calendar is Agenda-first; Grooming is a grouped status list; Billing uses labeled Charge/Payment rows; Customer Pets may use a snap/peek strip |
+| Tablet | 768–1023px | Medium density; touch-first adaptive grids; compact Home banner/actions; Calendar day/week hybrid; Grooming boards remain contained and horizontally navigable only inside the workflow surface; Billing keeps clear amount hierarchy |
+| Desktop | 1024px+ | Medium–high density without smaller body text; persistent navigation; split panes, operational rows, compact financial tables and Calendar planning use the available width |
 
 - Required QA widths are 320, 375, 390, 430, 768, 820, 1024, 1200 and 1440px.
 - Horizontal scrolling is allowed only for filter chips, segmented views, multiple-Pet snap/peek summaries, tablet workflow boards and Calendar date-range spans. It is prohibited for body copy, forms, Customer lists, Inbox messages, detail sections, critical alerts and confirmation dialogs.

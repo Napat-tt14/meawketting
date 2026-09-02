@@ -6,18 +6,18 @@ export type BusinessDestinationKey =
   | "messages"
   | "grooming"
   | "hotel"
-  | "finance"
+  | "billing"
   | "reports"
   | "team"
   | "settings";
 
-export type BusinessLiveDestinationKey = "calendar" | "customers" | "messages" | "grooming" | "hotel";
+export type BusinessLiveDestinationKey = "calendar" | "customers" | "messages" | "grooming" | "hotel" | "billing";
 export type BusinessPlannedDestinationKey = Exclude<BusinessDestinationKey, BusinessLiveDestinationKey>;
 
 export type BusinessLiveDestination = {
   key: BusinessLiveDestinationKey;
   label: string;
-  href: "/business/calendar" | "/business/customers" | "/business/inbox" | "/business/grooming" | "/business/hotel";
+  href: "/business/calendar" | "/business/customers" | "/business/inbox" | "/business/grooming" | "/business/hotel" | "/business/billing";
 };
 
 export type BusinessPlannedDestination = {
@@ -57,6 +57,12 @@ export const BUSINESS_HOTEL_DESTINATION = {
   href: "/business/hotel",
 } as const satisfies BusinessLiveDestination;
 
+export const BUSINESS_BILLING_DESTINATION = {
+  key: "billing",
+  label: "การเงิน",
+  href: "/business/billing",
+} as const satisfies BusinessLiveDestination;
+
 export const BUSINESS_TOP_DESTINATIONS = [
   BUSINESS_CALENDAR_DESTINATION,
   BUSINESS_CUSTOMERS_DESTINATION,
@@ -64,7 +70,6 @@ export const BUSINESS_TOP_DESTINATIONS = [
 ] as const satisfies readonly BusinessTopDestination[];
 
 export const BUSINESS_MANAGEMENT_DESTINATIONS = [
-  { key: "finance", label: "การเงิน" },
   { key: "reports", label: "รายงาน" },
   { key: "team", label: "ทีม" },
   { key: "settings", label: "ตั้งค่า" },

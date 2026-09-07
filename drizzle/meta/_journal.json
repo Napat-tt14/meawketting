@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788597858929,
+      "tag": "0000_lying_jean_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788599876739,
+      "tag": "0001_thick_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788732765766,
+      "tag": "0002_majestic_randall_flagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788770453668,
+      "tag": "0003_same_nekra",
+      "breakpoints": true
+    }
+  ]
+}

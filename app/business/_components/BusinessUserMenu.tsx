@@ -8,14 +8,16 @@ import {
   readActiveBusinessContext,
 } from "../../_prototype/businessState";
 import { LogOut, Storefront, UserRoundCheck, X } from "../../_components/icons";
+import { useBusinessStateReady } from "./useBusinessContext";
 
 export function BusinessUserMenu() {
+  const stateReady = useBusinessStateReady();
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState<DemoBusinessContext>(DEMO_BUSINESS_CONTEXTS[0]);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const details = getDemoBusinessContextDetails(context);
+  const details = getDemoBusinessContextDetails(context, !stateReady);
 
   const closeMenu = useCallback(() => {
     setOpen(false);

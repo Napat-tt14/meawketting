@@ -56,6 +56,136 @@ function countRenderedElements(html, tagName) {
   return (renderedMarkup.match(new RegExp(`<${tagName}\\b`, "g")) ?? []).length;
 }
 
+async function withBusinessStateTest(run) {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-bf10-bf12-test-"));
+  const previousWindow = globalThis.window;
+  const previousCustomEvent = globalThis.CustomEvent;
+  const storage = new Map();
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: (key) => storage.delete(key),
+      clear: () => storage.clear(),
+    },
+    dispatchEvent: () => true,
+  };
+  if (typeof globalThis.CustomEvent !== "function") {
+    globalThis.CustomEvent = class CustomEvent {
+      constructor(type) { this.type = type; }
+    };
+  }
+  let vite;
+  try {
+    vite = await createServer({
+      root: projectRoot,
+      configFile: false,
+      cacheDir: cacheDirectory,
+      server: { middlewareMode: true },
+      appType: "custom",
+      logLevel: "silent",
+    });
+    const state = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    await run({ state, vite, storage });
+  } finally {
+    await vite?.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = previousCustomEvent;
+  }
+}
+
+function installExecutionBookingFixture(state, context, draft, bookingId) {
+  const service = state.getBookingServices(context).find((candidate) => candidate.id === draft.serviceId);
+  assert.ok(service, `missing fixture service ${draft.serviceId}`);
+  const occurredAt = "2026-09-07T06:00:00.000Z";
+  const booking = {
+    bookingId,
+    customer: { ...draft.customer },
+    pets: draft.pets.map((pet) => ({ ...pet })),
+    businessId: context.businessId,
+    branchId: context.branchId,
+    serviceModule: service.module,
+    service: { id: service.id, label: service.label },
+    timeModel: service.timeModel,
+    start: draft.start,
+    end: service.timeModel === "day" ? null : draft.end,
+    requiredResources: [...service.requiredResourceKinds],
+    assignedResources: [...draft.assignedResourceIds],
+    status: draft.status,
+    estimate: draft.estimate,
+    notes: draft.notes,
+    revision: 1,
+    createdAt: occurredAt,
+    updatedAt: occurredAt,
+    cancelledAt: null,
+  };
+  assert.equal(state.synchronizePrototypeExecutionCompatibilityForBooking(booking), true);
+  return booking;
+}
+
+async function installBe1ConfigurationFixture(state, vite) {
+  const cache = await vite.ssrLoadModule("/app/_backend/be1/configurationCache.ts");
+  const businessIds = [...new Set(state.DEMO_BUSINESS_CONTEXTS.map((context) => context.businessId))];
+  const timestamp = "2026-09-05T00:00:00.000Z";
+  cache.installBusinessSession({
+    person: {
+      id: "prs_01k47meawketting000000001",
+      displayName: "คุณนนท์",
+      primaryEmail: "owner@meawketting.example.test",
+      status: "active",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    workspaces: businessIds.map((businessId, index) => {
+      const profile = state.getPrototypeBusinessProfile(businessId, true);
+      const branches = state.listPrototypeBusinessBranches(businessId, { includeInactive: true, fixtureOnly: true });
+      return {
+        membership: {
+          id: `mem_01k47meawketting00000000${index + 1}`,
+          personId: "prs_01k47meawketting000000001",
+          businessId,
+          role: "OWNER",
+          status: "active",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        business: {
+          id: profile.businessId,
+          name: profile.name,
+          contactName: profile.contactName,
+          phone: profile.phone,
+          email: profile.email,
+          description: profile.description,
+          address: profile.address,
+          logoUrl: profile.logoDataUrl,
+          status: "active",
+          createdAt: timestamp,
+          updatedAt: profile.updatedAt,
+        },
+        permittedBranches: branches.map((branch) => ({
+          id: branch.branchId,
+          businessId: branch.businessId,
+          name: branch.name,
+          area: branch.area,
+          address: branch.address,
+          phone: branch.phone,
+          email: branch.email,
+          timezone: "Asia/Bangkok",
+          status: branch.active ? "active" : "inactive",
+          enabledModules: branch.enabledModules,
+          operatingHours: branch.operatingHours,
+          createdAt: branch.createdAt,
+          updatedAt: branch.updatedAt,
+        })),
+      };
+    }),
+  });
+  return cache;
+}
+
 test("renders the Index as the Business Operating Platform landing page", async () => {
   const html = await htmlFor("/");
   const hero = html.match(/<section class="business-homepage-hero[\s\S]*?<\/section>/)?.[0] ?? "";
@@ -128,6 +258,9 @@ test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Y
   assert.match(homepageCss, /grid-template-columns:\s*minmax\(0, \.98fr\) minmax\(0, 1\.02fr\)/);
   assert.match(homepageCss, /@media \(max-width: 1023px\)/);
   assert.match(homepageCss, /@media \(max-width: 767px\)/);
+  assert.match(homepageCss, /grid-template-areas:\s*"tag" "title" "showcase" "lead" "actions" "pills" "note" "guardian"/);
+  assert.match(homepageCss, /\.business-homepage-hero__copy\s*\{\s*display: contents;/);
+  assert.match(homepageCss, /\.business-homepage-hero \.business-product-preview__photo\s*\{[\s\S]*?min-height: 0;[\s\S]*?max-height: none;/);
   assert.match(homepageCss, /@media \(max-width: 430px\)/);
   assert.match(homepageCss, /@media \(max-width: 359px\)/);
   assert.match(homepageCss, /prefers-reduced-motion:\s*reduce/);
@@ -863,7 +996,7 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(html, /href="\/business\/customers\?focus=search"/);
   assert.match(html, /href="\/business\/inbox"/);
   assert.equal(countRenderedElements(html, "h1"), 1);
-  assert.match(source, /getEnabledBusinessModules\(context\)/);
+  assert.match(source, /getEnabledBusinessModules\(context(?:, !businessStateReady)?\)/);
   assert.match(source, /enabledModules\.map/);
   assert.match(source, /listPrototypeBookings\(context/);
   assert.match(source, /getPrototypeInboxUnreadCount\(context/);
@@ -884,10 +1017,9 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(spotlight, /business-banner-hotel\.png/);
   assert.match(spotlight, /business-home-banner__arrow--previous/);
   assert.match(spotlight, /business-home-banner__arrow--next/);
-  assert.match(spotlight, /BANNER_ROTATION_MS = 6_000/);
   assert.match(spotlight, /SWIPE_THRESHOLD_PX = 48/);
-  assert.match(spotlight, /window\.setInterval/);
-  assert.match(spotlight, /prefers-reduced-motion/);
+  assert.doesNotMatch(spotlight, /window\.setInterval/);
+  assert.match(businessCss, /prefers-reduced-motion/);
   assert.match(spotlight, /onPointerDown=\{handlePointerDown\}/);
   assert.match(spotlight, /onPointerUp=\{handlePointerUp\}/);
   assert.match(spotlight, /business-home-banner__track/);
@@ -909,7 +1041,7 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.doesNotMatch(state, /nextWork:\s*\[/);
 });
 
-test("builds one Branch-aware Business shell with live Calendar, Customers, Inbox, Billing, and capability-aware operations", async () => {
+test("builds one Branch-aware Business shell with live Calendar, Customers, Inbox, Billing, Reports, Team, and capability-aware operations", async () => {
   const [layout, frame, desktopNav, mobileNav, model, header, menu, documentLink, state] = await Promise.all([
     readFile(new URL("business/layout.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessPortalFrame.tsx", appRoot), "utf8"),
@@ -932,15 +1064,9 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.match(header + mobileNav, /href="\/business\/scan"/);
   assert.match(documentLink, /return <a href=\{href\}/);
   assert.doesNotMatch(desktopNav + mobileNav + header, /from "next\/link"/);
-  assert.match(desktopNav + mobileNav, /aria-disabled="true"/);
-  assert.match(desktopNav + mobileNav, /disabled/);
-  assert.match(desktopNav, /PlannedBusinessModule/);
   assert.match(desktopNav, /BUSINESS_MANAGEMENT_DESTINATIONS/);
-  assert.match(mobileNav, /PlannedBusinessModule/);
-  assert.match(mobileNav, /BUSINESS_MANAGEMENT_DESTINATIONS/);
+  assert.match(mobileNav, /BUSINESS_SETTINGS_DESTINATION/);
   assert.match(desktopNav + mobileNav, /aria-label="งานบริการ"/);
-  assert.match(desktopNav + mobileNav, /ยังไม่เปิดใช้/);
-  assert.match(desktopNav + mobileNav, /disabled aria-disabled="true"/);
   assert.match(model, /BUSINESS_CALENDAR_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/calendar"/);
   assert.match(model, /BUSINESS_CUSTOMERS_DESTINATION/);
@@ -951,22 +1077,34 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.match(model, /href:\s*"\/business\/grooming"/);
   assert.match(model, /BUSINESS_HOTEL_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/hotel"/);
+  assert.match(model, /BUSINESS_DAYCARE_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/daycare"/);
+  assert.match(model, /BUSINESS_SETTINGS_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/settings"/);
   assert.match(model, /BUSINESS_BILLING_DESTINATION/);
   assert.match(model, /href:\s*"\/business\/billing"/);
+  assert.match(model, /BUSINESS_REPORTS_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/reports"/);
+  assert.match(model, /BUSINESS_TEAM_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/team"/);
   assert.match(desktopNav + mobileNav, /module === "grooming"/);
   assert.match(desktopNav + mobileNav, /module === "hotel"/);
-  assert.match(desktopNav + mobileNav, /PlannedBusinessModule key=\{module\} module=\{module\}/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_DAYCARE_DESTINATION/);
   assert.match(desktopNav + mobileNav, /BUSINESS_GROOMING_DESTINATION/);
   assert.match(desktopNav + mobileNav, /BUSINESS_HOTEL_DESTINATION/);
   assert.match(desktopNav + mobileNav, /BUSINESS_BILLING_DESTINATION/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_REPORTS_DESTINATION/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_TEAM_DESTINATION/);
   assert.match(mobileNav, /BUSINESS_CUSTOMERS_DESTINATION\.href/);
   assert.match(mobileNav, /BUSINESS_MESSAGES_DESTINATION\.href/);
-  assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/(?:daycare|finance|reports|team|settings)/);
+  assert.match(mobileNav, /BUSINESS_REPORTS_DESTINATION\.href/);
+  assert.match(mobileNav, /BUSINESS_TEAM_DESTINATION\.href/);
+  assert.doesNotMatch(desktopNav + mobileNav + model, /\/business\/finance/);
   for (const label of ["ปฏิทิน", "ลูกค้าและสัตว์เลี้ยง", "ข้อความ", "อาบน้ำ / ตัดขน", "โรงแรม", "Daycare", "การเงิน", "รายงาน", "ทีม", "ตั้งค่า"]) {
     assert.match(model, new RegExp(label));
   }
-  assert.match(desktopNav, /getEnabledBusinessModules\(context\)/);
-  assert.match(mobileNav, /getEnabledBusinessModules\(context\)/);
+  assert.match(desktopNav, /getEnabledBusinessModules\(context(?:, !stateReady)?\)/);
+  assert.match(mobileNav, /getEnabledBusinessModules\(context(?:, !stateReady)?\)/);
   assert.match(state, /getEnabledBusinessModules/);
   assert.doesNotMatch(menu, /href="\/business\/(?:home|scan)|ปฏิทิน|อาบน้ำ \/ ตัดขน|โรงแรม|Daycare|การเงิน/);
 });
@@ -1009,7 +1147,8 @@ test("switches the shared Business and Branch context through one keyboard-usabl
 
   assert.match(switcher, /<select/);
   assert.match(switcher, /aria-label="เปลี่ยนร้านและสาขา"/);
-  assert.match(switcher, /DEMO_BUSINESS_CONTEXTS\.map/);
+  assert.match(switcher, /listPrototypeBusinessContexts\(undefined, !stateReady\)/);
+  assert.match(switcher, /contexts\.map/);
   assert.match(hook, /meawketting:business-state/);
   assert.match(hook, /writeActiveBusinessContext/);
   assert.match(scanner, /meawketting:business-state/);
@@ -1019,7 +1158,7 @@ test("switches the shared Business and Branch context through one keyboard-usabl
   assert.match(fixtures, /whisker-thonglor/);
 });
 
-test("renders BF-2 Business Calendar as a live local planning route", async () => {
+test("renders BF-2 Business Calendar over durable BE3 planning truth", async () => {
   const [html, page, calendar, planningBoard, staySpan, dayTimeline, mutation, presentation, editor, state, agenda, css] = await Promise.all([
     htmlFor("/business/calendar"),
     readFile(new URL("business/calendar/page.tsx", appRoot), "utf8"),
@@ -1075,12 +1214,16 @@ test("renders BF-2 Business Calendar as a live local planning route", async () =
   assert.match(mutation, /calendarDayDistance/);
   assert.match(presentation, /daysForCalendarMonth/);
   assert.match(presentation, /daysForCustomRange/);
-  assert.match(editor, /role="dialog"/);
+  assert.match(editor, /role=\{cancelConfirmation \? "alertdialog" : "dialog"\}/);
   assert.match(editor, /aria-modal="true"/);
   assert.match(editor, /event\.key === "Escape"/);
   assert.match(editor, /event\.key !== "Tab"/);
   assert.match(calendar, /evaluatePrototypeBookingAvailability\(draft, context\)/);
-  assert.match(calendar, /if \(!availability\.available\)[\s\S]*?setInteractionConflict[\s\S]*?return;[\s\S]*?savePrototypeBooking\(draft, context\)/);
+  assert.match(calendar, /queryDurableBookings/);
+  assert.match(calendar, /rescheduleDurableBooking/);
+  assert.match(calendar, /createDurableBooking/);
+  assert.match(calendar, /cancelDurableBooking/);
+  assert.doesNotMatch(calendar, /savePrototypeBooking|cancelPrototypeBooking/);
   assert.match(calendar, /เลือกวัน\/เวลาใหม่/);
   assert.match(calendar, /เลือกตัวเลือกอื่น/);
   assert.doesNotMatch(calendar, /Move failed/i);
@@ -1204,11 +1347,12 @@ test("uses one accessible service identity and keeps quick relationship creation
   }
 });
 
-test("checks Branch services, resources, capacity, and duplicate confirmation before Booking save", async () => {
-  const [state, editor, availability] = await Promise.all([
+test("checks Branch services, resources, capacity, and duplicate confirmation before durable Booking save", async () => {
+  const [state, editor, availability, durableClient] = await Promise.all([
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
     readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
     readFile(new URL("business/calendar/AvailabilityStatus.tsx", appRoot), "utf8"),
+    readFile(new URL("_backend/be3/client.ts", appRoot), "utf8"),
   ]);
 
   assert.match(state, /getBookingServices\(context/);
@@ -1222,26 +1366,33 @@ test("checks Branch services, resources, capacity, and duplicate confirmation be
   assert.match(state, /status !== "cancelled"/);
   assert.match(state, /capacity-conflict/);
   assert.match(state, /duplicate-confirmation/);
-  assert.match(state, /savePrototypeBooking\(draft/);
+  assert.doesNotMatch(state, /export function savePrototypeBooking/);
   assert.match(editor, /evaluatePrototypeBookingAvailability\(draft, context\)/);
+  assert.match(editor, /checkDurableBookingAvailability/);
+  assert.match(editor, /createDurableBooking/);
+  assert.match(editor, /updateDurableBooking/);
+  assert.match(durableClient, /BE3_API_PATH/);
   assert.match(editor, /สาขาที่กำลังใช้งานเปลี่ยนแล้ว/);
   assert.match(availability, /เปลี่ยนเวลา/);
   assert.match(availability, /เปลี่ยนตัวเลือก/);
   assert.match(availability, /เปลี่ยนวันที่/);
 });
 
-test("supports local Booking create, edit, cancellation history, and safe recovery UI", async () => {
-  const [state, editor, css] = await Promise.all([
+test("supports durable Booking create, edit, cancellation history, and safe recovery UI", async () => {
+  const [state, editor, durableClient, css] = await Promise.all([
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
     readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("_backend/be3/client.ts", appRoot), "utf8"),
     readFile(new URL("globals.css", appRoot), "utf8"),
   ]);
 
   assert.match(state, /bookings: Record<string, PrototypeBooking>/);
-  assert.match(state, /savePrototypeBooking/);
-  assert.match(state, /cancelPrototypeBooking/);
+  assert.match(state, /JSON\.stringify\(\{ \.\.\.store, customers: \{\}, bookings: \{\} \}\)/);
+  assert.doesNotMatch(state, /export function (?:save|cancel)PrototypeBooking/);
+  assert.match(durableClient, /createDurableBooking/);
+  assert.match(durableClient, /updateDurableBooking/);
+  assert.match(durableClient, /cancelDurableBooking/);
   assert.match(state, /cancelledAt/);
-  assert.match(state, /duplicate: true/);
   assert.match(editor, /ยืนยันการจอง/);
   assert.match(editor, /บันทึกการเปลี่ยนแปลง/);
   assert.match(editor, /ยกเลิกการจอง/);
@@ -1255,7 +1406,7 @@ test("supports local Booking create, edit, cancellation history, and safe recove
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?booking-editor/);
 });
 
-test("keeps shared Business Core routes live with capability-aware Grooming and Hotel operations", async () => {
+test("keeps shared Business Core routes live with capability-aware Grooming, Hotel, Daycare, Team, and Settings", async () => {
   const routes = await readdir(appRoot, { recursive: true, withFileTypes: true });
   const routePaths = routes
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
@@ -1268,7 +1419,11 @@ test("keeps shared Business Core routes live with capability-aware Grooming and 
   assert.equal(routePaths.some((path) => /business\/grooming$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), true);
   assert.equal(routePaths.some((path) => /business\/billing$/.test(path)), true);
-  assert.equal(routePaths.some((path) => /business\/(?:bookings|daycare|finance|reports|team|settings)(?:\/|$)/.test(path)), false);
+  assert.equal(routePaths.some((path) => /business\/reports$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/team$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/daycare$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/settings$/.test(path)), true);
+  assert.equal(routePaths.some((path) => /business\/(?:bookings|finance)(?:\/|$)/.test(path)), false);
   assert.equal(routePaths.some((path) => /business\/pets(?:\/|$)/.test(path)), false);
 });
 
@@ -1292,7 +1447,7 @@ test("renders BF-5 Grooming as a visual, capability-aware execution board with a
   assert.match(html, /role="img"[^>]*aria-label="Mochi · แมว"/);
   assert.match(html, /รอลูกค้าอนุมัติ/);
   assert.match(page, /GroomingOperations/);
-  assert.match(operations, /getEnabledBusinessModules\(context\)\.includes\("grooming"\)/);
+  assert.match(operations, /getEnabledBusinessModules\(context(?:, !stateReady)?\)\.includes\("grooming"\)/);
   assert.match(operations, /onDragStart/);
   assert.match(operations, /onDrop=/);
   assert.match(operations, /onPointerDown/);
@@ -1316,7 +1471,7 @@ test("renders BF-5 Grooming as a visual, capability-aware execution board with a
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.grooming-job-card/);
   assert.match(state, /DEMO_GROOMING_SERVICE_JOB_FIXTURES/);
   assert.match(desktopNav + mobileNav, /BUSINESS_GROOMING_DESTINATION/);
-  assert.doesNotMatch(desktopNav + mobileNav, /href="\/business\/daycare"/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_DAYCARE_DESTINATION/);
 });
 
 test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-care foundation", async () => {
@@ -1350,7 +1505,7 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
   assert.match(html, /Luna/);
   assert.match(html, /ห้อง A01/);
   assert.match(page, /HotelOperations/);
-  assert.match(operations, /getEnabledBusinessModules\(context\)\.includes\("hotel"\)/);
+  assert.match(operations, /getEnabledBusinessModules\(context(?:, !stateReady)?\)\.includes\("hotel"\)/);
   assert.match(operations, /getPrototypeHotelRoomOccupancySummary/);
   assert.match(operations, /hotel-occupancy-span--\$\{span\.stay\.status\}/);
   assert.match(operations, /onDragStart/);
@@ -1376,9 +1531,9 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
   assert.match(detail, /การชำระเงินทำผ่าน Checkout แยกต่างหาก/);
   assert.match(presentation, /HOTEL_LIST_FILTERS/);
   assert.match(desktopNav + mobileNav + model, /BUSINESS_HOTEL_DESTINATION/);
-  assert.match(command, /getEnabledBusinessModules\(context\)\.includes\("hotel"\)/);
-  assert.match(desktopNav + mobileNav, /PlannedBusinessModule/);
-  assert.match(desktopNav + mobileNav, /ยังไม่เปิดใช้/);
+  assert.match(command, /getEnabledBusinessModules\(context, !stateReady\)\.map\(\(module\) => BUSINESS_MODULE_COMMANDS\[module\]\)/);
+  assert.match(command, /hotel: \{[\s\S]*?href: "\/business\/hotel"/);
+  assert.match(desktopNav + mobileNav, /BUSINESS_DAYCARE_DESTINATION/);
   assert.match(state, /export type PrototypeHotelStay/);
   assert.match(state, /hotelStays: Record<string, PrototypeHotelStay>/);
   assert.match(state, /synchronizePrototypeHotelStaysForBooking/);
@@ -1600,7 +1755,8 @@ test("renders BF-7 Billing as a branch-scoped Charge, Payment, and shared revenu
   const chargeCardSource = screen.match(/function ChargeCard[\s\S]*?\n}\n\nexport function BillingScreen/)?.[0] ?? "";
   assert.match(chargeCardSource, /billing-charge-card__source/);
   assert.doesNotMatch(chargeCardSource.match(/<button[\s\S]*?<\/button>/)?.[0] ?? "", /<Link/);
-  assert.match(screen, /Local prototype/);
+  assert.match(screen, /description="ตรวจรายละเอียดรายการ ยอดคงเหลือ และประวัติการรับชำระเงิน"/);
+  assert.doesNotMatch(screen, /Local prototype/);
   assert.doesNotMatch(screen, /LINE (?:Mini App|Login|messaging|notification)|Stripe|payment gateway/i);
   assert.match(state, /charges: Record<string, PrototypeCharge>/);
   assert.match(state, /payments: Record<string, PrototypePayment>/);
@@ -1625,6 +1781,46 @@ test("renders BF-7 Billing as a branch-scoped Charge, Payment, and shared revenu
   assert.doesNotMatch(inboxState, /recordPrototypePayment|addPrototypeChargeAdjustment|cancelPrototypeCharge|PrototypePayment/);
   assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.billing-charge-table \{ display: none; \}[\s\S]*?\.billing-charge-cards \{ display: grid/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.billing-charge-card/);
+});
+
+test("renders BF-8 Reports as a branch-aware business insights route derived from shared state", async () => {
+  const [html, page, screen, presentation, state, desktopNav, mobileNav, command, css] = await Promise.all([
+    htmlFor("/business/reports"),
+    readFile(new URL("business/reports/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/reports/ReportsScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/reports/reportsPresentation.ts", appRoot), "utf8"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessCommandPalette.tsx", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+  ]);
+
+  assert.match(html, /<h1[^>]*>รายงานและข้อมูลเชิงลึก<\/h1>/);
+  assert.equal(countRenderedElements(html, "h1"), 1);
+  assert.match(html, /รายรับรวม/);
+  assert.match(html, /บริการที่เสร็จสิ้น/);
+  assert.match(html, /การจองทั้งหมด/);
+  assert.match(html, /ลูกค้าที่ใช้บริการ/);
+  assert.match(html, /ภาพรวมตามประเภทบริการ/);
+  assert.match(html, /ข้อมูลเชิงลึกการดำเนินงาน/);
+  assert.match(html, /1,350 บาท/);
+  assert.match(html, /3,050 บาท/);
+
+  assert.match(screen, /getBusinessReportsSummary/);
+  assert.match(screen, /BusinessSegmentedControl/);
+  assert.match(screen, /REPORT_PRESET_OPTIONS/);
+  assert.match(screen, /REPORT_BRANCH_OPTIONS/);
+  assert.match(screen, /BusinessDataTable/);
+  assert.match(desktopNav, /BUSINESS_REPORTS_DESTINATION/);
+  assert.match(mobileNav, /BUSINESS_REPORTS_DESTINATION/);
+  assert.match(command, /"รายงาน"/);
+  assert.match(css, /\.business-reports/);
+  assert.match(css, /\.reports-kpi-grid/);
+  assert.match(css, /font-variant-numeric:\s*tabular-nums/);
+  assert.match(page, /ReportsScreen/);
+  assert.match(presentation, /formatBusinessMoney/);
+  assert.match(state, /getBusinessReportsSummary/);
 });
 
 test("collapses BF-8 into shared Service Record history without a standalone CareProof UI", async () => {
@@ -1714,6 +1910,19 @@ test("keeps BF-7 Charge and Payment records separate, branch-safe, idempotent, a
       { revenueToday: 1350, paymentCountToday: 2, unpaidBalance: 3050, unpaidCount: 1, partialCount: 1 },
     );
     assert.deepEqual(state.getPrototypeRevenueSummary(thonglor, state.BOOKING_DEMO_DATE, true).revenueToday, 650);
+
+    const ariReports = state.getBusinessReportsSummary(ari, { dateRangePreset: "today", branchScope: "current", fixtureOnly: true });
+    assert.equal(ariReports.keyMetrics.revenue, 1350);
+    assert.equal(ariReports.keyMetrics.paymentCount, 2);
+    assert.equal(ariReports.keyMetrics.unpaidBalance, 3050);
+    assert.equal(ariReports.keyMetrics.completedGrooming, 1);
+    assert.equal(ariReports.keyMetrics.completedHotel, 0);
+    assert.equal(ariReports.keyMetrics.completedServices, 1);
+    assert.ok(ariReports.keyMetrics.totalBookings > 0);
+
+    const allReports = state.getBusinessReportsSummary(ari, { dateRangePreset: "today", branchScope: "all", fixtureOnly: true });
+    assert.equal(allReports.branchComparison.length, 2);
+    assert.equal(allReports.keyMetrics.revenue, 1350 + 650);
 
     assert.equal(state.applyPrototypeApprovedGroomingAddOn({
       serviceJobId: "grooming-job-fixture-mochi",
@@ -2063,13 +2272,14 @@ test("keeps BF-8 Service Records source-keyed, private, correction-safe, and sep
   }
 });
 
-test("renders a searchable Customers & Pets route for Business frontdesk work", async () => {
-  const [html, page, screen, avatars, state, desktopNav, mobileNav, css] = await Promise.all([
+test("renders a backend-searchable Customers & Pets route for Business frontdesk work", async () => {
+  const [html, page, screen, avatars, state, durableClient, desktopNav, mobileNav, css] = await Promise.all([
     htmlFor("/business/customers"),
     readFile(new URL("business/customers/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomersScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessIdentityAvatar.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("_backend/be2/client.ts", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
     readFile(new URL("globals.css", appRoot), "utf8"),
@@ -2084,15 +2294,16 @@ test("renders a searchable Customers & Pets route for Business frontdesk work", 
   assert.match(html, /href="\/business\/customers\/booking-contact-nalin"/);
   assert.match(html, /นัดถัดไป/);
   assert.match(page, /CustomersScreen/);
-  assert.match(screen, /CUSTOMER_LIST_FILTERS/);
-  assert.match(screen, /matchesCustomerSearch/);
-  assert.match(screen, /customerMatchesFilter/);
+  assert.match(screen, /CUSTOMER_CRM_SEGMENTS/);
+  assert.match(screen, /searchDurableCustomers/);
+  assert.match(durableClient, /type: "customer\.search"/);
+  assert.match(screen, /customerMatchesCrmSegment/);
   assert.match(screen, /customer-list-item__identity/);
   assert.match(screen, /customer-list-item__pets/);
   assert.match(screen, /BusinessCustomerAvatar/);
   assert.match(screen, /BusinessPetAvatar/);
   assert.match(screen, /customer-results__heading/);
-  assert.match(screen, /customers\.filter\(\(customer\) => customerMatchesFilter\(customer, option\.value, bookings\)\)\.length/);
+  assert.match(screen, /crmProfiles\.filter\(\(profile\) => customerMatchesCrmSegment\(profile, option\.value\)\)\.length/);
   assert.doesNotMatch(screen, /customer-list__header|<table|<th/);
   assert.match(screen, /CustomerEditor/);
   assert.match(avatars, /aria-hidden="true"/);
@@ -2131,30 +2342,40 @@ test("renders stable Customer detail with Pets, Bookings, local notes, and Passp
   assert.match(detail, /สิทธิ์ที่ร้านมีตอนนี้/);
   assert.match(detail, /<details className="customer-authority-note">/);
   assert.doesNotMatch(detail, /<details className="customer-authority-note"\s+open/);
-  assert.match(detail, /updatePrototypeCustomerTags/);
+  assert.match(detail, /updateDurableCustomerTags/);
   assert.match(detail, /PetRelationshipEditor/);
   assert.match(badges, /ข้อมูลที่ลูกค้าแจ้ง|petDataSourceLabel/);
-  assert.match(petEditor, /addPrototypePetRelationship/);
+  assert.match(petEditor, /createDurablePet/);
+  assert.match(petEditor, /allowPotentialDuplicate/);
   assert.doesNotMatch(petEditor, /บังคับ.*Pet Passport|ต้องเชื่อม Pet Passport/);
-  assert.match(petEditor, /role="dialog"/);
-  assert.match(petEditor, /aria-modal="true"/);
+  assert.match(petEditor, /role=\{embedded \? "region" : "dialog"\}/);
+  assert.match(petEditor, /aria-modal=\{embedded \? undefined : "true"\}/);
 });
 
-test("keeps Customer, Guardian, Passport, and Business-local state boundaries explicit", async () => {
-  const [state, editor, detail, intake] = await Promise.all([
+test("keeps durable Customer/Pet truth and non-authoritative Passport compatibility explicit", async () => {
+  const [state, editor, detail, petEditor, durableClient, durableCache, passportCompatibility, intake] = await Promise.all([
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomerEditor.tsx", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/PetRelationshipEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("_backend/be2/client.ts", appRoot), "utf8"),
+    readFile(new URL("_backend/be2/customerPetCache.ts", appRoot), "utf8"),
+    readFile(new URL("_prototype/be2PassportCompatibility.ts", appRoot), "utf8"),
     readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
   ]);
 
   assert.match(state, /PetPassportConnectionState/);
   assert.match(state, /"linked-active" \| "linked-no-access" \| "unlinked" \| "access-expired"/);
   assert.match(state, /customers: Record<string, PrototypeCustomer>/);
-  assert.match(state, /savePrototypeCustomer/);
-  assert.match(state, /findPotentialPrototypeCustomerDuplicate/);
-  assert.match(state, /addPrototypePetRelationship/);
-  assert.match(state, /allowPotentialDuplicate/);
+  assert.match(state, /customers: \{\}/);
+  assert.doesNotMatch(state, /export function savePrototypeCustomer|export function addPrototypePetRelationship/);
+  assert.match(editor, /createDurableCustomer/);
+  assert.match(editor, /updateDurableCustomer/);
+  assert.match(petEditor, /createDurablePet/);
+  assert.match(durableClient, /BE2_API_PATH/);
+  assert.match(durableCache, /readBe2CustomerByStableId/);
+  assert.match(passportCompatibility, /DEV PROTOTYPE \/ NON-AUTHORITATIVE READ MODEL ONLY/);
+  assert.match(passportCompatibility, /not returned by BE2, persisted in D1/);
   assert.match(state, /findKnownBusinessCustomerPetByPassportSlug/);
   assert.match(state, /unknown QR never creates a permanent Customer relationship/);
   assert.match(editor, /อาจมีลูกค้ารายนี้อยู่แล้ว/);
@@ -2313,7 +2534,7 @@ test("integrates Inbox with Customer, Booking, Home, unread navigation, and stab
   assert.match(bookingEditor, /\/business\/inbox\?customerId=/);
   assert.match(bookingEditor, /bookingId=/);
   assert.match(calendarPage, /bookingId/);
-  assert.match(calendar, /readPrototypeBooking\(launchBookingId\)/);
+  assert.match(calendar, /getDurableBooking\(context\.businessId, context\.branchId, launchBookingId\)/);
   assert.match(inbox, /ensurePrototypeConversation/);
   assert.match(inbox, /params\.set\("conversation"/);
   assert.match(home, /getPrototypeInboxUnreadCount/);
@@ -2693,6 +2914,231 @@ test("keeps Phase E responsive, accessible, and free of Marketing Footer", async
   assert.doesNotMatch(scanner + intake, /<SiteFooter|Marketing Footer/);
 });
 
+test("renders BF-9 Team as a shared, branch-aware operations foundation", async () => {
+  const [html, page, operations, state, desktopNav, mobileNav, command, model, bookingEditor, groomingFields, groomingDetail, hotelDetail, css] = await Promise.all([
+    htmlFor("/business/team"),
+    readFile(new URL("business/team/page.tsx", appRoot), "utf8"),
+    readFile(new URL("business/team/TeamOperations.tsx", appRoot), "utf8"),
+    readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessCommandPalette.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/businessNavigationModel.ts", appRoot), "utf8"),
+    readFile(new URL("business/calendar/BookingEditor.tsx", appRoot), "utf8"),
+    readFile(new URL("business/calendar/GroomingBookingFields.tsx", appRoot), "utf8"),
+    readFile(new URL("business/grooming/GroomingJobDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/hotel/HotelStayDetail.tsx", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+  ]);
+
+  assert.equal(countRenderedElements(html, "h1"), 1);
+  assert.match(html, /<h1[^>]*>ทีม<\/h1>/);
+  assert.match(html, /ทีมและความสามารถของสาขา/);
+  assert.match(html, /aria-label="ขอบเขตการจัดการทีม"/);
+  assert.doesNotMatch(html, /Team &amp; Staff Operations|Local prototype/);
+  assert.match(html, /ดูบทบาท ความสามารถ สาขา ความพร้อม และงานวันนี้/);
+  assert.match(html, /รายชื่อทีม/);
+  assert.match(html, /พร้อมรับงาน/);
+  assert.match(page, /TeamOperations/);
+  for (const capability of [
+    "listPrototypeTeamMembers",
+    "createPrototypeTeamMember",
+    "updatePrototypeTeamMember",
+    "setPrototypeTeamMemberActive",
+    "evaluatePrototypeTeamMemberAvailability",
+    "getPrototypeTeamMemberWorkload",
+  ]) assert.match(operations, new RegExp(capability));
+  assert.match(operations, /BusinessStaffAvatar/);
+  assert.match(operations, /BusinessDataTable/);
+  assert.match(operations, /team-mobile-cards/);
+  assert.match(operations, /BusinessModal/);
+  assert.match(operations, /const CAPABILITY_LABELS = TEAM_MEMBER_CAPABILITY_LABELS/);
+  assert.match(operations, /ข้อมูลนี้ใช้ค้นหาพนักงานและช่วยมอบหมายงานของสาขา/);
+  assert.match(state, /teamMembers: Record<string, PrototypeTeamMember>/);
+  assert.match(state, /DEMO_TEAM_MEMBER_FIXTURES/);
+  assert.match(state, /branchIds: \["whisker-ari", "whisker-thonglor"\]/);
+  assert.match(state, /staffId: "team-pim"/);
+  assert.match(state, /getBookingResourceStaffMember/);
+  assert.match(state, /evaluateTeamResourceEligibility/);
+  assert.match(state, /listPrototypeTeamWorkItems/);
+  assert.match(state, /assignPrototypeHotelCareTaskStaff/);
+  assert.doesNotMatch(state, /DEMO_(?:GROOMING|HOTEL)_STAFF/);
+  assert.match(model, /BUSINESS_TEAM_DESTINATION/);
+  assert.match(model, /href:\s*"\/business\/team"/);
+  assert.match(desktopNav, /BUSINESS_TEAM_DESTINATION/);
+  assert.match(mobileNav, /BUSINESS_TEAM_DESTINATION/);
+  assert.match(command, /label: "ทีม"[\s\S]*?href: "\/business\/team"/);
+  assert.match(bookingEditor, /getBookingResourceStaffMember/);
+  assert.match(bookingEditor, /staff\.active/);
+  assert.match(groomingFields, /evaluatePrototypeTeamMemberAvailability/);
+  assert.match(groomingFields, /disabled=\{!staffState\.enabled\}/);
+  assert.match(groomingDetail, /evaluatePrototypeTeamMemberAvailability/);
+  assert.match(hotelDetail, /getTeamMembersForCapability/);
+  assert.match(hotelDetail, /assignPrototypeHotelCareTaskStaff/);
+  assert.match(hotelDetail, /ผู้รับผิดชอบ/);
+  assert.match(css, /\.team-directory__table/);
+  assert.match(css, /\.team-mobile-cards/);
+  assert.match(css, /@media \(max-width: 767px\) \{[\s\S]*?\.team-directory__table \{ display: none; \}[\s\S]*?\.team-mobile-cards \{ display: grid;/);
+});
+
+test("keeps BF-9 Team data branch-aware, availability-safe, and shared by Booking, Grooming, Hotel, and workload", async () => {
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-team-test-"));
+  const previousWindow = globalThis.window;
+  const previousCustomEvent = globalThis.CustomEvent;
+  const storage = new Map();
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: (key) => storage.delete(key),
+      clear: () => storage.clear(),
+    },
+    dispatchEvent: () => true,
+  };
+  if (typeof globalThis.CustomEvent !== "function") {
+    globalThis.CustomEvent = class CustomEvent {
+      constructor(type) {
+        this.type = type;
+      }
+    };
+  }
+
+  const vite = await createServer({
+    root: projectRoot,
+    configFile: false,
+    cacheDir: cacheDirectory,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "silent",
+  });
+
+  try {
+    const state = await vite.ssrLoadModule("/app/_prototype/businessState.ts");
+    const ari = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-ari-frontdesk");
+    const thonglor = state.DEMO_BUSINESS_CONTEXTS.find((item) => item.key === "whisker-thonglor-frontdesk");
+    assert.ok(ari);
+    assert.ok(thonglor);
+
+    const ariTeam = state.listPrototypeTeamMemberFixtures(ari, { includeInactive: true });
+    const thonglorTeam = state.listPrototypeTeamMemberFixtures(thonglor, { includeInactive: true });
+    const namAtAri = ariTeam.find((member) => member.staffId === "team-nam");
+    const namAtThonglor = thonglorTeam.find((member) => member.staffId === "team-nam");
+    assert.ok(namAtAri);
+    assert.ok(namAtThonglor);
+    assert.equal(state.DEMO_TEAM_MEMBER_FIXTURES.filter((member) => member.staffId === "team-nam").length, 1);
+    assert.deepEqual([...namAtAri.branchIds].sort(), ["whisker-ari", "whisker-thonglor"]);
+    assert.equal(namAtAri.staffId, namAtThonglor.staffId);
+    assert.equal(state.getBookingResourceStaffMember("ari-groomer-pim")?.staffId, "team-pim");
+    assert.equal(state.getBookingResourceStaffMember("ari-station-a"), null);
+
+    const activeGroomers = state.getTeamMembersForCapability(ari, "grooming");
+    const allGroomers = state.getTeamMembersForCapability(ari, "grooming", { includeInactive: true });
+    assert.deepEqual(activeGroomers.map((member) => member.staffId), ["team-pim"]);
+    assert.deepEqual(allGroomers.map((member) => member.staffId).sort(), ["team-joy", "team-pim"]);
+    const pim = state.readPrototypeTeamMember("team-pim");
+    assert.ok(pim);
+    const lunchBreak = state.evaluatePrototypeTeamMemberAvailability(
+      pim,
+      state.getBookingInterval("appointment", "2026-08-18T12:15", "2026-08-18T12:45"),
+    );
+    assert.equal(lunchBreak.available, false);
+    assert.equal(lunchBreak.state, "break");
+
+    const bookingDraft = {
+      businessId: ari.businessId,
+      branchId: ari.branchId,
+      serviceModule: "grooming",
+      serviceId: "ari-grooming-bath-groom",
+      timeModel: "appointment",
+      customer: { id: "booking-contact-nalin", name: "คุณนลิน" },
+      pets: [{ id: "booking-pet-mochi", name: "Mochi", species: "cat" }],
+      start: "2026-08-18T14:00",
+      end: "2026-08-18T15:00",
+      assignedResourceIds: ["ari-groomer-joy", "ari-station-b", "ari-dryer-2"],
+      notes: "BF-9 inactive staff validation",
+      estimate: 850,
+      status: "pending",
+    };
+    const inactiveBooking = state.evaluateBookingAvailability(bookingDraft, ari, []);
+    assert.equal(inactiveBooking.available, false);
+    assert.equal(inactiveBooking.conflicts.some((conflict) => conflict.code === "staff-inactive"), true);
+    const unavailableBooking = state.evaluateBookingAvailability({
+      ...bookingDraft,
+      start: "2026-08-18T12:15",
+      end: "2026-08-18T13:15",
+      assignedResourceIds: ["ari-groomer-pim", "ari-station-b", "ari-dryer-2"],
+    }, ari, []);
+    assert.equal(unavailableBooking.available, false);
+    assert.equal(unavailableBooking.conflicts.some((conflict) => conflict.code === "staff-unavailable"), true);
+
+    const groomingJob = state.listPrototypeGroomingServiceJobFixtures(ari, { date: state.BOOKING_DEMO_DATE })
+      .find((job) => job.serviceJobId === "grooming-job-fixture-tofu");
+    assert.ok(groomingJob);
+    const inactiveGroomingAssignment = state.evaluatePrototypeGroomingServiceJobResources(
+      groomingJob,
+      ["ari-groomer-joy", "ari-station-b", "ari-dryer-2"],
+      ari,
+      [groomingJob],
+    );
+    assert.equal(inactiveGroomingAssignment.available, false);
+    assert.equal(inactiveGroomingAssignment.conflicts.some((conflict) => conflict.code === "staff-inactive"), true);
+
+    const noonHotelCareStaff = state.getTeamMembersForCapability(ari, "hotel-care", {
+      interval: state.getBookingInterval("appointment", "2026-08-18T12:00", "2026-08-18T12:30"),
+    });
+    assert.deepEqual(noonHotelCareStaff.map((member) => member.staffId), ["team-nam"]);
+    const unavailableCareAssignment = state.assignPrototypeHotelCareTaskStaff(
+      "hotel-stay-fixture-luna",
+      "hotel-care-luna-water",
+      "team-aom",
+      ari,
+    );
+    assert.equal(unavailableCareAssignment.ok, false);
+    assert.equal(unavailableCareAssignment.reason, "unavailable");
+    const careAssignment = state.assignPrototypeHotelCareTaskStaff(
+      "hotel-stay-fixture-luna",
+      "hotel-care-luna-water",
+      "team-nam",
+      ari,
+    );
+    assert.equal(careAssignment.ok, true);
+    assert.equal(careAssignment.duplicate, false);
+    const luna = state.readPrototypeHotelStay("hotel-stay-fixture-luna");
+    assert.equal(luna?.dailyCareTasks.find((task) => task.id === "hotel-care-luna-water")?.assignedStaffId, "team-nam");
+    assert.equal(luna?.history.at(-1)?.type, "care-assignment");
+
+    const workItems = state.listPrototypeTeamWorkItems(ari, state.BOOKING_DEMO_DATE);
+    const pimWorkload = state.getPrototypeTeamMemberWorkload("team-pim", ari, state.BOOKING_DEMO_DATE);
+    assert.equal(workItems.some((item) => item.kind === "hotel-care" && item.staffId === "team-nam"), true);
+    assert.equal(workItems.some((item) => item.kind === "grooming" && item.staffId === "team-joy" && item.conflict), true);
+    assert.ok(pimWorkload.today > 0);
+    assert.equal(pimWorkload.items.every((item) => item.kind === "grooming" || item.kind === "hotel-care"), true);
+
+    const created = state.createPrototypeTeamMember({
+      staffId: "bf9-test-multi-branch",
+      branchIds: [ari.branchId, thonglor.branchId],
+      name: "ทีมทดสอบ",
+      avatarSeed: "bf9-test",
+      role: "staff",
+      capabilities: ["hotel-care"],
+      active: true,
+      availability: [{ id: "bf9-test-working", state: "working", start: "2026-08-18T08:00", end: "2026-08-18T18:00", note: null }],
+    }, ari);
+    assert.equal(created.ok, true);
+    const deactivated = state.setPrototypeTeamMemberActive("bf9-test-multi-branch", false, ari);
+    assert.equal(deactivated.ok, true);
+    assert.equal(deactivated.member.active, false);
+    assert.equal(state.listPrototypeTeamMembers(thonglor, { includeInactive: true }).filter((member) => member.staffId === "bf9-test-multi-branch").length, 1);
+  } finally {
+    await vite.close();
+    await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = previousCustomEvent;
+  }
+});
+
 test("keeps the derived manual aligned with the canonical hybrid Business architecture", async () => {
   const [html, validation, architecture, decisions] = await Promise.all([
     readFile(manualUrl, "utf8"),
@@ -2715,12 +3161,16 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
     assert.match(html, new RegExp(`id="${panelId}"`));
   }
 
-  assert.match(html, /Person → Business → Branch → Enabled Service Modules/);
-  assert.match(overviewPanel, /BF1–BF8 Operational Foundation/);
+  assert.match(html, /Person → BusinessMembership → Business → authorized Branch → Enabled Service Modules/);
+  assert.match(overviewPanel, /BF1–BF12 Business Frontend Prototype/);
+  assert.match(overviewPanel, /\/business\/settings/);
+  assert.match(overviewPanel, /\/business\/daycare/);
+  assert.match(overviewPanel, /CRM \/ Retention/);
   assert.match(overviewPanel, /\/business\/customers/);
   assert.match(overviewPanel, /\/business\/grooming/);
   assert.match(overviewPanel, /\/business\/hotel/);
   assert.match(overviewPanel, /\/business\/billing/);
+  assert.match(overviewPanel, /\/business\/team/);
   assert.match(overviewPanel, /ประวัติบริการ/);
   assert.doesNotMatch(overviewPanel, /\/business\/careproof/);
   assert.match(overviewPanel, /Cloudflare/);
@@ -2731,7 +3181,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(modelPanel, /Charge/);
   assert.match(modelPanel, /Payment/);
   assert.match(modelPanel, /Consent \/ Access Grant/);
-  assert.equal((corePanel.match(/class="capability"/g) ?? []).length, 14);
+  assert.equal((corePanel.match(/class="capability"/g) ?? []).length, 17);
   assert.match(corePanel, /Home \/ Today/);
   assert.match(corePanel, /\/business\/home/);
   assert.match(corePanel, /Branch-aware/);
@@ -2741,6 +3191,11 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(corePanel, /Charge/);
   assert.match(corePanel, /Payment/);
   assert.match(corePanel, /Service Record history/);
+  assert.match(corePanel, /Team &amp; Staff Operations/);
+  assert.match(corePanel, /LOCAL PROTOTYPE/);
+  assert.match(html, new RegExp("BE1 Identity / Scope"));
+  assert.match(html, /Production Auth.*not implemented/i);
+  assert.match(corePanel, /Payroll.*HR.*NOT IMPLEMENTED/);
   assert.doesNotMatch(corePanel, /\/business\/careproof/);
   assert.match(modulePanel, /Grooming \/ Bathing/);
   assert.match(modulePanel, /BF-5 LOCAL/);
@@ -2752,7 +3207,8 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.equal((scenarioPanel.match(/class="scenario"/g) ?? []).length, 6);
   assert.match(scenarioPanel, /Hotel Booking \+ Grooming/);
   assert.match(scenarioPanel, /Guardian approval เพิ่มเฉพาะ add-on และเวลา/);
-  assert.match(scenarioPanel, /Branch transfer/);
+  assert.match(scenarioPanel, /Branch scope and future transfer/);
+  assert.match(scenarioPanel, /Cross-Branch Hotel transfer ยังไม่ implement/);
   assert.match(scenarioPanel, /ประวัติบริการจากงานที่เสร็จแล้ว/);
 
   assert.match(html, /Noto Sans Thai/);
@@ -2784,7 +3240,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(designPanel, /ไม่โหลด <code>public\/images\/cats<\/code>/);
   assert.doesNotMatch(designPanel, /Deep Teal/);
   assert.match(designPanel, /16px/);
-  assert.match(designPanel, /180–300ms/);
+  assert.match(designPanel, /fast 180ms, base 220ms, slow 300ms/);
   assert.match(designPanel, /Grooming = Scissors \+ Coral/);
   assert.match(designPanel, /Billing \/ Payment/);
   assert.match(designPanel, /Custom ใช้ 28\/35\/42 วัน/);
@@ -2797,13 +3253,21 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(roadmapPanel, /BF-6 Hotel \/ Boarding implemented locally/);
   assert.match(roadmapPanel, /BF-7 Billing, Payments/);
   assert.match(roadmapPanel, /BF-8 Shared Service Record/);
-  assert.match(roadmapPanel, /Stop after BF-8/);
+  assert.match(roadmapPanel, /BF-9 Team &amp; Staff Operations/);
+  assert.match(roadmapPanel, /Stop after BE3/);
+  assert.match(roadmapPanel, /BE2 Customer \/ Pet implemented locally/);
+  assert.match(roadmapPanel, /BE3 Booking \/ Calendar implemented locally/);
+  assert.match(roadmapPanel, /BF-10/);
+  assert.match(roadmapPanel, /BF-11/);
+  assert.match(roadmapPanel, /BF-12/);
   assert.match(roadmapPanel, /Daycare operations/);
 
   assert.match(validation, /# Validation/);
-  assert.match(validation, /BF-8 SHARED SERVICE RECORD FOUNDATION/);
-  assert.match(validation, /30 `page\.tsx` route entries/);
-  assert.match(validation, /Cloudflare is the target platform direction/);
+  assert.match(validation, new RegExp("BE1 identity / Business / Branch validation"));
+  assert.match(validation, /34 `page\.tsx` route entries/);
+  assert.match(html, /Production Ready:.*NO/);
+  assert.doesNotMatch(html, /Daycare operations ยังไม่เริ่ม|Daycare has no operations route|Stop after BF-9|32 route entries/);
+  assert.match(validation, /Cloudflare Worker\/Vinext \+ D1 is the BE1–BE3 local architecture/);
   assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
   assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
   assert.match(decisions, /Cloudflare replaces Vercel as the target production platform direction/);
@@ -2814,6 +3278,541 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(validation, /Shared Business Intake Engine/);
   assert.doesNotMatch(html, /143 legacy|Page ID|OPS-\d{3}|docs\/ux-ui/i);
   assert.equal(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(html), false);
+});
+
+test("renders BF10 Settings, BF11 Daycare, and BF12 CRM with shared state and honest scope boundaries", async () => {
+  const [settingsHtml, daycareHtml, customersHtml, detailHtml, settings, daycare, daycareDetail, billing, customerDetail, crm, css] = await Promise.all([
+    htmlFor("/business/settings"),
+    htmlFor("/business/daycare"),
+    htmlFor("/business/customers"),
+    htmlFor("/business/customers/booking-contact-nalin"),
+    readFile(new URL("business/settings/SettingsScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/daycare/DaycareScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/daycare/DaycareAttendanceDetail.tsx", appRoot), "utf8"),
+    readFile(new URL("business/billing/BillingScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CrmPanel.tsx", appRoot), "utf8"),
+    readFile(businessCssUrl, "utf8"),
+  ]);
+  assert.equal(countRenderedElements(settingsHtml, "h1"), 1);
+  assert.match(settingsHtml, /<h1[^>]*>ตั้งค่า<\/h1>/);
+  assert.match(settingsHtml, /ข้อมูลร้าน/);
+  assert.match(settingsHtml, /aria-label="ส่วนการตั้งค่า"/);
+  assert.match(settings, /updateDurableBusiness/);
+  assert.match(settings, /saveDurableBranch/);
+  assert.match(settings, /setDurableBranchActive/);
+  assert.match(settings, /เวลาทำการรายวัน/);
+  assert.match(settings, /BUSINESS_SERVICE_MODULES/);
+  assert.match(settings, /profileToDraft\(context.businessId, !stateReady\)/);
+  assert.match(settings, /getPrototypeBusinessProfile\(businessId, fixtureOnly\)/);
+  assert.match(settings, /const team = stateReady \? listPrototypeTeamMembers\(\) : listPrototypeTeamMemberFixtures\(\)/);
+  assert.match(settings, /team=\{team\.filter\(\(member\) => member\.businessId === branch\.businessId && member\.branchIds\.includes\(branch\.branchId\)\)\}/);
+  assert.match(settings, /<dt>ทีมประจำสาขา<\/dt>/);
+  assert.match(settings, /team\.map\(\(member\) => member\.name\)\.join/);
+  assert.match(settings, /TEAM_MEMBER_CAPABILITY_LABELS\[capability\]/);
+  assert.match(settings, /const branchContext = getDemoBusinessContextForBranch\(branch\.businessId, branch\.branchId, fixtureOnly\)/);
+  assert.match(settings, /getBookingServices\(branchContext, fixtureOnly\)/);
+  assert.match(settings, /getHotelRooms\(branchContext, fixtureOnly\)/);
+  assert.match(settings, /getPrototypeDaycareZones\(branchContext, fixtureOnly\)/);
+  assert.match(settings, /<details className="settings-branch-services">[\s\S]*?<summary>บริการและทรัพยากร<\/summary>/);
+  assert.match(settings, /ใช้เวลาและทรัพยากรชุดเดียวกับปฏิทินและงานบริการ/);
+  assert.match(settings, /onOpenTeam=\{\(\) => selectContext\(getDemoBusinessContextForBranch\(branch\.businessId, branch\.branchId\)\.key\)\}/);
+  assert.match(settings, /branch\.active \? <a[^>]+href="\/business\/team" onClick=\{onOpenTeam\} aria-label=\{`ดูทีม \$\{branch\.name\}`\}/);
+  assert.doesNotMatch(settings, /createPrototypeTeamMember|updatePrototypeTeamMember|settingsTeam|branchTeamMembers/);
+  assert.equal(countRenderedElements(daycareHtml, "h1"), 1);
+  assert.match(daycareHtml, /<h1[^>]*>Daycare<\/h1>/);
+  assert.match(daycareHtml, /สาขานี้ยังไม่เปิด Daycare/);
+  assert.match(daycareHtml, /href="\/business\/settings\?section=branches"/);
+  assert.match(daycare, /listPrototypeDaycareAttendances/);
+  assert.match(daycare, /getPrototypeDaycareZoneAvailability/);
+  assert.match(daycare, /daycare-mobile-list/);
+  assert.match(daycare, /role="tabpanel"/);
+  assert.match(daycareDetail, /transitionPrototypeDaycareAttendance/);
+  assert.match(daycareDetail, /addPrototypeDaycareCareEvent/);
+  assert.match(billing, /getOrCreatePrototypeChargeForDaycareAttendance/);
+  assert.match(daycareDetail, /\/business\/billing\?daycareAttendanceId=/);
+  assert.match(daycareDetail, /daycareAttendanceId=/);
+  assert.match(customersHtml, /ภาพรวมความสัมพันธ์ลูกค้า/);
+  assert.match(customersHtml, /ไม่มีนัดถัดไป/);
+  assert.match(detailHtml, /ความสัมพันธ์ลูกค้า/);
+  assert.match(detailHtml, /ไทม์ไลน์ลูกค้า/);
+  assert.match(detailHtml, /งานถัดไปที่แนะนำ/);
+  assert.match(detailHtml, /Loyalty/);
+  assert.match(detailHtml, /Planned/);
+  assert.match(customerDetail, /deriveCustomerCrmProfile/);
+  assert.match(customerDetail, /deriveCustomerTimeline/);
+  assert.match(crm, /aria-pressed=\{timelineFilter === filter.value\}/);
+  assert.match(crm, /role="toolbar" aria-label="กรองไทม์ไลน์ลูกค้า"/);
+  assert.doesNotMatch(settings + daycare + crm, /sessionStorage\.setItem|localStorage\.setItem/);
+  assert.match(css, /\.business-settings/);
+  assert.match(css, /\.daycare-board/);
+  assert.match(css, /\.customer-crm-panel/);
+});
+
+test("BF10 configuration shares Business and Branch settings without replacing historical records", async () => {
+  await withBusinessStateTest(async ({ state, storage, vite }) => {
+    const cache = await installBe1ConfigurationFixture(state, vite);
+    const ari = state.getDemoBusinessContext("whisker-ari-frontdesk");
+    const thonglor = state.getDemoBusinessContext("whisker-thonglor-frontdesk");
+    const onnut = state.getDemoBusinessContext("paw-partner-onnut");
+    const baseline = state.getPrototypeBusinessProfile(ari.businessId);
+    const bookingsBefore = state.listPrototypeBookings(ari, { includeCancelled: true });
+    const customersBefore = state.listPrototypeCustomers(ari);
+    const settingsTeam = state.listPrototypeTeamMemberFixtures();
+    for (const branchContext of [ari, thonglor, onnut]) {
+      const branchTeam = settingsTeam.filter((member) => member.businessId === branchContext.businessId && member.branchIds.includes(branchContext.branchId));
+      assert.deepEqual(branchTeam, state.listPrototypeTeamMemberFixtures(branchContext), "Settings summary and Team directory use the same active staff source");
+      assert.equal(branchTeam.every((member) => member.active), true);
+      assert.equal(branchTeam.flatMap((member) => member.capabilities).every((capability) => Boolean(state.TEAM_MEMBER_CAPABILITY_LABELS[capability])), true);
+      const targetContext = state.getDemoBusinessContextForBranch(branchContext.businessId, branchContext.branchId);
+      state.writeActiveBusinessContext(targetContext.key);
+      assert.equal(state.readActiveBusinessContext().businessId, branchContext.businessId);
+      assert.equal(state.readActiveBusinessContext().branchId, branchContext.branchId, "opening Team from a Branch card preserves that Branch context");
+    }
+    state.writeActiveBusinessContext(ari.key);
+    const durableBusiness = cache.readCachedBusiness(ari.businessId);
+    cache.patchCachedBusiness({ ...durableBusiness, name: "Whisker Test", phone: "02-000-0010", updatedAt: "2026-09-05T01:00:00.000Z" });
+    assert.equal(state.getDemoBusinessContextDetails(thonglor).business.name, "Whisker Test");
+    assert.equal(state.getPrototypeBusinessProfile(ari.businessId, true).name, baseline.name, "SSR fixtures remain stable after local edits");
+
+    const durableAri = cache.readCachedBranches(ari.businessId).find((item) => item.id === ari.branchId);
+    cache.patchCachedBranch({
+      ...durableAri,
+      name: "อารีย์ใหม่",
+      enabledModules: ["grooming", "daycare"],
+      operatingHours: state.createDefaultOperatingHours().map((day) => ({ ...day, closed: day.day === "tuesday" })),
+      updatedAt: "2026-09-05T01:01:00.000Z",
+    });
+    assert.deepEqual(state.getEnabledBusinessModules(ari), ["grooming", "daycare"]);
+    assert.deepEqual(state.getEnabledBusinessModules(ari, true), ["grooming", "hotel"]);
+    assert.equal(state.getDemoBusinessContextDetails(ari).branch.name, "อารีย์ใหม่");
+    assert.equal(state.getBookingServices(ari).some((service) => service.module === "daycare"), true);
+    assert.equal(state.getBookingServices(ari).some((service) => service.module === "hotel"), false);
+    assert.equal(state.getPrototypeDaycareZones(ari).length > 0, true);
+    assert.deepEqual(state.listPrototypeBookings(ari, { includeCancelled: true }), bookingsBefore);
+    assert.deepEqual(state.listPrototypeCustomers(ari), customersBefore);
+    const daycareService = state.getBookingServices(ari).find((service) => service.module === "daycare");
+    const draft = {
+      businessId: ari.businessId, branchId: ari.branchId, serviceModule: "daycare", serviceId: daycareService.id,
+      timeModel: "day", customer: { id: "booking-contact-pim", name: "คุณพิม" },
+      pets: [{ id: "booking-pet-luna", name: "Luna", species: "cat" }],
+      start: "2026-08-25", end: "", assignedResourceIds: [state.getPrototypeDaycareZones(ari)[0].id],
+      notes: "", estimate: 450, status: "confirmed",
+    };
+    const closed = state.evaluateBookingAvailability(draft, ari, []);
+    assert.equal(closed.available, false);
+    assert.equal(closed.conflicts.some((conflict) => conflict.code === "branch-closed"), true);
+
+    const createdId = "brn_01k47meawketting000000101";
+    cache.patchCachedBranch({
+      ...durableAri,
+      id: createdId,
+      name: "สาขาทดสอบ",
+      status: "active",
+      enabledModules: ["hotel", "daycare"],
+      operatingHours: state.createDefaultOperatingHours(),
+      createdAt: "2026-09-05T01:02:00.000Z",
+      updatedAt: "2026-09-05T01:02:00.000Z",
+    });
+    const newContext = state.listPrototypeBusinessContexts(ari.businessId).find((context) => context.branchId === createdId);
+    assert.ok(newContext);
+    assert.equal(state.listPrototypeBusinessContexts(ari.businessId, true).some((context) => context.branchId === newContext.branchId), false);
+    assert.deepEqual(state.getEnabledBusinessModules(newContext), ["hotel", "daycare"]);
+    assert.equal(state.getBookingServices(newContext).length, 2);
+    assert.equal(state.listPrototypeBusinessBranches(onnut.businessId).some((item) => item.branchId === newContext.branchId), false);
+    state.writeActiveBusinessContext(newContext.key);
+    cache.patchCachedBranch({ ...cache.readCachedBranches(ari.businessId).find((item) => item.id === createdId), status: "inactive", updatedAt: "2026-09-05T01:03:00.000Z" });
+    assert.notEqual(state.readActiveBusinessContext().branchId, newContext.branchId);
+    assert.equal(state.listPrototypeBusinessContexts().some((context) => context.branchId === newContext.branchId), false);
+    assert.equal(state.getPrototypeBusinessBranch(ari.businessId, newContext.branchId).active, false);
+    const storedEnvelope = JSON.parse(storage.get(state.BUSINESS_STORAGE_KEY));
+    assert.equal(Object.hasOwn(storedEnvelope, "businessProfiles"), false);
+    assert.equal(Object.hasOwn(storedEnvelope, "branches"), false);
+  });
+});
+
+test("BF10 Reports retains inactive Branch history while capacity stays active-Branch-only", async () => {
+  await withBusinessStateTest(async ({ state, storage, vite }) => {
+    const cache = await installBe1ConfigurationFixture(state, vite);
+    const ari = state.getDemoBusinessContext("whisker-ari-frontdesk");
+    const thonglor = state.getDemoBusinessContext("whisker-thonglor-frontdesk");
+    const onnut = state.getDemoBusinessContext("paw-partner-onnut");
+    const options = { dateRangePreset: "today", branchScope: "all" };
+    const fixtureReports = state.getBusinessReportsSummary(ari, { ...options, fixtureOnly: true });
+    const ariBranch = cache.readCachedBranches(ari.businessId).find((branch) => branch.id === ari.branchId);
+    cache.patchCachedBranch({ ...ariBranch, name: "อารีย์เก็บประวัติ", updatedAt: "2026-09-05T02:00:00.000Z" });
+    const before = state.getBusinessReportsSummary(thonglor, options);
+    const ariBefore = before.branchComparison.find((branch) => branch.branchId === ari.branchId);
+    const recentAriBefore = before.customerInsights.recentServices.filter((service) => service.branchId === ari.branchId);
+    assert.ok(ariBefore.bookingCount > 0);
+    assert.ok(ariBefore.revenue > 0);
+    assert.equal(recentAriBefore.some((service) => service.module === "grooming"), true);
+    assert.equal(recentAriBefore.some((service) => service.module === "hotel"), true);
+    cache.patchCachedBranch({ ...cache.readCachedBranches(ari.businessId).find((branch) => branch.id === ari.branchId), status: "inactive", updatedAt: "2026-09-05T02:01:00.000Z" });
+    assert.equal(state.listPrototypeBusinessContexts(ari.businessId).some((branch) => branch.branchId === ari.branchId), false);
+    const storageBeforeRead = [...storage.entries()];
+    const after = state.getBusinessReportsSummary(thonglor, options);
+    assert.deepEqual(after.keyMetrics, before.keyMetrics, "deactivating a Branch cannot erase its report totals");
+    assert.deepEqual(after.branchComparison.find((branch) => branch.branchId === ari.branchId), ariBefore, "inactive Branch history remains in comparison");
+    assert.deepEqual(after.customerInsights.recentServices.filter((service) => service.branchId === ari.branchId), recentAriBefore, "Grooming and Hotel history keep the stored Branch name");
+    assert.equal(after.branchComparison.reduce((sum, branch) => sum + branch.revenue, 0), after.keyMetrics.revenue);
+    assert.equal(after.branchComparison.reduce((sum, branch) => sum + branch.bookingCount, 0), after.keyMetrics.totalBookings);
+    const activeHotelCapacity = state.listPrototypeBusinessContexts(ari.businessId).flatMap((branch) => state.getHotelRooms(branch)).reduce((sum, room) => sum + room.capacity, 0);
+    assert.equal(after.serviceBreakdown.hotel.capacity, activeHotelCapacity);
+    assert.ok(after.serviceBreakdown.hotel.capacity < before.serviceBreakdown.hotel.capacity);
+    assert.equal(state.getBusinessReportsSummary(ari).serviceBreakdown.hotel.capacity, 0, "a historical inactive context contributes no currently available capacity");
+    assert.deepEqual(state.getBusinessReportsSummary(ari, { ...options, fixtureOnly: true }), fixtureReports, "fixture reports ignore local Branch rename and deactivation");
+    assert.deepEqual([...storage.entries()], storageBeforeRead, "report reads do not persist replacement Branch or history data");
+
+    const onnutBranch = cache.readCachedBranches(onnut.businessId).find((branch) => branch.id === onnut.branchId);
+    const spareId = "brn_01k47meawketting000000102";
+    cache.patchCachedBranch({
+      ...onnutBranch,
+      id: spareId,
+      name: "สาขารับงานใหม่",
+      status: "active",
+      enabledModules: [],
+      createdAt: "2026-09-05T02:02:00.000Z",
+      updatedAt: "2026-09-05T02:02:00.000Z",
+    });
+    const spareContext = state.getDemoBusinessContextForBranch(onnut.businessId, spareId);
+    const onnutBefore = state.getBusinessReportsSummary(spareContext, options);
+    const recentDaycareBefore = onnutBefore.customerInsights.recentServices.filter((service) => service.module === "daycare");
+    assert.ok(recentDaycareBefore.length > 0);
+    cache.patchCachedBranch({ ...onnutBranch, status: "inactive", updatedAt: "2026-09-05T02:03:00.000Z" });
+    const onnutAfter = state.getBusinessReportsSummary(spareContext, options);
+    assert.deepEqual(onnutAfter.keyMetrics, onnutBefore.keyMetrics);
+    assert.deepEqual(onnutAfter.customerInsights.recentServices.filter((service) => service.module === "daycare"), recentDaycareBefore, "Daycare history keeps inactive Branch naming");
+    assert.deepEqual(onnutAfter.branchComparison.find((branch) => branch.branchId === onnut.branchId), onnutBefore.branchComparison.find((branch) => branch.branchId === onnut.branchId));
+    assert.equal(onnutAfter.branchComparison.some((branch) => branch.branchId === ari.branchId), false, "history stays Business-scoped");
+    assert.equal(onnutAfter.serviceBreakdown.daycare.enabled, false);
+    assert.equal(onnutAfter.serviceBreakdown.daycare.capacity, 0);
+    assert.equal(state.getBusinessReportsSummary(onnut).serviceBreakdown.daycare.capacity, 0);
+  });
+});
+
+test("BF11 Daycare enforces capacity and staff, preserves lifecycle history, and shares billing and Service Records", async () => {
+  await withBusinessStateTest(async ({ state }) => {
+    const onnut = state.getDemoBusinessContext("paw-partner-onnut");
+    const ari = state.getDemoBusinessContext("whisker-ari-frontdesk");
+    const puddingId = "daycare-attendance-fixture-pudding";
+    const mapleId = "daycare-attendance-fixture-maple";
+    const social = state.getPrototypeDaycareZoneAvailability(onnut, "onnut-daycare-social");
+    assert.equal(social.capacity, 2);
+    assert.equal(social.used, 2);
+    assert.equal(social.available, false);
+    assert.equal(state.listPrototypeDaycareAttendances(ari).length, 0);
+    assert.equal(state.transitionPrototypeDaycareAttendance(puddingId, "ready-for-pickup", ari).reason, "wrong-context");
+    assert.equal(state.transitionPrototypeDaycareAttendance(puddingId, "completed", onnut).reason, "invalid-transition");
+    assert.equal(state.assignPrototypeDaycareStaff(puddingId, "team-fern", onnut).reason, "invalid-staff");
+    const unavailable = state.createPrototypeTeamMember({
+      staffId: "bf11-unavailable", branchIds: [onnut.branchId], name: "ผู้ดูแลไม่ว่าง", avatarSeed: "bf11", role: "staff",
+      capabilities: ["daycare"], active: true,
+      availability: [{ id: "bf11-off", state: "unavailable", start: "2026-08-18T08:00", end: "2026-08-18T20:00", note: null }],
+    }, onnut);
+    assert.equal(unavailable.ok, true);
+    assert.equal(state.assignPrototypeDaycareStaff(puddingId, "bf11-unavailable", onnut).reason, "unavailable");
+    assert.equal(state.assignPrototypeDaycareStaff(puddingId, "team-mint", onnut).duplicate, true);
+
+    const service = state.getBookingServices(onnut).find((item) => item.module === "daycare");
+    const lee = state.readPrototypeCustomer("booking-contact-onnut-lee");
+    const booking = installExecutionBookingFixture(state, onnut, {
+      businessId: onnut.businessId, branchId: onnut.branchId, serviceModule: "daycare", serviceId: service.id,
+      timeModel: "day", customer: { id: lee.id, name: lee.name },
+      pets: lee.pets.map(({ id, name, species }) => ({ id, name, species })), start: state.BOOKING_DEMO_DATE, end: "",
+      assignedResourceIds: ["onnut-daycare-quiet"], notes: "ทดสอบรับฝากรายวัน", estimate: 450, status: "confirmed",
+    }, "be3-regression-daycare-leo");
+    const leo = state.listPrototypeDaycareAttendances(onnut).find((item) => item.bookingId === booking.bookingId);
+    assert.ok(leo);
+    assert.equal(leo.customerId, booking.customer.id);
+    assert.equal(leo.petId, booking.pets[0].id);
+    assert.equal(leo.status, "booked");
+    assert.equal(state.assignPrototypeDaycareZone(leo.daycareAttendanceId, "onnut-daycare-social", onnut).reason, "capacity");
+    assert.equal(state.addPrototypeDaycareCareEvent(leo.daycareAttendanceId, "water", "ก่อนรับเข้า", onnut), null);
+    assert.equal(state.transitionPrototypeDaycareAttendance(leo.daycareAttendanceId, "checked-in", onnut).ok, true);
+    assert.equal(state.transitionPrototypeDaycareAttendance(leo.daycareAttendanceId, "active", onnut).ok, true);
+    assert.equal(state.getPrototypeDaycareZoneAvailability(onnut, "onnut-daycare-quiet").used, 1);
+
+    const care = state.addPrototypeDaycareCareEvent(puddingId, "water", "เติมน้ำสะอาด", onnut);
+    assert.ok(care.careEvents.some((event) => event.kind === "water" && event.note === "เติมน้ำสะอาด"));
+    state.updatePrototypeDaycareNote(puddingId, "บันทึกภายในร้าน BF11", onnut);
+    const ready = state.transitionPrototypeDaycareAttendance(puddingId, "ready-for-pickup", onnut);
+    assert.equal(ready.ok, true);
+    assert.equal(state.transitionPrototypeDaycareAttendance(puddingId, "ready-for-pickup", onnut).duplicate, true);
+    const charge = state.getOrCreatePrototypeChargeForDaycareAttendance(puddingId, onnut);
+    const sharedCharge = state.getOrCreatePrototypeChargeForDaycareAttendance(mapleId, onnut);
+    assert.equal(charge.ok, true);
+    assert.equal(sharedCharge.ok, true);
+    assert.equal(sharedCharge.charge.chargeId, charge.charge.chargeId, "a multi-Pet booking is charged once");
+    assert.equal(sharedCharge.created, false);
+    assert.equal(charge.charge.petId, null);
+    const balance = state.getPrototypeChargeBalance(charge.charge, state.listPrototypePayments(null));
+    const paid = state.recordPrototypePayment({ chargeId: charge.charge.chargeId, context: onnut, amount: balance.remaining, method: "cash", requestKey: "bf11-daycare-payment" });
+    assert.equal(paid.ok, true);
+    assert.equal(state.recordPrototypePayment({ chargeId: charge.charge.chargeId, context: onnut, amount: balance.remaining, method: "cash", requestKey: "bf11-daycare-payment" }).duplicate, true);
+    assert.equal(state.getPrototypeChargeBalance(charge.charge, state.listPrototypePayments(null)).remaining, 0);
+    assert.equal(state.readPrototypeDaycareAttendance(puddingId).status, "ready-for-pickup", "Payment does not finish service execution");
+
+    const checkedOut = state.transitionPrototypeDaycareAttendance(puddingId, "checked-out", onnut);
+    assert.equal(checkedOut.ok, true);
+    assert.equal(state.getPrototypeDaycareZoneAvailability(onnut, "onnut-daycare-social").used, 1);
+    assert.equal(state.transitionPrototypeDaycareAttendance(puddingId, "completed", onnut).ok, true);
+    const record = state.listPrototypeServiceRecords(onnut).find((item) => item.daycareAttendanceId === puddingId);
+    assert.ok(record);
+    assert.equal(record.source, "daycare-attendance");
+    assert.equal(record.bookingId, checkedOut.attendance.bookingId);
+    assert.equal(record.customerId, checkedOut.attendance.customerId);
+    assert.equal(record.petId, checkedOut.attendance.petId);
+    assert.equal(record.businessNote, "บันทึกภายในร้าน BF11");
+    assert.equal(state.listPrototypeServiceRecords(onnut).filter((item) => item.daycareAttendanceId === puddingId).length, 1);
+    assert.equal(state.listPrototypeServiceRecords(ari).some((item) => item.serviceRecordId === record.serviceRecordId), false);
+    assert.equal(state.addPrototypeDaycareCareEvent(puddingId, "water", "หลังปิดงาน", onnut), null);
+    assert.equal(state.transitionPrototypeDaycareAttendance(puddingId, "active", onnut).reason, "invalid-transition");
+    assert.equal(state.synchronizePrototypeExecutionCompatibilityForBooking({
+      ...booking,
+      status: "cancelled",
+      revision: 2,
+      updatedAt: "2026-09-07T06:01:00.000Z",
+      cancelledAt: "2026-09-07T06:01:00.000Z",
+    }), true);
+    assert.equal(state.readPrototypeDaycareAttendance(leo.daycareAttendanceId).status, "cancelled");
+    assert.equal(state.getPrototypeDaycareZoneAvailability(onnut, "onnut-daycare-quiet").used, 0);
+  });
+});
+
+test("BF11 explicit Daycare Intake reuses consent and Customer/Pet identity without duplicate execution records", async () => {
+  await withBusinessStateTest(async ({ state, vite, storage }) => {
+    const sharing = await vite.ssrLoadModule("/app/_prototype/sharingState.ts");
+    const cache = await installBe1ConfigurationFixture(state, vite);
+    const ari = state.getDemoBusinessContext("whisker-ari-frontdesk");
+    const thonglor = state.getDemoBusinessContext("whisker-thonglor-frontdesk");
+    const branch = cache.readCachedBranches(ari.businessId).find((item) => item.id === ari.branchId);
+    cache.patchCachedBranch({ ...branch, enabledModules: [...branch.enabledModules, "daycare"], updatedAt: "2026-09-05T03:00:00.000Z" });
+    const service = state.getBookingServices(ari).find((item) => item.module === "daycare");
+    const zone = state.getPrototypeDaycareZones(ari)[0];
+    const bookingDraft = {
+      businessId: ari.businessId, branchId: ari.branchId, serviceModule: "daycare", serviceId: service.id,
+      timeModel: "day", customer: { id: "booking-contact-pim", name: "คุณพิม" },
+      pets: [{ id: "booking-pet-luna", name: "Luna", species: "cat" }], start: "2026-08-25", end: "",
+      assignedResourceIds: [zone.id], notes: "", estimate: 450, status: "confirmed",
+    };
+    const booking = installExecutionBookingFixture(state, ari, bookingDraft, "be3-regression-daycare-intake-one");
+    const attendance = state.listPrototypeDaycareAttendances(ari, { date: "2026-08-25" }).find((item) => item.bookingId === booking.bookingId);
+    assert.ok(attendance);
+    const accessRecord = {
+      id: "prototype-access-bf11-intake", fallbackCode: "BF11INTAKE", petSlug: "demo-luna",
+      businessId: ari.businessId, branchId: ari.branchId, purpose: "Daycare", scope: ["basicIdentity"],
+      createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      status: "active", consentStatus: "owner-consented", requester: null, decisionAt: null, revokedAt: null, events: [],
+    };
+    sharing.updateTemporaryAccess(accessRecord);
+    const intake = state.createOrResumeBusinessIntake(accessRecord, ari, { daycareAttendanceId: attendance.daycareAttendanceId });
+    assert.ok(intake);
+    assert.equal(intake.customerId, attendance.customerId);
+    assert.equal(intake.petRelationshipId, attendance.petId);
+    assert.equal(state.createOrResumeBusinessIntake(accessRecord, ari, { daycareAttendanceId: attendance.daycareAttendanceId }).id, intake.id);
+    assert.equal(state.createOrResumeBusinessIntake(accessRecord, thonglor, { daycareAttendanceId: attendance.daycareAttendanceId }), null);
+    assert.equal(state.confirmPrototypeCheckIn(intake.id, thonglor).ok, false);
+    // Simulate arrivals restored after the Intake screen was opened. The
+    // execution write must recheck current occupancy, not the earlier plan.
+    const beforeArrivals = storage.get(state.BUSINESS_STORAGE_KEY);
+    const arrivalStore = JSON.parse(beforeArrivals);
+    for (let index = 0; index < zone.capacity; index += 1) {
+      const arrivalId = `bf11-concurrent-arrival-${index}`;
+      arrivalStore.daycareAttendances[arrivalId] = {
+        ...attendance, daycareAttendanceId: arrivalId, petId: `bf11-arrival-pet-${index}`,
+        bookingId: `bf11-arrival-booking-${index}`, status: "active", checkedInAt: new Date().toISOString(),
+      };
+    }
+    storage.set(state.BUSINESS_STORAGE_KEY, JSON.stringify(arrivalStore));
+    assert.equal(state.getPrototypeDaycareZoneAvailability(ari, zone.id, "2026-08-25").remaining, 0);
+    assert.equal(state.confirmPrototypeCheckIn(intake.id, ari).ok, false, "Intake may not overfill a zone that became full");
+    assert.equal(state.transitionPrototypeDaycareAttendance(attendance.daycareAttendanceId, "checked-in", ari).reason, "capacity");
+    assert.equal(state.readBusinessIntake(intake.id).checkInState, "draft");
+    assert.equal(state.readPrototypeDaycareAttendance(attendance.daycareAttendanceId).status, "booked");
+    storage.set(state.BUSINESS_STORAGE_KEY, beforeArrivals);
+    const completed = state.confirmPrototypeCheckIn(intake.id, ari);
+    assert.equal(completed.ok, true, JSON.stringify(completed));
+    assert.equal(state.readPrototypeDaycareAttendance(attendance.daycareAttendanceId).intakeId, intake.id);
+    assert.equal(state.readPrototypeDaycareAttendance(attendance.daycareAttendanceId).status, "checked-in");
+    assert.equal(state.confirmPrototypeCheckIn(intake.id, ari).duplicate, true);
+    assert.equal(state.listPrototypeDaycareAttendances(ari, { date: "2026-08-25" }).filter((item) => item.bookingId === booking.bookingId).length, 1);
+
+    const secondBooking = installExecutionBookingFixture(state, ari, { ...bookingDraft, start: "2026-08-26" }, "be3-regression-daycare-intake-two");
+    const secondAttendance = state.listPrototypeDaycareAttendances(ari, { date: "2026-08-26" }).find((item) => item.bookingId === secondBooking.bookingId);
+    const secondIntake = state.createOrResumeBusinessIntake(accessRecord, ari, { daycareAttendanceId: secondAttendance.daycareAttendanceId });
+    assert.notEqual(secondIntake.id, intake.id);
+    assert.equal(state.readBusinessIntake(intake.id).daycareAttendanceId, attendance.daycareAttendanceId, "another explicit target cannot overwrite the completed Intake");
+    sharing.updateTemporaryAccess({ ...accessRecord, status: "revoked", revokedAt: new Date().toISOString() });
+    assert.equal(state.confirmPrototypeCheckIn(secondIntake.id, ari).ok, false);
+    assert.equal(state.readPrototypeDaycareAttendance(secondAttendance.daycareAttendanceId).status, "booked");
+  });
+});
+
+test("BF12 CRM derives segments, balances, next actions, and timeline from shared records without new truth", async () => {
+  await withBusinessStateTest(async ({ state, vite, storage }) => {
+    const crm = await vite.ssrLoadModule("/app/business/customers/crmPresentation.ts");
+    const inbox = await vite.ssrLoadModule("/app/_prototype/inboxState.ts");
+    const ari = state.getDemoBusinessContext("whisker-ari-frontdesk");
+    const onnut = state.getDemoBusinessContext("paw-partner-onnut");
+    const customer = state.readPrototypeCustomer("booking-contact-nalin");
+    const dataset = {
+      bookings: state.listPrototypeBookings(null, { includeCancelled: true }),
+      serviceRecords: state.listPrototypeServiceRecords(null),
+      charges: state.listPrototypeCharges(null), payments: state.listPrototypePayments(null),
+      conversations: [...inbox.listPrototypeConversations(ari.businessId), ...inbox.listPrototypeConversations(onnut.businessId)],
+    };
+    const storageBefore = [...storage.entries()];
+    const base = crm.deriveCustomerCrmProfile(customer, dataset, "2026-08-18T18:00:00.000Z");
+    const customerRecords = dataset.serviceRecords.filter((record) => record.customerId === customer.id && record.businessId === customer.businessId);
+    assert.equal(base.visitCount, new Set(customerRecords.map((record) => record.bookingId)).size);
+    assert.equal(base.outstandingBalance, dataset.charges.filter((charge) => charge.customerId === customer.id && charge.businessId === customer.businessId)
+      .reduce((total, charge) => total + state.getPrototypeChargeBalance(charge, dataset.payments).remaining, 0));
+    assert.equal(base.nextAction.kind, "billing");
+    assert.equal(crm.customerMatchesCrmSegment(base, "grooming"), true);
+    assert.equal(crm.customerMatchesCrmSegment(base, "all"), true);
+    assert.deepEqual([...storage.entries()], storageBefore, "deriving CRM never persists a CRM profile");
+
+    assert.ok(customerRecords.length > 0);
+    const visit = customerRecords[0];
+    const history = {
+      ...dataset, bookings: [], charges: [], payments: [],
+      serviceRecords: [
+        { ...visit, bookingId: "bf12-visit-1", serviceRecordId: "bf12-service-1", completedAt: "2026-08-17T12:00:00.000Z" },
+        { ...visit, bookingId: "bf12-visit-1", serviceRecordId: "bf12-service-other-pet", petId: "another-pet", completedAt: "2026-08-17T12:00:00.000Z" },
+        { ...visit, bookingId: "bf12-visit-2", serviceRecordId: "bf12-service-2", serviceModule: "daycare", completedAt: "2026-08-18T12:00:00.000Z" },
+        { ...visit, businessId: onnut.businessId, bookingId: "foreign-visit", serviceRecordId: "foreign-service", completedAt: "2026-08-19T12:00:00.000Z" },
+      ],
+    };
+    const regular = crm.deriveCustomerCrmProfile(customer, history, "2026-08-19T12:00:00.000Z");
+    assert.equal(regular.visitCount, 2, "two Pets on one Booking count as one visit");
+    assert.equal(regular.lifecycle, "regular");
+    assert.equal(regular.returned, true);
+    assert.equal(crm.customerMatchesCrmSegment(regular, "regular"), true);
+    assert.equal(crm.customerMatchesCrmSegment(regular, "daycare"), true);
+    assert.equal(crm.customerMatchesCrmSegment(regular, "no-next-booking"), true);
+    assert.equal(regular.nextAction.kind, "booking");
+    const inactive = crm.deriveCustomerCrmProfile(customer, history, "2026-10-15T12:00:00.000Z");
+    assert.equal(inactive.lifecycle, "inactive");
+    assert.equal(inactive.daysSinceLastVisit, 58);
+    assert.equal(crm.customerMatchesCrmSegment(inactive, "inactive"), true);
+    const upcoming = dataset.bookings.find((booking) => booking.customer.id === customer.id && booking.businessId === customer.businessId);
+    const active = crm.deriveCustomerCrmProfile(customer, {
+      ...history, serviceRecords: [], bookings: [
+        { ...upcoming, bookingId: "cancelled-future", start: "2026-10-16", status: "cancelled" },
+        { ...upcoming, bookingId: "next-future", start: "2026-10-17", status: "confirmed" },
+      ],
+    }, "2026-10-15T12:00:00.000Z");
+    assert.equal(active.lifecycle, "active");
+    assert.equal(active.nextBooking.bookingId, "next-future");
+    assert.equal(active.nextAction.kind, "prepare");
+    assert.equal(crm.customerMatchesCrmSegment(active, "new"), true);
+    const empty = { bookings: [], serviceRecords: [], charges: [], payments: [], conversations: [] };
+    assert.equal(crm.deriveCustomerCrmProfile(customer, empty).nextAction.kind, "booking");
+    assert.equal(crm.deriveCustomerCrmProfile(customer, { ...empty, conversations: dataset.conversations }).nextAction.kind, "message");
+
+    const charge = dataset.charges.find((item) => item.customerId === customer.id && item.businessId === customer.businessId && state.getPrototypeChargeBalance(item, dataset.payments).remaining > 0);
+    const remaining = state.getPrototypeChargeBalance(charge, dataset.payments).remaining;
+    const payment = state.recordPrototypePayment({ chargeId: charge.chargeId, context: state.getDemoBusinessContextForBranch(charge.businessId, charge.branchId), amount: remaining, method: "cash", requestKey: "bf12-derived-balance" });
+    assert.equal(payment.ok, true);
+    const refreshed = { ...dataset, payments: state.listPrototypePayments(null) };
+    const afterPayment = crm.deriveCustomerCrmProfile(customer, refreshed, "2026-08-18T18:00:00.000Z");
+    assert.equal(afterPayment.outstandingBalance, base.outstandingBalance - remaining);
+    assert.equal(afterPayment.visitCount, base.visitCount);
+    const timeline = crm.deriveCustomerTimeline({ ...customer, businessNote: "PRIVATE-CRM-NOTE" }, refreshed);
+    assert.deepEqual([...new Set(timeline.map((item) => item.kind))].sort(), ["booking", "message", "payment", "service"]);
+    assert.equal(new Set(timeline.map((item) => item.id)).size, timeline.length);
+    assert.equal(timeline.some((item) => item.id === `payment-${payment.payment.paymentId}`), true);
+    assert.equal(timeline.every((item, index) => index === 0 || timeline[index - 1].at >= item.at), true);
+    assert.equal(timeline.every((item) => item.href.startsWith("/business/") || item.href === "#customer-service-history-title"), true);
+    assert.doesNotMatch(JSON.stringify(timeline), /PRIVATE-CRM-NOTE|booking-contact-onnut|foreign-service/);
+    assert.equal(crm.deriveCustomerTimeline(customer, history).some((item) => item.id === "service-foreign-service"), false);
+    assert.equal([...storage.keys()].some((key) => /crm|retention/.test(key)), false);
+    assert.equal(crm.CUSTOMER_CRM_SEGMENTS.length, 8);
+  });
+});
+
+test("BF12 uses one date-level upcoming rule across CRM, customer list, detail, and pet cards", async () => {
+  const [customers, customerDetail, crmSource] = await Promise.all([
+    readFile(new URL("business/customers/CustomersScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/customers/crmPresentation.ts", appRoot), "utf8"),
+  ]);
+  assert.match(customers, /deriveCustomerCrmReferenceAt\(customers, crmDataset\)/);
+  assert.match(customers, /const nextBooking = crmProfile\.nextBooking/);
+  assert.match(customerDetail, /listPrototypeCustomers\(context\)/);
+  assert.match(customerDetail, /listPrototypeCustomerFixtures\(context\)/);
+  assert.match(customerDetail, /deriveCustomerCrmReferenceAt\(crmCustomers, crmDataset\)/);
+  assert.match(customerDetail, /deriveCustomerUpcomingBookings\(customer, crmDataset, referenceAt\)/);
+  assert.match(customerDetail, /upcomingBookings\.find\(\(booking\) => booking\.pets\.some/);
+  assert.match(customerDetail, /upcomingBookings\.slice\(0, 3\)\.map/);
+  assert.match(crmSource, /const nextBooking = deriveCustomerUpcomingBookings\(customer, dataset, referenceAt\)\[0\]/);
+  assert.doesNotMatch(customers + customerDetail, /bookingOccursAfterDemoStart|nextPetBooking|nextCustomerBooking/);
+
+  await withBusinessStateTest(async ({ state, vite, storage }) => {
+    const crm = await vite.ssrLoadModule("/app/business/customers/crmPresentation.ts");
+    const customer = state.readPrototypeCustomer("booking-contact-onnut-aom");
+    const booking = state.listPrototypeBookings(null).find((item) => item.bookingId === "booking-fixture-onnut-daycare-full");
+    const [pudding, maple] = booking.pets;
+    const recordTemplate = state.listPrototypeServiceRecords(null)[0];
+    const currentBooking = { ...booking, bookingId: "current-daycare", start: "2026-09-03", status: "arrived" };
+    const completedBooking = { ...booking, bookingId: "completed-daycare", start: "2026-09-03", pets: [maple] };
+    const completedRecord = {
+      ...recordTemplate,
+      serviceRecordId: "completed-maple",
+      bookingId: currentBooking.bookingId,
+      businessId: booking.businessId,
+      branchId: booking.branchId,
+      customerId: customer.id,
+      petId: maple.id,
+      serviceModule: "daycare",
+      completedAt: "2026-09-03T18:00:00.000Z",
+    };
+    const dataset = {
+      bookings: [
+        { ...booking, bookingId: "later-future", start: "2026-09-06" },
+        { ...booking, bookingId: "cancelled-future", start: "2026-09-04", status: "cancelled" },
+        { ...booking, bookingId: "historical-unfinished", start: "2026-08-18" },
+        completedBooking,
+        currentBooking,
+        { ...booking, bookingId: "next-future", start: "2026-09-04" },
+      ],
+      serviceRecords: [
+        completedRecord,
+        { ...completedRecord, serviceRecordId: "completed-one-pet-booking", bookingId: completedBooking.bookingId },
+        { ...completedRecord, serviceRecordId: "foreign-business", businessId: "another-business", petId: pudding.id },
+        { ...completedRecord, serviceRecordId: "foreign-customer", customerId: "another-customer", petId: pudding.id },
+        { ...completedRecord, serviceRecordId: "foreign-branch", branchId: "another-branch", petId: pudding.id },
+        { ...completedRecord, serviceRecordId: "other-service", serviceModule: "hotel", petId: pudding.id },
+      ],
+      charges: [], payments: [], conversations: [],
+    };
+    const originalDataset = JSON.stringify(dataset);
+    const storageBefore = [...storage.entries()];
+    const referenceAt = crm.deriveCustomerCrmReferenceAt([customer], dataset);
+    assert.equal(referenceAt, completedRecord.completedAt);
+    const upcoming = crm.deriveCustomerUpcomingBookings(customer, dataset, referenceAt);
+    assert.deepEqual(upcoming.map((item) => item.bookingId), ["current-daycare", "next-future", "later-future"]);
+    assert.deepEqual(upcoming[0].pets.map((pet) => pet.id), [pudding.id], "a completed Pet leaves a multi-Pet Booking without hiding the unfinished sibling");
+    assert.equal(upcoming.find((item) => item.pets.some((pet) => pet.id === maple.id)).bookingId, "next-future", "the completed Pet's next label skips its old attendance");
+    const profile = crm.deriveCustomerCrmProfile(customer, dataset, referenceAt);
+    assert.deepEqual(profile.nextBooking, upcoming[0]);
+    assert.equal(JSON.stringify(dataset), originalDataset, "upcoming projections never mutate shared Bookings or Service Records");
+    assert.deepEqual([...storage.entries()], storageBefore);
+
+    const fullyCompleted = {
+      ...dataset,
+      serviceRecords: [...dataset.serviceRecords, { ...completedRecord, serviceRecordId: "completed-pudding", petId: pudding.id }],
+    };
+    assert.equal(crm.deriveCustomerCrmProfile(customer, fullyCompleted, referenceAt).nextBooking.bookingId, "next-future");
+    const noFuture = { ...fullyCompleted, bookings: fullyCompleted.bookings.filter((item) => item.start <= "2026-09-03") };
+    assert.deepEqual(crm.deriveCustomerUpcomingBookings(customer, noFuture, referenceAt), []);
+    assert.equal(crm.deriveCustomerCrmProfile(customer, noFuture, referenceAt).nextBooking, null);
+    assert.equal(crm.customerMatchesCrmSegment(crm.deriveCustomerCrmProfile(customer, noFuture, referenceAt), "no-next-booking"), true);
+
+    const sameDayAppointment = { ...currentBooking, bookingId: "unresolved-same-day", timeModel: "appointment", start: "2026-09-03T09:00", end: "2026-09-03T10:00" };
+    assert.equal(crm.deriveCustomerUpcomingBookings(customer, { ...dataset, bookings: [sameDayAppointment], serviceRecords: [] }, referenceAt).length, 1, "CRM's data watermark does not treat unresolved same-day work as elapsed wall-clock time");
+  });
 });
 
 test("keeps typography, Business tokens, reduced motion, logo, and icon rules visible in source", async () => {
@@ -2854,7 +3853,7 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   assert.match(businessCss, /--radius-button:\s*0\.625rem/);
   assert.match(businessCss, /--radius-card:\s*1\.25rem/);
   assert.match(businessCss, /--type-body:\s*1rem/);
-  assert.match(businessCss, /--duration-fast:\s*160ms/);
+  assert.match(businessCss, /--duration-fast:\s*180ms/);
   assert.match(businessCss, /--duration-base:\s*220ms/);
   assert.match(businessCss, /--duration-slow:\s*300ms/);
   assert.match(businessCss, /business-skeleton-shimmer/);
@@ -2989,7 +3988,7 @@ test("keeps the requested Business interaction and component refinements explici
   assert.match(customerDetail, /customer-pets-heading-actions/);
   assert.match(businessCss, /\.business-inbox \.add-service-request[\s\S]*?inset: 50% auto auto 50%/);
   assert.match(calendar, /<span>เพิ่มการจอง<\/span>/);
-  assert.match(bookingEditor, /<span>ทบทวนการจอง<\/span>/);
+  assert.match(bookingEditor, /ทบทวนการจอง/);
   assert.match(businessCss, /\.business-signature-sweep\s*\{[\s\S]*?color: var\(--primary-foreground\);[\s\S]*?background: var\(--primary\);/);
   assert.match(businessCss, /\.business-signature-sweep > \*\s*\{[\s\S]*?transition: color 1000ms cubic-bezier\(0\.86, 0, 0\.07, 1\);/);
   assert.match(businessCss, /\.business-signature-sweep::after,\s*\.business-signature-sweep::before/);
@@ -3017,7 +4016,8 @@ test("promotes navigation, data, feedback, modal, progress, skeleton, and signat
   assert.match(segmented, /ArrowLeft/);
   assert.match(segmented, /ArrowRight/);
   assert.match(calendarView, /BusinessSegmentedControl/);
-  assert.match(bookingItem, /className="sr-only">สถานะ/);
+  assert.match(bookingItem, /booking-status-label/);
+  assert.match(bookingItem, /bookingStatusLabel\(status\)/);
   assert.doesNotMatch(bookingItem, /booking-status--|StatusIcon/);
   assert.match(navigation, /BusinessBreadcrumbs/);
   assert.match(navigation, /aria-current/);

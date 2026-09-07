@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import type { IconType } from "react-icons";
-import type { BusinessServiceModule } from "../../_prototype/businessState";
 import { getEnabledBusinessModules } from "../../_prototype/businessState";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
@@ -23,13 +22,14 @@ import { BrandMark } from "../../_components/BrandMark";
 import {
   BUSINESS_MANAGEMENT_DESTINATIONS,
   BUSINESS_BILLING_DESTINATION,
+  BUSINESS_DAYCARE_DESTINATION,
   BUSINESS_GROOMING_DESTINATION,
   BUSINESS_HOTEL_DESTINATION,
-  BUSINESS_MODULE_LABELS,
+  BUSINESS_REPORTS_DESTINATION,
+  BUSINESS_TEAM_DESTINATION,
   BUSINESS_TOP_DESTINATIONS,
   type BusinessDestinationKey,
   type BusinessLiveDestination,
-  type BusinessPlannedDestinationKey,
 } from "./businessNavigationModel";
 import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
 import { BusinessContextSwitcher } from "./BusinessContextSwitcher";
@@ -41,36 +41,12 @@ const DESTINATION_ICONS: Record<BusinessDestinationKey, IconType> = {
   messages: MessageCircle,
   grooming: Scissors,
   hotel: BedDouble,
+  daycare: PawPrint,
   billing: Wallet,
   reports: Chart,
   team: UserRoundCheck,
   settings: Settings,
 };
-
-const MODULE_ICONS: Record<BusinessServiceModule, IconType> = {
-  grooming: Scissors,
-  hotel: BedDouble,
-  daycare: PawPrint,
-};
-
-export function PlannedBusinessDestination({
-  destinationKey,
-  label,
-  className = "",
-}: {
-  destinationKey: BusinessPlannedDestinationKey;
-  label: string;
-  className?: string;
-}) {
-  const Icon = DESTINATION_ICONS[destinationKey];
-  return (
-    <button className={`business-nav-item business-nav-item--planned ${className}`.trim()} type="button" disabled aria-disabled="true">
-      <Icon size={19} />
-      <span>{label}</span>
-      <small>ยังไม่เปิดใช้</small>
-    </button>
-  );
-}
 
 export function LiveBusinessDestination({
   destination,
@@ -111,22 +87,11 @@ export function LiveBusinessDestination({
   );
 }
 
-export function PlannedBusinessModule({ module, className = "" }: { module: BusinessServiceModule; className?: string }) {
-  const Icon = MODULE_ICONS[module];
-  return (
-    <button className={`business-nav-item business-nav-item--planned ${className}`.trim()} type="button" disabled aria-disabled="true">
-      <Icon size={19} />
-      <span>{BUSINESS_MODULE_LABELS[module]}</span>
-      <small>ยังไม่เปิดใช้</small>
-    </button>
-  );
-}
-
 export function BusinessNavigation() {
   const pathname = usePathname();
   const { context, revision } = useBusinessContext();
   const stateReady = useBusinessStateReady();
-  const enabledModules = getEnabledBusinessModules(context);
+  const enabledModules = getEnabledBusinessModules(context, !stateReady);
   const unreadCount = getPrototypeInboxUnreadCount(context, !stateReady);
   void revision;
 
@@ -153,6 +118,14 @@ export function BusinessNavigation() {
           destination={BUSINESS_BILLING_DESTINATION}
           active={pathname === BUSINESS_BILLING_DESTINATION.href}
         />
+        <LiveBusinessDestination
+          destination={BUSINESS_REPORTS_DESTINATION}
+          active={pathname === BUSINESS_REPORTS_DESTINATION.href}
+        />
+        <LiveBusinessDestination
+          destination={BUSINESS_TEAM_DESTINATION}
+          active={pathname === BUSINESS_TEAM_DESTINATION.href}
+        />
         <div className="business-nav-group business-nav-group--services" aria-label="งานบริการ">
           <BusinessSidebarSectionHeader title="งานบริการ" />
           {enabledModules.map((module) => (
@@ -168,14 +141,20 @@ export function BusinessNavigation() {
                 destination={BUSINESS_HOTEL_DESTINATION}
                 active={pathname === BUSINESS_HOTEL_DESTINATION.href}
               />
-            ) : <PlannedBusinessModule key={module} module={module} />
+            ) : (
+              <LiveBusinessDestination
+                key={module}
+                destination={BUSINESS_DAYCARE_DESTINATION}
+                active={pathname === BUSINESS_DAYCARE_DESTINATION.href}
+              />
+            )
           ))}
         </div>
 
-        <div className="business-nav-group business-nav-group--management" aria-label="เมนูธุรกิจที่ยังไม่เปิดใช้">
-          <BusinessSidebarSectionHeader title="ยังไม่เปิดใช้" />
+        <div className="business-nav-group business-nav-group--management" aria-label="จัดการร้าน">
+          <BusinessSidebarSectionHeader title="จัดการร้าน" />
           {BUSINESS_MANAGEMENT_DESTINATIONS.map((item) => (
-            <PlannedBusinessDestination key={item.key} destinationKey={item.key} label={item.label} />
+            <LiveBusinessDestination key={item.key} destination={item} active={pathname === item.href} />
           ))}
         </div>
       </nav>

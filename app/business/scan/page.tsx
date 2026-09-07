@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 type BusinessScanPageProps = {
-  searchParams: Promise<{ hotelStayId?: string | string[] }>;
+  searchParams: Promise<{ hotelStayId?: string | string[]; daycareAttendanceId?: string | string[] }>;
 };
 
 function firstQueryValue(value: string | string[] | undefined) {
@@ -16,5 +16,5 @@ function firstQueryValue(value: string | string[] | undefined) {
 
 export default async function BusinessScanPage({ searchParams }: BusinessScanPageProps) {
   const params = await searchParams;
-  return <main id="main-content" className="page business-page business-scan-page"><BusinessScanner hotelStayId={firstQueryValue(params.hotelStayId)} /></main>;
+  return <main id="main-content" className="page business-page business-scan-page"><BusinessScanner hotelStayId={firstQueryValue(params.hotelStayId)} daycareAttendanceId={firstQueryValue(params.daycareAttendanceId)} /></main>;
 }

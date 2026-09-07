@@ -7,6 +7,10 @@ Visual treatment is owned by [DESIGN_SYSTEM](./DESIGN_SYSTEM.md); domain objects
 
 ## Core principles
 
+- Final Business UI audit (2026-09-05): **Business Font = LINE Seed Sans TH**. Follow the current 16px operational body / 14px supporting text contract in DESIGN_SYSTEM; mobile/tablet inputs remain at least 16px.
+- Calendar shortcuts operate only while focus is in the Calendar surface. Nested dialogs own their own Tab/Escape handling; closing a child preserves the parent and restores focus. Moving a Grooming card with the keyboard retains focus on that card.
+- Switching Inbox conversations starts a separate composer draft so text for one Customer cannot carry into another conversation. More remains visibly active on destinations it contains. Destructive Billing confirmation uses the destructive button variant.
+
 1. **Business-first commercial clarity.** Business operations drive commercial value; Pet Passport & Guardian Network provides the trust moat.
 2. **Minimize navigation without removing safety.** Add a boundary only for comprehension, privacy, meaningful decision, stable identity or recovery.
 3. **Concrete consent.** Recipient, purpose, data, duration and revoke must be understandable without legal text.
@@ -78,34 +82,36 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Use progressive disclosure for detail. Keep scans and lists compact; reveal permission, source, expiry and longer context at the relevant detail level.
 - Prefer lists before tables when Customer/Pet relationships read better as rows.
 - Chips are reserved for status, filter and tag—not names, phone numbers, services or explanatory sentences.
-- Show demo context once in the shell or page context rather than appending `Demo` / `(ตัวอย่าง)` to every record.
+- Do not render `Demo`, `ตัวอย่าง` or `ข้อมูลตัวอย่าง` in the operational experience. Keep local-prototype limitations explicit in documentation and explain an unavailable integration only where the limitation affects the task; removing demo copy never makes a production claim.
 - Development fixtures, simulators and interruption controls remain in state/test tooling and must not render as staff-facing Product controls.
 
 ## Business Home, navigation and context (BF-1)
 
 - Mock Business Login enters `/business/home` by default.
-- Business Home prioritizes attention and next work before compact summaries. The shell labels the page context as demo once; unavailable real integrations are named only where their limitation matters.
-- Business Home uses an operational banner with explicit previous/next arrows. It advances every six seconds, pauses during hover/focus, and stops for reduced-motion. Images stay mounted in one transform-only track so transitions slide without replacement flicker. Desktop uses a 50:50 hero split with square media capped at 400×400px beside add Booking / scan intake / find Customer; tablet uses a compact 2:1 crop; mobile uses a square composition before the same actions. BF-7 revenue/current outstanding values use the same recorded local Payment/Charge data as Billing; no separate revenue fixture is shown.
-- The compact header keeps the active Business and Branch visible. Role remains inspectable in the user menu; top-right controls align to the same 44px grid and the account click-away layer never blurs the page. The prototype switcher changes browser-local context only.
+- Business Home prioritizes attention and next work before compact summaries. The shell displays the actual selected Business/Branch context; unavailable real integrations are named only where their limitation matters.
+- Business Home uses an operational banner with explicit previous/next arrows and touch swipe, without automatic rotation. Images stay mounted in one transform-only track; reduced-motion removes the transition. Desktop uses a 50:50 hero split with square media capped at 400×400px beside add Booking / scan intake / find Customer; tablet uses a compact 2:1 crop; mobile uses a square composition before the same actions. BF-7 revenue/current outstanding values use the same recorded local Payment/Charge data as Billing; no separate revenue fixture is shown.
+- The compact header keeps the active Business and Branch visible. Role remains inspectable in the user menu; top-right controls align to the same 44px grid and the account click-away layer never blurs the page. The selected context is a browser preference only; BE1 membership/Branch grants still authorize each BE1–BE3 request.
 - The logged-in Header may inherit the public Warm White/glass visual DNA, but compact operational usability, Branch context, Scanner access, User Menu and mobile safe areas take priority over a marketing pill treatment.
-- Changing Branch updates Home values and the visible module menu together. Grooming and Hotel are live service destinations only when the active Branch enables the matching capability; modules not enabled for the Branch remain absent.
-- Desktop navigation has live Home, Calendar, Customers & Pets, Messages and Finance plus a prominent Scanner action in the header. Mobile has exactly Home, Calendar, Scan, Messages and More; Customers & Pets and Finance are live inside More. Service Record is shown in Customer/Pet detail, not navigation.
-- Service navigation under `งานบริการ` contains live capability-enabled Grooming and Hotel destinations. Daycare, Reports, Team, and Settings remain under `ยังไม่เปิดใช้`; Finance is a live shared destination, while Service Record is shared context data rather than a module switch.
+- Changing Branch updates Home values and the visible module menu together. Grooming, Hotel and Daycare are live only when the active Branch enables the matching capability; disabled modules remain absent from service navigation and commands.
+- Desktop navigation has live Home, Calendar, Customers & Pets, Messages, Finance, Reports and Team plus a prominent Scanner action in the header. Mobile has exactly Home, Calendar, Scan, Messages and More; Customers & Pets, Finance, Reports and Team are live inside More. Service Record is shown in Customer/Pet detail, not navigation.
+- Service navigation under `งานบริการ` contains capability-enabled Grooming, Hotel and Daycare. Settings is a live shared destination under `จัดการร้าน`; Finance, Reports and Team remain live. Service Records and derived CRM stay in Customer context rather than module switches.
 - Planned destinations use native disabled semantics plus `aria-disabled`, reduced emphasis, and no `href`; Mobile More mirrors live Branch-enabled services and the same planned groups without adding fake navigation behavior.
 
 ## Shared Booking & Calendar rules (BF-2 Live)
+
+BE1 supplies durable Branch activation, enabled-module and weekly-hours configuration; BE3 enforces the applicable planning rules on the server. This never deletes historical work and does not claim that still-open timezone/DST or multi-day operating policy is production-complete.
 
 - Calendar answers “ร้านมีอะไรเกิดขึ้นเมื่อไร?” across the Service Modules enabled at the active Branch.
 - Desktop/tablet supports Day, Week, Month, and Custom planning views beginning on Sunday. Custom ranges use whole seven-day rows: 28, 35, or 42 days. Mobile uses a readable date-oriented chronological Agenda rather than a compressed seven-column grid. The last selected view/range is a cookie-only browser preference.
 - Hotel date-range Bookings render as one continuous visible stay segment per calendar row with start/middle/end edges and one accessible label. They are never repeated as independent daily cards.
 - Booking items communicate service type with icon, text, and restrained service tint. Service color never carries status; status retains text and an icon. Cancelled items remain available only when their status filter includes them.
-- Creating and editing bookings happens within a contextual dialog/sheet without leaving the calendar view.
-- Create/Edit uses one title followed by a compact visual service selector, `ลูกค้า`, `สัตว์เลี้ยง`, and service-specific fields. A Customer and Pet relationship may be added inside this flow by reusing the existing editors and state source. Availability/conflict/recovery copy appears only when the state warrants it.
-- Capacity checks validate all required people, places/equipment, and capacity constraints before review.
-- Pointer drag moves supported Bookings; both appointment edges resize in 30-minute steps and both Hotel edges shrink/extend the exclusive check-out range. Alt-drag duplicates instead of moving. A focused Booking supports Ctrl/Cmd+C then Ctrl/Cmd+V; copy always receives a new Booking ID. Touch uses deliberate long-press drag with larger edge handles. Every preview and commit passes through the existing Branch/resource/capacity evaluator. Invalid destinations keep the original Booking and name the concrete conflict plus recovery actions.
+- Creating and editing Bookings happens within a contextual dialog/sheet without leaving the calendar view; submit/cancel actions use typed BE3 commands and returned server state.
+- Create/Edit uses one title followed by a compact visual service selector, `ลูกค้า`, `สัตว์เลี้ยง`, and service-specific fields. A Customer and Pet relationship may be added inside this flow through the existing BE2 editors. Availability/conflict/recovery copy appears only when the state warrants it.
+- Capacity checks validate all required people, places/equipment, and capacity constraints before review. The preview improves UX, but the BE3 server repeats Branch/module/hours/Resource/overlap validation at write time. A Resource's opaque Team display link does not make BF9 availability or roles backend authority.
+- Pointer drag moves supported Bookings; both appointment edges resize in 30-minute steps and both Hotel edges shrink/extend the exclusive check-out range. Alt-drag duplicates instead of moving. A focused Booking supports Ctrl/Cmd+C then Ctrl/Cmd+V; copy always receives a new stable Booking ID. Touch uses deliberate long-press drag with larger edge handles. Every preview uses the BE3 availability query and every commit uses a server command. Invalid destinations keep/restore the authoritative original and name the typed conflict plus recovery actions.
 - Drag/resize success must not insert an alert above the schedule. Use settle emphasis or a fixed neutral toast; keep the concise gesture/shortcut legend after the schedule so the grid never jumps.
 - Clicking a Booking selects it in place so staff can copy it before editing; Enter or a deliberate double-click opens the same date/time editor. Keyboard and assistive-technology users can complete every supported edit without drag.
-- Cancellation preserves booking history in local state and releases demo allocation.
+- Cancellation preserves durable Booking history/audit metadata and releases server-side reservations; it does not cancel or merge separate execution state.
 
 ## Grooming Operations rules (BF-5 Live Local Prototype)
 
@@ -115,7 +121,7 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Desktop/tablet support status drag/drop as an acceleration. A pointer-following card preview, valid/invalid destination highlights, and calm settle or rollback feedback must preserve the original Job when a transition is rejected. Keyboard, touch, and mobile users can open the detail and choose a permitted active status; drag is never the sole state-change path.
 - Each Job card keeps Pet photo/avatar as the scan anchor, then separates Pet/time on the left, status on the right, and groomer/attention context below. Date and job filter rails are not part of the board surface.
 - Job detail uses a section hierarchy: Pet/Customer contact → service/timing → status → resources → add-ons → internal Business notes → separate Customer messages → history. It does not present one long undifferentiated modal, duplicate Customer/Pet records, or expose non-consented Passport data.
-- Resource UI names existing shared Resources as `ช่าง`, `จุดบริการ`, and `เครื่องเป่า`. Changing a resource runs the same local availability/conflict foundation; it is not a staff roster, payroll, commission, or scheduling system.
+- Resource UI names existing shared Resources as `ช่าง`, `จุดบริการ`, and `เครื่องเป่า`. A linked groomer uses the same BF9 Team Member for active-state, Grooming-capability and lightweight-availability checking before the existing local conflict evaluator accepts the assignment. This is not a staff roster, payroll, commission, or scheduling system.
 - Attention states remain accessible context and are shown as a compact card row; there is no date/job filter rail. Status is communicated by the centered lane heading, visible text badge and full card surface.
 - Internal Business notes remain separate from Customer messages. The Inbox action opens/reuses the Business-wide Customer conversation; the note does not become a Customer-visible message or Passport write.
 - Intake reuses the existing consent-safe path. At check-in it may attach/activate only a valid matching Grooming Job; it does not introduce another scan/intake state machine.
@@ -131,13 +137,43 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Desktop/tablet occupancy uses continuous Stay spans grouped by room/zone with occupied, reserved and available capacity. Mobile uses grouped Today/Stay tabs and lists; it never squeezes the desktop board into narrow columns.
 - Assigning or moving a room validates the requested date interval, room/zone capability and capacity before commit. A valid move appends date-bounded assignment/movement history; a conflict preserves the current room and provides calm rollback feedback.
 - Desktop room drag is an acceleration only. The Stay detail room selector is the keyboard/touch/mobile alternative; no Hotel task depends on dragging. Motion obeys the canonical settle/rollback scale and reduced-motion fallback.
-- Daily care is lightweight: food, water, activity, cleaning/check, note and completion state. Medication requires explicit instructions and Customer-confirmed Intake authorization linked to the same Stay; Passport presence or free-text notes never authorize medication.
+- Daily care is lightweight: food, water, activity, cleaning/check, note and completion state. A care task may name a shared active Hotel-care Team Member only when the current Branch, capability and lightweight availability allow it; invalid assignment is visible rather than silent. Medication requires explicit instructions and Customer-confirmed Intake authorization linked to the same Stay; Passport presence or free-text notes never authorize medication.
 - Business notes, care notes and lightweight incident/attention notes remain internal. A Customer message must use the existing Business+Customer Inbox Conversation with Pet/Booking context; no per-Stay Conversation is created.
 - Hotel Stay detail groups shared Customer/Pet contact, dates, lifecycle, room, care, internal notes/incidents, Inbox action and movement history. It does not expose non-consented Passport data or become a medical/full incident system.
 
+## Team & Staff Operations rules (BF-9 Live Local Prototype)
+
+- `/business/team` is a shared, Branch-aware directory, not a separate HR module. Each row/card makes avatar, name, displayed role, Branch membership, capability, active/inactive state, current availability and today workload easy to scan.
+- Branch switching filters a shared Team Member by membership; it never clones a person for a second Branch. Adding/editing a member may select one or more Branches and a small capability set, but must not create a second Grooming/Hotel staff store.
+- Lightweight availability is limited to working, unavailable, break and time-off windows. It helps assignment and conflict recovery only; it is not an attendance record, approval workflow or production roster.
+- Active/inactive is visible and preserved in the Team directory. An inactive or unavailable member must not be silently assigned through Calendar/Booking, Grooming, Hotel care or Daycare.
+- Owner, Manager and Staff may be shown as role labels. **They do not grant real authentication, authorization or permissions.** Do not imply a permission matrix, payroll, salary, commission, HRIS, recruitment, review or productivity scoring.
+- Desktop uses a readable list/table hybrid when comparing staff; mobile stacks the same priority identity/Branch/capability/status/workload information. Use Business avatars, semantic status text/icons and light/Warm White surfaces; no Emoji UI or Dark Mode.
+
+## Business & Branch Settings rules (BF-10 Live Local Prototype)
+
+- Business profile and Branch configuration are shared state, never Settings-only copies. Every saved change must propagate through context selection, capability navigation, Booking, Team and Reports.
+- Branch Team count/names/capabilities come from the existing Team source; an active Branch's Team link selects that Branch before opening the shared directory. Service duration/capacity is read from existing service and Resource helpers, not duplicated into another catalogue or editor.
+- Branch add/edit validates names and weekly hours. Branch activation is explicit, the last active Branch is protected, and disabling the current Branch selects a valid active fallback. Disabling a Branch/module preserves historical records.
+- Business/Branch switching never transfers protected Pet consent, Customer authority or financial settlement. Displayed role labels still do not authorize changes in production.
+- Use labeled controls, visible keyboard focus, form feedback and mobile-first spacing. Keep drafts/error recovery inside the current task; a section or inline editor does not require another route.
+
+## Daycare rules (BF-11 Live Local Prototype)
+
+- Day Booking is planning; Pet-specific attendance is execution. Do not reuse Grooming status or create another Customer/Pet/Booking store.
+- Zone capacity, Branch membership and shared Team capability/active/availability must be checked before operational assignment. Full/invalid choices return a clear corrective action.
+- Intake uses an explicit attendance ID and matching Business/Branch/Customer/Pet identity. QR/Passport consent rules remain unchanged; care and Business notes do not imply medical facts or Guardian visibility.
+- Staff-triggered Inbox and Billing actions reuse the shared records. Ready-for-pickup, checkout, Service Record completion and paid status remain separate concerns.
+
+## Customer CRM & Retention rules (BF-12 Live Local Prototype)
+
+- Lifecycle/service/follow-up segments, visit counts, next Booking, outstanding balance and timeline derive from existing records. No persisted CRM score, duplicate Customer identity, predictive claim or extra CRM route is permitted.
+- Count completed visits without double-counting Pet-specific records from one Booking. Show Branch attribution and distinguish Booking, completed service, payment and message events.
+- Next actions are suggestions that require a staff click; no automated send, campaign, points, rewards or AI inference occurs. Loyalty must remain clearly labeled planned.
+
 ## Billing, Payments & Revenue rules (BF-7 Live Local Prototype)
 
-- `Service / Job / Stay → Charge → Payment` is the required visible mental model. A Charge records what is owed; a Payment records how and when funds were received. Staff must never be led to infer that creating a Charge, completing a Grooming Job, or completing a Hotel Stay means paid.
+- `Service / Job / Stay / Attendance → Charge → Payment` is the required visible mental model. A Charge records what is owed; a Payment records how and when funds were received. Staff must never be led to infer that creating a Charge or completing Grooming, Hotel or Daycare execution means paid.
 - Amounts use whole Thai Baht integers as a **prototype assumption**. Show total, paid and remaining with tabular numerals and clear labels; do not imply VAT calculation, invoice compliance, exchange handling, gateway precision, or accounting policy.
 - Status is derived, not separately edited: unpaid, partial and paid come from recorded Payment allocations; cancelled comes from a valid Charge cancellation. Status always uses text and an icon/non-color cue as well as semantic color.
 - A Booking-level base amount is represented once. A multi-Pet Booking must not create one full base Charge per linked Grooming Job or Hotel Stay. An approved Grooming add-on remains a Job-only Inbox effect until explicit checkout reconciles it idempotently into the Charge.
@@ -146,27 +182,28 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Finance uses a dense desktop table/row pattern only when comparison helps. At mobile widths it becomes labeled Charge/Payment rows or a task sheet; total, status, Branch and the next safe action remain visible without horizontal scrolling.
 - The available Payment methods are local Cash, bank-transfer and Other records. A duplicate-safe local submission guard prevents a repeated click from creating a duplicate payment effect. There is no real gateway, bank confirmation, receipt compliance, refund processor, General Ledger, tax or accounting export.
 
-## Shared Service Record rules (BF-8 local domain foundation)
+## Shared Service Record rules (BF-8/BF-11 local domain foundation)
 
-- Service Record is shared domain data, not a module. The visible flow stays in context: Grooming/Hotel execution → automatic record creation/update → Customer/Pet `ประวัติบริการ`. Do not add a CareProof dashboard, menu item, management page, duplicate summary page, standalone route or post-completion handover workflow.
-- One Service Record belongs to one completed Grooming Job or checked-out/completed Hotel Stay, scoped to the same Business and Branch. It reuses shared Customer, Pet, Booking, Job/Stay and Charge/Payment references; it never creates a duplicate history fixture, Customer/Pet identity, Invoice, Passport or medical record.
-- Grooming shows completed base service, approved add-ons, staff/resource labels, local Business note, completion time and photo metadata if present. Hotel shows stay dates, room/zone, ordinary daily-care summary, permitted local note and completion time. Hotel Service Record must never copy Guardian care instructions, Intake details, medication instructions/authorization or incident content.
+- Service Record is shared domain data, not a module. The visible flow stays in context: Grooming/Hotel/Daycare execution → automatic record creation/update → Customer/Pet `ประวัติบริการ`. Do not add a CareProof dashboard, menu item, management page, duplicate summary page, standalone route or post-completion handover workflow.
+- One Service Record belongs to one completed Grooming Job or checked-out/completed Hotel Stay or Daycare Attendance, scoped to the same Business and Branch. It reuses shared Customer, Pet, Booking, Job/Stay/Attendance and Charge/Payment references; it never creates a duplicate history fixture, Customer/Pet identity, Invoice, Passport or medical record.
+- Grooming shows completed base service, approved add-ons, staff/resource labels, local Business note, completion time and photo metadata if present. Hotel shows stay dates, room/zone, ordinary daily-care summary, permitted local note and completion time. Daycare shows attendance date/windows, zone, responsible staff, ordinary care events, internal Business note and completion time. Service Records must not copy protected Passport/Guardian facts or Intake/medical authorization; Hotel incident content remains outside the record.
 - Photo support is metadata-only. There is no upload, cloud/local object storage, public sharing URL, copied Passport image, print/certificate engine or real retention policy in BF8.
 - Correction is lightweight and append-only: summary or local Business note changes retain prior value, reason, staff, time and duplicate-safe request key. Source re-completion retains a safe prior source snapshot. No UI action silently destroys original history.
 - Customer/Pet detail uses one inline timeline/list. Pet photo/avatar is the visual anchor; expandable items reveal summary, service details, activities, staff/resources, permitted photo metadata, completion time and a short read-only BF7 payment reference. Payment state uses text plus icon/non-color cue and never changes Service Record state.
 - Guardian LINE visibility is **PLANNED** and Consumer work remains paused. Legacy handover metadata in old local records may remain for compatibility, but the current UI does not start or advance that workflow.
 
-## Customers & Pets rules (BF-3 Live Local Prototype)
+## Customers & Pets rules (BF-3 frozen UI / BE2 durable)
 
-- Customer is a Business-level relationship. A Customer is not duplicated by Grooming, Hotel, Daycare, or Branch; operational history continues to name its Branch.
+- Customer is a durable Business-level relationship. A Customer or Business-local Pet profile is not duplicated by Grooming, Hotel, Daycare, or Branch; operational history continues to name its Branch while identity remains Business-wide.
 - `ผู้ติดต่อหลัก` means a contact relationship only. Never use `เจ้าของ` unless the real relationship is known. Booking convenience never grants Guardian or Pet Passport authority.
-- A local Customer and a local Pet relationship may be added without an account or Passport. New Pets start unlinked and are clearly presented as Business relationship records, not Business-owned Passports.
-- A phone match raises `อาจมีลูกค้ารายนี้อยู่แล้ว`. Staff can view the existing record or choose `สร้างต่อ`; the prototype never silently merges identities.
-- Search supports Customer name, Pet name, and phone with one visible input boundary. Results are clickable Customer rows—not a spreadsheet table—and show short labeled Customer, Pet, next Booking/activity and tag information. Passport connected/not-connected is context on the record, not a list filter.
+- A Customer and a Business-local Pet contact relationship may be added without an account or Passport. BE2 persists the neutral association; new Pets receive only an unlinked compatibility presentation and are never Business-owned Passports.
+- A normalized phone match raises `อาจมีลูกค้ารายนี้อยู่แล้ว`; a matching Pet name/species also warns. Active or inactive candidates are considered. Staff can inspect/recover the existing record or explicitly choose `สร้างต่อ`; no path silently merges or destructively deduplicates identities.
+- Search supports Customer name, Pet name, and phone through one Business-scoped backend query with bounded limit/offset. Results are clickable Customer rows—not a spreadsheet table—and show short labeled Customer, Pet, next Booking/activity and tag information. Passport connected/not-connected is context on the record, not a list filter.
 - Connection and access remain separate. The list gives only the compact connection state; expiry, source, allowed-data and no-additional-access detail uses progressive disclosure on Customer/Pet detail. Protected values remain hidden and never become editable Business data.
-- Business notes and tags are Business-owned local records. Important source labels distinguish `ข้อมูลที่ลูกค้าแจ้ง`, `ข้อมูลของร้าน`, and Guardian-controlled Passport data. Correction remains a suggestion, not an overwrite.
+- Business notes and tags are durable Business-owned internal records and are not Guardian-visible by default. Important source labels distinguish `ข้อมูลที่ลูกค้าแจ้ง`, `ข้อมูลของร้าน`, and Guardian-controlled Passport data. Correction remains a suggestion, not an overwrite.
 - A Customer detail opens with the Customer header and actions, then separates Pets, Booking history, current/recent Hotel Stays, one shared `ประวัติบริการ` timeline/list, compact Charge/Payment history with unpaid balance and Branch attribution, and Business notes/tags without a repeated explanatory overview. Multiple Pets may use a horizontal snap/peek strip on mobile. It can start the existing Booking Editor with Customer/Pet preselected; Calendar keeps its own capacity/Branch validation and uses shared relationship names where practical.
-- A valid Temporary Business QR may reconnect an explicit, already-known local relationship after consent validation. An unknown QR never auto-creates a permanent Customer.
+- Every Customer/Pet read or mutation must pass BE1 actor → active membership → active Business authorization and re-scope the target server-side. A Branch grant never exposes another Business or creates a Branch-specific Customer clone.
+- Frozen seeded Passport/access badges come only from the explicit non-authoritative dev compatibility read model. A valid local Temporary Business QR prototype may reconnect an already-known relationship presentation after its own local consent validation, but BE2 grants no authority and an unknown QR never auto-creates a permanent Customer.
 
 ## Inbox & Customer Communication rules (BF-4 Live Local Prototype)
 
@@ -208,7 +245,7 @@ Do not mix internal technical nouns into ordinary Thai instructions without a re
 - Badge, alert and validation status normally combine semantic color with visible text and an icon or other non-color cue. Compact Calendar cards intentionally omit status dots/labels, retain full Thai status in their accessible name and use the semantic card surface; service color remains classification, never status.
 - Dialogs and mobile sheets trap and restore focus, support predictable close/recovery and keep the primary/destructive hierarchy clear. Grooming Job detail drawer/sheets move focus to their title and return it to the triggering record. Toast placement respects mobile safe areas and is reserved for meaningful feedback.
 - Structural skeletons mirror Customer rows, Calendar, Home metrics and Inbox lists. Determinate progress uses Brand/Semantic color; the multi-accent indeterminate bar is loading-only and carries no operational meaning.
-- Motion uses the premium easing with canonical 160ms Fast, 220ms Base, 300ms Slow and 280ms Navigation tokens from the Design System. No bounce, wobble or confetti; reduced-motion removes non-essential transforms, shimmer travel and animation.
+- Motion uses the premium easing with canonical 180ms Fast, 220ms Base, 300ms Slow and 280ms Navigation tokens from the Design System. No bounce, wobble, confetti or indefinite decorative loops; reduced-motion removes non-essential transforms, shimmer travel and animation.
 
 ## Accessibility and mobile behavior
 

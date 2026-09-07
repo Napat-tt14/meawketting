@@ -5,7 +5,7 @@ import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { bookingStatusLabel, bookingTimeLabel } from "./calendarPresentation";
 
 export function BookingStatusBadge({ status }: { status: PrototypeBooking["status"] }) {
-  return <span className="sr-only">สถานะ {bookingStatusLabel(status)}</span>;
+  return <span className={`booking-status-label booking-status-label--${status}`}>{bookingStatusLabel(status)}</span>;
 }
 
 export function BookingItem({

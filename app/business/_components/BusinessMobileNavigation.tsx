@@ -4,28 +4,32 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDemoBusinessContextDetails, getEnabledBusinessModules } from "../../_prototype/businessState";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
-import { BedDouble, CalendarDays, House, List, MessageCircle, Scan, Scissors, UsersRound, Wallet, X } from "../../_components/icons";
+import { BedDouble, CalendarDays, Chart, House, List, MessageCircle, PawPrint, Scan, Scissors, Settings, UserRoundCheck, UsersRound, Wallet, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import {
   BUSINESS_CALENDAR_DESTINATION,
   BUSINESS_BILLING_DESTINATION,
   BUSINESS_CUSTOMERS_DESTINATION,
+  BUSINESS_DAYCARE_DESTINATION,
   BUSINESS_GROOMING_DESTINATION,
   BUSINESS_HOTEL_DESTINATION,
-  BUSINESS_MANAGEMENT_DESTINATIONS,
   BUSINESS_MESSAGES_DESTINATION,
+  BUSINESS_REPORTS_DESTINATION,
+  BUSINESS_SETTINGS_DESTINATION,
+  BUSINESS_TEAM_DESTINATION,
 } from "./businessNavigationModel";
-import { PlannedBusinessDestination, PlannedBusinessModule } from "./BusinessNavigation";
 import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
 
 export function BusinessMobileNavigation() {
   const pathname = usePathname();
   const { context, revision } = useBusinessContext();
   const stateReady = useBusinessStateReady();
-  const details = getDemoBusinessContextDetails(context);
-  const enabledModules = getEnabledBusinessModules(context);
+  const details = getDemoBusinessContextDetails(context, !stateReady);
+  const enabledModules = getEnabledBusinessModules(context, !stateReady);
   const unreadCount = getPrototypeInboxUnreadCount(context, !stateReady);
   const [open, setOpen] = useState(false);
+  const moreActive = [BUSINESS_CUSTOMERS_DESTINATION, BUSINESS_BILLING_DESTINATION, BUSINESS_REPORTS_DESTINATION, BUSINESS_TEAM_DESTINATION, BUSINESS_SETTINGS_DESTINATION, BUSINESS_GROOMING_DESTINATION, BUSINESS_HOTEL_DESTINATION, BUSINESS_DAYCARE_DESTINATION]
+    .some(({ href }) => pathname === href || pathname.startsWith(`${href}/`));
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
 
@@ -81,7 +85,7 @@ export function BusinessMobileNavigation() {
         >
           <CalendarDays size={20} /><span>{BUSINESS_CALENDAR_DESTINATION.label}</span>
         </Link>
-        <Link className={`business-mobile-navigation__item business-mobile-navigation__item--scan${pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? " is-active" : ""}`} href="/business/scan" aria-current={pathname === "/business/scan" ? "page" : undefined}>
+        <Link className={`business-mobile-navigation__item business-mobile-navigation__item--scan${pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? " is-active" : ""}`} href="/business/scan" aria-current={pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? "page" : undefined}>
           <Scan size={20} /><span>สแกน</span>
         </Link>
         <a
@@ -92,14 +96,14 @@ export function BusinessMobileNavigation() {
           <MessageCircle size={20} /><span>{BUSINESS_MESSAGES_DESTINATION.label}</span>
           {unreadCount > 0 ? <span className="business-mobile-unread-badge" aria-label={`ข้อความใหม่ ${unreadCount} ข้อความ`}>{unreadCount}</span> : null}
         </a>
-        <button ref={triggerRef} className={`business-mobile-navigation__item${open ? " is-active" : ""}`} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+        <button ref={triggerRef} className={`business-mobile-navigation__item${open || moreActive ? " is-active" : ""}`} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
           <List size={20} /><span>เพิ่มเติม</span>
         </button>
       </nav>
 
       {open ? (
         <>
-          <button className="business-more-sheet__backdrop" type="button" aria-label="ปิดเมนูเพิ่มเติม" onClick={close} />
+          <button className="business-more-sheet__backdrop" type="button" tabIndex={-1} aria-label="ปิดเมนูเพิ่มเติม" onClick={close} />
           <section ref={panelRef} className="business-more-sheet" role="dialog" aria-modal="true" aria-label="เมนูธุรกิจเพิ่มเติม">
             <header>
               <div><small>{details.business?.name}</small><strong>{details.branch?.name}</strong></div>
@@ -124,6 +128,24 @@ export function BusinessMobileNavigation() {
               >
                 <Wallet size={19} />
                 <span>{BUSINESS_BILLING_DESTINATION.label}</span>
+              </Link>
+              <Link
+                className={`business-nav-item business-nav-item--sheet${pathname === BUSINESS_REPORTS_DESTINATION.href ? " is-active" : ""}`}
+                href={BUSINESS_REPORTS_DESTINATION.href}
+                aria-current={pathname === BUSINESS_REPORTS_DESTINATION.href ? "page" : undefined}
+                onClick={close}
+              >
+                <Chart size={19} />
+                <span>{BUSINESS_REPORTS_DESTINATION.label}</span>
+              </Link>
+              <Link
+                className={`business-nav-item business-nav-item--sheet${pathname === BUSINESS_TEAM_DESTINATION.href ? " is-active" : ""}`}
+                href={BUSINESS_TEAM_DESTINATION.href}
+                aria-current={pathname === BUSINESS_TEAM_DESTINATION.href ? "page" : undefined}
+                onClick={close}
+              >
+                <UserRoundCheck size={19} />
+                <span>{BUSINESS_TEAM_DESTINATION.label}</span>
               </Link>
               <div className="business-more-sheet__group">
                 <p>งานบริการ</p>
@@ -150,14 +172,31 @@ export function BusinessMobileNavigation() {
                       <BedDouble size={19} />
                       <span>{BUSINESS_HOTEL_DESTINATION.label}</span>
                     </Link>
-                  ) : <PlannedBusinessModule key={module} module={module} className="business-nav-item--sheet" />
+                  ) : (
+                    <Link
+                      key={module}
+                      className={`business-nav-item business-nav-item--sheet${pathname === BUSINESS_DAYCARE_DESTINATION.href ? " is-active" : ""}`}
+                      href={BUSINESS_DAYCARE_DESTINATION.href}
+                      aria-current={pathname === BUSINESS_DAYCARE_DESTINATION.href ? "page" : undefined}
+                      onClick={close}
+                    >
+                      <PawPrint size={19} />
+                      <span>{BUSINESS_DAYCARE_DESTINATION.label}</span>
+                    </Link>
+                  )
                 ))}
               </div>
               <div className="business-more-sheet__group business-more-sheet__group--management">
-                <p>ยังไม่เปิดใช้</p>
-                {BUSINESS_MANAGEMENT_DESTINATIONS.map((item) => (
-                  <PlannedBusinessDestination key={item.key} destinationKey={item.key} label={item.label} className="business-nav-item--sheet" />
-                ))}
+                <p>จัดการร้าน</p>
+                <Link
+                  className={`business-nav-item business-nav-item--sheet${pathname === BUSINESS_SETTINGS_DESTINATION.href ? " is-active" : ""}`}
+                  href={BUSINESS_SETTINGS_DESTINATION.href}
+                  aria-current={pathname === BUSINESS_SETTINGS_DESTINATION.href ? "page" : undefined}
+                  onClick={close}
+                >
+                  <Settings size={19} />
+                  <span>{BUSINESS_SETTINGS_DESTINATION.label}</span>
+                </Link>
               </div>
             </div>
           </section>

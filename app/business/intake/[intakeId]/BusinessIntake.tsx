@@ -118,6 +118,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     function handleCorrectionKeys(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         event.preventDefault();
         closeCorrection();
@@ -128,7 +129,10 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (!focusable.includes(document.activeElement as HTMLElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -315,12 +319,12 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
       ) : null}
 
       {record.taskState === "complete" || record.checkInState === "checked-in" ? (
-        <section className="checkin-complete business-state-enter" aria-labelledby="checkin-complete-heading"><span className="checkin-complete__icon"><CheckCircle size={48} weight="bold" /></span><h2 ref={stateHeadingRef} id="checkin-complete-heading" tabIndex={-1}>รับเข้าเรียบร้อย</h2><p>{pet.name} เข้ารับบริการกับ {details.business?.name} · {details.branch?.name}</p><dl><div><dt>เวลารับเข้า</dt><dd>{formatSharingDate(record.checkedInAt)}</dd></div><div><dt>งานบริการ</dt><dd>{record.servicePurpose}</dd></div><div><dt>เลขอ้างอิงรายการ</dt><dd><code>{record.prototypeSessionReference}</code><small>ใช้ติดตามรายการในอุปกรณ์นี้</small></dd></div></dl><div className="scanner-actions">{record.hotelStayId ? <a className="button button--business button--large" href={`/business/hotel?stayId=${encodeURIComponent(record.hotelStayId)}`}>ระบุห้องและไปที่โรงแรม</a> : null}{record.serviceJobId ? <a className="button button--business button--large" href={`/business/grooming?jobId=${encodeURIComponent(record.serviceJobId)}`}>ไปที่งานอาบน้ำ / ตัดขน</a> : null}<a className="button button--ghost" href="/business/scan">สแกนน้องตัวถัดไป</a></div></section>
+        <section className="checkin-complete business-state-enter" aria-labelledby="checkin-complete-heading"><span className="checkin-complete__icon"><CheckCircle size={48} weight="bold" /></span><h2 ref={stateHeadingRef} id="checkin-complete-heading" tabIndex={-1}>รับเข้าเรียบร้อย</h2><p>{pet.name} เข้ารับบริการกับ {details.business?.name} · {details.branch?.name}</p><dl><div><dt>เวลารับเข้า</dt><dd>{formatSharingDate(record.checkedInAt)}</dd></div><div><dt>งานบริการ</dt><dd>{record.servicePurpose}</dd></div><div><dt>เลขอ้างอิงรายการ</dt><dd><code>{record.prototypeSessionReference}</code><small>ใช้ติดตามรายการในอุปกรณ์นี้</small></dd></div></dl><div className="scanner-actions">{record.daycareAttendanceId ? <a className="button button--business button--large" href={`/business/daycare?attendanceId=${encodeURIComponent(record.daycareAttendanceId)}`}>ไปที่รายการ Daycare</a> : null}{record.hotelStayId ? <a className="button button--business button--large" href={`/business/hotel?stayId=${encodeURIComponent(record.hotelStayId)}`}>ระบุห้องและไปที่โรงแรม</a> : null}{record.serviceJobId ? <a className="button button--business button--large" href={`/business/grooming?jobId=${encodeURIComponent(record.serviceJobId)}`}>ไปที่งานอาบน้ำ / ตัดขน</a> : null}<a className="button button--ghost" href="/business/scan">สแกนน้องตัวถัดไป</a></div></section>
       ) : null}
 
       {correctionOpen ? (
         <div className="correction-layer" role="presentation">
-          <button className="correction-backdrop" type="button" aria-label="ปิดหน้าต่างเสนอแก้ไขข้อมูล" onClick={closeCorrection} />
+          <button className="correction-backdrop" type="button" tabIndex={-1} aria-label="ปิดหน้าต่างเสนอแก้ไขข้อมูล" onClick={closeCorrection} />
           <section ref={correctionSheetRef} className="correction-sheet" role="dialog" aria-modal="true" aria-labelledby="correction-heading">
             <header><h2 id="correction-heading">เสนอแก้ไขข้อมูล</h2><button type="button" aria-label="ปิดหน้าต่างเสนอแก้ไขข้อมูล" onClick={closeCorrection}><X size={20} weight="bold" /></button></header>
             <form onSubmit={submitCorrection}>

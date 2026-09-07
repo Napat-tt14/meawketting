@@ -1,6 +1,13 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import {
+  cancelDurableBooking,
+  checkDurableBookingAvailability,
+  createBookingIdempotencyKey,
+  createDurableBooking,
+  updateDurableBooking,
+} from "../../_backend/be3/client";
 import type {
   BookingConflictRecovery,
   DemoBookingResource,
@@ -12,13 +19,19 @@ import type {
 } from "../../_prototype/businessState";
 import {
   BOOKING_DEMO_DATE,
-  cancelPrototypeBooking,
+  durableBookingAvailabilityInput,
+  durableCreateBookingInputFromDraft,
+  durableUpdateBookingInputFromDraft,
   evaluatePrototypeBookingAvailability,
+  getBookingResourceStaffMember,
   getBookingResources,
   getBookingServices,
   getDemoBookingContacts,
+  projectDurableBooking,
+  projectDurableBookingAvailability,
+  readPrototypeBooking,
   readPrototypeCustomer,
-  savePrototypeBooking,
+  synchronizePrototypeExecutionCompatibilityForBooking,
 } from "../../_prototype/businessState";
 import { CheckCircle, CircleAlert, MessageCircle, Plus, X } from "../../_components/icons";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
@@ -38,7 +51,11 @@ type RelationshipEditorState = { kind: "customer" } | { kind: "pet"; customer: P
 
 function defaultAssignments(service: DemoBookingService, resources: readonly DemoBookingResource[]) {
   return service.requiredResourceKinds.flatMap((kind) => {
-    const candidates = resources.filter((resource) => resource.kind === kind);
+    const candidates = resources.filter((resource) => {
+      if (resource.kind !== kind) return false;
+      const staff = getBookingResourceStaffMember(resource.id);
+      return !staff || (staff.active && (resource.kind !== "groomer" || staff.capabilities.includes("grooming")));
+    });
     const selected = [...candidates].sort((first, second) => second.capacity - first.capacity || first.label.localeCompare(second.label, "th"))[0];
     return selected ? [selected.id] : [];
   });
@@ -130,7 +147,9 @@ export function BookingEditor({
   });
   const [step, setStep] = useState<BookingEditorStep>("details");
   const [didCheck, setDidCheck] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [durableAvailability, setDurableAvailability] = useState<ReturnType<typeof evaluatePrototypeBookingAvailability> | null>(null);
   const [cancelConfirmation, setCancelConfirmation] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [relationshipEditor, setRelationshipEditor] = useState<RelationshipEditorState>(null);
@@ -141,6 +160,11 @@ export function BookingEditor({
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const onCloseRef = useRef(onClose);
   const relationshipEditorOpenRef = useRef(false);
+  const cancelConfirmationOpenRef = useRef(false);
+  const cancelPanelRef = useRef<HTMLElement>(null);
+  const cancelBackButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelReturnFocusRef = useRef<HTMLElement | null>(null);
+  const createIdempotencyKeyRef = useRef<string | null>(null);
 
   const contextMatches = draft.businessId === context.businessId && draft.branchId === context.branchId;
   const service = services.find((item) => item.id === draft.serviceId) ?? null;
@@ -148,7 +172,8 @@ export function BookingEditor({
   void relationshipRevision;
   const contacts = getDemoBookingContacts(context);
   const selectedContact = draft.customer ? contacts.find((contact) => contact.id === draft.customer?.id) ?? null : null;
-  const availability = useMemo(() => evaluatePrototypeBookingAvailability(draft, context), [context, draft]);
+  const previewAvailability = useMemo(() => evaluatePrototypeBookingAvailability(draft, context), [context, draft]);
+  const availability = durableAvailability ?? previewAvailability;
   const availabilityId = "booking-availability";
   const showAutomaticAvailability = Boolean(contextMatches && service && draft.customer?.id && draft.pets.length > 0);
 
@@ -161,24 +186,38 @@ export function BookingEditor({
   }, [relationshipEditor]);
 
   useEffect(() => {
+    cancelConfirmationOpenRef.current = cancelConfirmation;
+  }, [cancelConfirmation]);
+
+  useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const frame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || relationshipEditorOpenRef.current) return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (relationshipEditorOpenRef.current) setRelationshipEditor(null);
-        else if (cancelConfirmation) setCancelConfirmation(false);
+        else if (cancelConfirmationOpenRef.current) {
+          setCancelConfirmation(false);
+          window.requestAnimationFrame(() => cancelReturnFocusRef.current?.focus());
+        }
         else onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])")];
+      const focusScope = cancelConfirmationOpenRef.current ? cancelPanelRef.current : dialogRef.current;
+      if (!focusScope) return;
+      const focusable = [...focusScope.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => !element.closest("[inert]") && element.getClientRects().length > 0 && element.tabIndex !== -1);
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (!focusScope.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -191,9 +230,9 @@ export function BookingEditor({
       window.cancelAnimationFrame(frame);
       document.body.style.overflow = overflow;
       document.removeEventListener("keydown", handleKeyDown);
-      window.requestAnimationFrame(() => previousFocusRef.current?.focus());
+      window.requestAnimationFrame(() => { if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus(); });
     };
-  }, [cancelConfirmation]);
+  }, []);
 
   useEffect(() => {
     if (step !== "review") return;
@@ -201,8 +240,35 @@ export function BookingEditor({
     return () => window.cancelAnimationFrame(frame);
   }, [step]);
 
+  const installAutomaticAvailability = useEffectEvent((
+    result: Awaited<ReturnType<typeof checkDurableBookingAvailability>>,
+    checkedDraft: PrototypeBookingDraft,
+  ) => {
+    setDurableAvailability(projectDurableBookingAvailability(result, checkedDraft, context));
+  });
+
+  useEffect(() => {
+    if (!contextMatches || !draft.serviceId || !draft.customer?.id || draft.pets.length === 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void checkDurableBookingAvailability(durableBookingAvailabilityInput(draft))
+        .then((result) => {
+          if (!cancelled) installAutomaticAvailability(result, draft);
+        })
+        .catch(() => {
+          // The immediate compatibility preview remains visible. Review and
+          // save still require an authoritative BE3 response.
+        });
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [contextMatches, draft]);
+
   function updateDraft(next: PrototypeBookingDraft) {
     setDraft(next);
+    setDurableAvailability(null);
     setNotice(null);
   }
 
@@ -266,16 +332,15 @@ export function BookingEditor({
     setNotice(`เพิ่ม ${customer.name} แล้ว · เพิ่มสัตว์เลี้ยงเพื่อจบข้อมูลการจอง`);
   }
 
-  function petCreated(customer: PrototypeCustomer) {
-    const pet = customer.pets.at(-1) ?? null;
+  function petCreated(customer: PrototypeCustomer, pet: PrototypeCustomer["pets"][number]) {
     setRelationshipRevision((current) => current + 1);
     updateDraft({
       ...draft,
       customer: { id: customer.id, name: customer.name },
-      pets: pet ? [{ id: pet.id, name: pet.name, species: pet.species }] : [],
+      pets: [{ id: pet.id, name: pet.name, species: pet.species }],
     });
     setRelationshipEditor(null);
-    setNotice(pet ? `เพิ่ม ${pet.name} และเลือกให้การจองนี้แล้ว` : "เพิ่มลูกค้าแล้ว");
+    setNotice(`เพิ่ม ${pet.name} และเลือกให้การจองนี้แล้ว`);
   }
 
   function handleRecovery(recovery: BookingConflictRecovery) {
@@ -289,39 +354,102 @@ export function BookingEditor({
     window.requestAnimationFrame(() => document.getElementById(targets[recovery])?.focus());
   }
 
-  function showReview(event: FormEvent<HTMLFormElement>) {
+  async function showReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDidCheck(true);
-    if (!availability.available) {
+    if (!previewAvailability.available) {
       setNotice("ข้อมูลยังไม่พร้อมยืนยัน โปรดแก้รายการที่แจ้งไว้ด้านล่าง");
       window.requestAnimationFrame(() => document.getElementById(availabilityId)?.focus());
       return;
     }
-    setNotice(null);
-    setStep("review");
+    setChecking(true);
+    try {
+      const checked = projectDurableBookingAvailability(
+        await checkDurableBookingAvailability(durableBookingAvailabilityInput(draft)),
+        draft,
+        context,
+      );
+      setDurableAvailability(checked);
+      if (!checked.available) {
+        setNotice("ข้อมูลเปลี่ยนระหว่างตรวจสอบ โปรดแก้รายการที่แจ้งไว้ด้านล่าง");
+        window.requestAnimationFrame(() => document.getElementById(availabilityId)?.focus());
+        return;
+      }
+      setNotice(null);
+      setStep("review");
+    } catch {
+      setNotice("ตรวจเวลาว่างจากระบบไม่สำเร็จ ลองอีกครั้ง");
+    } finally {
+      setChecking(false);
+    }
   }
 
-  function saveBooking() {
+  async function saveBooking() {
     setSaving(true);
-    const result = savePrototypeBooking(draft, context);
-    setSaving(false);
-    if (!result.ok) {
+    try {
+      const current = draft.bookingId ? readPrototypeBooking(draft.bookingId) : null;
+      const result = draft.bookingId
+        ? await updateDurableBooking(durableUpdateBookingInputFromDraft(draft, current?.revision ?? initialBooking?.revision ?? 1))
+        : await createDurableBooking(durableCreateBookingInputFromDraft(
+          draft,
+          createIdempotencyKeyRef.current ??= createBookingIdempotencyKey(),
+        ));
+      if (result.outcome === "conflict") {
+        setDurableAvailability(projectDurableBookingAvailability(result.availability, draft, context));
+        setStep("details");
+        setDidCheck(true);
+        setNotice(result.availability.conflicts.some((item) => item.code === "DUPLICATE_BOOKING")
+          ? "มีรายการนี้อยู่แล้ว จึงไม่ได้สร้างการจองซ้ำ"
+          : "ข้อมูลเปลี่ยนระหว่างตรวจทาน โปรดตรวจเวลาว่างอีกครั้ง");
+        return;
+      }
+      const booking = projectDurableBooking(result.booking);
+      synchronizePrototypeExecutionCompatibilityForBooking(booking);
+      onSaved(booking, !initialBooking);
+    } catch {
       setStep("details");
       setDidCheck(true);
-      setNotice(result.reason === "duplicate" ? "มีรายการนี้อยู่แล้ว จึงไม่ได้สร้างการจองซ้ำ" : "ข้อมูลเปลี่ยนระหว่างตรวจทาน โปรดตรวจเวลาว่างอีกครั้ง");
-      return;
+      setNotice("บันทึกการจองกับระบบไม่สำเร็จ ลองอีกครั้ง");
+    } finally {
+      setSaving(false);
     }
-    onSaved(result.booking, result.created);
   }
 
-  function cancelBooking() {
+  async function cancelBooking() {
     if (!initialBooking) return;
-    const result = cancelPrototypeBooking(initialBooking.bookingId, context);
-    if (!result.ok) {
+    setSaving(true);
+    try {
+      const current = readPrototypeBooking(initialBooking.bookingId) ?? initialBooking;
+      const result = await cancelDurableBooking({
+        businessId: context.businessId,
+        branchId: context.branchId,
+        bookingId: initialBooking.bookingId,
+        expectedRevision: current.revision ?? 1,
+      });
+      if (result.outcome === "conflict") {
+        setNotice("ข้อมูลการจองเปลี่ยนแล้ว โปรดกลับไปเปิดรายการอีกครั้ง");
+        return;
+      }
+      const booking = projectDurableBooking(result.booking);
+      synchronizePrototypeExecutionCompatibilityForBooking(booking);
+      onSaved(booking, false);
+    } catch {
       setNotice("ไม่สามารถยกเลิกจากบริบทสาขาปัจจุบันได้");
-      return;
+    } finally {
+      setSaving(false);
     }
-    onSaved(result.booking, false);
+  }
+
+  function requestCancellation() {
+    cancelReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setNotice(null);
+    setCancelConfirmation(true);
+    window.requestAnimationFrame(() => cancelBackButtonRef.current?.focus());
+  }
+
+  function dismissCancellation() {
+    setCancelConfirmation(false);
+    window.requestAnimationFrame(() => cancelReturnFocusRef.current?.focus());
   }
 
   const existingCancelled = initialBooking?.status === "cancelled";
@@ -329,9 +457,9 @@ export function BookingEditor({
 
   return (
     <>
-      <button className="booking-editor__backdrop" type="button" tabIndex={-1} inert={relationshipEditor ? true : undefined} aria-label="ปิดการแก้ไขการจอง" onClick={onClose} />
-      <section className={`booking-editor${relationshipEditor ? " booking-editor--relationship" : ""}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="booking-editor-title">
-        <header className="booking-editor__header">
+      <button className="booking-editor__backdrop" type="button" tabIndex={-1} inert={relationshipEditor ? true : undefined} aria-label={cancelConfirmation ? "กลับไปดูข้อมูลการจอง" : "ปิดการแก้ไขการจอง"} onClick={cancelConfirmation ? dismissCancellation : onClose} />
+      <section className={`booking-editor${relationshipEditor ? " booking-editor--relationship" : ""}${cancelConfirmation ? " booking-editor--confirming" : ""}`} ref={dialogRef} role={cancelConfirmation ? "alertdialog" : "dialog"} aria-modal="true" aria-labelledby={cancelConfirmation ? "booking-cancel-title" : "booking-editor-title"} aria-describedby={cancelConfirmation ? "booking-cancel-description" : undefined}>
+        <header className="booking-editor__header" inert={cancelConfirmation ? true : undefined}>
           <h2 id="booking-editor-title">{initialBooking ? "แก้ไขการจอง" : "เพิ่มการจอง"}</h2>
           <div className="booking-editor__header-actions">
             {initialBooking?.serviceModule === "grooming" ? <a href={`/business/grooming?jobId=${encodeURIComponent(initialBooking.bookingId)}`}><BusinessServiceIcon module="grooming" size={18} />ดูงานบริการ</a> : null}
@@ -340,7 +468,7 @@ export function BookingEditor({
           </div>
         </header>
 
-        <div className="booking-editor__body" inert={relationshipEditor ? true : undefined}>
+        <div className="booking-editor__body" inert={relationshipEditor || cancelConfirmation ? true : undefined}>
           {existingCancelled ? (
             <div className="booking-editor__cancelled-state">
               <CircleAlert size={24} />
@@ -423,8 +551,8 @@ export function BookingEditor({
             {notice ? <p className="booking-editor__notice" role="status">{notice}</p> : null}
             <AvailabilityStatus result={availability} id={availabilityId} show={showAutomaticAvailability || didCheck || !contextMatches} automatic={showAutomaticAvailability} onRecovery={handleRecovery} />
             <footer className="booking-editor__actions">
-              {initialBooking ? <button className="button button--business-ghost booking-editor__cancel-action" type="button" onClick={() => setCancelConfirmation(true)}>ยกเลิกการจอง</button> : <span />}
-              <button className="button button--business business-signature-sweep" type="submit"><CheckCircle size={18} /><span>ทบทวนการจอง</span></button>
+              {initialBooking ? <button className="button button--business-ghost booking-editor__cancel-action" type="button" onClick={requestCancellation}>ยกเลิกการจอง</button> : <span />}
+              <button className="button button--business business-signature-sweep" type="submit" disabled={checking} aria-busy={checking}><CheckCircle size={18} /><span>{checking ? "กำลังตรวจสอบ" : "ทบทวนการจอง"}</span></button>
             </footer>
             </form>
           ) : (
@@ -451,14 +579,16 @@ export function BookingEditor({
             </section>
           )}
 
-          {cancelConfirmation ? (
-            <section className="booking-cancel-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="booking-cancel-title">
-              <div><CircleAlert size={20} /><h3 id="booking-cancel-title">ยกเลิกการจองนี้หรือไม่</h3></div>
-              <p>รายการจะยังอยู่ในประวัติ แต่จะไม่ใช้วัน เวลา หรือพื้นที่อีกต่อไป</p>
-              <div><button type="button" onClick={() => setCancelConfirmation(false)}>กลับไปดูข้อมูล</button><button type="button" onClick={cancelBooking}>ยืนยันยกเลิกการจอง</button></div>
-            </section>
-          ) : null}
         </div>
+
+        {cancelConfirmation ? (
+          <section className="booking-cancel-confirmation" ref={cancelPanelRef}>
+            <div><CircleAlert size={20} /><h3 id="booking-cancel-title">ยกเลิกการจองนี้หรือไม่</h3></div>
+            <p id="booking-cancel-description">รายการจะยังอยู่ในประวัติ แต่จะไม่ใช้วัน เวลา หรือพื้นที่อีกต่อไป</p>
+            {notice ? <p className="booking-editor__notice" role="alert">{notice}</p> : null}
+            <div><button ref={cancelBackButtonRef} type="button" onClick={dismissCancellation}>กลับไปดูข้อมูล</button><button type="button" disabled={saving} aria-busy={saving} onClick={() => void cancelBooking()}>ยืนยันยกเลิกการจอง</button></div>
+          </section>
+        ) : null}
 
         {relationshipEditor ? (
           <section className="booking-editor__relationship-panel" aria-label={relationshipEditor.kind === "customer" ? "เพิ่มลูกค้าในรายการจอง" : "เพิ่มสัตว์เลี้ยงในรายการจอง"}>

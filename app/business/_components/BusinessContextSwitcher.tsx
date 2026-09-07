@@ -1,19 +1,25 @@
 "use client";
 
+import Image from "next/image";
 import {
-  DEMO_BUSINESS_CONTEXTS,
   getDemoBusinessContextDetails,
+  getPrototypeBusinessProfile,
+  listPrototypeBusinessContexts,
 } from "../../_prototype/businessState";
 import { ChevronDown, MapPin } from "../../_components/icons";
-import { useBusinessContext } from "./useBusinessContext";
+import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
 
 export function BusinessContextSwitcher() {
-  const { context, selectContext } = useBusinessContext();
-  const details = getDemoBusinessContextDetails(context);
+  const { context, selectContext, revision } = useBusinessContext();
+  const stateReady = useBusinessStateReady();
+  const details = getDemoBusinessContextDetails(context, !stateReady);
+  const profile = getPrototypeBusinessProfile(context.businessId, !stateReady);
+  void revision;
+  const contexts = listPrototypeBusinessContexts(undefined, !stateReady);
 
   return (
     <label className="business-context-switcher">
-      <span className="business-context-switcher__icon"><MapPin size={18} weight="bold" /></span>
+      <span className="business-context-switcher__icon">{profile?.logoDataUrl ? <Image src={profile.logoDataUrl} alt="" width={32} height={32} unoptimized /> : <MapPin size={18} weight="bold" />}</span>
       <span className="business-context-switcher__copy">
         <strong>{details.business?.name ?? "ร้าน"}</strong>
         <small>{details.branch?.name ?? "สาขา"}</small>
@@ -25,8 +31,8 @@ export function BusinessContextSwitcher() {
         value={context.key}
         onChange={(event) => selectContext(event.target.value)}
       >
-        {DEMO_BUSINESS_CONTEXTS.map((item) => {
-          const itemDetails = getDemoBusinessContextDetails(item);
+        {contexts.map((item) => {
+          const itemDetails = getDemoBusinessContextDetails(item, !stateReady);
           return (
             <option key={item.key} value={item.key}>
               {itemDetails.business?.name} · {itemDetails.branch?.name}

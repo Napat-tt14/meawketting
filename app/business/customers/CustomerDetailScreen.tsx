@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState, useSyncExternalStore } from "react";
+import { getDurableCustomer, updateDurableCustomerTags } from "../../_backend/be2/client";
 import {
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
@@ -8,6 +9,8 @@ import {
   getPrototypeHotelStayRoomId,
   HOTEL_STAY_STATUS_LABELS,
   listPrototypeChargeBalances,
+  listPrototypeChargeFixtures,
+  listPrototypeCharges,
   listPrototypePaymentFixtures,
   listPrototypePayments,
   getPrototypeServiceRecordPaymentReference,
@@ -17,16 +20,18 @@ import {
   listPrototypeBookings,
   listPrototypeHotelStayFixtures,
   listPrototypeHotelStays,
+  listPrototypeCustomerFixtures,
+  listPrototypeCustomers,
   readPrototypeCustomer,
   readPrototypeCustomerFixture,
   resolvePrototypeBookingRelationship,
-  updatePrototypeCustomerTags,
   type DemoBusinessContext,
   type PrototypeChargeStatus,
   type PrototypeCustomer,
   type PrototypeServiceRecord,
   type PrototypeServiceRecordPaymentStatus,
 } from "../../_prototype/businessState";
+import { listPrototypeConversationFixtures, listPrototypeConversations } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { ArrowLeft, CalendarDays, CheckCircle, CircleAlert, CircleDashed, CircleOff, Clock, FileImage, Info, MessageCircle, Pencil, Phone, Plus, Wallet, X } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
@@ -37,16 +42,15 @@ import { PetRelationshipEditor } from "./PetRelationshipEditor";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import {
-  bookingOccursAfterDemoStart,
   bookingDateLabel,
   bookingSummary,
   customerTagLabel,
-  customerBookings,
-  nextPetBooking,
   petSpeciesLabel,
 } from "./customerPresentation";
 import { calendarDateLabel } from "../calendar/calendarPresentation";
 import { chargeStatusLabel, formatBusinessMoney, paymentMethodLabel } from "../billing/billingPresentation";
+import { CustomerCrmPanel } from "./CrmPanel";
+import { deriveCustomerCrmProfile, deriveCustomerCrmReferenceAt, deriveCustomerTimeline, deriveCustomerUpcomingBookings } from "./crmPresentation";
 
 const emptySubscribe = () => () => {};
 function useIsClient() {
@@ -80,7 +84,7 @@ function ServiceRecordHistoryItem({
   customer: PrototypeCustomer;
 }) {
   const pet = customer.pets.find((item) => item.id === record.petId);
-  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(record.businessId, record.branchId)).branch;
+  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(record.businessId, record.branchId, fixtureOnly), fixtureOnly).branch;
   const paymentReference = getPrototypeServiceRecordPaymentReference(record, context, fixtureOnly);
   return (
     <li className="customer-service-history__item">
@@ -133,12 +137,26 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
     return () => window.removeEventListener("meawketting:business-state", sync);
   }, []);
 
+  useEffect(() => {
+    void getDurableCustomer(context.businessId, customerId).catch(() => {
+      setNotice("ไม่สามารถโหลดข้อมูลลูกค้าจาก Business นี้ได้");
+    });
+  }, [context.businessId, customerId]);
+
   void revision;
   const candidate = relationshipStateReady ? readPrototypeCustomer(customerId) : readPrototypeCustomerFixture(customerId);
   const customer = candidate?.businessId === context.businessId ? candidate : null;
   const bookings = relationshipStateReady
     ? listPrototypeBookings(null, { includeCancelled: true })
     : listPrototypeBookingFixtures(null, { includeCancelled: true });
+  const crmServiceRecords = relationshipStateReady
+    ? listPrototypeServiceRecords(null)
+    : listPrototypeServiceRecordFixtures(null);
+  const crmCharges = relationshipStateReady ? listPrototypeCharges(null) : listPrototypeChargeFixtures(null);
+  const crmPayments = relationshipStateReady ? listPrototypePayments(null) : listPrototypePaymentFixtures(null);
+  const crmConversations = relationshipStateReady
+    ? listPrototypeConversations(context.businessId)
+    : listPrototypeConversationFixtures(context.businessId);
 
   if (!customer) {
     return (
@@ -150,9 +168,25 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
     );
   }
   const resolvedCustomer = customer;
+  const crmDataset = {
+    bookings,
+    serviceRecords: crmServiceRecords,
+    charges: crmCharges,
+    payments: crmPayments,
+    conversations: crmConversations,
+  };
+  const crmCustomers = relationshipStateReady
+    ? listPrototypeCustomers(context)
+    : listPrototypeCustomerFixtures(context);
+  const referenceAt = deriveCustomerCrmReferenceAt(crmCustomers, crmDataset);
+  const crmProfile = deriveCustomerCrmProfile(
+    customer,
+    crmDataset,
+    referenceAt,
+  );
+  const customerTimeline = deriveCustomerTimeline(customer, crmDataset);
 
-  const relatedBookings = customerBookings(customer, bookings);
-  const upcomingBookings = relatedBookings.filter(bookingOccursAfterDemoStart).slice(0, 3);
+  const upcomingBookings = deriveCustomerUpcomingBookings(customer, crmDataset, referenceAt);
   // Hotel execution stays Branch-scoped even though Customer identity is shared
   // across the Business. This avoids exposing another Branch's live operations.
   const hotelStays = relationshipStateReady
@@ -177,16 +211,23 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
     .filter((balance) => balance.status === "unpaid" || balance.status === "partial")
     .reduce((total, balance) => total + balance.remaining, 0);
 
-  function updateTags(nextTags: readonly string[]) {
-    const updated = updatePrototypeCustomerTags(resolvedCustomer.id, nextTags);
-    if (!updated) setNotice("บันทึกป้ายกำกับในเบราว์เซอร์ไม่สำเร็จ ลองอีกครั้ง");
+  async function updateTags(nextTags: readonly string[]) {
+    try {
+      await updateDurableCustomerTags({
+        businessId: resolvedCustomer.businessId,
+        customerId: resolvedCustomer.id,
+        tags: [...nextTags],
+      });
+    } catch {
+      setNotice("บันทึกป้ายกำกับไม่สำเร็จ ลองอีกครั้ง");
+    }
   }
 
   function addTag(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextTag = tagInput.trim();
     if (!nextTag || resolvedCustomer.tags.includes(nextTag)) return;
-    updateTags([...resolvedCustomer.tags, nextTag]);
+    void updateTags([...resolvedCustomer.tags, nextTag]);
     setTagInput("");
   }
 
@@ -219,6 +260,8 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
 
       <div className="business-customer-detail__layout">
         <div className="business-customer-detail__main">
+          <CustomerCrmPanel profile={crmProfile} timeline={customerTimeline} />
+
           <section className="customer-detail-section customer-detail-section--pets" aria-labelledby="customer-pets-title">
             <header>
               <div><h2 id="customer-pets-title">สัตว์เลี้ยง</h2><p>เลือกดูข้อมูลและเพิ่มการจองแยกตามตัว</p></div>
@@ -230,7 +273,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             {customer.pets.length > 0 ? (
               <ul className="customer-pet-list" aria-label="สัตว์เลี้ยงของลูกค้ารายนี้">
                 {customer.pets.map((pet) => {
-                  const nextBooking = nextPetBooking(pet, relatedBookings);
+                  const nextBooking = upcomingBookings.find((booking) => booking.pets.some((bookingPet) => bookingPet.id === pet.id)) ?? null;
                   return (
                     <li className="customer-pet-row" key={pet.id}>
                       <div className="customer-pet-row__identity">
@@ -284,9 +327,9 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             <header><div><h2 id="customer-upcoming-title">นัดหมายที่กำลังจะมาถึง</h2></div><CalendarDays size={22} /></header>
             {upcomingBookings.length > 0 ? (
               <ol className="customer-booking-list">
-                {upcomingBookings.map((booking) => {
+                {upcomingBookings.slice(0, 3).map((booking) => {
                   const relationship = resolvePrototypeBookingRelationship(booking);
-                  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(booking.businessId, booking.branchId)).branch;
+                  const branch = getDemoBusinessContextDetails(getDemoBusinessContextForBranch(booking.businessId, booking.branchId, !relationshipStateReady), !relationshipStateReady).branch;
                   return <li key={booking.bookingId}><div className="customer-booking-list__identity"><BusinessServiceIcon module={booking.serviceModule} size={18} /><span><strong>{relationship.pets.map((pet) => pet.name).join(", ") || "น้อง"}</strong><small>{booking.service.label}</small></span></div><div className="customer-booking-list__when"><strong>{bookingDateLabel(booking)}</strong><small>{branch?.name ?? "สาขานี้"}</small></div></li>;
                 })}
               </ol>
@@ -294,7 +337,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
           </section>
 
           <section className="customer-detail-section customer-detail-section--service-history" aria-labelledby="customer-service-history-title">
-            <header><div><h2 id="customer-service-history-title">ประวัติบริการ</h2><p>บันทึกจากงาน Grooming และ Hotel ที่เสร็จแล้ว · เปิดรายละเอียดในรายการนี้</p></div><Clock size={22} /></header>
+            <header><div><h2 id="customer-service-history-title">ประวัติบริการ</h2><p>บันทึกจาก Grooming, Hotel และ Daycare ที่เสร็จแล้ว · เปิดรายละเอียดในรายการนี้</p></div><Clock size={22} /></header>
             {recentServiceRecords.length > 0 ? <ol className="customer-service-history">{recentServiceRecords.map((record) => <ServiceRecordHistoryItem key={record.serviceRecordId} record={record} context={context} fixtureOnly={!relationshipStateReady} customer={customer} />)}</ol> : <p className="customer-section-empty">ยังไม่มีประวัติบริการที่เสร็จสมบูรณ์ของลูกค้ารายนี้ในสาขานี้</p>}
           </section>
 
@@ -316,7 +359,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             <div className="customer-tags" aria-labelledby="customer-tags-title">
               <header><h3 id="customer-tags-title">ป้ายกำกับ</h3></header>
               <div className="customer-tags__list">
-                {customer.tags.length > 0 ? customer.tags.map((tag) => <span key={tag}>{customerTagLabel(tag)}<button type="button" title={`เอาป้ายกำกับ ${customerTagLabel(tag)} ออก`} aria-label={`เอาป้ายกำกับ ${customerTagLabel(tag)} ออก`} onClick={() => updateTags(customer.tags.filter((item) => item !== tag))}><X size={14} /></button></span>) : <p>ยังไม่มีป้ายกำกับ</p>}
+                {customer.tags.length > 0 ? customer.tags.map((tag) => <span key={tag}>{customerTagLabel(tag)}<button type="button" title={`เอาป้ายกำกับ ${customerTagLabel(tag)} ออก`} aria-label={`เอาป้ายกำกับ ${customerTagLabel(tag)} ออก`} onClick={() => void updateTags(customer.tags.filter((item) => item !== tag))}><X size={14} /></button></span>) : <p>ยังไม่มีป้ายกำกับ</p>}
               </div>
               <form className="customer-tags__form" onSubmit={addTag}>
                 <label className="sr-only" htmlFor="customer-tag-input">เพิ่มป้ายกำกับ</label>

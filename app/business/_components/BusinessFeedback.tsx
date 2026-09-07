@@ -17,6 +17,7 @@ export function BusinessAlert({
   children,
   actions,
   className = "",
+  role,
   ...attributes
 }: Omit<HTMLAttributes<HTMLElement>, "title"> & {
   tone?: BusinessAlertTone;
@@ -26,7 +27,7 @@ export function BusinessAlert({
 }) {
   const AlertIcon = alertIcons[tone];
   return (
-    <section className={`business-alert business-alert--${tone} ${className}`.trim()} role="alert" {...attributes}>
+    <section className={`business-alert business-alert--${tone} ${className}`.trim()} role={role ?? (tone === "critical" || tone === "warning" ? "alert" : "status")} {...attributes}>
       <AlertIcon className="business-alert__icon" size={20} aria-hidden="true" />
       <div className="business-alert__content">
         <strong className="business-alert__title">{title}</strong>

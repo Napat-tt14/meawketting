@@ -57,7 +57,7 @@ export function BusinessServicesSection() {
               <div>
                 <h3>บริการเสริม</h3>
                 <p>Training · Transport · Retail</p>
-                <small>ปรับรูปแบบบริการให้เข้ากับร้านและสาขา</small>
+                <small>วางแผนไว้สำหรับอนาคต · ยังไม่เปิดใช้งาน</small>
               </div>
             </li>
           </ul>

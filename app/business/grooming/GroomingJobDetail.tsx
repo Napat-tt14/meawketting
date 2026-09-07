@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  evaluatePrototypeTeamMemberAvailability,
   getBookingResources,
+  getBookingInterval,
+  getBookingResourceStaffMember,
   readPrototypeBooking,
   readPrototypeCustomer,
   type DemoBusinessContext,
@@ -69,10 +72,12 @@ export function GroomingJobDetail({
   const [notice, setNotice] = useState<string | null>(null);
   const [requestOpen, setRequestOpen] = useState<{ conversationId: string; bookingId: string; serviceLabel: string } | null>(null);
   const onCloseRef = useRef(onClose);
+  const requestOpenRef = useRef(false);
   const customer = readPrototypeCustomer(job.customerId);
   const pet = customer?.pets.find((item) => item.id === job.petId) ?? null;
   const booking = readPrototypeBooking(job.bookingId);
   const resources = getBookingResources(context, job.baseServiceId);
+  const assignmentInterval = getBookingInterval("appointment", job.scheduledStart, job.scheduledEnd);
   const availableTransitions = statusOptionsForGroomingJob(job.status);
   const statusChoices = job.status === "cancelled"
     ? ["cancelled" as ServiceJobStatus]
@@ -90,10 +95,15 @@ export function GroomingJobDetail({
   }, [onClose]);
 
   useEffect(() => {
+    requestOpenRef.current = Boolean(requestOpen);
+  }, [requestOpen]);
+
+  useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const frame = window.requestAnimationFrame(() => headingRef.current?.focus());
     function trapFocus(event: KeyboardEvent) {
+      if (event.defaultPrevented || requestOpenRef.current) return;
       if (event.key === "Escape") {
         event.preventDefault();
         close();
@@ -104,7 +114,10 @@ export function GroomingJobDetail({
       const first = focusable[0];
       const last = focusable.at(-1);
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (!focusable.includes(document.activeElement as HTMLElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -128,6 +141,17 @@ export function GroomingJobDetail({
 
   function assignedForKind(kind: "groomer" | "grooming-station" | "dryer") {
     return resources.find((resource) => resource.kind === kind && assignments.includes(resource.id))?.id ?? "";
+  }
+
+  function resourceOptionState(resourceId: string) {
+    const staff = getBookingResourceStaffMember(resourceId);
+    if (!staff) return { enabled: true, suffix: "" };
+    if (!staff.active) return { enabled: false, suffix: " · ปิดใช้งาน" };
+    if (!staff.capabilities.includes("grooming")) return { enabled: false, suffix: " · รับงานนี้ไม่ได้" };
+    const availability = assignmentInterval ? evaluatePrototypeTeamMemberAvailability(staff, assignmentInterval) : null;
+    return availability?.available === false
+      ? { enabled: false, suffix: " · ไม่พร้อมในเวลานี้" }
+      : { enabled: true, suffix: "" };
   }
 
   function changeStatus(nextStatus: ServiceJobStatus) {
@@ -246,13 +270,17 @@ export function GroomingJobDetail({
                     <span>{label}</span>
                     <select value={assignedForKind(kind)} onChange={(event) => setResource(kind, event.currentTarget.value)}>
                       <option value="">ยังไม่ระบุ{label}</option>
-                      {resources.filter((resource) => resource.kind === kind).map((resource) => <option key={resource.id} value={resource.id}>{resource.label}</option>)}
+                      {resources.filter((resource) => resource.kind === kind).map((resource) => {
+                        const resourceState = resourceOptionState(resource.id);
+                        return <option key={resource.id} value={resource.id} disabled={!resourceState.enabled}>{resource.label}{resourceState.suffix}</option>;
+                      })}
                     </select>
                   </label>
                 );
               })}
             </div>
             <button className="button button--business-ghost" type="button" onClick={saveAssignments}><Save size={17} />บันทึกการมอบหมาย</button>
+            <p className="grooming-detail-section__hint"><CircleAlert size={16} />ช่างที่ปิดใช้งานหรือไม่พร้อมจะเลือกไม่ได้ และระบบตรวจอีกครั้งก่อนบันทึก</p>
           </section>
 
           <section className="grooming-detail-section" aria-labelledby="grooming-addon-title">
@@ -264,7 +292,7 @@ export function GroomingJobDetail({
 
           <section className="grooming-detail-section" aria-labelledby="grooming-note-title">
             <header><h3 id="grooming-note-title">หมายเหตุของร้าน</h3></header>
-            <textarea value={note} rows={3} maxLength={360} placeholder="ใช้ภายในทีมเท่านั้น" onInput={(event) => setNote(event.currentTarget.value)} />
+            <textarea aria-labelledby="grooming-note-title" value={note} rows={3} maxLength={360} placeholder="ใช้ภายในทีมเท่านั้น" onInput={(event) => setNote(event.currentTarget.value)} />
             <div className="grooming-detail-section__actions"><button type="button" onClick={saveNote}><Save size={17} />บันทึกหมายเหตุ</button><a href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />เปิดข้อความลูกค้า</a></div>
           </section>
 

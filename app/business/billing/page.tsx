@@ -3,7 +3,7 @@ import { BillingScreen, type BillingLaunchRequest } from "./BillingScreen";
 
 export const metadata: Metadata = {
   title: "การเงิน",
-  description: "ตรวจยอด รับชำระ และดูรายรับของสาขาใน local prototype",
+  description: "ตรวจยอด รับชำระ และดูรายรับของสาขา",
 };
 
 type BillingPageProps = {
@@ -11,6 +11,7 @@ type BillingPageProps = {
     chargeId?: string | string[];
     serviceJobId?: string | string[];
     hotelStayId?: string | string[];
+    daycareAttendanceId?: string | string[];
   }>;
 };
 
@@ -23,8 +24,9 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const chargeId = firstQueryValue(params.chargeId);
   const serviceJobId = firstQueryValue(params.serviceJobId);
   const hotelStayId = firstQueryValue(params.hotelStayId);
-  const launchRequest: BillingLaunchRequest | null = chargeId || serviceJobId || hotelStayId
-    ? { key: `${chargeId ?? ""}:${serviceJobId ?? ""}:${hotelStayId ?? ""}`, chargeId, serviceJobId, hotelStayId }
+  const daycareAttendanceId = firstQueryValue(params.daycareAttendanceId);
+  const launchRequest: BillingLaunchRequest | null = chargeId || serviceJobId || hotelStayId || daycareAttendanceId
+    ? { key: `${chargeId ?? ""}:${serviceJobId ?? ""}:${hotelStayId ?? ""}:${daycareAttendanceId ?? ""}`, chargeId, serviceJobId, hotelStayId, daycareAttendanceId }
     : null;
   return <main id="main-content" className="page business-page business-billing-page"><BillingScreen launchRequest={launchRequest} /></main>;
 }

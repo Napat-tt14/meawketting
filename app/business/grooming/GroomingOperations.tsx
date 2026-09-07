@@ -24,6 +24,7 @@ import {
 } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { BusinessAlert } from "../_components/BusinessFeedback";
 import { BusinessSidebarSectionHeader } from "../_components/BusinessNavigationPrimitives";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
 import { CircleAlert, Plus, Scissors } from "../../_components/icons";
@@ -77,7 +78,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
   const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
   const [settledJobId, setSettledJobId] = useState<string | null>(null);
-  const [, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const touchStartRef = useRef<GroomingPointerState | null>(null);
   const draggingJobIdRef = useRef<string | null>(null);
   const suppressOpenRef = useRef<string | null>(null);
@@ -89,7 +90,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     if (settledTimerRef.current !== null) window.clearTimeout(settledTimerRef.current);
   }, []);
 
-  const groomingEnabled = getEnabledBusinessModules(context).includes("grooming");
+  const groomingEnabled = getEnabledBusinessModules(context, !stateReady).includes("grooming");
   const jobs = stateReady
     ? listPrototypeGroomingServiceJobs(context, { date: BOOKING_DEMO_DATE, includeCancelled: false })
     : listPrototypeGroomingServiceJobFixtures(context, { date: BOOKING_DEMO_DATE, includeCancelled: false });
@@ -143,7 +144,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
       setNotice(message);
       return { ok: false, notice: message };
     }
-    const message = result.duplicate ? "สถานะนี้ถูกบันทึกไว้แล้ว" : `เปลี่ยนสถานะเป็น ${groomingStatusLabel(next)} แล้ว`;
+    const message = result.duplicate ? "สถานะนี้ถูกบันทึกไว้แล้ว" : `อัปเดตสถานะ: ${groomingStatusLabel(next)}`;
     setNotice(message);
     setSettledJobId(serviceJobId);
     if (settledTimerRef.current !== null) window.clearTimeout(settledTimerRef.current);
@@ -240,7 +241,13 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     const destination = GROOMING_BOARD_LANES[currentIndex + direction];
     if (!destination || !statusForDestination(job, destination.key)) return;
     event.preventDefault();
-    finishDrop(job.serviceJobId, destination.key);
+    const result = finishDrop(job.serviceJobId, destination.key);
+    if (result.ok) window.requestAnimationFrame(() => {
+      const card = [...document.querySelectorAll<HTMLElement>("[data-service-job-id]")]
+        .find((element) => element.dataset.serviceJobId === job.serviceJobId && element.getClientRects().length > 0);
+      card?.focus({ preventScroll: true });
+      card?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
   }
 
   function pointerDown(job: PrototypeServiceJob, event: PointerEvent<HTMLElement>) {
@@ -426,6 +433,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
         </>
       )}
 
+      {notice && !selectedJob ? <BusinessAlert title={notice} role="status" aria-live="polite" /> : null}
       {selectedJob ? <GroomingJobDetail key={selectedJob.serviceJobId} job={selectedJob} context={context} onClose={closeJob} onTransition={transitionFromDetail} onAssign={assignResources} onSaveNote={saveNote} /> : null}
     </div>
   );

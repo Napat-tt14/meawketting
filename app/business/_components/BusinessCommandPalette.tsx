@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getEnabledBusinessModules } from "../../_prototype/businessState";
 import { Search, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
-import { useBusinessContext } from "./useBusinessContext";
+import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
 
 type BusinessCommand = {
   label: string;
@@ -18,14 +18,16 @@ const BUSINESS_COMMANDS: readonly BusinessCommand[] = [
   { label: "ลูกค้าและสัตว์เลี้ยง", detail: "ค้นหาข้อมูลลูกค้า", href: "/business/customers" },
   { label: "ข้อความ", detail: "คุยกับเจ้าของสัตว์เลี้ยง", href: "/business/inbox" },
   { label: "การเงิน", detail: "ตรวจยอด รับชำระ และดูรายรับ", href: "/business/billing" },
-  { label: "อาบน้ำ / ตัดขน", detail: "จัดการงานบริการ", href: "/business/grooming" },
+  { label: "รายงาน", detail: "ภาพรวมธุรกิจ ยอดขาย และประสิทธิภาพ", href: "/business/reports" },
+  { label: "ทีม", detail: "ดูทีม งาน และความพร้อมของสาขา", href: "/business/team" },
   { label: "สแกนรับเข้า", detail: "ตรวจสิทธิ์ก่อนเปิดข้อมูล", href: "/business/scan" },
+  { label: "ตั้งค่า", detail: "จัดการข้อมูลร้าน สาขา บริการ และเวลาทำการ", href: "/business/settings" },
 ];
 
-const BUSINESS_HOTEL_COMMAND: BusinessCommand = {
-  label: "โรงแรม",
-  detail: "จัดการการเข้าพัก ห้อง และงานดูแล",
-  href: "/business/hotel",
+const BUSINESS_MODULE_COMMANDS = {
+  grooming: { label: "อาบน้ำ / ตัดขน", detail: "จัดการคิวและงานบริการ", href: "/business/grooming" },
+  hotel: { label: "โรงแรม", detail: "จัดการการเข้าพัก ห้อง และงานดูแล", href: "/business/hotel" },
+  daycare: { label: "Daycare", detail: "จัดการรับเข้า โซน และกิจกรรมระหว่างวัน", href: "/business/daycare" },
 };
 
 function normalize(value: string) {
@@ -33,7 +35,8 @@ function normalize(value: string) {
 }
 
 export function BusinessCommandPalette() {
-  const { context } = useBusinessContext();
+  const { context, revision } = useBusinessContext();
+  const stateReady = useBusinessStateReady();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -42,10 +45,11 @@ export function BusinessCommandPalette() {
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const commands = useMemo(
-    () => getEnabledBusinessModules(context).includes("hotel")
-      ? [...BUSINESS_COMMANDS, BUSINESS_HOTEL_COMMAND]
-      : BUSINESS_COMMANDS,
-    [context],
+    () => {
+      void revision;
+      return [...BUSINESS_COMMANDS, ...getEnabledBusinessModules(context, !stateReady).map((module) => BUSINESS_MODULE_COMMANDS[module])];
+    },
+    [context, revision, stateReady],
   );
 
   const visibleCommands = useMemo(() => {
@@ -63,6 +67,7 @@ export function BusinessCommandPalette() {
   useEffect(() => {
     function openWithShortcut(event: globalThis.KeyboardEvent) {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
+      if (event.defaultPrevented || [...document.querySelectorAll('[aria-modal="true"]')].some((dialog) => dialog.getClientRects().length > 0 && dialog !== panelRef.current)) return;
       event.preventDefault();
       setOpen(true);
     }
@@ -77,6 +82,23 @@ export function BusinessCommandPalette() {
       if (event.key === "Escape") {
         event.preventDefault();
         closePalette();
+        return;
+      }
+      if ((event.key === "ArrowDown" || event.key === "ArrowUp") && panelRef.current) {
+        const links = [...panelRef.current.querySelectorAll<HTMLAnchorElement>(".business-command-palette__results a[href]")];
+        if (!links.length) return;
+        event.preventDefault();
+        const current = links.findIndex((link) => link === document.activeElement);
+        const next = event.key === "ArrowDown" ? (current + 1) % links.length : (current <= 0 ? links.length - 1 : current - 1);
+        links[next]?.focus();
+        return;
+      }
+      if (event.key === "Enter" && document.activeElement === inputRef.current) {
+        const firstResult = panelRef.current?.querySelector<HTMLAnchorElement>(".business-command-palette__results a[href]");
+        if (firstResult) {
+          event.preventDefault();
+          firstResult.click();
+        }
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
@@ -119,7 +141,7 @@ export function BusinessCommandPalette() {
 
       {open ? (
         <>
-          <button className="business-command-palette__backdrop" type="button" aria-label="ปิดการค้นหา" onClick={closePalette} />
+          <button className="business-command-palette__backdrop" type="button" tabIndex={-1} aria-label="ปิดการค้นหา" onClick={closePalette} />
           <div id="business-command-palette-panel" ref={panelRef} className="business-command-palette__panel" role="dialog" aria-modal="true" aria-label="ค้นหาในระบบ">
             <header className="business-command-palette__header">
               <div><strong>ไปที่หน้า</strong><small>ค้นหาเมนูด้วยคำค้น หรือกด Ctrl K</small></div>

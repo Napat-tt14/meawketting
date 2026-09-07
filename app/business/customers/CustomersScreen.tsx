@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { searchDurableCustomers } from "../../_backend/be2/client";
 import {
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
@@ -8,7 +9,14 @@ import {
   listPrototypeCustomers,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
+  listPrototypeChargeFixtures,
+  listPrototypeCharges,
+  listPrototypePaymentFixtures,
+  listPrototypePayments,
+  listPrototypeServiceRecordFixtures,
+  listPrototypeServiceRecords,
 } from "../../_prototype/businessState";
+import { listPrototypeConversationFixtures, listPrototypeConversations } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { CalendarDays, ChevronRight, Info, Phone, Plus } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
@@ -19,15 +27,20 @@ import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { BusinessSearchField } from "../_components/BusinessSearchField";
 import { BusinessSegmentedControl } from "../_components/BusinessSegmentedControl";
 import {
-  CUSTOMER_LIST_FILTERS,
-  type CustomerListFilter,
   bookingDateLabel,
   customerTagLabel,
-  customerMatchesFilter,
-  matchesCustomerSearch,
-  nextCustomerBooking,
   petSpeciesLabel,
 } from "./customerPresentation";
+import { calendarDateLabel } from "../calendar/calendarPresentation";
+import { CustomerCrmOverview } from "./CrmPanel";
+import {
+  CUSTOMER_CRM_SEGMENTS,
+  CUSTOMER_LIFECYCLE_LABELS,
+  customerMatchesCrmSegment,
+  deriveCustomerCrmProfile,
+  deriveCustomerCrmReferenceAt,
+  type CustomerCrmSegment,
+} from "./crmPresentation";
 
 const emptySubscribe = () => () => {};
 function useIsClient() {
@@ -37,10 +50,12 @@ function useIsClient() {
 export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean }) {
   const { context } = useBusinessContext();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<CustomerListFilter>("all");
+  const [filter, setFilter] = useState<CustomerCrmSegment>("all");
   const [revision, setRevision] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [searchResult, setSearchResult] = useState<{ businessId: string; query: string; customerIds: string[] } | null>(null);
+  const [searching, setSearching] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const relationshipStateReady = useIsClient();
 
@@ -62,6 +77,34 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
     };
   }, [focusSearch]);
 
+  useEffect(() => {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      void searchDurableCustomers(context.businessId, normalizedQuery)
+        .then((page) => {
+          if (cancelled) return;
+          setSearchResult({
+            businessId: context.businessId,
+            query: normalizedQuery,
+            customerIds: page.items.map((customer) => customer.id),
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setNotice("ค้นหาข้อมูลไม่สำเร็จ ลองอีกครั้ง");
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [context.businessId, query]);
+
   void revision;
   const customers = relationshipStateReady
     ? listPrototypeCustomers(context)
@@ -69,8 +112,27 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const bookings = relationshipStateReady
     ? listPrototypeBookings(null, { includeCancelled: true })
     : listPrototypeBookingFixtures(null, { includeCancelled: true });
+  const serviceRecords = relationshipStateReady
+    ? listPrototypeServiceRecords(null)
+    : listPrototypeServiceRecordFixtures(null);
+  const charges = relationshipStateReady ? listPrototypeCharges(null) : listPrototypeChargeFixtures(null);
+  const payments = relationshipStateReady ? listPrototypePayments(null) : listPrototypePaymentFixtures(null);
+  const conversations = relationshipStateReady
+    ? listPrototypeConversations(context.businessId)
+    : listPrototypeConversationFixtures(context.businessId);
+  const crmDataset = { bookings, serviceRecords, charges, payments, conversations };
+  const referenceAt = deriveCustomerCrmReferenceAt(customers, crmDataset);
+  const crmProfiles = customers.map((customer) => deriveCustomerCrmProfile(customer, crmDataset, referenceAt));
+  const crmProfilesByCustomer = new Map(crmProfiles.map((profile) => [profile.customerId, profile]));
+  const normalizedQuery = query.trim();
+  const backendSearchIds = normalizedQuery
+    && searchResult?.businessId === context.businessId
+    && searchResult.query === normalizedQuery
+    ? new Set(searchResult.customerIds)
+    : null;
   const visibleCustomers = customers.filter((customer) => (
-    matchesCustomerSearch(customer, query) && customerMatchesFilter(customer, filter, bookings)
+    (!normalizedQuery || backendSearchIds?.has(customer.id) === true)
+    && customerMatchesCrmSegment(crmProfilesByCustomer.get(customer.id)!, filter)
   ));
   return (
     <div className="business-customers shell">
@@ -79,26 +141,38 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
         actions={<button className="button button--business business-signature-sweep" type="button" onClick={() => { setNotice(null); setEditorOpen(true); }}><Plus size={19} /><span>เพิ่มลูกค้า</span></button>}
       />
 
+      <CustomerCrmOverview profiles={crmProfiles} />
+
       <section className="customer-search-panel" aria-label="ค้นหาและกรองลูกค้า">
         <BusinessSearchField
           ref={searchRef}
           id="customer-search"
           label="ค้นหาลูกค้าและสัตว์เลี้ยง"
           value={query}
-          onInput={(event) => setQuery(event.currentTarget.value)}
+          onInput={(event) => {
+            const nextQuery = event.currentTarget.value;
+            setQuery(nextQuery);
+            if (!nextQuery.trim()) {
+              setSearchResult(null);
+              setSearching(false);
+            }
+          }}
           placeholder="ค้นหาชื่อลูกค้า ชื่อน้อง หรือเบอร์โทร"
           autoComplete="off"
         />
-        <BusinessSegmentedControl
-          className="customer-filter-group"
-          value={filter}
-          options={CUSTOMER_LIST_FILTERS.map((option) => ({
-            ...option,
-            label: `${option.label} ${customers.filter((customer) => customerMatchesFilter(customer, option.value, bookings)).length}`,
-          }))}
-          ariaLabel="กรองรายชื่อลูกค้า"
-          onChange={setFilter}
-        />
+        <div className="crm-segment-filter">
+          <span>กลุ่มลูกค้า</span>
+          <BusinessSegmentedControl
+            className="customer-filter-group"
+            value={filter}
+            options={CUSTOMER_CRM_SEGMENTS.map((option) => ({
+              ...option,
+              label: `${option.label} ${crmProfiles.filter((profile) => customerMatchesCrmSegment(profile, option.value)).length}`,
+            }))}
+            ariaLabel="กรองกลุ่มลูกค้า"
+            onChange={setFilter}
+          />
+        </div>
       </section>
 
       {notice ? <p className="business-customers__notice" role="status"><Info size={18} />{notice}</p> : null}
@@ -108,7 +182,9 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
           <h2>ลูกค้า {visibleCustomers.length} ราย</h2>
           {query || filter !== "all" ? <span>จากทั้งหมด {customers.length} ราย</span> : null}
         </header>
-        {customers.length === 0 ? (
+        {searching && normalizedQuery && !backendSearchIds ? (
+          <div className="customer-empty-state customer-empty-state--search"><div><strong>กำลังค้นหา…</strong><p>ค้นหาจากข้อมูลลูกค้าและสัตว์เลี้ยงของ Business นี้</p></div></div>
+        ) : customers.length === 0 ? (
           <div className="customer-empty-state">
             <div><strong>ยังไม่มีลูกค้าในรายการ</strong><p>เพิ่มลูกค้าและสัตว์เลี้ยงเพื่อใช้กับการจองและงานบริการ</p></div>
             <button className="button button--business business-signature-sweep" type="button" onClick={() => setEditorOpen(true)}><Plus size={18} /><span>เพิ่มลูกค้า</span></button>
@@ -129,9 +205,12 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
             </div>
             <ol className="customer-list">
               {visibleCustomers.map((customer) => {
-                const nextBooking = nextCustomerBooking(customer, bookings);
+                const crmProfile = crmProfilesByCustomer.get(customer.id)!;
+                // CRM's next Booking contains only Pets whose service is still
+                // outstanding, matching the detail page's upcoming section.
+                const nextBooking = crmProfile.nextBooking;
                 const nextPet = nextBooking?.pets.find((pet) => customer.pets.some((customerPet) => customerPet.id === pet.id)) ?? null;
-                const nextBranch = nextBooking ? getDemoBusinessContextDetails(getDemoBusinessContextForBranch(nextBooking.businessId, nextBooking.branchId)).branch?.name : null;
+                const nextBranch = nextBooking ? getDemoBusinessContextDetails(getDemoBusinessContextForBranch(nextBooking.businessId, nextBooking.branchId, !relationshipStateReady), !relationshipStateReady).branch?.name : null;
                 const visiblePets = customer.pets.slice(0, 2);
                 const hiddenPetCount = customer.pets.length - visiblePets.length;
                 const visibleTags = customer.tags.slice(0, 2);
@@ -142,7 +221,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
                       <span className="customer-list-item__identity">
                         <BusinessCustomerAvatar name={customer.name} />
                         <span>
-                          <strong>{customer.name}</strong>
+                          <span className="crm-customer-name"><strong>{customer.name}</strong><small className={`crm-lifecycle-badge crm-lifecycle-badge--${crmProfile.lifecycle}`}>{CUSTOMER_LIFECYCLE_LABELS[crmProfile.lifecycle]}</small></span>
                           {customer.phone ? <small><Phone size={15} />{customer.phone}</small> : <small>ผู้ติดต่อหลัก</small>}
                         </span>
                       </span>
@@ -157,8 +236,8 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
                         {customer.pets.length === 0 ? <small className="customer-list-item__empty">ยังไม่มีสัตว์เลี้ยง</small> : null}
                       </span>
                       <span className="customer-list-item__activity">
-                        <small>นัดถัดไป</small>
-                        {nextBooking ? <><strong><BusinessServiceIcon module={nextBooking.serviceModule} size={16} />{nextPet?.name ?? "น้อง"} · {nextBooking.service.label}</strong><span><CalendarDays size={16} />{bookingDateLabel(nextBooking)}{nextBranch ? ` · ${nextBranch}` : ""}</span></> : <strong className="customer-list-item__empty">ยังไม่มีนัดหมาย</strong>}
+                        <small>{nextBooking ? "นัดถัดไป" : "ความสัมพันธ์"}</small>
+                        {nextBooking ? <><strong><BusinessServiceIcon module={nextBooking.serviceModule} size={16} />{nextPet?.name ?? "น้อง"} · {nextBooking.service.label}</strong><span><CalendarDays size={16} />{bookingDateLabel(nextBooking)}{nextBranch ? ` · ${nextBranch}` : ""}</span><span className="crm-customer-list-signal">ใช้บริการเสร็จแล้ว {crmProfile.visitCount} ครั้ง</span></> : <><strong className="customer-list-item__empty">{crmProfile.visitCount > 0 ? `ใช้บริการเสร็จแล้ว ${crmProfile.visitCount} ครั้ง` : "ยังไม่มีประวัติบริการ"}</strong><span>{crmProfile.lastVisitAt ? `ล่าสุด ${calendarDateLabel(crmProfile.lastVisitAt.slice(0, 10), { day: "numeric", month: "short" })}` : "เพิ่มนัดหมายเพื่อเริ่มความสัมพันธ์"}</span></>}
                       </span>
                       <span className="customer-list-item__tags">
                         {visibleTags.map((tag) => <span key={tag}>{customerTagLabel(tag)}</span>)}

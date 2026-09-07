@@ -115,7 +115,7 @@ export function HotelOperations({
   const dragOutcomeRef = useRef<"pending" | "invalid" | "committed" | null>(null);
   void revision;
 
-  const hotelEnabled = getEnabledBusinessModules(context).includes("hotel");
+  const hotelEnabled = getEnabledBusinessModules(context, !stateReady).includes("hotel");
   const stays = (stateReady
     ? listPrototypeHotelStays(context, { includeClosed: true })
     : listPrototypeHotelStayFixtures(context, { includeClosed: true }))
@@ -275,6 +275,16 @@ export function HotelOperations({
             type="button"
             role="tab"
             aria-selected={mobileView === value}
+            tabIndex={mobileView === value ? 0 : -1}
+            onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const tabs = [...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+              const index = tabs.indexOf(event.currentTarget);
+              const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              tabs[next]?.focus();
+              tabs[next]?.click();
+            }}
             onClick={() => {
               setMobileView(value);
               if (value === "staying") setFilter("current");
@@ -303,7 +313,7 @@ export function HotelOperations({
       </section>
 
       <section className="hotel-toolbar" aria-label="เลือกวัน ช่วงแสดงผล และค้นหาการเข้าพัก">
-        <label className="hotel-toolbar__date"><span>วันที่</span><input type="date" value={date} onChange={(event) => setDate(event.currentTarget.value)} /></label>
+        <label className="hotel-toolbar__date"><span>วันที่</span><input type="date" value={date} onChange={(event) => { if (event.currentTarget.value) setDate(event.currentTarget.value); }} /></label>
         <button type="button" onClick={() => setDate(BOOKING_DEMO_DATE)}><CalendarDays size={17} />วันนี้</button>
         <div className="hotel-toolbar__range">
           <span className="hotel-toolbar__range-label">ช่วงแสดงผล</span>

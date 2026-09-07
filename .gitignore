@@ -2,6 +2,7 @@
 /workfiledesign/
 /.claude/
 /.agents/
+/.agent/
 /.codex/
 
 # Local-only project manual; keep detailed HTML manual out of Git

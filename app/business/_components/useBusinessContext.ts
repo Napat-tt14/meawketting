@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import {
+  getBusinessConfigurationRevision,
+  subscribeBusinessConfiguration,
+} from "../../_backend/be1/configurationCache";
+import { ensureBusinessSession } from "../../_backend/be1/client";
+import {
   DEMO_BUSINESS_CONTEXTS,
   readActiveBusinessContext,
   writeActiveBusinessContext,
@@ -19,6 +24,19 @@ export function useBusinessContext() {
   const [context, setContext] = useState(DEMO_BUSINESS_CONTEXTS[0]);
   const [revision, setRevision] = useState(0);
   const [isContextReady, setIsContextReady] = useState(false);
+  const configurationRevision = useSyncExternalStore(
+    subscribeBusinessConfiguration,
+    getBusinessConfigurationRevision,
+    () => 0,
+  );
+
+  useEffect(() => {
+    void ensureBusinessSession().catch(() => {
+      // The frozen prototype remains usable with DEV/TEST fixtures when its
+      // explicitly local backend is not initialized. No browser write becomes
+      // an authorization or Business/Branch source of truth.
+    });
+  }, []);
 
   useEffect(() => {
     const sync = () => {
@@ -32,7 +50,7 @@ export function useBusinessContext() {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("meawketting:business-state", sync);
     };
-  }, []);
+  }, [configurationRevision]);
 
   const selectContext = useCallback((contextKey: string) => {
     const next = writeActiveBusinessContext(contextKey);

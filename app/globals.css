@@ -18301,7 +18301,7 @@ a.business-nav-item:focus-visible,
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
   .business-header--app .business-header__inner {
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 12px;
@@ -21839,21 +21839,55 @@ a.business-nav-item:focus-visible,
   }
 
   .business-homepage-hero {
-    gap: 36px;
-    padding-block: 44px 68px;
+    grid-template-areas: "tag" "title" "showcase" "lead" "actions" "pills" "note" "guardian";
+    gap: 20px;
+    padding-block: 24px 68px;
+  }
+
+  .business-homepage-hero__copy {
+    display: contents;
+  }
+
+  .business-homepage-hero .business-hero-tag {
+    grid-area: tag;
+    justify-self: start;
+    margin: 0;
   }
 
   .business-homepage-hero__copy h1 {
+    grid-area: title;
+    margin: 0;
     font-size: clamp(2.35rem, 11vw, 3.25rem);
   }
 
-  .business-hero-pills {
-    margin-top: 16px;
+  .business-homepage-hero__showcase {
+    grid-area: showcase;
+  }
+
+  .business-homepage-hero__lead {
+    grid-area: lead;
+  }
+
+  .business-homepage-hero .business-hero-pills {
+    grid-area: pills;
+    margin: 0;
   }
 
   .business-homepage-hero__actions {
+    grid-area: actions;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    margin-top: 0;
+  }
+
+  .business-homepage-hero__note {
+    grid-area: note;
+    margin-top: 0;
+  }
+
+  .business-homepage-hero__guardian-link {
+    grid-area: guardian;
+    margin-top: 0;
   }
 
   .business-homepage-hero__actions .button {
@@ -21873,6 +21907,30 @@ a.business-nav-item:focus-visible,
   .business-product-preview__photo {
     aspect-ratio: 16 / 9;
     max-height: 200px;
+  }
+
+  .business-homepage-hero .business-product-preview__topbar,
+  .business-homepage-hero .business-product-preview__body,
+  .business-homepage-hero .business-product-preview__photo-overlay,
+  .business-homepage-hero .business-product-preview__photo-meta,
+  .business-homepage-hero .business-product-preview__photo-note,
+  .business-homepage-hero .business-hero-glow {
+    display: none;
+  }
+
+  .business-homepage-hero .business-product-preview {
+    animation: none;
+  }
+
+  .business-homepage-hero .business-product-preview__photo {
+    min-height: 0;
+    max-height: none;
+    border-bottom: 0;
+  }
+
+  .business-homepage-hero .business-product-preview__photo>img {
+    object-position: center;
+    animation: none;
   }
 
   .business-services-list {

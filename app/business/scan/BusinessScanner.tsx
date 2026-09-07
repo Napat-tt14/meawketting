@@ -25,6 +25,7 @@ import {
   WifiOff,
 } from "../../_components/icons";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { useBusinessStateReady } from "../_components/useBusinessContext";
 
 type ScannerState =
   | "ready"
@@ -65,9 +66,12 @@ const SCANNER_COPY: Record<Exclude<ScannerState, "ready" | "camera-permission" |
   "access-changed": { title: "สิทธิ์เปลี่ยนระหว่างตรวจ", message: "ระบบหยุดขั้นตอนเพื่อไม่ใช้สิทธิ์ที่ล้าสมัย", recovery: "สแกน QR ชั่วคราวสำหรับร้านอีกครั้ง" },
 };
 
-export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string | null }) {
+const INITIAL_BUSINESS_CONTEXT = DEMO_BUSINESS_CONTEXTS[0];
+
+export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null }: { hotelStayId?: string | null; daycareAttendanceId?: string | null }) {
+  const stateReady = useBusinessStateReady();
   const [scannerState, setScannerState] = useState<ScannerState>("ready");
-  const [context, setContext] = useState<DemoBusinessContext>(DEMO_BUSINESS_CONTEXTS[0]);
+  const [context, setContext] = useState<DemoBusinessContext>(INITIAL_BUSINESS_CONTEXT);
   const [manualCode, setManualCode] = useState("");
   const [manualError, setManualError] = useState("");
   const [detectedType, setDetectedType] = useState<QrContractType | null>(null);
@@ -79,7 +83,7 @@ export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string |
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
-  const contextKeyRef = useRef(DEMO_BUSINESS_CONTEXTS[0].key);
+  const contextKeyRef = useRef(INITIAL_BUSINESS_CONTEXT.key);
 
   const stopCamera = useCallback(() => {
     if (scanTimerRef.current !== null) window.clearInterval(scanTimerRef.current);
@@ -261,7 +265,7 @@ export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string |
       setScannerState(gate === "expired" || gate === "revoked" || gate === "wrong-business" ? gate : "access-changed");
       return;
     }
-    const intake = createOrResumeBusinessIntake(access, context, { hotelStayId });
+    const intake = createOrResumeBusinessIntake(access, context, { hotelStayId, daycareAttendanceId });
     if (!intake) {
       setScannerState("network-error");
       return;
@@ -269,7 +273,7 @@ export function BusinessScanner({ hotelStayId = null }: { hotelStayId?: string |
     window.location.assign(`/business/intake/${encodeURIComponent(intake.id)}`);
   }
 
-  const details = getDemoBusinessContextDetails(context);
+  const details = getDemoBusinessContextDetails(context, !stateReady);
   const errorCopy = SCANNER_COPY[scannerState as keyof typeof SCANNER_COPY];
 
   return (

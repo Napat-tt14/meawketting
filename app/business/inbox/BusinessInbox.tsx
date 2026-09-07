@@ -161,6 +161,7 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
         />
         {selectedItem ? (
           <ConversationPane
+            key={selectedItem.conversation.conversationId}
             conversation={selectedItem.conversation}
             context={selectedItem.context}
             businessId={context.businessId}

@@ -8,6 +8,7 @@ import {
   getEnabledBusinessModules,
   getGroomingServiceJobSummary,
   getPrototypeHotelStaySummary,
+  summarizePrototypeDaycare,
   getPrototypeRevenueSummary,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
@@ -17,6 +18,7 @@ import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLin
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
 import {
   CheckCircle,
+  ChevronRight,
   Clock,
   MessageCircle,
   Plus,
@@ -56,18 +58,21 @@ function bookingPetName(booking: ReturnType<typeof listPrototypeBookings>[number
 export function BusinessHome() {
   const { context, revision } = useBusinessContext();
   const businessStateReady = useBusinessStateReady();
-  const details = getDemoBusinessContextDetails(context);
+  const details = getDemoBusinessContextDetails(context, !businessStateReady);
   const demo = getBusinessHomeDemo(context);
-  const enabledModules = getEnabledBusinessModules(context);
+  const enabledModules = getEnabledBusinessModules(context, !businessStateReady);
   void revision;
-  const branchBookings = businessStateReady
+  const allBranchBookings = businessStateReady
     ? listPrototypeBookings(context, { includeCancelled: false })
     : listPrototypeBookingFixtures(context, { includeCancelled: false });
+  const branchBookings = allBranchBookings.filter((booking) => enabledModules.includes(booking.serviceModule));
   const unreadMessageCount = getPrototypeInboxUnreadCount(context, !businessStateReady);
   const groomingSummary = getGroomingServiceJobSummary(context, BOOKING_DEMO_DATE, !businessStateReady);
   const groomingEnabled = enabledModules.includes("grooming");
   const hotelEnabled = enabledModules.includes("hotel");
   const hotelSummary = getPrototypeHotelStaySummary(context, BOOKING_DEMO_DATE, !businessStateReady);
+  const daycareEnabled = enabledModules.includes("daycare");
+  const daycareSummary = summarizePrototypeDaycare(context, BOOKING_DEMO_DATE, !businessStateReady);
   const revenueSummary = getPrototypeRevenueSummary(context, BOOKING_DEMO_DATE, !businessStateReady);
   const attentionItems = [
     ...demo.attention.filter((item) => !(groomingEnabled && item.id === "pickup")),
@@ -84,6 +89,12 @@ export function BusinessHome() {
       detail: hotelSummary.unassignedArrivals > 0
         ? `มีน้องเข้าพักวันนี้ ${hotelSummary.unassignedArrivals} ตัวที่ยังไม่ระบุห้อง`
         : `งานดูแลค้าง ${hotelSummary.careDue} งาน · ออกวันนี้ ${hotelSummary.departures} ตัว`,
+    }] : []),
+    ...(daycareEnabled && (daycareSummary.booked > 0 || daycareSummary.readyForPickup > 0) ? [{
+      id: "daycare-attention",
+      tone: daycareSummary.readyForPickup > 0 ? "ready" as const : "waiting" as const,
+      title: daycareSummary.readyForPickup > 0 ? `Daycare พร้อมรับกลับ ${daycareSummary.readyForPickup} ตัว` : `Daycare รอรับเข้า ${daycareSummary.booked} ตัว`,
+      detail: `${daycareSummary.occupied}/${daycareSummary.capacity} ที่กำลังใช้งาน · บันทึกการดูแล ${daycareSummary.careEvents} รายการ`,
     }] : []),
     ...(unreadMessageCount > 0 ? [{
       id: "messages",
@@ -102,7 +113,8 @@ export function BusinessHome() {
     waitingIntake: demo.today.waitingIntake,
     bookingsToday: branchBookings.filter(bookingIsOnDemoDay).length,
     readyForPickup: (groomingEnabled ? groomingSummary.readyForPickup : demo.today.readyForPickup ?? 0)
-      + (hotelEnabled ? hotelSummary.readyForPickup : 0),
+      + (hotelEnabled ? hotelSummary.readyForPickup : 0)
+      + (daycareEnabled ? daycareSummary.readyForPickup : 0),
     newMessages: unreadMessageCount,
   };
   return (
@@ -113,10 +125,43 @@ export function BusinessHome() {
         <BusinessHomeSpotlight />
 
         <nav className="business-quick-actions" aria-label="งานด่วน">
-          <div className="business-quick-actions__heading"><strong>งานด่วน</strong><small>เริ่มงานที่ใช้บ่อย</small></div>
-          <Link className="business-quick-action business-quick-action--primary" href="/business/calendar?new=1"><Plus size={20} /><span><strong>เพิ่มการจอง</strong><small>เริ่มรายการใหม่</small></span></Link>
-          <Link className="business-quick-action" href="/business/scan"><Scan size={20} /><span><strong>สแกนรับเข้า</strong><small>ตรวจสิทธิ์ก่อนเปิดข้อมูล</small></span></Link>
-          <Link className="business-quick-action" href="/business/customers?focus=search"><Search size={20} /><span><strong>ค้นหาลูกค้า</strong><small>ชื่อ น้อง หรือเบอร์โทร</small></span></Link>
+          <div className="business-quick-actions__heading">
+            <div className="business-quick-actions__title-row">
+              <span className="business-quick-actions__live-dot" aria-hidden="true" />
+              <strong>งานด่วน</strong>
+            </div>
+            <small>เริ่มงานที่ใช้บ่อย</small>
+          </div>
+          <Link className="business-quick-action business-quick-action--primary" href="/business/calendar?new=1">
+            <span className="business-quick-action__icon-wrap">
+              <Plus size={20} />
+            </span>
+            <span className="business-quick-action__text">
+              <strong>เพิ่มการจอง</strong>
+              <small>เริ่มรายการใหม่</small>
+            </span>
+            <ChevronRight size={18} className="business-quick-action__arrow" aria-hidden="true" />
+          </Link>
+          <Link className="business-quick-action" href="/business/scan">
+            <span className="business-quick-action__icon-wrap">
+              <Scan size={20} />
+            </span>
+            <span className="business-quick-action__text">
+              <strong>สแกนรับเข้า</strong>
+              <small>ตรวจสิทธิ์ก่อนเปิดข้อมูล</small>
+            </span>
+            <ChevronRight size={18} className="business-quick-action__arrow" aria-hidden="true" />
+          </Link>
+          <Link className="business-quick-action" href="/business/customers?focus=search">
+            <span className="business-quick-action__icon-wrap">
+              <Search size={20} />
+            </span>
+            <span className="business-quick-action__text">
+              <strong>ค้นหาลูกค้า</strong>
+              <small>ชื่อ น้อง หรือเบอร์โทร</small>
+            </span>
+            <ChevronRight size={18} className="business-quick-action__arrow" aria-hidden="true" />
+          </Link>
         </nav>
       </div>
 
@@ -130,9 +175,9 @@ export function BusinessHome() {
             <ul className="business-attention__list">
               {attentionItems.map((item) => (
                 <li key={item.id} className={`business-attention__item business-attention__item--${item.tone}`}>
-                  {item.id === "messages" || item.id === "hotel-attention" ? (
-                    <a href={item.id === "messages" ? "/business/inbox" : "/business/hotel?filter=attention"}>
-                      <span className="business-attention__cue">{item.id === "messages" ? <MessageCircle size={20} /> : <BusinessServiceIcon module="hotel" size={20} />}</span>
+                  {item.id === "messages" || item.id === "hotel-attention" || item.id === "daycare-attention" ? (
+                    <a href={item.id === "messages" ? "/business/inbox" : item.id === "daycare-attention" ? "/business/daycare?filter=attention" : "/business/hotel?filter=attention"}>
+                      <span className="business-attention__cue">{item.id === "messages" ? <MessageCircle size={20} /> : <BusinessServiceIcon module={item.id === "daycare-attention" ? "daycare" : "hotel"} size={20} />}</span>
                       <span><strong>{item.title}</strong><small>{item.detail}</small></span>
                     </a>
                   ) : (
@@ -177,6 +222,7 @@ export function BusinessHome() {
                 <div key={item.key}><dt>{item.label}</dt><dd>{todaySummary[item.key]}</dd></div>
               ))}
               {hotelEnabled ? <><div><dt>เข้าพักวันนี้</dt><dd>{hotelSummary.arrivals}</dd></div><div><dt>กลับวันนี้</dt><dd>{hotelSummary.departures}</dd></div></> : null}
+              {daycareEnabled ? <><div><dt>Daycare รับเข้าแล้ว</dt><dd>{daycareSummary.checkedIn + daycareSummary.active}</dd></div><div><dt>Daycare พร้อมรับกลับ</dt><dd>{daycareSummary.readyForPickup}</dd></div></> : null}
             </dl>
           </section>
 
@@ -192,6 +238,11 @@ export function BusinessHome() {
                     ? {
                       value: `${hotelSummary.occupied} / ${hotelSummary.capacity} ตัวกำลังพัก`,
                       detail: `ว่าง ${hotelSummary.available} · จองไว้ ${hotelSummary.reserved} · ต้องดู ${hotelSummary.attention}`,
+                    }
+                  : module === "daycare" && daycareEnabled
+                    ? {
+                      value: `${daycareSummary.occupied} / ${daycareSummary.capacity} ตัวกำลังดูแล`,
+                      detail: `ว่าง ${daycareSummary.available} · รอรับเข้า ${daycareSummary.booked} · พร้อมรับกลับ ${daycareSummary.readyForPickup}`,
                     }
                   : demo.moduleSummaries[module];
                 if (!summary) return null;
@@ -215,7 +266,6 @@ export function BusinessHome() {
               <div><dt>Payment วันนี้</dt><dd>{revenueSummary.paymentCountToday} รายการ</dd></div>
               <div><dt>ยอดค้างชำระ</dt><dd>{formatBusinessMoney(revenueSummary.unpaidBalance)}</dd></div>
             </dl>
-            <p>ใช้ข้อมูล Charge และ Payment เดียวกับหน้าการเงิน · ไม่รวมยอดที่ยังไม่รับชำระเป็นรายรับ</p>
           </section>
 
         </aside>

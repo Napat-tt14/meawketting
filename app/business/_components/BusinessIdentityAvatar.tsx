@@ -19,6 +19,26 @@ export function BusinessCustomerAvatar({
   );
 }
 
+/**
+ * A lightweight initials avatar for a Business Team member. Team data is
+ * browser-local prototype data, so this deliberately does not imply a
+ * profile-photo or identity-verification system.
+ */
+export function BusinessStaffAvatar({
+  name,
+  size = "medium",
+}: {
+  name: string;
+  size?: AvatarSize;
+}) {
+  const initial = name.replace(/^(คุณ|ช่าง)/, "").trim().charAt(0) || "ท";
+  return (
+    <span className={`business-identity-avatar business-identity-avatar--staff is-${size}`} aria-hidden="true">
+      {initial}
+    </span>
+  );
+}
+
 export function BusinessPetAvatar({
   pet,
   size = "medium",

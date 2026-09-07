@@ -1,21 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { rescheduleDurableBooking } from "../../_backend/be3/client";
 import {
   addPrototypeHotelIncidentNote,
+  assignPrototypeHotelCareTaskStaff,
   assignPrototypeHotelStayRoom,
   checkInPrototypeHotelStay,
   completePrototypeHotelCareTask,
+  evaluatePrototypeHotelStayDateChange,
   getHotelRooms,
+  getTeamMembersForCapability,
   getPrototypeHotelStayRoomAssignment,
   listPrototypeHotelLinkedGroomingJobs,
   movePrototypeHotelStayRoom,
+  projectDurableBooking,
   readPrototypeBooking,
   readPrototypeCustomer,
   readPrototypeCustomerFixture,
   resolvePrototypeHotelIncidentNote,
+  synchronizePrototypeExecutionCompatibilityForBooking,
   transitionPrototypeHotelStay,
-  updatePrototypeHotelStayDates,
   updatePrototypeHotelStayNote,
   type DemoBusinessContext,
   type PrototypeHotelStay,
@@ -80,12 +85,14 @@ export function HotelStayDetail({
 }) {
   const dialogRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const requestOpenRef = useRef(false);
   const [note, setNote] = useState(stay.businessNote);
   const [roomId, setRoomId] = useState("");
   const [moveReason, setMoveReason] = useState("");
   const [incidentSummary, setIncidentSummary] = useState("");
   const [checkInDate, setCheckInDate] = useState(stay.scheduledCheckIn);
   const [checkOutDate, setCheckOutDate] = useState(stay.scheduledCheckOut);
+  const [savingDates, setSavingDates] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [requestOpen, setRequestOpen] = useState<{ conversationId: string; bookingId: string; serviceLabel: string } | null>(null);
   const customer = fixtureOnly ? readPrototypeCustomerFixture(stay.customerId) : readPrototypeCustomer(stay.customerId);
@@ -96,14 +103,20 @@ export function HotelStayDetail({
   const currentRoom = rooms.find((room) => room.id === currentAssignment?.roomId) ?? null;
   const linkedGroomingJobs = useMemo(() => listPrototypeHotelLinkedGroomingJobs(stay, fixtureOnly), [fixtureOnly, stay]);
   const booking = readPrototypeBooking(stay.bookingId);
+  const careStaff = getTeamMembersForCapability(context, "hotel-care", { includeInactive: true, includeUnavailable: true });
 
   const close = useCallback(() => onClose(), [onClose]);
+
+  useEffect(() => {
+    requestOpenRef.current = Boolean(requestOpen);
+  }, [requestOpen]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const frame = window.requestAnimationFrame(() => headingRef.current?.focus());
     function trapFocus(event: KeyboardEvent) {
+      if (event.defaultPrevented || requestOpenRef.current) return;
       if (event.key === "Escape") {
         event.preventDefault();
         close();
@@ -114,7 +127,10 @@ export function HotelStayDetail({
       const first = focusable[0];
       const last = focusable.at(-1);
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (!focusable.includes(document.activeElement as HTMLElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -155,15 +171,49 @@ export function HotelStayDetail({
     publish({ ok: true, notice: currentAssignment ? "ย้ายห้องแล้ว และเก็บประวัติการย้ายไว้" : "ระบุห้องหรือโซนแล้ว" });
   }
 
-  function saveDates() {
-    const result = updatePrototypeHotelStayDates(stay.hotelStayId, checkInDate, checkOutDate, context);
-    if (!result.ok) {
-      const detail = result.availability?.conflicts.map((conflict) => conflict.message).join(" · ");
-      const fallback = result.reason === "invalid-dates" ? "เลือกวันออกให้หลังวันเข้าพัก" : "ปรับวันเข้าพักไม่สำเร็จ";
+  async function saveDates() {
+    const preview = evaluatePrototypeHotelStayDateChange(stay.hotelStayId, checkInDate, checkOutDate, context);
+    if (!preview.ok) {
+      const detail = preview.availability?.conflicts.map((conflict) => conflict.message).join(" · ");
+      const fallback = preview.reason === "invalid-dates" ? "เลือกวันออกให้หลังวันเข้าพัก" : "ปรับวันเข้าพักไม่สำเร็จ";
       publish({ ok: false, notice: detail || fallback });
       return;
     }
-    publish({ ok: true, notice: "ปรับวันเข้าพักแล้ว และ sync กับ Calendar" });
+    const booking = readPrototypeBooking(stay.bookingId);
+    if (!booking || booking.serviceModule !== "hotel") {
+      publish({ ok: false, notice: "ไม่พบการจองหลักของรายการเข้าพักนี้" });
+      return;
+    }
+    setSavingDates(true);
+    try {
+      const result = await rescheduleDurableBooking({
+        businessId: context.businessId,
+        branchId: context.branchId,
+        bookingId: booking.bookingId,
+        expectedRevision: booking.revision ?? 1,
+        start: checkInDate,
+        end: checkOutDate,
+      });
+      if (result.outcome === "conflict") {
+        publish({
+          ok: false,
+          notice: result.availability.conflicts.map((conflict) => conflict.message).join(" · ") || "ปรับวันเข้าพักไม่สำเร็จ",
+        });
+        return;
+      }
+      const authoritative = projectDurableBooking(result.booking);
+      const compatibilitySaved = synchronizePrototypeExecutionCompatibilityForBooking(authoritative);
+      publish({
+        ok: compatibilitySaved,
+        notice: compatibilitySaved
+          ? "ปรับวันเข้าพักและตารางการจองแล้ว"
+          : "บันทึกตารางการจองแล้ว แต่ข้อมูลปฏิบัติการในเบราว์เซอร์ยังอัปเดตไม่สำเร็จ",
+      });
+    } catch {
+      publish({ ok: false, notice: "ปรับวันเข้าพักไม่สำเร็จ รายการเดิมยังไม่เปลี่ยน" });
+    } finally {
+      setSavingDates(false);
+    }
   }
 
   function saveNote() {
@@ -174,6 +224,20 @@ export function HotelStayDetail({
   function completeCare(taskId: string) {
     const updated = completePrototypeHotelCareTask(stay.hotelStayId, taskId, context);
     publish({ ok: Boolean(updated), notice: updated ? "บันทึกงานดูแลเป็นเสร็จแล้ว" : "บันทึกงานดูแลไม่สำเร็จ ลองอีกครั้ง" });
+  }
+
+  function assignCareStaff(taskId: string, staffId: string) {
+    const result = assignPrototypeHotelCareTaskStaff(stay.hotelStayId, taskId, staffId || null, context);
+    if (!result.ok) {
+      const fallback = result.reason === "invalid-staff"
+        ? "พนักงานคนนี้ไม่อยู่ในสาขาหรือไม่มีความสามารถงานดูแล"
+        : result.reason === "unavailable"
+          ? result.availability?.conflicts[0]?.message ?? "พนักงานไม่พร้อมในเวลางานดูแลนี้"
+          : "บันทึกผู้รับผิดชอบงานดูแลไม่สำเร็จ";
+      publish({ ok: false, notice: fallback });
+      return;
+    }
+    publish({ ok: true, notice: staffId ? "มอบหมายงานดูแลให้ทีมแล้ว" : "ยกเลิกการมอบหมายงานดูแลแล้ว" });
   }
 
   function addIncident() {
@@ -280,7 +344,7 @@ export function HotelStayDetail({
               <label><span>เข้าพัก</span><input type="date" value={checkInDate} onChange={(event) => setCheckInDate(event.currentTarget.value)} /></label>
               <label><span>ออก</span><input type="date" value={checkOutDate} onChange={(event) => setCheckOutDate(event.currentTarget.value)} /></label>
             </div>
-            <button className="button button--business-ghost" type="button" onClick={saveDates}><Save size={17} />ปรับช่วงเข้าพัก</button>
+            <button className="button button--business-ghost" type="button" disabled={savingDates} aria-busy={savingDates} onClick={() => void saveDates()}><Save size={17} />{savingDates ? "กำลังบันทึก" : "ปรับช่วงเข้าพัก"}</button>
           </section>
 
           <section className="hotel-detail-section" aria-labelledby="hotel-room-title">
@@ -308,7 +372,8 @@ export function HotelStayDetail({
             <header><h3 id="hotel-care-title">งานดูแลวันนี้</h3><CheckCircle size={20} /></header>
             {stay.dailyCareTasks.length > 0 ? <ul className="hotel-care-list">{stay.dailyCareTasks.map((task) => {
               const stateLabel = hotelCareTaskStateLabel(task, referenceDate);
-              return <li key={task.id} className={task.state === "completed" ? "is-complete" : ""}><span className="hotel-care-list__time"><time>{task.scheduledTime}</time><small>{hotelCareTaskIconLabel(task)}</small></span><span className="hotel-care-list__task"><strong>{task.label}</strong><small>{task.completedAt ? `โดย ${task.completedBy ?? "ทีมร้าน"}` : task.kind === "medication" ? `${stateLabel} · ยืนยันจาก Intake แล้ว` : stateLabel}</small>{task.instructions ? <em>{task.instructions}</em> : null}</span><button type="button" disabled={task.state === "completed"} onClick={() => completeCare(task.id)} aria-label={`${task.state === "completed" ? "ทำเสร็จแล้ว" : "ทำเครื่องหมายเสร็จ"} ${task.label}`}>{task.state === "completed" ? <CheckCircle size={18} /> : "เสร็จ"}</button></li>;
+              const assignedStaff = careStaff.find((member) => member.staffId === task.assignedStaffId) ?? null;
+              return <li key={task.id} className={task.state === "completed" ? "is-complete" : ""}><span className="hotel-care-list__time"><time>{task.scheduledTime}</time><small>{hotelCareTaskIconLabel(task)}</small></span><span className="hotel-care-list__task"><strong>{task.label}</strong><small>{task.completedAt ? `โดย ${task.completedBy ?? "ทีมร้าน"}` : task.kind === "medication" ? `${stateLabel} · ยืนยันจาก Intake แล้ว` : stateLabel}</small>{task.instructions ? <em>{task.instructions}</em> : null}<label className="hotel-care-list__assignee"><span>ผู้รับผิดชอบ</span><select value={task.assignedStaffId ?? ""} onChange={(event) => assignCareStaff(task.id, event.currentTarget.value)} aria-label={`มอบหมาย ${task.label} ให้ทีม`}><option value="">ยังไม่มอบหมาย</option>{careStaff.map((member) => <option key={member.staffId} value={member.staffId} disabled={!member.active}>{member.name}{member.active ? "" : " · ปิดใช้งาน"}</option>)}</select></label>{assignedStaff ? <small className="hotel-care-list__assignee-state">มอบหมายให้ {assignedStaff.name}</small> : null}</span><button type="button" disabled={task.state === "completed"} onClick={() => completeCare(task.id)} aria-label={`${task.state === "completed" ? "ทำเสร็จแล้ว" : "ทำเครื่องหมายเสร็จ"} ${task.label}`}>{task.state === "completed" ? <CheckCircle size={18} /> : "เสร็จ"}</button></li>;
             })}</ul> : <p className="hotel-detail-empty">งานดูแลจะเริ่มเมื่อรับน้องเข้าพักแล้ว</p>}
             <p className="hotel-detail-section__hint"><CheckCircle size={16} />รายการยาแสดงได้เฉพาะเมื่อมีคำแนะนำและการยืนยันจาก Intake ของการเข้าพักนี้</p>
           </section>
@@ -317,7 +382,7 @@ export function HotelStayDetail({
             <header><h3 id="hotel-incidents-title">Incident / note ที่ต้องติดตาม</h3><CircleAlert size={20} /></header>
             <div className="hotel-incident-compose"><label className="hotel-detail-field"><span>บันทึกเหตุแบบสั้น</span><input value={incidentSummary} maxLength={200} placeholder="เช่น ชามน้ำหก ตรวจพื้นที่แล้ว" onInput={(event) => setIncidentSummary(event.currentTarget.value)} /></label><button className="button button--business-ghost" type="button" onClick={addIncident}>เพิ่มรายการ</button></div>
             {stay.incidentNotes.length > 0 ? <ul className="hotel-incident-list">{stay.incidentNotes.slice().reverse().map((incident) => <li key={incident.id} className={incident.resolvedAt ? "is-resolved" : ""}><span><strong>{incident.summary}</strong><small>{incident.resolvedAt ? `ปิดแล้วโดย ${incident.resolvedBy ?? "ทีมร้าน"}` : `ติดตามโดย ${incident.createdBy ?? "ทีมร้าน"}`}</small></span>{incident.resolvedAt ? <CheckCircle size={18} /> : <button type="button" onClick={() => resolveIncident(incident.id)}>ปิดรายการ</button>}</li>)}</ul> : <p className="hotel-detail-empty">ยังไม่มี incident / note ที่บันทึกไว้</p>}
-            <p className="hotel-detail-section__hint"><CircleAlert size={16} />เป็น foundation สำหรับการติดตามภายในร้าน ไม่ใช่ระบบ incident หรือเวชระเบียนเต็มรูปแบบ</p>
+            <p className="hotel-detail-section__hint"><CircleAlert size={16} />บันทึกเหตุและติดตามการดูแลร่วมกันภายในทีม</p>
           </section>
 
           <section className="hotel-detail-section" aria-labelledby="hotel-instructions-title">

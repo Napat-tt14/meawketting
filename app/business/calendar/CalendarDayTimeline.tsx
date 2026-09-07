@@ -19,6 +19,39 @@ function minutesInDay(value: string) {
   return hours * 60 + minutes;
 }
 
+
+// Lay out intersecting appointments in separate visual lanes. Connected overlap
+// groups share their lane count; the original Booking times stay unchanged.
+function appointmentLayouts(bookings: readonly PrototypeBooking[]) {
+  const layouts = bookings.map((booking) => {
+    const start = minutesInDay(booking.start);
+    const end = booking.end ? minutesInDay(booking.end) : start + 60;
+    return { booking, start, end, lane: 0, laneCount: 1 };
+  }).sort((first, second) => first.start - second.start || first.end - second.end);
+  let group: typeof layouts = [];
+  let laneEnds: number[] = [];
+  let groupEnd = -Infinity;
+
+  function completeGroup() {
+    for (const layout of group) layout.laneCount = laneEnds.length;
+  }
+
+  for (const layout of layouts) {
+    if (layout.start >= groupEnd) {
+      completeGroup();
+      group = [];
+      laneEnds = [];
+    }
+    const availableLane = laneEnds.findIndex((end) => end <= layout.start);
+    layout.lane = availableLane < 0 ? laneEnds.length : availableLane;
+    laneEnds[layout.lane] = layout.end;
+    group.push(layout);
+    groupEnd = Math.max(...laneEnds);
+  }
+  completeGroup();
+  return layouts;
+}
+
 export function CalendarDayTimeline({
   date,
   bookings,
@@ -49,7 +82,7 @@ export function CalendarDayTimeline({
   settledBookingId?: string | null;
 }) {
   const dateBookings = bookings.filter((booking) => bookingOccursOnDate(booking, date));
-  const appointments = dateBookings.filter((booking) => booking.timeModel === "appointment");
+  const appointments = appointmentLayouts(dateBookings.filter((booking) => booking.timeModel === "appointment"));
   const allDayBookings = dateBookings.filter((booking) => booking.timeModel !== "appointment");
 
   return (
@@ -111,12 +144,22 @@ export function CalendarDayTimeline({
           );
         })}
 
-        {appointments.map((booking) => {
-          const start = minutesInDay(booking.start);
-          const end = booking.end ? minutesInDay(booking.end) : start + 60;
+        {appointments.map(({ booking, start, end, lane, laneCount }) => {
           const startRow = Math.max(1, Math.floor((start - START_HOUR * 60) / SNAP_MINUTES) + 1);
-          const span = Math.max(1, Math.ceil((end - start) / SNAP_MINUTES));
-          const style = { gridColumn: 2, gridRow: `${startRow} / span ${span}` } satisfies CSSProperties;
+          const rowStart = START_HOUR * 60 + (startRow - 1) * SNAP_MINUTES;
+          const startOffset = Math.max(0, start - rowStart);
+          const span = Math.max(1, Math.ceil((end - rowStart) / SNAP_MINUTES));
+          const endOffset = Math.max(0, rowStart + span * SNAP_MINUTES - end);
+          const pixelsPerMinute = 48 / SNAP_MINUTES;
+          const style = {
+            gridColumn: 2,
+            gridRow: `${startRow} / span ${span}`,
+            marginBlockStart: `${startOffset * pixelsPerMinute + 2}px`,
+            marginBlockEnd: `${endOffset * pixelsPerMinute + 2}px`,
+            marginInlineStart: `calc(${lane * 100 / laneCount}% + 4px)`,
+            marginInlineEnd: "10px",
+            width: `calc(${100 / laneCount}% - 14px)`,
+          } satisfies CSSProperties;
           const petLabel = bookingPetLabel(booking);
           const draggable = booking.status !== "cancelled";
           return (

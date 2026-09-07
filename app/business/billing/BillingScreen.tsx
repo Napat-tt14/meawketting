@@ -7,6 +7,7 @@ import {
   addPrototypeChargeAdjustment,
   cancelPrototypeCharge,
   getOrCreatePrototypeChargeForGroomingJob,
+  getOrCreatePrototypeChargeForDaycareAttendance,
   getOrCreatePrototypeChargeForHotelStay,
   getPrototypeRevenueSummary,
   listPrototypeChargeBalances,
@@ -50,6 +51,7 @@ export type BillingLaunchRequest = {
   chargeId: string | null;
   serviceJobId: string | null;
   hotelStayId: string | null;
+  daycareAttendanceId: string | null;
 };
 
 type BillingFilter = "all" | PrototypeChargeStatus;
@@ -86,6 +88,7 @@ function chargeCustomer(balance: PrototypeChargeBalance) {
 function sourceHref(balance: PrototypeChargeBalance) {
   if (balance.charge.serviceJobId) return `/business/grooming?jobId=${encodeURIComponent(balance.charge.serviceJobId)}`;
   if (balance.charge.hotelStayId) return `/business/hotel?stayId=${encodeURIComponent(balance.charge.hotelStayId)}`;
+  if (balance.charge.daycareAttendanceId) return `/business/daycare?attendanceId=${encodeURIComponent(balance.charge.daycareAttendanceId)}`;
   return `/business/calendar?bookingId=${encodeURIComponent(balance.charge.bookingId)}`;
 }
 
@@ -154,7 +157,9 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         ? getOrCreatePrototypeChargeForGroomingJob(launchRequest.serviceJobId, context)
         : launchRequest.hotelStayId
           ? getOrCreatePrototypeChargeForHotelStay(launchRequest.hotelStayId, context)
-          : null;
+          : launchRequest.daycareAttendanceId
+            ? getOrCreatePrototypeChargeForDaycareAttendance(launchRequest.daycareAttendanceId, context)
+            : null;
       if (result?.ok) {
         setSelectedChargeId(result.charge.chargeId);
         setMode("review");
@@ -242,7 +247,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
     setAdjustmentAmount("");
     setAdjustmentReason("");
     setMode("review");
-    setNotice({ tone: "success", title: "ปรับยอดแล้ว", detail: "เก็บเหตุผลไว้กับยอดนี้ใน local prototype" });
+    setNotice({ tone: "success", title: "ปรับยอดแล้ว", detail: "บันทึกเหตุผลไว้กับรายการนี้แล้ว" });
   }
 
   function submitCancellation(event: FormEvent<HTMLFormElement>) {
@@ -286,8 +291,8 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
       : `แจ้งยอด ${balance.charge.serviceLabel} ${formatBusinessMoney(balance.total)} · คงเหลือ ${formatBusinessMoney(balance.remaining)}`;
     const sent = sendPrototypeTextMessage(conversation.conversation.conversationId, context.businessId, text);
     setNotice(sent.ok
-      ? { tone: "success", title: "ส่งข้อความใน Inbox แล้ว", detail: "เป็นข้อความ local prototype เท่านั้น ไม่มี LINE integration" }
-      : { tone: "critical", title: "ส่งข้อความไม่ได้", detail: "ไม่สามารถบันทึกข้อความ local prototype ได้" });
+      ? { tone: "success", title: "ส่งข้อความใน Inbox แล้ว", detail: "เปิดบทสนทนาใน Inbox เพื่อติดตามกับลูกค้า" }
+      : { tone: "critical", title: "ส่งข้อความไม่ได้", detail: "ไม่สามารถบันทึกข้อความได้ กรุณาลองอีกครั้ง" });
   }
 
   const modalTitle = mode === "payment" ? "รับชำระเงิน" : mode === "adjustment" ? "ปรับยอด" : mode === "cancel" ? "ยกเลิกยอด" : "ตรวจยอดและ Checkout";
@@ -297,15 +302,42 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
     <div className="business-billing shell">
       <BusinessPageHeader
         title="การเงิน"
-        context="Charge และ Payment แยกกัน · สาขาปัจจุบัน"
+        context="สาขาปัจจุบัน"
       />
 
       {notice ? <BusinessAlert tone={notice.tone} title={notice.title} className="business-billing__notice">{notice.detail ? <p>{notice.detail}</p> : null}</BusinessAlert> : null}
 
       <section className="billing-summary" aria-label="สรุปรายรับและยอดค้างของวันนี้">
-        <article><span><Wallet size={20} />รายรับวันนี้</span><strong>{formatBusinessMoney(revenue.revenueToday)}</strong><small>จาก Payment {revenue.paymentCountToday} รายการ</small></article>
-        <article><span><Clock size={20} />ยอดค้างชำระ</span><strong>{formatBusinessMoney(revenue.unpaidBalance)}</strong><small>ยังไม่ชำระ {revenue.unpaidCount} · บางส่วน {revenue.partialCount}</small></article>
-        <article><span><CheckCircle size={20} />ตามบริการ</span><strong>{revenue.breakdown.length} กลุ่ม</strong><small>{revenue.breakdown.length > 0 ? revenue.breakdown.map((item) => `${item.module === "grooming" ? "อาบน้ำ / ตัดขน" : item.module === "hotel" ? "โรงแรม" : "Daycare"} ${formatBusinessMoney(item.revenue)}`).join(" · ") : "ยังไม่มี Payment วันนี้"}</small></article>
+        <article className="billing-summary-card billing-summary-card--revenue">
+          <header className="billing-summary-card__header">
+            <div className="billing-summary-card__title-row">
+              <span className="billing-summary-card__icon billing-summary-card__icon--revenue" aria-hidden="true"><Wallet size={18} /></span>
+              <span className="billing-summary-card__label">รายรับวันนี้</span>
+            </div>
+          </header>
+          <div className="billing-summary-card__value">{formatBusinessMoney(revenue.revenueToday)}</div>
+          <footer className="billing-summary-card__footer"><span>จาก Payment {revenue.paymentCountToday} รายการ</span></footer>
+        </article>
+        <article className="billing-summary-card billing-summary-card--unpaid">
+          <header className="billing-summary-card__header">
+            <div className="billing-summary-card__title-row">
+              <span className="billing-summary-card__icon billing-summary-card__icon--unpaid" aria-hidden="true"><Clock size={18} /></span>
+              <span className="billing-summary-card__label">ยอดค้างชำระ</span>
+            </div>
+          </header>
+          <div className="billing-summary-card__value">{formatBusinessMoney(revenue.unpaidBalance)}</div>
+          <footer className="billing-summary-card__footer"><span>ยังไม่ชำระ {revenue.unpaidCount} · บางส่วน {revenue.partialCount}</span></footer>
+        </article>
+        <article className="billing-summary-card billing-summary-card--breakdown">
+          <header className="billing-summary-card__header">
+            <div className="billing-summary-card__title-row">
+              <span className="billing-summary-card__icon billing-summary-card__icon--breakdown" aria-hidden="true"><CheckCircle size={18} /></span>
+              <span className="billing-summary-card__label">ตามบริการ</span>
+            </div>
+          </header>
+          <div className="billing-summary-card__value">{revenue.breakdown.length} <small>กลุ่ม</small></div>
+          <footer className="billing-summary-card__footer"><span>{revenue.breakdown.length > 0 ? revenue.breakdown.map((item) => `${item.module === "grooming" ? "อาบน้ำ / ตัดขน" : item.module === "hotel" ? "โรงแรม" : "Daycare"} ${formatBusinessMoney(item.revenue)}`).join(" · ") : "ยังไม่มี Payment วันนี้"}</span></footer>
+        </article>
       </section>
 
       <section className="billing-list-section" aria-labelledby="billing-charges-title">
@@ -320,14 +352,23 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         {visibleBalances.length > 0 ? (
           <>
             <BusinessDataTable caption="รายการ Charge ของสาขาปัจจุบัน" className="billing-charge-table">
-              <thead><tr><th scope="col">รายการ</th><th scope="col">ยอดรวม</th><th scope="col">รับแล้ว</th><th scope="col">คงเหลือ</th><th scope="col">สถานะ</th><th scope="col"><span className="sr-only">การทำงาน</span></th></tr></thead>
+              <thead>
+                <tr>
+                  <th scope="col">รายการ</th>
+                  <th scope="col" style={{ textAlign: "right" }}>ยอดรวม</th>
+                  <th scope="col" style={{ textAlign: "right" }}>รับแล้ว</th>
+                  <th scope="col" style={{ textAlign: "right" }}>คงเหลือ</th>
+                  <th scope="col">สถานะ</th>
+                  <th scope="col" style={{ textAlign: "right" }}><span className="sr-only">การทำงาน</span></th>
+                </tr>
+              </thead>
               <tbody>{visibleBalances.map((balance) => <tr key={balance.charge.chargeId}>
                 <td><ChargeFacts balance={balance} /></td>
-                <td className="billing-number">{formatBusinessMoney(balance.total)}</td>
-                <td className="billing-number">{formatBusinessMoney(balance.paid)}</td>
-                <td className="billing-number">{formatBusinessMoney(balance.remaining)}</td>
+                <td className="billing-number" style={{ textAlign: "right" }}>{formatBusinessMoney(balance.total)}</td>
+                <td className="billing-number" style={{ textAlign: "right" }}>{formatBusinessMoney(balance.paid)}</td>
+                <td className="billing-number" style={{ textAlign: "right" }}>{formatBusinessMoney(balance.remaining)}</td>
                 <td><StatusPill status={balance.status} /></td>
-                <td><button className="button button--business-ghost billing-open-charge" type="button" onClick={() => openCharge(balance)}>ตรวจรายการ</button></td>
+                <td style={{ textAlign: "right" }}><button className="button button--business-ghost billing-open-charge" type="button" onClick={() => openCharge(balance)}>ตรวจรายการ</button></td>
               </tr>)}</tbody>
             </BusinessDataTable>
             <div className="billing-charge-cards" aria-label="รายการยอดสำหรับหน้าจอขนาดเล็ก">
@@ -342,7 +383,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         onClose={closeModal}
         size="large"
         title={modalTitle}
-        description="Local prototype · ยอดและการรับชำระถูกบันทึกแยกกัน"
+        description="ตรวจรายละเอียดรายการ ยอดคงเหลือ และประวัติการรับชำระเงิน"
         footer={mode === "review" ? <div className="billing-modal-actions">
           <button className="button button--business-ghost" type="button" onClick={() => sendBillingMessage(selected)}><MessageCircle size={17} />ส่งข้อความ</button>
           {selected.status !== "cancelled" ? <button className="button button--business-ghost" type="button" onClick={() => { setAdjustmentKind("manual-adjustment"); setMode("adjustment"); }}><Plus size={17} />ปรับยอด</button> : null}
@@ -360,7 +401,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
 
         {mode === "adjustment" ? <form className="billing-form" onSubmit={submitAdjustment}><label><span>ประเภท</span><select value={adjustmentKind} onChange={(event) => setAdjustmentKind(event.currentTarget.value as "manual-adjustment" | "discount")}><option value="manual-adjustment">ปรับเพิ่มยอด</option><option value="discount">ส่วนลด</option></select></label><label><span>ชื่อรายการ</span><input maxLength={80} value={adjustmentLabel} onChange={(event) => setAdjustmentLabel(event.currentTarget.value)} placeholder="เช่น ค่าบริการเพิ่มเติม" required /></label><label><span>จำนวนเต็มบาท</span><input inputMode="numeric" min="1" step="1" type="number" value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.currentTarget.value)} required /></label><label><span>เหตุผล</span><textarea maxLength={240} rows={3} value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.currentTarget.value)} placeholder="บอกเหตุผลของการปรับยอด" required /></label><button className="button button--business" type="submit"><Plus size={17} />บันทึกการปรับยอด</button></form> : null}
 
-        {mode === "cancel" ? <form className="billing-form billing-form--cancel" onSubmit={submitCancellation}><p>ใช้ได้เฉพาะยอดที่ยังไม่มี Payment record การคืนเงินยังไม่อยู่ใน BF7</p><label><span>เหตุผลที่ยกเลิกยอด</span><textarea maxLength={240} rows={3} value={cancellationReason} onChange={(event) => setCancellationReason(event.currentTarget.value)} placeholder="เช่น ยกเลิกบริการก่อนเริ่ม" required /></label><button className="button button--business" type="submit">ยืนยันยกเลิกยอด</button></form> : null}
+        {mode === "cancel" ? <form className="billing-form billing-form--cancel" onSubmit={submitCancellation}><p>ยกเลิกได้เฉพาะรายการที่ยังไม่มีการรับชำระเงิน</p><label><span>เหตุผลที่ยกเลิกยอด</span><textarea maxLength={240} rows={3} value={cancellationReason} onChange={(event) => setCancellationReason(event.currentTarget.value)} placeholder="เช่น ยกเลิกบริการก่อนเริ่ม" required /></label><button className="button button--destructive" type="submit">ยืนยันยกเลิกยอด</button></form> : null}
       </BusinessModal> : null}
     </div>
   );

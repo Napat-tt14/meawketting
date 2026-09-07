@@ -20,6 +20,14 @@ Business surfaces must feel readable, calm, efficient, warm, fluid, modern, and 
 
 ## Scope, source and exclusions
 
+### BF10–BF12 current implementation checkpoint — 2026-09-04
+
+- Settings uses progressive Business profile / Branch sections, labeled forms, restrained branch cards and an inline editor. Branch cards keep shared Team context concise and disclose existing service duration/capacity on demand rather than nesting another editor. The same Warm White/Yellow tokens, LINE Seed Sans TH, visible focus and 44px controls apply; profile logos are local image data, not a new asset-hosting service.
+- Daycare uses PawPrint + Mint for service classification, while explicit status text/semantics remain independent. Desktop operational lanes and mobile grouped views share a detail task with complete non-drag controls for zone, staff, care and lifecycle actions.
+- CRM is a compact extension of the existing Customers list/detail: derived summary and segment controls, relationship facts, next action and a readable event timeline. It does not add a dashboard route or visually imply an implemented loyalty/rewards engine.
+- Branch configuration, navigation and command entries use the same enabled-module source. Configuration readers start with deterministic fixture snapshots before adopting session state after hydration; the command palette supports keyboard arrows, Enter and Escape.
+- The BF10–BF12 audit retains Consumer styling and `/workfiledesign` unchanged. Required responsive/keyboard/console evidence is recorded in [VALIDATION](./VALIDATION.md); this design checkpoint does not claim a final QA pass.
+
 - `workfiledesign/htmlpack/index.html` and `workfiledesign/htmlpack/design-system.css` are the **visual source of truth for Business and Business-first public surfaces** from this rebase onward.
 - They are reference inputs, not runtime dependencies. Extract and map their tokens and patterns into the existing semantic token and shared-component architecture; do not copy either file wholesale.
 - `/workfiledesign` remains read-only and untouched.
@@ -29,6 +37,8 @@ Business surfaces must feel readable, calm, efficient, warm, fluid, modern, and 
 - AI Rainbow CTA styling remains **RESERVED / EXPERIMENTAL**. A restrained multi-accent indeterminate progress treatment is allowed only for structural Business loading, without AI Marketing/Agency copy or operational status meaning.
 
 ## Typography ownership
+
+Final Business UI audit (2026-09-05): **Business Font = LINE Seed Sans TH**. Current sizing is 16px body, 14px supporting copy, 24–30px page titles, and at least 16px form text on mobile/tablet. Earlier 14px-body historical decisions do not override this current contract. Only local Regular 400 and Bold 700 faces are shipped for runtime use.
 
 | Context | Font status |
 |---|---|
@@ -81,6 +91,8 @@ Primitive value → Semantic token → Component styling
 | Accent foreground | `#4D3700` | Text on warm accent surfaces |
 
 ### Semantic status palette
+
+The table retains the base semantic palette. Runtime Business status ink mixes 92% of its base with 8% foreground to exceed 4.5:1 on the corresponding soft surface; service badge text uses the existing service ink token rather than pastel accents. Service backgrounds remain Coral/Sky/Mint, independently from status.
 
 | Status | Foreground | Soft surface | Dot / supporting cue |
 |---|---:|---:|---:|
@@ -161,18 +173,18 @@ Service identity is a secondary classification system and never replaces status:
 - Use progressive disclosure for detail. Customer rows show the relationship, Pets, next Booking and lightweight status; access/source/expiry detail belongs in the relevant Customer/Pet detail.
 - Prefer lists before tables when relational information reads better as rows. Use the surface that matches the information: schedule, agenda, row, timeline, status strip, grouped fields or compact stat.
 - Chips are reserved for status, filter and tag. Names, phone numbers, services and long Passport sentences remain normal text.
-- Demo context appears once in the Business shell/page context rather than being repeated on records.
+- Operational UI uses product wording without `Demo`, `ตัวอย่าง` or `ข้อมูลตัวอย่าง` labels. Local-prototype limitations stay explicit in documentation and at genuinely unavailable integration boundaries; mock fixtures remain in code/tests.
 - Avoid card-inside-card composition. A card exists only when a real boundary is needed.
 
 ## Business navigation architecture
 
-- Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, `ข้อความ`, and `การเงิน`; the Inbox uses the same unread source as Home and mobile navigation.
-- The Sidebar exposes Grooming and Hotel as live `งานบริการ` destinations only when the active Branch enables the matching capability, and Finance as the live shared BF-7 destination. Service Record is shown in Customer/Pet detail rather than as a navigation destination. Daycare, Reports, Team and Settings remain under the planned grouping. Mobile More mirrors the same Branch capability state plus Finance.
+- Desktop keeps live `หน้าหลัก`, `ปฏิทิน`, `ลูกค้าและสัตว์เลี้ยง`, `ข้อความ`, `การเงิน`, `รายงาน`, and `ทีม`; the Inbox uses the same unread source as Home and mobile navigation.
+- The Sidebar exposes Grooming, Hotel and Daycare as live `งานบริการ` destinations only when the active Branch enables the matching capability, with Finance, Reports, Team and Settings as shared destinations. Service Record and derived CRM remain in Customer/Pet context rather than new navigation destinations. Mobile More and the command palette mirror the same capability state.
 - Planned rows are native disabled buttons with `aria-disabled`, reduced emphasis, and no `href` or fake route. Mobile More mirrors the live Customers and capability-enabled service links, plus the same Branch-enabled planned/service-management groups.
 
 ## Operational focal points and schedules
 
-- Business Home begins with a three-variant square Spotlight using local Business imagery. Desktop uses a 50:50 hero split and caps the media at 400×400px; the carousel keeps every image mounted and moves one transform-only track to prevent replacement flicker. It advances every six seconds, pauses while hovered or focused, stops under reduced-motion, and always exposes 44px previous/next arrow controls.
+- Business Home begins with a three-variant square Spotlight using local Business imagery. Desktop uses a 50:50 hero split and caps the media at 400×400px; images stay mounted in one transform-only track. Previous/next arrows and touch swipe advance the banner deliberately, without automatic looping. Controls remain 44px and reduced-motion disables the track transition.
 - On desktop the Spotlight is the left focal column and add Booking / scan intake / find Customer form a dedicated right-hand action rail. Tablet uses a compact 2:1 crop so direct actions and the first operational section remain in the initial viewport. Mobile uses a square artwork composition followed by the same task order.
 - Calendar uses service-tinted schedule surfaces instead of border color alone. Grooming appointments are time-positioned blocks; Hotel Bookings are continuous date-range bars with distinct start, continuation, and end edges; Daycare uses the day-based service treatment.
 - A Hotel Booking label appears once per visible week segment, not once per day column. The domain keeps an exclusive check-out date even though the visual bar communicates the complete arrival-to-check-out span.
@@ -186,6 +198,8 @@ Service identity is a secondary classification system and never replaces status:
 - Hotel / Boarding uses Bed + Sky/Blue for module recognition only; lifecycle, success, warning and incident states continue to use semantic status tokens. Brand Yellow remains the primary CTA instead of turning Sky into the main action color.
 - On desktop/tablet, Hotel Operations presents each room/zone as a capacity row across a continuous date range. Occupied, reserved and available values use text plus surface/border treatment, and multi-day Stay spans preserve start/continuation/end semantics without becoming a second Calendar.
 - Hotel Stay detail is a focus-managed right drawer at larger widths and a bottom sheet/task surface on mobile. Identity/contact, dates, lifecycle, room, care, internal notes/incidents, messages and movement history remain grouped and scannable rather than nested into cards.
+- Team & Staff Operations uses a calm, readable directory rather than an HR dashboard: avatar is the visual anchor; name/role, Branches, capabilities, active/availability status and today workload form the comparison hierarchy. Desktop may use the shared data table/list hybrid; mobile stacks the same priority fields without hiding conflicts.
+- Team capability is a visible label and availability/conflict feedback uses semantic text plus icon/non-color cue. Do not use service tint as availability, and do not imply authorization from Owner/Manager/Staff labels.
 - At mobile widths the desktop occupancy board is hidden in favor of grouped Today/Stay tabs and lists. Room selection and lifecycle controls are explicit non-drag alternatives; the desktop board must never be compressed into unreadable columns.
 - Desktop room drag previews valid/invalid capacity before commit, settles smoothly when accepted, and rolls back without losing the current room when rejected. These transitions use the canonical motion scale and obey `prefers-reduced-motion`.
 - Billing uses amount-first hierarchy: a clearly labeled total, paid and remaining values use tabular numerals; Charge lines and Payment records are dense desktop rows only where comparison benefits staff. Mobile changes them to labeled card-rows while preserving Charge status, Branch attribution and the primary payment action.
@@ -250,7 +264,7 @@ All primitives consume the existing three-layer Business token model. The refere
 ## Data tables
 
 - Tables use LINE Seed Sans TH, tabular numerals where needed, warm borders, restrained headers, readable row spacing and a clear hover/focus treatment.
-- Use tables only for genuinely tabular BF-7 Billing, Reports, Team, inventory-like or financial data. Service Record history belongs to the Customer/Pet timeline context rather than a standalone table.
+- Use tables only for genuinely tabular BF-7 Billing, Reports, Team, inventory-like or financial data. Team tables keep a visible identity/avatar anchor and must degrade to labeled mobile rows/cards; Service Record history belongs to the Customer/Pet timeline context rather than a standalone table.
 - Every responsive table has an explicit mobile strategy: priority-column reduction, stacked labeled rows or controlled horizontal scrolling with the primary action/identity retained. Customer/Pet Service Record history keeps the Pet visual anchor and text-plus-icon payment reference in its inline detail pattern.
 
 ## Modal, alert, toast and feedback surfaces
@@ -263,7 +277,8 @@ All primitives consume the existing three-layer Business token model. The refere
 ## Motion and loading
 
 - Canonical easing is `--ease-premium: cubic-bezier(0.22, 1, 0.36, 1)`.
-- Canonical duration tokens are `--duration-fast: 160ms`, `--duration-base: 220ms`, `--duration-slow: 300ms`, and `--duration-navigation: 280ms`. Fast covers press/hover, Base covers tabs/accordion/dropdown, Slow covers emphasized settle/rollback, and Navigation covers sheet/drawer transitions.
+- Canonical duration tokens are `--duration-fast: 180ms`, `--duration-base: 220ms`, `--duration-slow: 300ms`, and `--duration-navigation: 280ms`. Fast covers press/hover, Base covers tabs/accordion/dropdown, Slow covers emphasized settle/rollback, and Navigation covers sheet/drawer transitions.
+- Public decorative motion never loops indefinitely. Route/section entry releases its animation stacking context after completion so task dialogs cover the shell. Calendar Booking status has visible text in addition to color; operational status uses semantic tokens independently from service accents.
 - Approved patterns include button hover/press, subtle card lift, modal fade/scale, toast slide/fade, accordion/tabs, normal progress and structural skeleton shimmer.
 - Calendar, Booking, Grooming board, Customer records, Scanner and Intake remain responsive and restrained. Bounce, wobble and confetti are not used.
 - Shared skeletons match content structure: Customer rows, Calendar, Home metrics and Inbox list. Prefer structural skeletons over a giant generic spinner.
@@ -297,11 +312,15 @@ All primitives consume the existing three-layer Business token model. The refere
 
 | Viewport | Range | Behavior |
 |---|---|---|
-| Mobile | 320–767px | Low–medium density; bottom navigation and full-screen/sheet tasks; Calendar is Agenda-first; Grooming is a grouped status list; Billing uses labeled Charge/Payment rows; Customer Pets may use a snap/peek strip |
-| Tablet | 768–1023px | Medium density; touch-first adaptive grids; compact Home banner/actions; Calendar day/week hybrid; Grooming boards remain contained and horizontally navigable only inside the workflow surface; Billing keeps clear amount hierarchy |
-| Desktop | 1024px+ | Medium–high density without smaller body text; persistent navigation; split panes, operational rows, compact financial tables and Calendar planning use the available width |
+| Mobile | 320–767px | Low–medium density; bottom navigation and full-screen/sheet tasks; Calendar is Agenda-first; Grooming is a grouped status list; Billing uses labeled Charge/Payment rows; Team stacks identity/Branch/capability/status/workload; Customer Pets may use a snap/peek strip |
+| Tablet / compact desktop | 768–1199px | Bottom navigation plus visible Business/Branch Header context; More sheet shares the same breakpoint. Adaptive grids, contained Grooming board lanes and Calendar planning retain readable controls. |
+| Desktop | 1200px+ | Persistent sidebar, split panes, operational rows, financial/Team tables and Calendar planning use the available width without shrinking body text. |
+
+- Reports use labeled stacked rows on mobile for both recent services and branch comparison; the underlying table must not retain a desktop minimum width. Settings footer sticky positioning must leave the final operating-hours row reachable. Grooming lanes preserve room for Pet identity, time and status.
+- The Header owns the Business/Branch switcher with actions and account at every width. At desktop the sidebar retains brand identity and primary destinations; its duplicate switcher is hidden. The public Header retains all existing links in a second row at tablet widths.
 
 - Required QA widths are 320, 375, 390, 430, 768, 820, 1024, 1200 and 1440px.
+- The public hero uses its existing photographic asset with responsive cropping. Below 768px, headline → photo → supporting copy → actions keeps the first screen image-led; miniature dashboard chrome is hidden. Desktop keeps the two-column composition. This public-only rule does not style Consumer or the operational shell.
 - Horizontal scrolling is allowed only for filter chips, segmented views, multiple-Pet snap/peek summaries, tablet workflow boards and Calendar date-range spans. It is prohibited for body copy, forms, Customer lists, Inbox messages, detail sections, critical alerts and confirmation dialogs.
 - Responsive components keep the same data and behavior but may change composition: desktop row/board/split pane → tablet adaptive row/contained board → mobile stacked summary/tabbed task/full-screen sheet.
 - Desktop hover enhancement always has a usable focus, pressed and touch equivalent. No mobile path depends on hover.

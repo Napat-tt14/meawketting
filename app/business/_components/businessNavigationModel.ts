@@ -6,26 +6,21 @@ export type BusinessDestinationKey =
   | "messages"
   | "grooming"
   | "hotel"
+  | "daycare"
   | "billing"
   | "reports"
   | "team"
   | "settings";
 
-export type BusinessLiveDestinationKey = "calendar" | "customers" | "messages" | "grooming" | "hotel" | "billing";
-export type BusinessPlannedDestinationKey = Exclude<BusinessDestinationKey, BusinessLiveDestinationKey>;
+export type BusinessLiveDestinationKey = "calendar" | "customers" | "messages" | "grooming" | "hotel" | "daycare" | "billing" | "reports" | "team" | "settings";
 
 export type BusinessLiveDestination = {
   key: BusinessLiveDestinationKey;
   label: string;
-  href: "/business/calendar" | "/business/customers" | "/business/inbox" | "/business/grooming" | "/business/hotel" | "/business/billing";
+  href: "/business/calendar" | "/business/customers" | "/business/inbox" | "/business/grooming" | "/business/hotel" | "/business/daycare" | "/business/billing" | "/business/reports" | "/business/team" | "/business/settings";
 };
 
-export type BusinessPlannedDestination = {
-  key: BusinessPlannedDestinationKey;
-  label: string;
-};
-
-export type BusinessTopDestination = BusinessLiveDestination | BusinessPlannedDestination;
+export type BusinessTopDestination = BusinessLiveDestination;
 
 export const BUSINESS_CALENDAR_DESTINATION = {
   key: "calendar",
@@ -57,10 +52,34 @@ export const BUSINESS_HOTEL_DESTINATION = {
   href: "/business/hotel",
 } as const satisfies BusinessLiveDestination;
 
+export const BUSINESS_DAYCARE_DESTINATION = {
+  key: "daycare",
+  label: "Daycare",
+  href: "/business/daycare",
+} as const satisfies BusinessLiveDestination;
+
 export const BUSINESS_BILLING_DESTINATION = {
   key: "billing",
   label: "การเงิน",
   href: "/business/billing",
+} as const satisfies BusinessLiveDestination;
+
+export const BUSINESS_REPORTS_DESTINATION = {
+  key: "reports",
+  label: "รายงาน",
+  href: "/business/reports",
+} as const satisfies BusinessLiveDestination;
+
+export const BUSINESS_TEAM_DESTINATION = {
+  key: "team",
+  label: "ทีม",
+  href: "/business/team",
+} as const satisfies BusinessLiveDestination;
+
+export const BUSINESS_SETTINGS_DESTINATION = {
+  key: "settings",
+  label: "ตั้งค่า",
+  href: "/business/settings",
 } as const satisfies BusinessLiveDestination;
 
 export const BUSINESS_TOP_DESTINATIONS = [
@@ -70,10 +89,8 @@ export const BUSINESS_TOP_DESTINATIONS = [
 ] as const satisfies readonly BusinessTopDestination[];
 
 export const BUSINESS_MANAGEMENT_DESTINATIONS = [
-  { key: "reports", label: "รายงาน" },
-  { key: "team", label: "ทีม" },
-  { key: "settings", label: "ตั้งค่า" },
-] as const satisfies readonly BusinessPlannedDestination[];
+  BUSINESS_SETTINGS_DESTINATION,
+] as const satisfies readonly BusinessLiveDestination[];
 
 export const BUSINESS_MODULE_LABELS: Record<BusinessServiceModule, string> = {
   grooming: "อาบน้ำ / ตัดขน",

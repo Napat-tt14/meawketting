@@ -1,7 +1,7 @@
 # Routes
 
 Status: **CURRENT REPOSITORY AUDIT (BUSINESS-FIRST REBASE)**  
-Audit date: 2026-09-02
+Audit date: 2026-09-07
 Owner: Product Architecture / Front-end
 
 This file owns URLs and navigation destinations only. Wizard steps, tabs, task states, boards, modals and reusable errors are not routes by default.
@@ -20,29 +20,37 @@ No LINE Mini App route is created in this audit. The future LINE channel is an e
 ## Route count summary
 
 ```text
-CURRENT ROUTE AUDIT: 30 route entries / 26 active local routes / 3 compatibility redirects / 1 legacy demo route
+CURRENT ROUTE AUDIT: 34 route entries / 30 active local routes / 3 compatibility redirects / 1 legacy demo route
 ```
 
 The route table below is the canonical route contract. Matching build/test evidence is recorded in [VALIDATION](./VALIDATION.md).
 
-Service Record is shared domain data created by Grooming/Hotel completion and shown in Customer/Pet detail. The former standalone CareProof route, menu and management experience are **SUPERSEDED**; no replacement route is created by BF-8.
+Service Record is shared domain data created by Grooming completion or Hotel/Daycare checkout/completion and shown in Customer/Pet detail. The former standalone CareProof route, menu and management experience are **SUPERSEDED**; BF-8/BF-11 create no replacement history route.
 
-## Active live local routes — current validated local count
+Team & Staff Operations is a local shared operational route. Its Owner/Manager/Staff labels do not create authentication, authorization or a permission matrix.
+
+BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch configuration. BE2 exposes typed same-origin `POST /api/be2` for Customer/Pet queries and commands. BE3 exposes typed same-origin `POST /api/be3` for Booking/Calendar/planning Resource queries and commands. These server endpoints are not counted as `page.tsx` UI routes and expose no D1 binding to the browser.
+
+## Active live local routes — current repository count
 
 | Route | Context / goal | Status and boundary |
 |---|---|---|
 | `/` | **Business-first Landing (Canonical Commercial Homepage)** | LIVE LOCAL; primary CTA `/business/login`; owner entry secondary |
 | `/business/login` | Business Login with mock Google auth | LIVE MOCK; no real membership |
-| `/business/home` | Branch-aware Business Home with square three-image carousel, arrow/click navigation, touch swipe and operational overview | LIVE LOCAL PROTOTYPE |
-| `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, guarded move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE LOCAL PROTOTYPE |
+| `/business/home` | Branch-aware Business Home with square three-image carousel, arrow/click navigation, touch swipe and operational overview | LIVE FROZEN HYBRID; next-work/Booking summaries use BE3 truth, while execution/attention/finance remain local projections |
+| `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, server-backed move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE FROZEN UI / BE3 D1 TRUTH; range/create/edit/reschedule/Resource/cancel use typed backend operations and server conflict recovery |
 | `/business/grooming` | Capability-aware Grooming Today execution board for linked Pet-specific Service Jobs; aligned status cards, pointer-following reversible drag or swipe, no date/job filter rail, and mobile grouped status-list/detail alternative | LIVE LOCAL PROTOTYPE only when the active Branch enables Grooming; Calendar remains Booking planning, not execution |
 | `/business/hotel` | Capability-aware Hotel Today operations and continuous room/zone occupancy for Pet-specific Stays linked to shared date-range Bookings; guarded room assignment/moves, lightweight care, notes/incidents and mobile grouped alternatives | LIVE LOCAL PROTOTYPE only when the active Branch enables Hotel; Calendar remains Booking planning, not occupancy execution |
-| `/business/billing` | Branch-attributed local Charge review, Payment recording, derived unpaid/partial/paid/cancelled state, Revenue summary, and Grooming/Hotel checkout context | LIVE LOCAL PROTOTYPE; whole-THB prototype amounts only; no payment gateway, full accounting, tax, refund processor, or cross-Branch settlement |
-| `/business/customers` | Search and browse Business-level Customer relationships and linked local Pets in responsive desktop table/mobile cards; filters are booking-based only | LIVE LOCAL PROTOTYPE |
-| `/business/customers/[customerId]` | Stable responsive Customer relationship detail with clearer Pets, Booking context, tags, Business notes, compact Branch-attributed Charge/Payment history, and one inline shared `ประวัติบริการ` timeline/list | LIVE LOCAL PROTOTYPE |
+| `/business/daycare` | Pet-specific attendance, zone capacity, shared Team assignment, care/notes, pickup and Intake/Inbox/Billing/Service Record handoffs | LIVE LOCAL PROTOTYPE only when the active Branch enables Daycare; shared day Booking remains planning |
+| `/business/settings` | Business profile/logo/contact details and Branch add/edit, active state, enabled modules, weekly hours, shared Team summary/link and existing service-duration/capacity disclosure | LIVE FROZEN UI / BE1 D1 TRUTH except local logo bytes; `?section=branches` selects Branch settings, not another route; no production permission administration |
+| `/business/billing` | Branch-attributed local Charge review, Payment recording, derived unpaid/partial/paid/cancelled state, Revenue summary, and Grooming/Hotel/Daycare checkout context | LIVE LOCAL PROTOTYPE; whole-THB prototype amounts only; no payment gateway, full accounting, tax, refund processor, or cross-Branch settlement |
+| `/business/reports` | Single-page Reports & Business Insights derived dynamically from shared operational/configuration state; date range presets (วันนี้, 7 วัน, 30 วัน, กำหนดเอง), current vs all-Branches scope, revenue matching BF7, all three service modules, Hotel occupancy, Daycare attendance/capacity, operational & customer metrics | LIVE LOCAL PROTOTYPE; no separate fixtures, accounting, tax, forecasting, AI analytics, or backend |
+| `/business/team` | Branch-aware Team directory with shared display identity, multi-Branch assignment, Grooming/Hotel care/Daycare/Front desk capabilities, active/inactive and lightweight availability/workload context | LIVE LOCAL PROTOTYPE; BE3 owns only a minimal durable planning Resource projection with an opaque display link. No production auth, payroll/HR, certification or full workforce scheduling |
+| `/business/customers` | Search durable Business-level Customers/Pets through BE2 and derive CRM lifecycle, service and follow-up segments from existing shared operational records | LIVE FROZEN UI / BE2 D1 TRUTH; no separate CRM route or persisted score; Passport/access badges are non-authoritative compatibility only |
+| `/business/customers/[customerId]` | Durable Customer/Pet detail and notes/tags, BE3 upcoming Booking projection, local shared service/financial history, derived last visit/repeat-use signals and unified Booking/service/payment/message timeline | LIVE FROZEN UI / BE2 IDENTITY + BE3 BOOKING TRUTH; next actions are staff-triggered, not campaigns or automation; Guardian/Passport authority not implemented |
 | `/business/inbox` | Business-wide Customer conversations with readable split/mobile layouts, compact search/filters, Pet/Booking context, unread state, local send, three default quick replies with remembered visibility, structured add-service request prototype, and optional staff-triggered billing text | LIVE LOCAL PROTOTYPE; `?conversation=`, `?customerId=`, `?petId=`, and `?bookingId=` provide local recovery/context; no real delivery or LINE transport |
-| `/business/scan` | Temporary Business QR scan/manual validation | LIVE LOCAL MOCK |
-| `/business/intake/[intakeId]` | Allowed data, Intake, consent review, check-in | LIVE LOCAL MOCK |
+| `/business/scan` | Temporary Business QR scan/manual validation; optional explicit `hotelStayId` or `daycareAttendanceId` target | LIVE LOCAL MOCK; a target never bypasses Business/Branch/Customer/Pet consent validation |
+| `/business/intake/[intakeId]` | Allowed data, Intake, consent review, guarded execution handoff/check-in | LIVE LOCAL MOCK; same shared engine for all eligible service targets |
 | `/login` | Consumer web-prototype mock login | LIVE MOCK — CURRENT WEB PROTOTYPE; not LINE Login |
 | `/my-pets` | Consumer web-prototype Pet library | LIVE LOCAL MOCK — CURRENT WEB PROTOTYPE / FROZEN |
 | `/activity` | Honest Consumer web-prototype activity categories | LIVE LOCAL MOCK — CURRENT WEB PROTOTYPE / FROZEN |
@@ -86,7 +94,6 @@ This is conceptual and **NOT IMPLEMENTED**. Do not add `/line/*`, Mini App paths
 
 | Concept | Target Milestone | Purpose |
 |---|---|---|
-| Daycare Operations | M-DAYCARE | Daycare Attendance; no route has been created |
 | Multi-Service Visit / Order checkout | Future checkout policy | Combined service grouping and checkout policy; no additional route is created by BF-7 |
 | Guardian Service Record visibility | Future Guardian phase | LINE Mini App service-record visibility/delivery; no Guardian route is created by BF-8 |
 | Business Onboarding | Multi-branch setup | Resumable business setup wizard (`/business/onboarding`) |

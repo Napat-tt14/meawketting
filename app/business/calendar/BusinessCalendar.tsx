@@ -1,17 +1,28 @@
 "use client";
 
 import { type DragEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
+import {
+  cancelDurableBooking,
+  createBookingIdempotencyKey,
+  createDurableBooking,
+  getDurableBooking,
+  queryDurableBookings,
+  rescheduleDurableBooking,
+  updateDurableBooking,
+} from "../../_backend/be3/client";
 import type { BookingStatus, BusinessServiceModule, PrototypeBooking } from "../../_prototype/businessState";
 import {
   BOOKING_DEMO_DATE,
   BOOKING_STATUS_LABELS,
-  cancelPrototypeBooking,
+  durableCreateBookingInputFromDraft,
+  durableUpdateBookingInputFromDraft,
   evaluatePrototypeBookingAvailability,
   getEnabledBusinessModules,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
+  projectDurableBooking,
   readPrototypeBooking,
-  savePrototypeBooking,
+  synchronizePrototypeExecutionCompatibilityForBooking,
 } from "../../_prototype/businessState";
 import { ArrowLeft, ArrowRight, CalendarDays, Maximize2, Minimize2, Plus } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
@@ -121,10 +132,10 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const [interactionConflict, setInteractionConflict] = useState<InteractionConflict>(null);
   const handledLaunchRef = useRef<string | null>(launchBookingId ? null : launchKey);
   const pointerDragRef = useRef<{ dispose: () => void } | null>(null);
-  const settledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const confirmationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settledTimerRef = useRef<number | null>(null);
+  const confirmationTimerRef = useRef<number | null>(null);
   const suppressSelectRef = useRef(false);
-  const suppressSelectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressSelectTimerRef = useRef<number | null>(null);
   const copiedBookingRef = useRef<PrototypeBooking | null>(null);
   const undoStackRef = useRef<CalendarUndoAction[]>([]);
   const fullscreenFrameRef = useRef<HTMLDivElement>(null);
@@ -192,17 +203,21 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     }
     if (launchBookingId) {
       if (!bookingStateReady || handledLaunchRef.current === launchKey) return;
-      handledLaunchRef.current = launchKey;
-      const booking = readPrototypeBooking(launchBookingId);
-      if (!booking || booking.businessId !== context.businessId || booking.branchId !== context.branchId) {
-        const frame = window.requestAnimationFrame(() => setConfirmation("การจองนี้อยู่คนละสาขาหรือไม่พบในบริบทปัจจุบัน"));
-        return () => window.cancelAnimationFrame(frame);
-      }
-      const frame = window.requestAnimationFrame(() => {
-        setSelectedDate(booking.start.slice(0, 10));
-        setEditor({ kind: "edit", booking });
-      });
-      return () => window.cancelAnimationFrame(frame);
+      let cancelled = false;
+      void getDurableBooking(context.businessId, context.branchId, launchBookingId)
+        .then((durable) => {
+          if (cancelled) return;
+          handledLaunchRef.current = launchKey;
+          const booking = projectDurableBooking(durable);
+          setSelectedDate(booking.start.slice(0, 10));
+          setEditor({ kind: "edit", booking });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          handledLaunchRef.current = launchKey;
+          setConfirmation("การจองนี้อยู่คนละสาขาหรือไม่พบในบริบทปัจจุบัน");
+        });
+      return () => { cancelled = true; };
     }
     if (editor || handledLaunchRef.current === launchKey) return;
     handledLaunchRef.current = launchKey;
@@ -212,7 +227,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     return () => window.cancelAnimationFrame(frame);
   }, [bookingStateReady, context.branchId, context.businessId, editor, launchBookingId, launchCustomerId, launchKey, launchPetId]);
 
-  const enabledModuleList = getEnabledBusinessModules(context);
+  const enabledModuleList = getEnabledBusinessModules(context, !bookingStateReady);
   const effectiveModuleFilter = moduleFilter === "all" || enabledModuleList.includes(moduleFilter) ? moduleFilter : "all";
 
   void revision;
@@ -232,6 +247,38 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       : view === "month"
         ? daysForCalendarMonth(selectedDate)
         : daysForCustomRange(selectedDate, customRangeDays);
+  const queryRangeStart = displayedDays[0] ?? selectedDate;
+  const queryRangeEnd = addCalendarDays(displayedDays.at(-1) ?? selectedDate, 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      let offset = 0;
+      let total = 0;
+      do {
+        const page = await queryDurableBookings({
+          businessId: context.businessId,
+          branchId: context.branchId,
+          rangeStart: queryRangeStart,
+          rangeEnd: queryRangeEnd,
+          modules: effectiveModuleFilter === "all" ? undefined : [effectiveModuleFilter],
+          statuses: statusFilter === "all" || statusFilter === "active"
+            ? statusFilter === "active" ? ["pending", "confirmed", "arrived"] : undefined
+            : [statusFilter],
+          includeCancelled: true,
+          limit: 100,
+          offset,
+        });
+        if (cancelled) return;
+        total = page.total;
+        offset += page.items.length;
+        if (page.items.length === 0) break;
+      } while (offset < total);
+    })().catch(() => {
+      if (!cancelled) setAnnouncement("โหลดช่วงปฏิทินจากระบบไม่สำเร็จ");
+    });
+    return () => { cancelled = true; };
+  }, [context.branchId, context.businessId, effectiveModuleFilter, queryRangeEnd, queryRangeStart, statusFilter]);
 
   function moveDate(direction: -1 | 1) {
     if (view === "month") setSelectedDate((current) => addCalendarMonths(current, direction));
@@ -402,47 +449,57 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     }, 300);
   }
 
-  function commitDropFor(booking: PrototypeBooking, operation: CalendarDragOperation, target: BookingDropTarget, copy = false) {
+  async function commitDropFor(booking: PrototypeBooking, operation: CalendarDragOperation, target: BookingDropTarget, copy = false) {
     setConfirmation(null);
     setInteractionConflict(null);
     const draft = copy
       ? buildBookingCopyDraft(booking, target)
       : buildBookingMutationDraft(booking, operation, target);
-    const availability = evaluatePrototypeBookingAvailability(draft, context);
-    if (!availability.available) {
-      setInteractionConflict({
-        booking,
-        messages: availability.conflicts.map((conflict) => conflict.message),
-        allowAlternative: availability.conflicts.some((conflict) => conflict.recovery === "change-resource"),
-      });
+    try {
+      const current = readPrototypeBooking(booking.bookingId) ?? booking;
+      const result = copy
+        ? await createDurableBooking(durableCreateBookingInputFromDraft(draft, createBookingIdempotencyKey()))
+        : await rescheduleDurableBooking({
+          businessId: context.businessId,
+          branchId: context.branchId,
+          bookingId: booking.bookingId,
+          expectedRevision: current.revision ?? 1,
+          start: draft.start,
+          end: draft.timeModel === "day" ? null : draft.end || null,
+        });
+      if (result.outcome === "conflict") {
+        setInteractionConflict({
+          booking,
+          messages: result.availability.conflicts.map((conflict) => conflict.message),
+          allowAlternative: result.availability.conflicts.some((conflict) => conflict.recovery === "change-resource"),
+        });
+        return;
+      }
+      const saved = projectDurableBooking(result.booking);
+      synchronizePrototypeExecutionCompatibilityForBooking(saved);
+      recordUndo(copy
+        ? { kind: "cancel-created", bookingId: saved.bookingId, petName: saved.pets[0]?.name ?? "สัตว์เลี้ยง" }
+        : { kind: "restore", booking });
+      setRevision((currentRevision) => currentRevision + 1);
+      markBookingSettled(saved.bookingId);
+      setAnnouncement(copy
+        ? `คัดลอกการจองของ ${saved.pets[0]?.name ?? "น้อง"} ไปช่วงใหม่แล้ว`
+        : operation === "move"
+          ? `${saved.pets[0]?.name ?? "น้อง"} ย้ายไปช่วงใหม่แล้ว`
+          : saved.timeModel === "date-range"
+            ? `ปรับ${operation === "resize-start" ? "วันเริ่ม" : "วันเช็กเอาต์"}ของ ${saved.pets[0]?.name ?? "น้อง"} แล้ว`
+            : `ปรับระยะเวลาของ ${saved.pets[0]?.name ?? "น้อง"} แล้ว`);
+      setSelectedBookingId(saved.bookingId);
+    } catch {
+      setInteractionConflict({ booking, messages: ["บันทึกการเปลี่ยนแปลงกับระบบไม่สำเร็จ รายการกลับอยู่ตำแหน่งเดิม"], allowAlternative: false });
+    } finally {
       endDrag();
-      return;
     }
-    const result = savePrototypeBooking(draft, context);
-    if (!result.ok) {
-      setInteractionConflict({ booking, messages: result.availability.conflicts.map((conflict) => conflict.message), allowAlternative: true });
-      endDrag();
-      return;
-    }
-    recordUndo(copy
-      ? { kind: "cancel-created", bookingId: result.booking.bookingId, petName: result.booking.pets[0]?.name ?? "สัตว์เลี้ยง" }
-      : { kind: "restore", booking });
-    setRevision((current) => current + 1);
-    markBookingSettled(result.booking.bookingId);
-    setAnnouncement(copy
-      ? `คัดลอกการจองของ ${result.booking.pets[0]?.name ?? "น้อง"} ไปช่วงใหม่แล้ว`
-      : operation === "move"
-        ? `${result.booking.pets[0]?.name ?? "น้อง"} ย้ายไปช่วงใหม่แล้ว`
-        : result.booking.timeModel === "date-range"
-          ? `ปรับ${operation === "resize-start" ? "วันเริ่ม" : "วันเช็กเอาต์"}ของ ${result.booking.pets[0]?.name ?? "น้อง"} แล้ว`
-          : `ปรับระยะเวลาของ ${result.booking.pets[0]?.name ?? "น้อง"} แล้ว`);
-    endDrag();
-    setSelectedBookingId(result.booking.bookingId);
   }
 
   function commitDrop(target: BookingDropTarget) {
     if (!dragState) return;
-    commitDropFor(dragState.booking, dragState.operation, target, dragState.copy);
+    void commitDropFor(dragState.booking, dragState.operation, target, dragState.copy);
   }
 
   function pointerDropTarget(clientX: number, clientY: number): BookingDropTarget | null {
@@ -455,7 +512,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   function beginPointerDrag(booking: PrototypeBooking, operation: CalendarDragOperation, event: ReactPointerEvent<HTMLElement>) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || booking.status === "cancelled") return;
     pointerDragRef.current?.dispose();
 
     const pointerId = event.pointerId;
@@ -464,7 +521,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     const pointerKind = event.pointerType === "mouse" ? "mouse" : "touch";
     const copy = operation === "move" && event.altKey;
     let active = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let timer: number | null = null;
     const previousDraggable = source.getAttribute("draggable");
 
     // Use the same pointer path for mouse, pen, and touch. Temporarily opting
@@ -519,7 +576,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       if (active) suppressNextSelect();
       if (shouldCommit && target) {
         if (finishEvent.cancelable) finishEvent.preventDefault();
-        commitDropFor(booking, operation, target, copy);
+        void commitDropFor(booking, operation, target, copy);
       } else if (active) {
         endDrag();
       }
@@ -532,10 +589,11 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     window.addEventListener("pointercancel", finish);
   }
 
-  const handleCalendarShortcut = useEffectEvent((event: KeyboardEvent) => {
-    if (editor || event.altKey || event.repeat) return;
+  const handleCalendarShortcut = useEffectEvent(async (event: KeyboardEvent) => {
+    if (event.defaultPrevented || editor || event.altKey || event.repeat) return;
     const activeElement = document.activeElement;
     if (!(activeElement instanceof HTMLElement) || isEditableTarget(activeElement)) return;
+    if (!calendarSurfaceRef.current?.contains(activeElement)) return;
 
     const key = event.key.toLowerCase();
     const commandKey = event.ctrlKey || event.metaKey;
@@ -557,22 +615,57 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       }
       event.preventDefault();
       if (action.kind === "cancel-created") {
-        const result = cancelPrototypeBooking(action.bookingId, context);
-        if (!result.ok) {
+        const current = readPrototypeBooking(action.bookingId);
+        if (!current) {
           undoStackRef.current.push(action);
           setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้");
           return;
         }
-        setAnnouncement(`ย้อนกลับการเพิ่มการจองของ ${action.petName} แล้ว`);
-      } else {
-        const result = savePrototypeBooking(bookingDraftFromPrototype(action.booking), context);
-        if (!result.ok) {
+        try {
+          const result = await cancelDurableBooking({
+            businessId: current.businessId,
+            branchId: current.branchId,
+            bookingId: current.bookingId,
+            expectedRevision: current.revision ?? 1,
+          });
+          if (result.outcome === "conflict") {
+            undoStackRef.current.push(action);
+            setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้ เพราะข้อมูลเปลี่ยนแล้ว");
+            return;
+          }
+          synchronizePrototypeExecutionCompatibilityForBooking(projectDurableBooking(result.booking));
+          setAnnouncement(`ย้อนกลับการเพิ่มการจองของ ${action.petName} แล้ว`);
+        } catch {
           undoStackRef.current.push(action);
-          setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้ เพราะช่วงเวลาไม่ว่างแล้ว");
+          setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้");
           return;
         }
-        markBookingSettled(result.booking.bookingId);
-        setAnnouncement(`ย้อนกลับการเปลี่ยนแปลงของ ${result.booking.pets[0]?.name ?? "สัตว์เลี้ยง"} แล้ว`);
+      } else {
+        const current = readPrototypeBooking(action.booking.bookingId);
+        if (!current) {
+          undoStackRef.current.push(action);
+          setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้");
+          return;
+        }
+        try {
+          const result = await updateDurableBooking(durableUpdateBookingInputFromDraft(
+            bookingDraftFromPrototype(action.booking),
+            current.revision ?? 1,
+          ));
+          if (result.outcome === "conflict") {
+            undoStackRef.current.push(action);
+            setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้ เพราะช่วงเวลาไม่ว่างหรือข้อมูลเปลี่ยนแล้ว");
+            return;
+          }
+          const restored = projectDurableBooking(result.booking);
+          synchronizePrototypeExecutionCompatibilityForBooking(restored);
+          markBookingSettled(restored.bookingId);
+          setAnnouncement(`ย้อนกลับการเปลี่ยนแปลงของ ${restored.pets[0]?.name ?? "สัตว์เลี้ยง"} แล้ว`);
+        } catch {
+          undoStackRef.current.push(action);
+          setAnnouncement("ย้อนกลับรายการล่าสุดไม่ได้");
+          return;
+        }
       }
       setRevision((current) => current + 1);
       return;
@@ -591,7 +684,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
       const targetDate = targetElement?.dataset.calendarDropDate ?? selectedDate;
       const targetTime = targetElement?.dataset.calendarDropTime;
       event.preventDefault();
-      commitDropFor(copiedBookingRef.current, "move", { date: targetDate, time: targetTime || undefined }, true);
+      await commitDropFor(copiedBookingRef.current, "move", { date: targetDate, time: targetTime || undefined }, true);
       return;
     }
 
@@ -616,11 +709,24 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     if (event.key === "Delete") {
       if (!focusedBooking || focusedBooking.status === "cancelled") return;
       event.preventDefault();
-      const result = cancelPrototypeBooking(focusedBooking.bookingId, context);
-      if (!result.ok) {
+      let result: Awaited<ReturnType<typeof cancelDurableBooking>>;
+      try {
+        const current = readPrototypeBooking(focusedBooking.bookingId) ?? focusedBooking;
+        result = await cancelDurableBooking({
+          businessId: context.businessId,
+          branchId: context.branchId,
+          bookingId: focusedBooking.bookingId,
+          expectedRevision: current.revision ?? 1,
+        });
+      } catch {
         setAnnouncement("ยกเลิกรายการนี้ไม่ได้");
         return;
       }
+      if (result.outcome === "conflict") {
+        setAnnouncement("ยกเลิกรายการนี้ไม่ได้ เพราะข้อมูลเปลี่ยนแล้ว");
+        return;
+      }
+      synchronizePrototypeExecutionCompatibilityForBooking(projectDurableBooking(result.booking));
       recordUndo({ kind: "restore", booking: focusedBooking });
       setRevision((current) => current + 1);
       setAnnouncement(`ยกเลิกการจองของ ${focusedBooking.pets[0]?.name ?? "สัตว์เลี้ยง"} แล้ว กด Control Z เพื่อย้อนกลับ`);
@@ -655,7 +761,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   });
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => handleCalendarShortcut(event);
+    const handleKeyDown = (event: KeyboardEvent) => { void handleCalendarShortcut(event); };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
@@ -720,7 +826,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
           <button type="button" aria-label="ดูช่วงก่อนหน้า" onClick={() => moveDate(-1)}><ArrowLeft size={18} /></button>
           <label>
             <span>วันที่</span>
-            <input type="date" value={selectedDate} onInput={(event) => setSelectedDate(event.currentTarget.value)} />
+            <input type="date" value={selectedDate} onInput={(event) => { if (event.currentTarget.value) setSelectedDate(event.currentTarget.value); }} />
           </label>
           <button type="button" aria-label="ดูช่วงถัดไป" onClick={() => moveDate(1)}><ArrowRight size={18} /></button>
           <button className="calendar-toolbar__demo-day" type="button" aria-label={`ไปวันนี้ ${calendarDateLabel(BOOKING_DEMO_DATE, { day: "numeric", month: "short" })}`} onClick={goToToday}>

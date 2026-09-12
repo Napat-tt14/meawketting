@@ -51,6 +51,7 @@ import { calendarDateLabel } from "../calendar/calendarPresentation";
 import { chargeStatusLabel, formatBusinessMoney, paymentMethodLabel } from "../billing/billingPresentation";
 import { CustomerCrmPanel } from "./CrmPanel";
 import { deriveCustomerCrmProfile, deriveCustomerCrmReferenceAt, deriveCustomerTimeline, deriveCustomerUpcomingBookings } from "./crmPresentation";
+import { ensureDurableCrm } from "../../_backend/be8/client";
 
 const emptySubscribe = () => () => {};
 function useIsClient() {
@@ -124,12 +125,20 @@ function ServiceRecordHistoryItem({
 }
 
 export function CustomerDetailScreen({ customerId }: { customerId: string }) {
-  const { context } = useBusinessContext();
+  const { context, isContextReady } = useBusinessContext();
   const [revision, setRevision] = useState(0);
   const [editor, setEditor] = useState<"customer" | "pet" | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const relationshipStateReady = useIsClient();
+  const { businessId, branchId } = context;
+  useEffect(() => {
+    if (!isContextReady) return;
+    let stopped = false;
+    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }, customerId); if (!stopped) setNotice((v) => v === "โหลด CRM ล่าสุดไม่สำเร็จ" ? null : v); } catch { if (!stopped) setNotice("โหลด CRM ล่าสุดไม่สำเร็จ"); } };
+    void load(); const timer = window.setInterval(() => void load(), 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [businessId, branchId, customerId, isContextReady]);
 
   useEffect(() => {
     const sync = () => setRevision((current) => current + 1);
@@ -169,6 +178,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
   }
   const resolvedCustomer = customer;
   const crmDataset = {
+    scope: context,
     bookings,
     serviceRecords: crmServiceRecords,
     charges: crmCharges,
@@ -345,7 +355,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             <header><div><h2 id="customer-billing-title">ยอดและการชำระ</h2><p>ข้อมูลการเงินของสาขาปัจจุบัน</p></div><Wallet size={22} /></header>
             <div className="customer-financial-summary"><span><small>ยอดค้างชำระ</small><strong>{formatBusinessMoney(unpaidFinancialBalance)}</strong></span><Link href="/business/billing">เปิดการเงิน</Link></div>
             {financialBalances.length > 0 ? <ol className="customer-financial-list">{financialBalances.map((balance) => <li key={balance.charge.chargeId}><div><BusinessServiceIcon module={balance.charge.serviceModule} size={18} /><span><strong>{balance.charge.serviceLabel}</strong><small>{balance.charge.petId ? customer.pets.find((pet) => pet.id === balance.charge.petId)?.name ?? "น้อง" : "หลายตัวตามการจอง"} · คงเหลือ {formatBusinessMoney(balance.remaining)}</small></span></div><span><CustomerChargeStatus status={balance.status} /><Link href={`/business/billing?chargeId=${encodeURIComponent(balance.charge.chargeId)}`}>ตรวจยอด</Link></span></li>)}</ol> : <p className="customer-section-empty">ยังไม่มี Charge ของลูกค้ารายนี้ในสาขานี้</p>}
-            <div className="customer-payment-history"><h3>Payment ล่าสุด</h3>{financialPayments.length > 0 ? <ol>{financialPayments.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มี Payment record ในสาขานี้</p>}</div>
+            <div className="customer-payment-history"><h3>การรับชำระล่าสุด</h3>{financialPayments.length > 0 ? <ol>{financialPayments.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มีรายการรับชำระในสาขานี้</p>}</div>
           </section>
         </div>
 

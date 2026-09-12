@@ -32,13 +32,14 @@ export function MessageComposer({
   onSend,
 }: {
   disabled?: boolean;
-  onSend: (message: string) => boolean;
+  onSend: (message: string) => Promise<boolean>;
 }) {
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [quickRepliesOpen, setQuickRepliesOpen] = useState(true);
   const [showAllQuickReplies, setShowAllQuickReplies] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -47,15 +48,17 @@ export function MessageComposer({
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  function submit(event?: FormEvent<HTMLFormElement>) {
+  async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const text = message.trim();
-    if (!text || disabled) return;
-    if (!onSend(text)) {
+    if (!text || disabled || sendingRef.current) return;
+    sendingRef.current = true;
+    const sent = await onSend(text).catch(() => false); sendingRef.current = false;
+    if (!sent) {
       setNotice("ส่งข้อความไม่สำเร็จ ลองอีกครั้ง");
       return;
     }
-    setMessage("");
+    setMessage((current) => current.trim() === text ? "" : current);
     setNotice(null);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }

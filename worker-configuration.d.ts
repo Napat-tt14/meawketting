@@ -13,5 +13,7 @@ declare namespace Cloudflare {
     };
     /** Local-only gate for the explicit BE1 development identity adapter. */
     MEAWKETTING_AUTH_MODE?: string;
+    /** Secret binding keyed by opaque channel secret reference; never exposed to clients. */
+    MEAWKETTING_LINE_CREDENTIALS?: string;
   }
 }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./business-design-system.css";
+import "./business-workspace.css";
 import { RouteFooter } from "./_components/RouteFooter";
 import { SiteHeader } from "./_components/SiteHeader";
 

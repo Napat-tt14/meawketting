@@ -4,14 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DemoBusinessContext, QrContractType } from "../../_prototype/businessState";
 import {
   DEMO_BUSINESS_CONTEXTS,
-  createOrResumeBusinessIntake,
   detectQrContract,
-  ensureBusinessScanFixtures,
-  findTemporaryAccessFromScanValue,
   getDemoBusinessContextDetails,
   readActiveBusinessContext,
 } from "../../_prototype/businessState";
-import { evaluateTemporaryAccess } from "../../_prototype/sharingState";
+import { scanTemporaryAccess, startDurableIntake } from "../../_backend/be5/client";
+import { BusinessRequestError } from "../../_backend/shared/client";
 import {
   Camera,
   CheckCircle,
@@ -76,6 +74,8 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
   const [manualError, setManualError] = useState("");
   const [detectedType, setDetectedType] = useState<QrContractType | null>(null);
   const [validAccessId, setValidAccessId] = useState<string | null>(null);
+  const validScanValueRef = useRef<string | null>(null);
+  const validationRevisionRef = useRef(0);
   const [announcement, setAnnouncement] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -93,15 +93,17 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
-  const validateValue = useCallback((value: string, source: "camera" | "manual" | "fixture") => {
+  const validateValue = useCallback(async (value: string, source: "camera" | "manual") => {
     stopCamera();
     setScannerState("validating");
     setManualError("");
     setValidAccessId(null);
+    validScanValueRef.current = null;
+    const revision = ++validationRevisionRef.current;
     const type = detectQrContract(value);
     setDetectedType(type);
 
-    window.setTimeout(() => {
+    try {
       if (type === "quick-passport" || type === "public-safety") {
         setScannerState("wrong-qr-type");
         setAnnouncement("ปฏิเสธ QR ที่ไม่ได้ออกสำหรับรับเข้าร้านแล้ว");
@@ -112,55 +114,31 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
         setAnnouncement("ไม่พบ QR ชั่วคราวสำหรับร้านที่ใช้ได้");
         return;
       }
-      const access = findTemporaryAccessFromScanValue(value);
-      const gate = evaluateTemporaryAccess(access, context.businessId, context.branchId);
-      if (gate !== "valid" || !access) {
-        setScannerState(gate === "network-error" ? "network-error" : gate);
+      const access = await scanTemporaryAccess(context, value);
+      if (revision !== validationRevisionRef.current) return;
+      if (access.status !== "active" && access.status !== "awaiting-owner") {
+        setScannerState(access.status === "expired" || access.status === "revoked" ? access.status : "invalid");
         setAnnouncement("ตรวจสิทธิ์แล้ว แต่ยังเริ่มรับเข้าไม่ได้");
         return;
       }
       setValidAccessId(access.id);
+      validScanValueRef.current = value;
       setScannerState("valid");
-      setAnnouncement(`ตรวจ QR ชั่วคราวสำหรับร้านจาก ${source === "camera" ? "กล้อง" : source === "manual" ? "รหัสใต้ QR" : "รหัสระบบ"} สำเร็จ`);
-    }, 320);
-  }, [context.branchId, context.businessId, stopCamera]);
+      setAnnouncement(`ตรวจ QR ชั่วคราวสำหรับร้านจาก ${source === "camera" ? "กล้อง" : "รหัสใต้ QR"} สำเร็จ`);
+    } catch (error) {
+      if (revision !== validationRevisionRef.current) return;
+      setScannerState(error instanceof BusinessRequestError && ["NOT_FOUND", "INVALID_INPUT", "FORBIDDEN"].includes(error.code) ? "invalid" : "network-error");
+      setAnnouncement("ยังตรวจสิทธิ์ไม่สำเร็จ ไม่มีข้อมูลของน้องถูกเปิด");
+    }
+  }, [context, stopCamera]);
 
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
     const frame = window.requestAnimationFrame(() => {
-      ensureBusinessScanFixtures();
       const activeContext = readActiveBusinessContext();
       contextKeyRef.current = activeContext.key;
       setContext(activeContext);
-      const fixture = new URLSearchParams(window.location.search).get("fixture");
-      if (!fixture) return;
-      const fixtureStates: Partial<Record<string, ScannerState>> = {
-        network: "network-error",
-        suspicious: "suspicious",
-        unreadable: "unreadable",
-        denied: "camera-denied",
-        unavailable: "camera-unavailable",
-        "no-camera": "no-camera",
-        changed: "access-changed",
-      };
-      const directState = fixtureStates[fixture];
-      if (directState) {
-        setScannerState(directState);
-        return;
-      }
-      const fixtureValues: Record<string, string> = {
-        active: "DEMO-TEMP-ACTIVE",
-        pending: "DEMO-TEMP-PENDING",
-        expired: "DEMO-TEMP-EXPIRED",
-        revoked: "DEMO-TEMP-REVOKED",
-        wrong: "DEMO-TEMP-WRONG",
-        quick: "QUICK-PASSPORT-DEMO",
-        safety: "PUBLIC-SAFETY-DEMO",
-        invalid: "DEMO-TEMP-UNKNOWN",
-      };
-      const value = fixtureValues[fixture];
-      if (value) validateValue(value, "fixture");
     });
     return () => window.cancelAnimationFrame(frame);
   }, [validateValue]);
@@ -176,6 +154,8 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
       setManualError("");
       setDetectedType(null);
       setValidAccessId(null);
+      validScanValueRef.current = null;
+      validationRevisionRef.current++;
       setAnnouncement("เปลี่ยนร้านหรือสาขาแล้ว");
     };
     window.addEventListener("meawketting:business-state", syncContext);
@@ -253,42 +233,50 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
     setManualError("");
     setDetectedType(null);
     setValidAccessId(null);
+    validScanValueRef.current = null;
+    validationRevisionRef.current++;
     setAnnouncement("");
   }
 
-  function enterIntake() {
-    if (!validAccessId) return;
-    const access = findTemporaryAccessFromScanValue(`/temporary-access/${validAccessId}`);
-    const gate = evaluateTemporaryAccess(access, context.businessId, context.branchId);
-    if (!access || gate !== "valid") {
+  async function enterIntake() {
+    if (!validAccessId || !validScanValueRef.current) return;
+    const revision = validationRevisionRef.current;
+    setScannerState("validating");
+    try {
+      const result = await startDurableIntake(context, validScanValueRef.current, daycareAttendanceId ?? hotelStayId);
+      if (revision !== validationRevisionRef.current) return;
+      validScanValueRef.current = null;
+      window.location.assign(`/business/intake/${encodeURIComponent(result.record.id)}`);
+    } catch (error) {
+      if (revision !== validationRevisionRef.current) return;
       setValidAccessId(null);
-      setScannerState(gate === "expired" || gate === "revoked" || gate === "wrong-business" ? gate : "access-changed");
-      return;
+      setScannerState(error instanceof BusinessRequestError && error.code === "CONFLICT" ? "access-changed" : "network-error");
     }
-    const intake = createOrResumeBusinessIntake(access, context, { hotelStayId, daycareAttendanceId });
-    if (!intake) {
-      setScannerState("network-error");
-      return;
-    }
-    window.location.assign(`/business/intake/${encodeURIComponent(intake.id)}`);
   }
 
   const details = getDemoBusinessContextDetails(context, !stateReady);
   const errorCopy = SCANNER_COPY[scannerState as keyof typeof SCANNER_COPY];
 
   return (
-    <div className="business-shell shell">
+    <div className="business-shell business-scan shell">
       <BusinessPageHeader
         title="สแกนรับเข้า"
-        context={`ใช้ QR ชั่วคราวสำหรับ ${details.business?.name} · ${details.branch?.name}`}
+        context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"}`}
       />
       <p className="sr-live" role="status" aria-live="polite">{announcement}</p>
+      <div className="scan-layout">
+      <div className="scan-main">
+      <ol className="scan-progress" aria-label="ขั้นตอนรับเข้า">
+        <li aria-current={scannerState !== "valid" ? "step" : undefined}><span>1</span>ตรวจ QR</li>
+        <li aria-current={scannerState === "valid" ? "step" : undefined}><span>2</span>ตรวจข้อมูล</li>
+        <li><span>3</span>รับน้องเข้าร้าน</li>
+      </ol>
 
       {scannerState === "ready" ? (
         <section className="scanner-workspace business-state-enter" aria-labelledby="scanner-ready-heading">
           <div className="scanner-camera scanner-camera--idle">
-            <span className="scanner-frame" aria-hidden="true"><Scan size={64} weight="bold" /></span>
-            <div><h2 id="scanner-ready-heading">สแกน QR</h2><p>วาง QR ให้อยู่ในกรอบ หรือกรอกรหัสใต้ QR</p></div>
+            <span className="scanner-frame" aria-hidden="true"><QrCode size={64} /></span>
+            <div><h2 id="scanner-ready-heading">พร้อมต้อนรับน้องแล้วหรือยัง?</h2><p>เปิดกล้อง แล้วสแกน QR ที่เจ้าของแสดงให้ร้าน</p></div>
           </div>
           <div className="scanner-actions">
             <button className="button button--business button--large" type="button" onClick={() => void startCamera()}><Camera size={20} weight="bold" /> เปิดกล้องสแกน</button>
@@ -304,6 +292,7 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
             <span className="scanner-live-frame" aria-hidden="true" />
             <span className="scanner-camera-status"><Video size={18} weight="bold" /> {scannerState === "camera-permission" ? "กำลังขอสิทธิ์กล้อง" : "กำลังมองหา QR"}</span>
           </div>
+          <h2 id="scanner-camera-heading" className="sr-only">สแกน QR จากกล้อง</h2>
           <p className="scanner-instruction">จัด QR ให้อยู่กลางกรอบ เมื่ออ่านได้ระบบจะตรวจประเภทและสิทธิ์ก่อนเปิดข้อมูล</p>
           <div className="scanner-actions">
             <button className="button button--ghost" type="button" onClick={() => resetScanner("unreadable")}>QR อ่านไม่ออก</button>
@@ -354,6 +343,19 @@ export function BusinessScanner({ hotelStayId = null, daycareAttendanceId = null
           <small className="scanner-detected-type">ประเภทที่ตรวจพบ: {detectedType === "temporary-business" ? "QR ชั่วคราวสำหรับร้าน" : detectedType}</small>
         </section>
       ) : null}
+      </div>
+      <aside className="scan-guide" aria-labelledby="scan-guide-title">
+        <span className="scan-guide__eyebrow">ก่อนเริ่มรับเข้า</span>
+        <h2 id="scan-guide-title">ใช้ QR สำหรับร้านนี้</h2>
+        <p>ให้เจ้าของเปิด QR ชั่วคราวสำหรับร้าน แล้วตรวจชื่อร้านและสาขาให้ตรงกัน</p>
+        <dl>
+          <div><dt>ร้านที่รับเข้า</dt><dd>{details.business?.name ?? "—"}</dd></div>
+          <div><dt>สาขา</dt><dd>{details.branch?.name ?? "—"}</dd></div>
+        </dl>
+        <div className="scan-guide__privacy"><ShieldCheck size={20} /><p>แสดงเฉพาะข้อมูลที่เจ้าของอนุญาต หลังตรวจสิทธิ์สำเร็จ</p></div>
+        <details><summary>สแกนไม่สำเร็จ?</summary><p>เพิ่มแสงและจัด QR ให้อยู่กลางกรอบ หรือเลือกกรอกรหัสใต้ QR แทน หาก QR หมดอายุ ให้เจ้าของสร้างใหม่</p></details>
+      </aside>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { searchDurableCustomers } from "../../_backend/be2/client";
+import { ensureDurableCrm } from "../../_backend/be8/client";
 import {
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
@@ -48,7 +49,7 @@ function useIsClient() {
 }
 
 export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean }) {
-  const { context } = useBusinessContext();
+  const { context, isContextReady } = useBusinessContext();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CustomerCrmSegment>("all");
   const [revision, setRevision] = useState(0);
@@ -58,6 +59,14 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const [searching, setSearching] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const relationshipStateReady = useIsClient();
+  const { businessId, branchId } = context;
+  useEffect(() => {
+    if (!isContextReady) return;
+    let stopped = false;
+    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }); if (!stopped) setNotice((v) => v === "โหลด CRM ล่าสุดไม่สำเร็จ" ? null : v); } catch { if (!stopped) setNotice("โหลด CRM ล่าสุดไม่สำเร็จ"); } };
+    void load(); const timer = window.setInterval(() => void load(), 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [businessId, branchId, isContextReady]);
 
   useEffect(() => {
     const sync = () => setRevision((current) => current + 1);
@@ -120,7 +129,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const conversations = relationshipStateReady
     ? listPrototypeConversations(context.businessId)
     : listPrototypeConversationFixtures(context.businessId);
-  const crmDataset = { bookings, serviceRecords, charges, payments, conversations };
+  const crmDataset = { scope: context, bookings, serviceRecords, charges, payments, conversations };
   const referenceAt = deriveCustomerCrmReferenceAt(customers, crmDataset);
   const crmProfiles = customers.map((customer) => deriveCustomerCrmProfile(customer, crmDataset, referenceAt));
   const crmProfilesByCustomer = new Map(crmProfiles.map((profile) => [profile.customerId, profile]));

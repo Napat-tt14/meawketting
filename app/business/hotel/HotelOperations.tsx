@@ -1,8 +1,9 @@
 "use client";
 
+import { businessToday } from "../../_backend/shared/businessClock";
+
 import { type CSSProperties, type DragEvent, useMemo, useRef, useState } from "react";
 import {
-  BOOKING_DEMO_DATE,
   evaluatePrototypeHotelStayRoomAvailability,
   getEnabledBusinessModules,
   getHotelRooms,
@@ -10,13 +11,13 @@ import {
   getPrototypeHotelStayRoomAssignment,
   listPrototypeHotelStayFixtures,
   listPrototypeHotelStays,
-  movePrototypeHotelStayRoom,
   readPrototypeCustomer,
   readPrototypeCustomerFixture,
   summarizePrototypeHotelStays,
   type DemoBookingPet,
   type PrototypeHotelStay,
 } from "../../_prototype/businessState";
+import { movePrototypeHotelStayRoom } from "../../_backend/be4/facade";
 import { listPrototypeConversationFixtures, listPrototypeConversations, type PrototypeAddServiceRequestMessage } from "../../_prototype/inboxState";
 import {
   BedDouble,
@@ -89,7 +90,7 @@ function validFilter(value: string | null | undefined): value is HotelListFilter
   return HOTEL_LIST_FILTERS.some((filter) => filter.key === value);
 }
 
-function formatConflict(result: ReturnType<typeof evaluatePrototypeHotelStayRoomAvailability>) {
+function formatConflict(result: { conflicts: { message: string }[] }) {
   return result.conflicts.map((conflict) => conflict.message).join(" · ");
 }
 
@@ -102,7 +103,7 @@ export function HotelOperations({
 }) {
   const { context, revision } = useBusinessContext();
   const stateReady = useBusinessStateReady();
-  const [date, setDate] = useState<string>(BOOKING_DEMO_DATE);
+  const [date, setDate] = useState<string>(businessToday(context));
   const [range, setRange] = useState<7 | 14 | 28>(7);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<HotelListFilter>(validFilter(launchFilter) ? launchFilter : "all");
@@ -213,7 +214,7 @@ export function HotelOperations({
     setDropTarget({ roomId, valid });
   }
 
-  function dropIntoRoom(roomId: string, event: DragEvent<HTMLElement>) {
+  async function dropIntoRoom(roomId: string, event: DragEvent<HTMLElement>) {
     event.preventDefault();
     const stayId = dragging?.stayId ?? event.dataTransfer.getData("text/plain");
     const stay = stays.find((item) => item.hotelStayId === stayId) ?? null;
@@ -230,7 +231,7 @@ export function HotelOperations({
       setNotice(formatConflict(availability) || "ห้องหรือโซนนี้ไม่พร้อมในช่วงวันที่เลือก");
       return;
     }
-    const result = movePrototypeHotelStayRoom(stay.hotelStayId, roomId, context, "ย้ายจากตารางห้องพัก", effectiveDate);
+    const result = await movePrototypeHotelStayRoom(stay.hotelStayId, roomId, context, "ย้ายจากตารางห้องพัก", effectiveDate);
     if (!result.ok) {
       dragOutcomeRef.current = "invalid";
       setNotice(result.availability ? formatConflict(result.availability) : "ย้ายห้องไม่สำเร็จ ลองอีกครั้ง");
@@ -304,9 +305,9 @@ export function HotelOperations({
           <BedDouble size={22} aria-hidden="true" />
         </header>
         <div className="hotel-today-summary__stats">
+          <article className="hotel-summary-card hotel-summary-card--occupancy"><span><BedDouble size={18} />การใช้พื้นที่</span><strong>{summary.occupied.toLocaleString("th-TH")} / {summary.capacity.toLocaleString("th-TH")}</strong><small>จองไว้ {summary.reserved} · ว่าง {summary.available}</small></article>
           <article className="hotel-summary-card hotel-summary-card--arrivals"><span><CalendarDays size={18} />เข้าพักวันนี้</span><strong>{summary.arrivals}</strong><small>รอรับเข้า {summary.unassignedArrivals} ตัว</small></article>
           <article className="hotel-summary-card hotel-summary-card--departures"><span><Clock size={18} />ออกวันนี้</span><strong>{summary.departures}</strong><small>เตรียมรับกลับตามรายการ</small></article>
-          <article className="hotel-summary-card hotel-summary-card--occupancy"><span><BedDouble size={18} />การใช้พื้นที่</span><strong>{summary.occupied} / {summary.capacity}</strong><small>จองไว้ {summary.reserved} · ว่าง {summary.available}</small></article>
           <article className="hotel-summary-card hotel-summary-card--care"><span><CheckCircle size={18} />ต้องดูแล</span><strong>{summary.careDue}</strong><small>งานดูแลที่ยังค้างวันนี้</small></article>
           <article className="hotel-summary-card hotel-summary-card--attention"><span><CircleAlert size={18} />ต้องจัดการ</span><strong>{summary.attention}</strong><small>งานดูแล {summary.careDue} · incident {summary.incidents} · พร้อมกลับ {summary.readyForPickup}</small></article>
         </div>
@@ -314,7 +315,7 @@ export function HotelOperations({
 
       <section className="hotel-toolbar" aria-label="เลือกวัน ช่วงแสดงผล และค้นหาการเข้าพัก">
         <label className="hotel-toolbar__date"><span>วันที่</span><input type="date" value={date} onChange={(event) => { if (event.currentTarget.value) setDate(event.currentTarget.value); }} /></label>
-        <button type="button" onClick={() => setDate(BOOKING_DEMO_DATE)}><CalendarDays size={17} />วันนี้</button>
+        <button type="button" onClick={() => setDate(businessToday(context))}><CalendarDays size={17} />วันนี้</button>
         <div className="hotel-toolbar__range">
           <span className="hotel-toolbar__range-label">ช่วงแสดงผล</span>
           <BusinessSegmentedControl

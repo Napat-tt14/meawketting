@@ -2,11 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import {
-  cancelPrototypeAddServiceRequest,
   type PrototypeAddServiceRequestMessage,
   type PrototypeConversation,
   type PrototypeInboxMessage,
 } from "../../_prototype/inboxState";
+import { cancelDurableAddServiceRequest as cancelPrototypeAddServiceRequest } from "../../_backend/be6/client";
 import { CheckCircle, CircleOff, Clock, X } from "../../_components/icons";
 import {
   prototypeMessageTimeLabel,
@@ -56,8 +56,8 @@ function StructuredRequestCard({
         ? X
         : Clock;
 
-  function cancelRequest() {
-    const result = cancelPrototypeAddServiceRequest(request.messageId, businessId);
+  async function cancelRequest() {
+    const result = await cancelPrototypeAddServiceRequest(request.messageId, businessId);
     onMutation(result ? "ยกเลิกคำขอแล้ว" : "ยกเลิกคำขอไม่สำเร็จ ลองอีกครั้ง");
   }
 
@@ -81,8 +81,8 @@ function StructuredRequestCard({
         <div className="structured-request-card__waiting-actions">
           <button type="button" onClick={cancelRequest}>ยกเลิกคำขอ</button>
         </div>
-      ) : request.responseSource === "guardian-local-preview" ? (
-        <small className="structured-request-card__source">เจ้าของตอบแล้ว · บันทึกในอุปกรณ์นี้</small>
+      ) : request.responseSource ? (
+        <small className="structured-request-card__source">ผู้ดูแลตอบแล้ว{request.responseSource === "dev-test-guardian" ? " · ทดสอบระบบ" : ""}</small>
       ) : null}
       {request.requestStatus === "approved" ? <small className="structured-request-card__effect">{request.serviceJobId ? "อัปเดตเฉพาะงานบริการ · ไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ" : "ยังไม่เปลี่ยนการจองหรือยอดเรียกเก็บอัตโนมัติ"}</small> : null}
     </article>
@@ -136,7 +136,7 @@ export function MessageTimeline({
                   <span>
                     <time dateTime={message.sentAt}>{prototypeMessageTimeLabel(message.sentAt)}</time>
                     {message.direction === "business" && message.deliveryState ? (
-                      <small>{message.deliveryState === "local-read" ? "อ่านแล้ว" : "ส่งแล้ว"}</small>
+                      <small>{{ "local-read": "อ่านแล้ว", "local-sent": "ส่งแล้ว", sent: "ส่งให้ช่องทางแล้ว", "test-sent": "ส่งทดสอบแล้ว", queued: "รอส่ง", "not-connected": "ยังไม่เชื่อมช่องทาง", failed: "ส่งไม่สำเร็จ" }[message.deliveryState]}</small>
                     ) : null}
                   </span>
                 </div>

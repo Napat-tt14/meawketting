@@ -1,8 +1,9 @@
 "use client";
 
+import { businessToday } from "../../_backend/shared/businessClock";
+
 import { type KeyboardEvent, useCallback, useRef, useState } from "react";
 import {
-  BOOKING_DEMO_DATE,
   DAYCARE_ATTENDANCE_STATUS_LABELS,
   getEnabledBusinessModules,
   getPrototypeDaycareZoneAvailability,
@@ -98,7 +99,7 @@ function DaycareCard({ item, onOpen }: { item: DaycareItem; onOpen: (item: Dayca
 export function DaycareScreen({ launchAttendanceId = null }: { launchAttendanceId?: string | null }) {
   const { context, revision } = useBusinessContext();
   const stateReady = useBusinessStateReady();
-  const [date, setDate] = useState<string>(BOOKING_DEMO_DATE);
+  const [date, setDate] = useState<string>(businessToday(context));
   const [query, setQuery] = useState("");
   const [mobileView, setMobileView] = useState<DaycareMobileView>("all");
   const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(launchAttendanceId);
@@ -198,7 +199,7 @@ export function DaycareScreen({ launchAttendanceId = null }: { launchAttendanceI
 
       <section className="daycare-toolbar" aria-label="เลือกวันและค้นหารายการ Daycare">
         <label><span>วันที่</span><input type="date" value={date} onChange={(event) => { if (event.currentTarget.value) setDate(event.currentTarget.value); }} /></label>
-        <button type="button" onClick={() => setDate(BOOKING_DEMO_DATE)}><CalendarDays size={17} />วันนี้</button>
+        <button type="button" onClick={() => setDate(businessToday(context))}><CalendarDays size={17} />วันนี้</button>
         <label className="daycare-toolbar__search"><Search size={19} /><span className="sr-only">ค้นหารายการ Daycare</span><input value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="ค้นหาน้อง ลูกค้า โซน หรือผู้ดูแล" /></label>
       </section>
 

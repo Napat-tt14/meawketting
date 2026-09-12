@@ -1,6 +1,6 @@
 # Meawketting
 
-Meawketting is a Business-first Pet Business Operating Platform prototype. BF1–BF12 UI is frozen; BE1 Person/Business/Branch, BE2 Customer/Pet and BE3 Booking/Calendar planning foundations are implemented locally with Vinext/Cloudflare Worker and D1.
+Meawketting is a Business-first Pet Business Operating Platform prototype. BF1–BF12 UI is frozen; BE1–BE8 backend foundations are implemented locally with Vinext/Cloudflare Worker and D1. BE6 remains provider-neutral, BE7 remains gateway-neutral, and BE8 is read-only/derived.
 
 ## Run locally
 
@@ -25,10 +25,20 @@ Useful backend checks:
 npm.cmd run typecheck:be1
 npm.cmd run typecheck:be2
 npm.cmd run typecheck:be3
+npm.cmd run typecheck:be4
+npm.cmd run typecheck:be5
+npm.cmd run typecheck:be6
+npm.cmd run typecheck:be7
+npm.cmd run typecheck:be8
 npm.cmd run db:check
 npm.cmd run test:be1
 npm.cmd run test:be2
 npm.cmd run test:be3
+npm.cmd run test:be4
+npm.cmd run test:be5
+npm.cmd run test:be6
+npm.cmd run test:be7
+npm.cmd run test:be8
 ```
 
 ## Current prototype
@@ -53,9 +63,9 @@ Business Landing → mock Business Login → Business Home
 → Customer CRM & Retention (BF-12; derived within Customers, not another store)
 ```
 
-BE1 moves Business text profile and Branch registry—including contact details, active state, enabled services and weekly hours—from browser truth to a typed server application boundary and durable D1 records. BE2 likewise makes Business-wide Customer, Business-local Pet profile/contact relationship, notes/tags/lifecycle and Customer/Pet search durable. BE3 makes Booking planning, Pet links, Branch service/resource catalogues, assignments, availability reservations and Calendar range queries durable while continuing to reference BE2 identities. Logo bytes stay a local preview because media/R2 is excluded. Grooming Jobs, Hotel Stays, Daycare Attendance and all other execution/financial/communication domains remain browser-local compatibility data until their own backend phases. Consult `docs/VALIDATION.md` for recorded evidence.
+BE1 moves Business text profile and Branch registry—including contact details, active state, enabled services and weekly hours—from browser truth to a typed server application boundary and durable D1 records. BE2 makes Business-wide Customer, Business-local Pet profile/contact relationship, notes/tags/lifecycle and Customer/Pet search durable. BE3 makes Booking planning, Pet links, Branch service/resource catalogues, assignments, availability reservations and Calendar range queries durable while continuing to reference BE2 identities. BE4 adds durable Grooming Jobs, Hotel Stays, Daycare Attendance, assignments, care logs and canonical Service Records. BE5 adds scoped temporary access grants, Consent and Intake; BE6 adds durable Inbox, outbox and provider-neutral Business-owned LINE OA boundaries; BE7 adds Charge/Payment records, allocations, refunds, attempts and webhook/reconciliation ledgers; BE8 derives read-only Reports/CRM from those records. Logo and other media remain outside the implementation because R2 is not provisioned. Consult `docs/VALIDATION.md` for recorded evidence.
 
-Business Home and Shared Calendar keep their frozen presentation while their Booking summaries and planning mutations use BE3 truth after hydration. Customers & Pets keeps the same frozen UI with BE2 truth, including BE3-backed upcoming Booking projections; the explicit seeded Passport/access compatibility read model remains non-authoritative. Business Inbox, the Shared Business Intake Engine, Grooming Jobs, Hotel Stays/room assignments, Daycare Attendance, Billing/Payments, Service Records/Reports and the full Team directory remain browser-local prototypes that reference durable BE2/BE3 IDs. Charge remains distinct from Payment, execution remains distinct from Booking, and Service Record remains Business-side history. Guardian/Passport authority, Consent, real messaging/LINE, payment processing, media, production auth and deployment are not implemented. BF10 text profile/Branch configuration uses BE1; BF12 CRM remains a derived projection rather than a new store.
+Business Home and Shared Calendar keep their frozen presentation while Booking summaries and planning mutations use BE3 truth after hydration. Customers & Pets keeps the same frozen UI with BE2 truth, including BE3-backed upcoming Booking projections; the explicit seeded Passport/access compatibility read model remains non-authoritative. Inbox, Intake, Grooming, Hotel, Daycare, Billing, Service Records, Reports and CRM now hydrate through their typed BE4–BE8 clients; persistent compatibility is explicit fixture mode only, and any pre-hydration snapshot is presentation-only. Charge remains distinct from Payment, execution remains distinct from Booking, and Service Record remains Business-side history. Production Guardian/Passport authority, real messaging/LINE delivery, payment processing, media, production auth and deployment are not implemented. BF10 text profile/Branch configuration uses BE1; BF12 CRM remains a derived projection rather than a new store.
 
 Consumer navigation is currently four slots: live `สัตว์เลี้ยง` (`/my-pets`) and `กิจกรรม` (`/activity`), plus disabled planned `หน้าหลัก` and `ข้อความ` placeholders. `สร้าง Pet Passport` remains a contextual action in My Pets at `/create-passport`; no Consumer Home or Inbox/Chat route has been created.
 
@@ -71,9 +81,9 @@ A Business or Branch may enable several services; there is no fixed Business Typ
 
 ## Boundaries
 
-BE1 Person, Business, Branch, BusinessMembership, Branch access, configuration, server authorization and audit/correlation are implemented locally. BE2 Customer, Pet identity/Business-local profile, neutral contact relationship, notes/tags/lifecycle/search/duplicate warnings and audit are implemented locally. BE3 Booking planning, three time models, multi-Pet links, minimal planning Resources, server availability/conflict enforcement, create idempotency and optimistic revision checks are implemented locally. OWNER has Business-wide Branch/configuration access; active OWNER/MANAGER/STAFF reuse the current operational membership foundation with Branch scope enforced server-side. Production authentication is **not implemented**; the development/test adapter fails closed unless explicitly configured.
+BE1 Person, Business, Branch, BusinessMembership, Branch access, configuration, server authorization and audit/correlation are implemented locally. BE2 Customer, Pet identity/Business-local profile, neutral contact relationship, notes/tags/lifecycle/search/duplicate warnings and audit are implemented locally. BE3 Booking planning, three time models, multi-Pet links, minimal planning Resources, server availability/conflict enforcement, create idempotency and optimistic revision checks are implemented locally. BE4 execution/staff assignments, care/activity logs and Service Records; BE5 Consent/temporary access and Intake; BE6 Inbox/message/outbox and the Business-owned LINE adapter boundary; BE7 Charge/Payment/allocations/refunds/attempts and webhook/reconciliation ledgers; and BE8 read-only Reports/CRM projections are implemented locally with Branch and Business authorization. OWNER has Business-wide Branch/configuration access; active OWNER/MANAGER/STAFF reuse the current operational membership foundation with Branch scope enforced server-side. Production authentication is **not implemented**; the development/test adapter fails closed unless explicitly configured.
 
-Service Operations (BE4), Guardian/Passport/Consent/Intake, Inbox/LINE, Billing/Payment, Reports, media/R2 and Consumer backends have not started. Their existing operational UI data remains local compatibility state linked by durable BE2 Customer/Pet and BE3 Booking IDs. BE3 does not make the browser-local Team directory or Hotel room/zone execution authoritative; it persists only the minimal schedulable Resource projection needed for planning. Secure QR tokens, real payment processing, payroll, HRIS, full accounting, production verification and deployment remain out of scope. Consumer development is **PAUSED**; **BE1, BE2 and BE3 are implemented locally; BE4 is not started**.
+Temporary QR tokens, Consent and Intake are server-validated and do not infer Guardian authority from Customer or LINE identity. Real LINE delivery, payment gateway processing, media/R2, payroll, HRIS, full accounting, production verification and deployment remain out of scope. Consumer development is **PAUSED**; `/workfiledesign` remains untouched.
 
 ```text
 TARGET PLATFORM: Cloudflare
@@ -81,4 +91,4 @@ PRODUCTION: NOT DEPLOYED / NOT VERIFIED
 PRODUCTION READY: NO
 ```
 
-Cloudflare Worker/Vinext with D1 is the implemented local BE1–BE3 architecture. No production resource or deployment has been created or verified. Browser/session Booking records are dev/test fixtures only and are not backfilled into D1. BF1–BF12 are frozen; standalone CareProof/Handover is superseded. Production integration and later phases do not start automatically. See `docs/ROADMAP.md`.
+Cloudflare Worker/Vinext with D1 is the implemented local BE1–BE8 architecture; the latest safe migration is `0014_be7_settlement_guards.sql`. No production resource or deployment has been created or verified. Browser/session records are explicit DEV/TEST compatibility fixtures only and are not backfilled into D1. BF1–BF12 are frozen; standalone CareProof/Handover is superseded. Production auth, external providers, R2/media and deployment remain launch dependencies. See `docs/ROADMAP.md`.

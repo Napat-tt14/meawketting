@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sendPrototypeTextMessage, type PrototypeConversation } from "../../_prototype/inboxState";
+import { type PrototypeConversation } from "../../_prototype/inboxState";
+import { sendDurableTextMessage as sendPrototypeTextMessage } from "../../_backend/be6/client";
 import { ArrowLeft, CalendarDays, MessageCircle, Plus, UserRound } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
@@ -49,8 +50,8 @@ export function ConversationPane({
     onStateChange(nextNotice);
   }
 
-  function send(message: string) {
-    const result = sendPrototypeTextMessage(conversation.conversationId, businessId, message);
+  async function send(message: string) {
+    const result = await sendPrototypeTextMessage(conversation.conversationId, businessId, message);
     if (!result.ok) return false;
     return true;
   }

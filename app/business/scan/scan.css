@@ -1,0 +1,48 @@
+.business-app-frame .business-scan { max-width: 1160px; }
+.scan-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr); gap: 32px; align-items: start; }
+.scan-main { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.business-scan .scan-progress { display: flex; justify-content: space-between; gap: 12px; margin: 0; padding: 20px 24px; border-bottom: 1px solid var(--border); list-style: none; }
+.business-scan .scan-progress li { display: flex; gap: 8px; align-items: center; color: var(--muted-foreground); font-size: 13px !important; }
+.scan-progress li > span { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--border); border-radius: 50%; font-variant-numeric: tabular-nums; }
+.scan-progress li[aria-current] { color: var(--foreground); font-weight: 600; }
+.scan-progress li[aria-current] > span { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.business-scan :is(.scanner-workspace, .scanner-manual, .scanner-result) { width: 100%; max-width: none; margin: 0; padding: 28px; border: 0; border-radius: 0; box-shadow: none; background: var(--surface); }
+.business-scan .scanner-camera { min-height: 290px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); }
+.business-scan .scanner-camera--idle { display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: 32px 20px; }
+.business-scan .scanner-frame { display: grid; place-items: center; width: 110px; height: 110px; border: 0; border-radius: 16px; background: var(--accent); color: var(--foreground); box-shadow: none; }
+.business-scan .scanner-camera--idle h2 { margin: 0 0 8px; font-size: 22px; color: var(--foreground); }
+.business-scan .scanner-camera--idle p { margin: 0; color: var(--muted-foreground); font-size: 14px !important; }
+.business-scan .scanner-camera--live { position: relative; overflow: hidden; aspect-ratio: 4 / 3; background: #242620; }
+.business-scan .scanner-camera--live video { width: 100%; height: 100%; object-fit: cover; }
+.business-scan .scanner-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.business-scan .scanner-actions .button { flex: 1 1 auto; min-height: 48px; font-size: 14px; }
+.business-scan :is(.scanner-manual, .scanner-result) { min-height: 360px; text-align: left; }
+.business-scan .scanner-manual form { max-width: none; }
+.business-scan .scanner-manual input { width: 100%; min-height: 52px; font-size: 18px; }
+.business-scan .scanner-state-icon { width: 44px; height: 44px; background: transparent; box-shadow: none; border: 0; margin: 0 0 16px; }
+.business-scan :is(.scanner-manual, .scanner-result) h2 { font-size: 22px; }
+.business-scan :is(.scanner-privacy-lock, .scanner-safe-result) { border-radius: 6px; box-shadow: none; }
+.scan-guide { padding: 24px 0; }
+.scan-guide__eyebrow { color: var(--muted-foreground); font-size: 12px; }
+.business-scan .scan-guide h2 { margin: 10px 0; font-size: 22px; }
+.business-scan .scan-guide p { margin: 0; color: var(--muted-foreground); font-size: 14px !important; line-height: 1.7; }
+.scan-guide dl { display: grid; gap: 14px; margin: 24px 0; padding: 20px 0; border-block: 1px solid var(--border); }
+.scan-guide dl > div { display: flex; justify-content: space-between; gap: 16px; }
+.scan-guide dt { color: var(--muted-foreground); font-size: 13px; }
+.scan-guide dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.scan-guide__privacy { display: flex; align-items: flex-start; gap: 10px; }
+.scan-guide__privacy svg { flex-shrink: 0; margin-top: 3px; color: var(--status-success); }
+.scan-guide details { margin-top: 20px; }
+.scan-guide summary { min-height: 44px; cursor: pointer; font-size: 14px; }
+@media (max-width: 900px) {
+  .scan-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .scan-guide { padding: 20px 4px; }
+}
+@media (max-width: 480px) {
+  .business-scan .scan-progress { padding: 16px 12px; gap: 8px; }
+  .business-scan .scan-progress li { flex-direction: column; gap: 6px; font-size: 12px !important; text-align: center; }
+  .business-scan :is(.scanner-workspace, .scanner-manual, .scanner-result) { padding: 16px; }
+  .business-scan .scanner-camera { min-height: 255px; }
+  .business-scan .scanner-camera--idle h2 { font-size: 20px; }
+  .business-scan .scanner-actions { flex-direction: column; }
+}

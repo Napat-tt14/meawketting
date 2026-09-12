@@ -1,9 +1,9 @@
 # Product and Domain Architecture
 
-Status: **CANONICAL ARCHITECTURE DIRECTION (BUSINESS-FIRST / BF1–BF12 FROZEN / BE1 + BE2 + BE3 IMPLEMENTED LOCALLY)**
+Status: **CANONICAL ARCHITECTURE DIRECTION (BUSINESS-FIRST / BF1–BF12 FROZEN / BE1–BE8 IMPLEMENTED LOCALLY)**
 Owner: Product Architecture
 
-This document owns shared objects, authority and boundaries. Capability detail is in [MODULE_MAP](./MODULE_MAP.md); unresolved policy is in [DECISIONS](./DECISIONS.md). [BACKEND_READINESS](./BACKEND_READINESS.md) owns the BE0 map and the implemented BE1–BE3 persistence/application boundary.
+This document owns shared objects, authority and boundaries. Capability detail is in [MODULE_MAP](./MODULE_MAP.md); unresolved policy is in [DECISIONS](./DECISIONS.md). [BACKEND_READINESS](./BACKEND_READINESS.md) owns the BE0 map and the implemented BE1–BE8 persistence/application boundaries.
 
 ## Guardian channel status
 
@@ -24,12 +24,12 @@ Person (Human identity)
       ├─ enabled Service Modules (Grooming, Hotel, Daycare, etc.)
       └─ Branch (Operational execution unit)
          ├─ enabled subset of Business modules
-         ├─ shared local team members, Branch memberships and displayed roles
+         ├─ shared BE4 operation staff, Branch memberships and displayed roles
          ├─ operational hours & booking availability
          └─ physical/schedulable resources (stations, rooms, zones)
 ```
 
-- One Person may belong to several Businesses through durable BE1 memberships. Owner sees every Branch in that Business; Manager/Staff see explicit durable Branch grants. BF9 Team Members remain separate browser-local operational data and do not grant authorization.
+- One Person may belong to several Businesses through durable BE1 memberships. Owner sees every Branch in that Business; Manager/Staff see explicit durable Branch grants. BE4 operational staff remain separate from BE1 memberships and do not grant authorization.
 - One Business may enable many Service Modules; there is no fixed Business Type enum.
 - A Branch is operational, not cosmetic. It scopes services, staff, rooms/stations/zones, execution and local attribution.
 - **Workspace is not a user-facing product concept.** Engineering may later introduce an internal tenant abstraction without changing this hierarchy.
@@ -72,7 +72,7 @@ Business
 - `CustomerPetRelationship` is many-to-many and lifecycle-aware. It expresses only a Business-local contact association, never legal ownership, Guardian authority, Consent or Passport access.
 - Every `POST /api/be2` operation reuses BE1 actor → active membership → active Business authorization and then scopes the target in repository SQL. No Branch grant can widen access into a different Business.
 - Customer/Pet search and duplicate candidates are Business-scoped. Duplicate warnings do not merge or delete records.
-- The frozen Customer UI is fed through a typed client and memory compatibility cache. Remaining browser-local modules keep stable BE2 IDs; the old session Customer slice is not imported or dual-written.
+- The frozen Customer UI is fed through a typed client and memory compatibility cache. Explicit fixture-only modules keep stable BE2 IDs; the old session Customer slice is not imported or dual-written.
 - Passport/access badges for seeded Pets remain an explicit non-authoritative dev read model. BE2 does not implement Guardian, Passport ownership, Consent, QR or protected Passport fields.
 
 ## BE3 Booking, Calendar and planning Resource foundation
@@ -91,7 +91,28 @@ authorized BE1 Business + Branch
 - BE3 persists only the Branch-local schedulable projection needed by planning: service eligibility, active state, capacity units and availability windows. It does not migrate the BF9 Team/HR directory or Hotel room/zone execution truth.
 - Calendar range reads and create/edit/reschedule/resource/cancel commands pass through `POST /api/be3`. Browser conflict previews are advisory; the server repeats active Branch, module, hours, Resource, overlap and tenant validation on every write.
 - D1 writes reserve Resource/capacity intervals and write a final commit guard in one transactional batch. Reservation triggers reject overlap/capacity races; optimistic revisions reject stale edits and Business-scoped idempotency keys make equivalent create retries replay the original result.
-- Successful BE3 writes may refresh still-local BE4 execution projections by stable IDs. That best-effort compatibility step is not atomic with D1 and never becomes Booking authority.
+- Successful BE3 writes may refresh explicitly gated fixture projections by stable IDs. Normal BE4 execution is D1-backed and never becomes Booking authority.
+
+## BE4–BE8 backend architecture
+
+```text
+BE3 Booking + BE2 Customer/Pet
+        │
+        ├─ BE4 D1 ServiceExecution (Grooming | Hotel | Daycare)
+        │       ├─ assignments / capacity / care / event history
+        │       └─ completed → one source-keyed ServiceRecord per Pet
+        ├─ BE5 D1 Guardian authority → Consent → temporary Grant → Intake
+        ├─ BE6 D1 Conversation / Message / read state → outbox → OA adapter
+        ├─ BE7 D1 Charge → Payment allocation / refund / attempt ledger
+        └─ BE8 read-only snapshot queries → Reports + CRM projections
+```
+
+- **BE4:** Booking is planning. Grooming Job, Hotel Stay and Daycare Attendance are independent execution lifecycles with server-checked staff/resource/room/zone assignments. Completion writes a canonical Service Record and never marks a Charge paid.
+- **BE5:** Guardian authority is a separate Person-to-Pet record. Temporary Business QR is the only QR taxonomy that can authorize Business Intake; tokens are opaque, hashed, scoped, expiring and revocable. Customer relationship and LINE identity never infer authority.
+- **BE6:** Each Business owns its own LINE OA channel boundary. Conversations and Messages retain Business/Branch/Customer/Pet/Booking context, read state, approvals and durable outbox attempts. Webhook signatures and event IDs are checked before deduplicated ingestion. A mock provider is used only in tests.
+- **BE7:** Charge is what is owed; Payment is money recorded; allocations, refunds, attempts and webhook/reconciliation ledgers remain separate and idempotent. Service completion is never auto-paid. Provider credentials are external and unconfigured.
+- **BE8:** Reports and CRM run read-only, authorized snapshots over BE1–BE7 canonical records. Revenue comes from Payments less refunds, balances from Charge allocations, occupancy/workload/unread are derived, and no report/CRM writable tables exist.
+- **Frontend boundary:** normal Business runtime hydrates typed BE4–BE8 clients from D1. `MEAWKETTING_FIXTURE_MODE=test` is an explicit compatibility-only mode; browser state is not production authority.
 
 ## Shared object model
 
@@ -136,12 +157,12 @@ Service Record ── records permitted evidence across module execution records
 | **Booking** | Planned activity for one or more Pets and linked module execution records | Supports appointment, date-range and day models; Branch, estimate, planning status and required/assigned resources—not always a one-hour appointment. It is not an execution-status field. |
 | **Service Job / execution record** | Shared direction for a unit of work executed for one Pet inside a Booking/Visit | BF-5 Grooming Service Job, BF-6 Hotel Stay and BF-11 Daycare Attendance are distinct Pet-specific execution records linked to shared Bookings. Their execution lifecycles are not Booking status. Training remains future scope. |
 | **Resource** | Durable BE3 Branch-local schedulable/capacity projection required for planning | Use user-facing words such as ช่าง, จุดบริการ, ห้อง or โซน rather than exposing `Resource` blindly; it is not full Team/HR or execution inventory truth |
-| **Team Member** | Shared local operational person record for Team & Staff Operations | One member can carry multiple Branch IDs, capabilities, lightweight availability and an active/inactive state. Existing Resources may link to that member; a staff record is not cloned by Grooming, Hotel or Branch. Displayed roles are not authorization. |
-| **Conversation** | Contextual communication and workflow thread | Can link Customer, Pet, Booking, Visit, Service Job and Branch; future modules reuse shared context rather than creating isolated identity threads |
-| **Charge** | What is owed for a service, add-on, manual adjustment or lightweight discount | **Not a Payment.** BF-7 stores a Branch-attributed local Charge with line-item snapshot, total and cancellation history; a Booking-level base amount is never copied once per Pet-specific Job/Stay/Attendance. |
-| **Payment** | A record of how and when money was received | BF-7 records local Cash, bank-transfer or Other Payment allocations. `unpaid` / `partial` / `paid` is derived from allocations; cancelling an unpaid Charge is distinct from refunds. Provider, refund and cross-Branch rules remain open. |
-| **Consent / Access Grant** | Guardian authorization for a named recipient, purpose, scope and duration | Business/Branch/context checked on every protected transition; revoke/expiry removes stale access |
-| **Service Record** | Business evidence that a Pet-specific service execution completed | BF8/BF11 stores one Branch-attributed local record per completed Grooming Job or checked-out/completed Hotel Stay or Daycare Attendance, with permitted summary/details/activity/resource facts, optional photo metadata, and append-only correction/source-recompletion history. It is **not** a receipt, certificate, Pet Passport, ownership record, medical chart, or Guardian channel. The former standalone CareProof experience is **SUPERSEDED**. |
+| **Team Member** | Shared BE4 operational staff record for Team & Staff Operations | One member can carry multiple Branch IDs, capabilities, lightweight availability and an active/inactive state. Existing Resources may link to that member; a staff record is not cloned by Grooming, Hotel or Branch. Displayed roles are not authorization. |
+| **Conversation** | Durable BE6 contextual communication and workflow thread | Can link Customer, Pet, Booking, execution and Branch; provider delivery is an adapter concern and does not create a second identity thread |
+| **Charge** | What is owed for a service, add-on, manual adjustment or lightweight discount | **Not a Payment.** BE7 stores a Branch-attributed D1 Charge with line-item snapshot, total and cancellation/refund history; a Booking-level base amount is never copied once per Pet-specific Job/Stay/Attendance. |
+| **Payment** | A record of how and when money was received | BE7 records D1 Cash, bank-transfer or Other Payment allocations plus attempts, webhook and reconciliation state. `unpaid` / `partial` / `paid` is derived from allocations; cancelling an unpaid Charge and recording an authorized refund are distinct actions. Provider execution, automated refunds and cross-Branch settlement remain external/open. |
+| **Consent / Access Grant** | Durable BE5 Guardian authorization for a named recipient, purpose, scope and duration | Business/Branch/context checked on every protected transition; revoke/expiry removes stale access |
+| **Service Record** | Business evidence that a Pet-specific service execution completed | BE4/BE8 stores one Branch-attributed D1 record per completed Grooming Job or checked-out/completed Hotel Stay or Daycare Attendance, with permitted summary/details/activity/resource facts and append-only correction/source-recompletion history. It is **not** a receipt, certificate, Pet Passport, ownership record, medical chart, or Guardian channel. The former standalone CareProof experience is **SUPERSEDED**. |
 
 ## Portal and entry architecture
 
@@ -186,16 +207,16 @@ Add Meawketting LINE
 
 This flow is conceptual and has no repository route contract yet. Do not invent LINE Mini App routes, imply that LINE integration exists, or treat LINE identity as proof of Pet ownership or consent. Future production linking must establish the Person ↔ Guardian relationship and consent authority separately.
 
-## BF-4–BF-7 local Conversation architecture
+## BE6 / BF-4 Conversation architecture
 
-- The implemented prototype uses one ongoing Conversation per `Business + Customer` relationship. It stores IDs for Customer and optional Pet/Booking/Branch/Grooming Service Job context. Hotel launches reuse the Customer/Pet/Booking context rather than creating a Stay-specific thread. Display identity is resolved from the shared Business Customer/Booking source.
+- The implemented backend uses one ongoing Conversation per `Business + Customer` relationship. It stores IDs for Customer and optional Pet/Booking/Branch/execution context. Hotel launches reuse the Customer/Pet/Booking context rather than creating a Stay-specific thread. Display identity is resolved from the shared Business Customer/Booking source.
 - `/business/inbox?conversation=<id>` is the local recovery contract. Customer/Pet/Booking launch parameters reuse or create the relationship and then normalize to this query; no dynamic Conversation route is required for the current split/mobile task model.
 - Conversation is Business-wide so switching Branch does not duplicate it. A linked Booking retains Branch attribution, and the active Branch does not gain another Branch's Passport consent or protected data.
-- Structured add-service approval is a message/request state. Business can send/cancel but cannot approve; only the explicitly labeled local Guardian-response simulator may approve/decline. A linked approved Grooming request idempotently updates the shared Grooming Service Job's add-on and estimated duration only. It has no Booking, Charge, Payment, settlement, delivery-proof, or production Guardian-identity effect.
+- Structured add-service approval is a durable message/request state. Business can send/cancel but cannot approve; only the explicitly labeled dev/test Guardian-response boundary may approve/decline. A linked approved Grooming request idempotently updates the shared Grooming Service Job's add-on and estimated duration only. It has no Booking, Charge, Payment, settlement, delivery-proof, or production Guardian-identity effect.
 - Hotel Business notes, care instructions and incident notes remain internal Stay fields. They are never copied into a Customer message automatically.
-- BF-7 may offer an explicit staff action to send a local text about an amount due or a recorded payment through this same Conversation. It does not create another thread, mutate financial state from Inbox, or imply delivery, notification, LINE transport, or a real payment link.
+- BE7 may offer an explicit staff action to send a text about an amount due or a recorded payment through this same Conversation. It does not create another thread, mutate financial state from Inbox, or imply production delivery, notification, LINE transport, or a real payment link.
 
-## BF-6 local Hotel / Boarding architecture
+## BE4 / BF-6 Hotel / Boarding architecture
 
 - Shared Calendar owns date-range Hotel Booking planning. `/business/hotel` owns arrival/departure execution, occupancy and care; it does not create or edit another Booking model.
 - One Hotel Booking projects one `PrototypeHotelStay` per Pet. A Stay references shared Booking, Business, Branch, Customer and Pet IDs and keeps its independent `จองไว้ → รับเข้า → พักอยู่ → พร้อมรับกลับ → เช็กเอาต์ → เสร็จสิ้น` lifecycle, plus guarded cancelled/no-show terminal states.
@@ -206,19 +227,19 @@ This flow is conceptual and has no repository route contract yet. Do not invent 
 - Navigation, Command Palette and direct-route content all check the active Branch's Hotel capability. Home, Customer Detail and Inbox resolve the same Stay/Customer/Booking state without duplicating identities or conversations.
 - Ready-for-pickup, checked-out and completed remain operational states. An explicit checkout action may open BF-7 Billing with the linked Stay context, but no Hotel transition creates a Payment or makes a Charge paid. BF8 automatically creates/reuses one Service Record only after a Stay is checked out/completed with an actual checkout time; it does not copy medication, Guardian instruction, Intake, or incident facts.
 
-## BF-7 local Billing, Payments & Revenue architecture
+## BE7 / BF-7 Billing, Payments & Revenue architecture
 
-- `/business/billing` is a **browser-local** financial surface within the existing shared Business state envelope, not a separate ledger, database or payment gateway. It is available in the active Business/Branch context and retains Branch as financial attribution on both Charge and Payment records.
+- `/business/billing` is a **BE7 D1-backed** financial surface, not a separate UI ledger or payment gateway. It is available in the active Business/Branch context and retains Branch as financial attribution on both Charge and Payment records.
 - A Charge references the shared Business, Branch, Customer, Booking and service context, with optional Pet/Grooming Job/Hotel Stay references where a single-Pet source is unambiguous. The Booking estimate becomes one booking-level base-service Charge rather than a duplicate base charge for each linked Pet-specific Job or Stay.
 - Charge lines are immutable local financial snapshots: `base-service`, `add-on`, `manual-adjustment`, and `discount`. Manual adjustments and discounts require a stated reason. Approved Grooming add-ons remain Job-only Inbox effects; checkout reconciles those approved add-ons idempotently into Charge lines instead of letting Inbox create a Charge or Payment.
 - A Payment is recorded separately with Cash, bank-transfer, or Other method, an amount, note and duplicate-safe local request key, then allocates to Charge(s). Charge status is derived from the sum of allocations and Charge cancellation state: `unpaid`, `partial`, `paid`, or `cancelled`; it is not inferred from a Booking, Grooming Job or Hotel Stay lifecycle.
 - Money uses whole Thai Baht integers as a **prototype assumption**. This does not choose tax precision, receipt/invoice requirements, a payment provider, refund policy, discount authority, price authority, accounting treatment or cross-Branch settlement rules.
 - Billing, Customer Detail and Business Home reuse the same Charge/Payment records and selectors. Customer/Pet identity remains Business-wide and shared; financial history names its Branch. Current-Branch revenue derives from recorded Payment allocations, not a separate Home fixture.
-- BF-7 permits cancellation of an unpaid Charge with a required reason. It does not delete or automatically reverse a recorded Payment, process refunds, settle across Branches, or implement General Ledger, tax, payroll, inventory or accounting exports.
+- BE7 permits cancellation of an unpaid Charge with a required reason and an authorized Owner/Manager refund with a required reason. It does not delete or automatically reverse a recorded Payment, execute a provider refund, settle across Branches, or implement General Ledger, tax, payroll, inventory or accounting exports.
 
-## BF-8 shared Service Record architecture
+## BE4 / BE8 shared Service Record architecture
 
-- Service Record is **domain data in the existing Business state envelope**, not a module, dashboard, menu item, standalone route, or post-completion workflow. The former standalone CareProof experience is **SUPERSEDED**.
+- Service Record is **BE4 D1 domain data**, not a module, dashboard, menu item, standalone route, or post-completion workflow. The former standalone CareProof experience is **SUPERSEDED**.
 - One immutable source key gives one record per Pet-specific execution: a completed Grooming Job with `actualCompletedAt`, a checked-out/completed Hotel Stay with `actualCheckOutAt`, or a checked-out/completed Daycare Attendance with `completedAt` / `checkedOutAt`. Completion creates or updates that record in the same local transaction; repeated actions are idempotent and never add a duplicate.
 - A record references the shared Business, Branch, Customer, Pet, Booking, and exactly one Job, Stay or Attendance. It stores a service summary, permitted details/activity timeline, staff/resource labels, a local Business-note snapshot, optional before/after **metadata**, and append-only correction/source-recompletion history. It neither duplicates Customer/Pet identity nor becomes a new Booking, Charge, Payment, Inbox, Passport, or medical record.
 - Grooming summaries may include the completed base service, approved Job add-ons, and assigned shared resources. Hotel summaries may include stay dates, room/zone movement summary, and ordinary completed daily-care summary. Hotel Service Record explicitly excludes Guardian care instructions, Intake details, medication instructions/authorization, and incident content.
@@ -227,12 +248,12 @@ This flow is conceptual and has no repository route contract yet. Do not invent 
 - Lightweight correction supports only Service Record summary or Business note. It appends prior value, next value, reason, staff, time and a duplicate-safe request key; source re-completion also appends a permitted source-revision snapshot. Audit timestamps are monotonic and neither path silently destroys prior record/history. Legacy handover fields in older browser records are retained for compatibility only; no current UI starts or advances that workflow.
 - Guardian LINE visibility is **PLANNED**, not implemented; no Consumer route, LINE Mini App, LINE message, Guardian UI, or Guardian authorization/ownership claim is added.
 
-## BF-9 Team & Staff Operations architecture
+## BE4 / BF-9 Team & Staff Operations architecture
 
-- `/business/team` reads and writes one shared browser-local Team Member foundation in the existing Business state envelope. It does not introduce a second Staff, Person or Resource store.
+- `/business/team` reads and writes one shared BE4 operation-staff foundation in D1. It does not introduce a second Staff, Person or Resource store.
 - A Team Member belongs to the active Business and may reference one or more Branch IDs. Branch switching filters the same member identity by membership; it never creates one person per Branch.
 - The lightweight model contains only a name/avatar anchor, displayed `owner` / `manager` / `staff` role, service capabilities (`grooming`, `hotel-care`, `daycare`, `front-desk`), active/inactive state and simple working, unavailable, break or time-off intervals. It is not a certification, attendance, leave-approval, timesheet or full workforce scheduling system.
-- BE3 schedulable Resources are the canonical planning assignment model for groomer/station/dryer and coarse Hotel/Daycare capacity. An opaque compatibility staff ID lets the frozen UI resolve a BF9 display person, but BF9 mutation does not authorize or silently mutate durable Resource state. Hotel care and room/zone execution remain local and do not create another Booking model.
+- BE3 schedulable Resources are the canonical planning assignment model for groomer/station/dryer and coarse Hotel/Daycare capacity. An opaque compatibility staff ID lets the frozen UI resolve a BF9 display person, but BF9 mutation does not authorize or silently mutate durable Resource state. BE4 owns durable Hotel care and room/zone execution, and those records do not create another Booking model.
 - Team workload is a local derived view of today’s linked Booking/Grooming/Hotel/Daycare work. It identifies current/next work and local conflicts/overload signals; it is not productivity scoring or a staffing optimization engine.
 - BF9 role labels establish an operational presentation vocabulary only. BE1 separately enforces membership/Branch scope for Business/Branch configuration; production authentication and a granular operational permission matrix are not implemented.
 
@@ -243,12 +264,12 @@ This flow is conceptual and has no repository route contract yet. Do not invent 
 - **Daycare execution:** `daycareAttendances` stores one Pet-specific record per shared Daycare Booking Pet. It references Business, Branch, Customer, Pet, Booking, optional Intake, zone Resource and responsible Team Member. The guarded lifecycle is `booked → checked-in → active → ready-for-pickup → checked-out → completed`, plus terminal cancellation; care events include meal, water, activity, rest and note. Zone capacity and staff capability/active/availability guards run before assignment or intake transition.
 - **Shared handoffs:** Daycare supplies an explicit `daycareAttendanceId` to the existing Scanner/Intake and Billing entry points. Business/Branch/Customer/Pet identity must match; no protected Passport facts are inferred. Staff may explicitly open the same Business + Customer Inbox. Checkout/completion creates or reuses one source-keyed Daycare Service Record; a Booking-level Charge base is not duplicated for every Pet. Attendance completion never records a Payment.
 - **Derived CRM:** `crmPresentation.ts` reads shared Bookings, Service Records, Charges/Payments and Conversations to derive lifecycle/service segments, unique completed visits, latest visit, next Booking, outstanding balance, relationship signals, next action and timeline. These are recalculated views, not persisted scores, another Customer database or a prediction engine. Business-level customer identity and Branch attribution remain intact.
-- **Hydration and scope:** configuration selectors support deterministic fixture-only server snapshots, then hydrate the authorized BE1 session/configuration graph into memory. The active context key is only a display preference. Other BF domains still opt into their same-tab prototype state. Production auth, LINE transport, gateway, accounting, payroll, rewards, marketing automation and AI are not added. Existing BF9 architecture remains the browser-local Team foundation; Consumer stays frozen.
+- **Hydration and scope:** configuration selectors support deterministic fixture-only server snapshots, then hydrate the authorized BE1 session/configuration graph into memory. The active context key is only a display preference. BE2–BE8 domains hydrate through their typed clients; only explicitly gated fixture mode uses same-tab prototype state. Production auth, LINE transport, gateway, accounting, payroll, rewards, marketing automation and AI are not added. Consumer stays frozen.
 
 ## BF-5 local Grooming Service Job architecture
 
 - `/business/grooming` is an execution surface for an active Grooming-capable Branch; Calendar remains the shared Booking planning surface. The direct route checks the same active Branch capability as navigation, so a non-capable Branch is not shown a working Grooming board.
-- `PrototypeServiceJob` lives in the existing browser-local Business envelope, separate from Booking records. It keeps references to `Booking`, `Business`, `Branch`, `Customer`, `Pet`, and assigned shared `Resource` IDs rather than copying Customer/Pet identity, Passport values, or a second booking fixture.
+- BE4 `ServiceExecution` lives in D1, separate from Booking records. It keeps references to `Booking`, `Business`, `Branch`, `Customer`, `Pet`, and assigned shared `Resource` IDs rather than copying Customer/Pet identity, Passport values, or a second booking fixture.
 - Current local implementation is Grooming-only. It projects one Pet-specific Job from each Grooming Booking and retains a narrow lifecycle: `booked → checked-in → waiting → in-service → ready-for-pickup → completed`, with a permitted direct `checked-in → in-service` path and terminal `cancelled`. Booking's `pending/confirmed/arrived/cancelled` planning state remains independent.
 - A Job carries scheduled start/end and estimate, actual service start/completion, assigned Groomer/Station/Dryer resource IDs, internal Business note, approved local add-ons, and lightweight activity history. It is explicitly not a Visit/Order, staffing roster, payroll object, inventory object, price/discount/refund authority, Charge, Payment, or Service Record itself. Completing the Job automatically creates or updates its one BF8 Service Record; an explicit BF-7 checkout may reference the Job, but completing the Job never records payment.
 - Job resource changes use the existing Branch/service Resource list and overlap evaluator. A linked Team Member adds the BF9 active/capability/availability check, so an inactive or unavailable groomer cannot be silently assigned. This is still a local conflict guard only; full staff scheduling, capacity policy, holds and resolution authority remain open.
@@ -276,14 +297,14 @@ In the BF-5 local Grooming case, a valid known Customer/Pet relationship and mat
 | Pet identity and Guardian-managed profile | Guardian according to relationship permission | Read only within active consent; correction is a suggestion |
 | Guardian private notes | Authorized Guardian | Never shared by default |
 | Business intake and operational notes | Business author under role/Branch | Do not overwrite Pet source; audience is explicit |
-| Team member and displayed role | Browser-local BF9 operational data | One shared display member may span Branches and service capabilities. It is not the durable BE1 membership/access source or BE3 Resource authority. |
+| Team member and displayed role | BE4 D1 operation-staff record | One shared display member may span Branches and service capabilities. It is not the durable BE1 membership/access source or BE3 Resource authority. |
 | Planning Resource / availability reservation | BE3 D1 records scoped through active membership and Branch access | Enforces schedulability, service eligibility, active state, availability and overlap/capacity at write time; it is not Team/HR or Hotel execution inventory. |
-| Person / Business membership / Branch grant | BE1 D1 records resolved through the server identity/application boundary | Authorizes BE1 configuration, BE2 Customer/Pet and BE3 Booking/Resource capabilities; client IDs and BF9 role labels cannot grant access. |
+| Person / Business membership / Branch grant | BE1 D1 records resolved through the server identity/application boundary | Authorizes BE1 configuration, BE2 Customer/Pet, BE3 Booking/Resource and BE4–BE7 capabilities; BE8 reads only. Client IDs and BF9 role labels cannot grant access. |
 | Customer / Business Pet profile / contact relationship | BE2 D1 records, always selected through an active Business membership | Business-internal contact/profile data only; does not grant Guardian, ownership, Passport, Consent or QR authority. |
 | Service Record evidence | Business service actor and completed Job/Stay/Attendance source | BF8 retains permitted actor/time/source and append-only correction/source-recompletion history. It never copies Passport, Guardian instruction, medication authorization, incident content, or Guardian-owned photo data; LINE visibility is planned. |
 | Customer contact/authority | Customer relationship plus policy | Booking authority and Pet consent authority are not assumed identical; "ผู้ติดต่อหลัก" is not an ownership claim |
 | Public Safety fields | Guardian | Anonymous sees selected public-safe fields only |
-| Charge/Payment data | Business operational record | BF-7 records Branch financial attribution and Customer visibility from shared identities; role, cross-Branch settlement, refund and provider rules remain open |
+| Charge/Payment data | BE7 D1 records | Branch financial attribution and Customer visibility use shared identities; Staff collection and Owner/Manager adjustment/refund policy is enforced server-side, while provider execution, cross-Branch settlement and accounting rules remain external |
 | Platform Admin case/audit | Restricted platform role | Reason-bound and audited; no routine Business/Consumer access |
 
 ## Production platform direction
@@ -293,8 +314,8 @@ TARGET PLATFORM: Cloudflare
 PRODUCTION: NOT DEPLOYED / NOT VERIFIED
 ```
 
-Cloudflare replaces Vercel as the target production platform direction. BE1–BE3 use the local Worker/Vinext runtime and a D1 relational binding with reproducible migrations. No production D1 database, domain or deployment workflow has been provisioned; R2, KV, Queues and Durable Objects remain unused.
+Cloudflare replaces Vercel as the target production platform direction. BE1–BE8 use the local Worker/Vinext runtime and a D1 relational binding with reproducible migrations. No production D1 database, domain or deployment workflow has been provisioned; R2 remains unused, while BE6/BE7 outbox and attempt ledgers are durable relational foundations rather than production provider connections.
 
 ## Production intent, not implementation
 
-BE1–BE3 provide local stable Person/tenant/Customer/Pet/Booking identities, scoped persistence, server authorization and correlated mutation audit for their narrow domains. Booking/Calendar planning and minimal scheduling Resources are durable; service execution remains separate and browser-local. Production authentication, Guardian/Passport/Consent, BE4 operations persistence, production infrastructure, backup/recovery/observability policy, secure QR tokens, retention, exports, notifications, background jobs, real payment processing/providers, payroll/HR and tax/refund/accounting policy remain future work. **BE4 is not started.**
+BE1–BE8 provide local stable Person/tenant/Customer/Pet/Booking/execution/Consent/Conversation/Charge/Payment identities, scoped persistence, server authorization and correlated mutation audit. Booking/Calendar planning, service execution and financial records are durable; Reports/CRM are read-only derived queries. Production authentication, external LINE/payment providers, R2, backup/recovery/observability policy, retention, exports, payroll/HR, tax/invoice policy and Cloudflare deployment remain future work.

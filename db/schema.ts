@@ -10,6 +10,14 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+// BE4 and later mutations use these relational guards/receipts. Guards exist
+// only inside a D1 batch and are deleted before commit; they are not domain data.
+export const backendGuards = sqliteTable("backend_guards", {
+  id: text("id").primaryKey().notNull(),
+  allowed: integer("allowed").notNull(),
+  versionOk: integer("version_ok").notNull().default(1),
+}, (table) => [check("ck_backend_authorization", sql`${table.allowed} = 1`), check("ck_backend_version", sql`${table.versionOk} = 1`)]);
+
 const lifecycle = (column: ReturnType<typeof text>) =>
   check(`ck_${column.name}_lifecycle`, sql`${column} in ('active', 'inactive')`);
 
@@ -585,3 +593,376 @@ export const bookingWriteCommits = sqliteTable("booking_write_commits", {
   }).onDelete("restrict"),
   index("idx_booking_write_commits_token").on(table.writeToken),
 ]);
+
+export const backendMutations = sqliteTable("backend_mutations", {
+  businessId: text("business_id").notNull().references(() => businesses.id),
+  branchId: text("branch_id").notNull(),
+  command: text("command").notNull(),
+  requestKey: text("request_key").notNull(),
+  requestHash: text("request_hash").notNull(),
+  targetId: text("target_id").notNull(),
+  actorPersonId: text("actor_person_id").notNull().references(() => persons.id),
+  createdAt: text("created_at").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.businessId, t.command, t.requestKey] }),
+  foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
+  index("idx_backend_mutations_target").on(t.businessId, t.targetId),
+]);
+
+// A Business-local operational staff profile is separate from a login or
+// membership. An optional Person link never creates authorization.
+export const operationStaff = sqliteTable("operation_staff", {
+  id: text("id").primaryKey().notNull(),
+  businessId: text("business_id").notNull().references(() => businesses.id),
+  personId: text("person_id").references(() => persons.id),
+  name: text("name").notNull(),
+  avatarSeed: text("avatar_seed").notNull(),
+  displayRole: text("display_role").notNull(),
+  capabilities: text("capabilities_json").notNull(),
+  status: text("status").notNull().default("active"),
+  revision: integer("revision").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("uq_operation_staff_scope").on(t.businessId, t.id),
+  check("ck_operation_staff_role", sql`${t.displayRole} in ('owner','manager','staff')`),
+  check("ck_operation_staff_capabilities", sql`json_valid(${t.capabilities})`),
+  lifecycle(t.status),
+]);
+
+export const operationStaffBranches = sqliteTable("operation_staff_branches", {
+  businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), staffId: text("staff_id").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.businessId, t.branchId, t.staffId] }),
+  foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
+  foreignKey({ columns: [t.businessId, t.staffId], foreignColumns: [operationStaff.businessId, operationStaff.id] }),
+]);
+
+export const operationStaffWindows = sqliteTable("operation_staff_windows", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), staffId: text("staff_id").notNull(),
+  state: text("state").notNull(), startLocal: text("start_local").notNull(), endLocal: text("end_local").notNull(), note: text("note"),
+}, (t) => [
+  foreignKey({ columns: [t.businessId, t.staffId], foreignColumns: [operationStaff.businessId, operationStaff.id] }),
+  index("idx_operation_staff_windows").on(t.businessId, t.staffId, t.startLocal, t.endLocal),
+  check("ck_operation_staff_window_state", sql`${t.state} in ('working','unavailable','break','time-off')`),
+  check("ck_operation_staff_window_range", sql`${t.startLocal} < ${t.endLocal} or (${t.startLocal} = ${t.endLocal} and length(${t.startLocal}) = 10)`),
+]);
+
+export const hotelSpaces = sqliteTable("hotel_spaces", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
+  serviceId: text("service_id").notNull(), label: text("label").notNull(), kind: text("kind").notNull(),
+  capacity: integer("capacity").notNull(), status: text("status").notNull().default("active"),
+}, (t) => [
+  uniqueIndex("uq_hotel_spaces_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.serviceId], foreignColumns: [bookingServices.businessId, bookingServices.branchId, bookingServices.id] }),
+  index("idx_hotel_spaces_branch").on(t.businessId, t.branchId, t.status),
+  check("ck_hotel_spaces_kind", sql`${t.kind} in ('room','zone')`),
+  check("ck_hotel_spaces_capacity", sql`${t.capacity} between 1 and 10000`), lifecycle(t.status),
+]);
+
+// The discriminator represents three execution aggregates, not a Booking
+// status. Only operational scalar details are JSON; references, assignments,
+// events, care tasks and Service Records have independent constrained rows.
+export const serviceExecutions = sqliteTable("service_executions", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
+  bookingId: text("booking_id").notNull(), customerId: text("customer_id").notNull(), petId: text("pet_id").notNull(),
+  module: text("module").notNull(), status: text("status").notNull(), intakeId: text("intake_id"),
+  scheduledStart: text("scheduled_start").notNull(), scheduledEnd: text("scheduled_end"),
+  businessNote: text("business_note").notNull().default(""), details: text("details_json").notNull().default("{}"),
+  revision: integer("revision").notNull().default(1), writeToken: text("write_token").notNull(),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), cancelledAt: text("cancelled_at"),
+}, (t) => [
+  uniqueIndex("uq_service_executions_source").on(t.businessId, t.bookingId, t.petId, t.module),
+  uniqueIndex("uq_service_executions_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.bookingId], foreignColumns: [bookings.businessId, bookings.branchId, bookings.id] }),
+  foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
+  foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
+  index("idx_executions_branch_module_range").on(t.businessId, t.branchId, t.module, t.scheduledStart, t.id),
+  index("idx_executions_customer").on(t.businessId, t.customerId, t.branchId, t.updatedAt),
+  check("ck_executions_module", sql`${t.module} in ('grooming','hotel','daycare')`),
+  check("ck_executions_revision", sql`${t.revision} >= 1`),
+  check("ck_executions_details", sql`json_valid(${t.details}) and length(${t.details}) <= 16000`),
+  check("ck_executions_note", sql`length(${t.businessNote}) <= 4000`),
+  check("ck_executions_status", sql`(${t.module} = 'grooming' and ${t.status} in ('booked','checked-in','waiting','in-service','ready-for-pickup','completed','cancelled')) or (${t.module} = 'hotel' and ${t.status} in ('booked','expected-today','checked-in','in-stay','ready-for-checkout','checked-out','completed','cancelled','no-show')) or (${t.module} = 'daycare' and ${t.status} in ('booked','checked-in','active','ready-for-pickup','checked-out','completed','cancelled'))`),
+]);
+
+export const executionAssignments = sqliteTable("execution_assignments", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
+  executionId: text("execution_id").notNull(), resourceId: text("resource_id"), spaceId: text("space_id"), staffId: text("staff_id"),
+  startLocal: text("start_local").notNull(), endLocal: text("end_local").notNull(),
+  assignedAt: text("assigned_at").notNull(), assignedBy: text("assigned_by").references(() => persons.id), reason: text("reason"),
+}, (t) => [
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.resourceId], foreignColumns: [bookingResources.businessId, bookingResources.branchId, bookingResources.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.spaceId], foreignColumns: [hotelSpaces.businessId, hotelSpaces.branchId, hotelSpaces.id] }),
+  foreignKey({ columns: [t.businessId, t.staffId], foreignColumns: [operationStaff.businessId, operationStaff.id] }),
+  index("idx_execution_assignments_source").on(t.businessId, t.branchId, t.executionId),
+  index("idx_execution_assignments_resource").on(t.businessId, t.branchId, t.resourceId, t.startLocal, t.endLocal),
+  index("idx_execution_assignments_space").on(t.businessId, t.branchId, t.spaceId, t.startLocal, t.endLocal),
+  check("ck_execution_assignment_target", sql`(${t.resourceId} is not null) + (${t.spaceId} is not null) + (${t.staffId} is not null) = 1`),
+  check("ck_execution_assignment_range", sql`${t.endLocal} >= ${t.startLocal}`),
+]);
+
+export const executionEvents = sqliteTable("execution_events", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
+  kind: text("kind").notNull(), summary: text("summary").notNull(), data: text("data_json").notNull().default("{}"),
+  actorPersonId: text("actor_person_id").references(() => persons.id), occurredAt: text("occurred_at").notNull(),
+}, (t) => [
+  uniqueIndex("uq_execution_event_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  index("idx_execution_events_source").on(t.businessId, t.branchId, t.executionId, t.occurredAt, t.id),
+  check("ck_execution_events_json", sql`json_valid(${t.data}) and length(${t.data}) <= 16000`),
+]);
+
+export const executionCareTasks = sqliteTable("execution_care_tasks", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
+  kind: text("kind").notNull(), label: text("label").notNull(), scheduledDate: text("scheduled_date").notNull(), scheduledTime: text("scheduled_time").notNull(),
+  staffId: text("staff_id"), completedAt: text("completed_at"), completedBy: text("completed_by").references(() => persons.id), instructions: text("instructions"), authorizedIntakeId: text("authorized_intake_id"),
+}, (t) => [
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  foreignKey({ columns: [t.businessId, t.staffId], foreignColumns: [operationStaff.businessId, operationStaff.id] }),
+  index("idx_execution_care_due").on(t.businessId, t.branchId, t.executionId, t.scheduledDate, t.completedAt),
+  check("ck_execution_care_kind", sql`${t.kind} in ('meal','water','medication','activity','cleaning','check','note','other')`),
+]);
+
+export const serviceRecords = sqliteTable("service_records", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
+  customerId: text("customer_id").notNull(), petId: text("pet_id").notNull(), completedAt: text("completed_at").notNull(),
+  summary: text("summary").notNull(), businessNote: text("business_note").notNull(), snapshot: text("snapshot_json").notNull(),
+  sourceRevision: integer("source_revision").notNull(), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("uq_service_records_source").on(t.businessId, t.branchId, t.executionId),
+  uniqueIndex("uq_service_records_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
+  foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
+  index("idx_service_records_history").on(t.businessId, t.branchId, t.customerId, t.completedAt, t.id),
+  check("ck_service_record_snapshot", sql`json_valid(${t.snapshot})`),
+]);
+
+export const serviceRecordRevisions = sqliteTable("service_record_revisions", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), recordId: text("record_id").notNull(),
+  kind: text("kind").notNull(), data: text("data_json").notNull(), actorPersonId: text("actor_person_id").notNull().references(() => persons.id), occurredAt: text("occurred_at").notNull(),
+}, (t) => [
+  foreignKey({ columns: [t.businessId, t.branchId, t.recordId], foreignColumns: [serviceRecords.businessId, serviceRecords.branchId, serviceRecords.id] }),
+  index("idx_service_record_revisions").on(t.businessId, t.branchId, t.recordId, t.occurredAt, t.id),
+  check("ck_service_record_revision_kind", sql`${t.kind} in ('correction','source-recompleted')`),
+  check("ck_service_record_revision_json", sql`json_valid(${t.data})`),
+]);
+
+// BE5: Passport authority belongs to a Person/Pet relationship, never a Business Customer.
+export const passportProfiles = sqliteTable("passport_profiles", {
+  petId: text("pet_id").primaryKey().notNull().references(() => pets.id),
+  name: text("name").notNull(), species: text("species").notNull(), reference: text("reference").notNull(),
+  photoObjectKey: text("photo_object_key"), revision: integer("revision").notNull().default(1), updatedAt: text("updated_at").notNull(),
+}, (t) => [check("ck_passport_species", sql`${t.species} in ('cat','dog')`), check("ck_passport_name", sql`length(${t.name}) between 1 and 160`)]);
+export const petAuthorities = sqliteTable("pet_authorities", {
+  id: text("id").primaryKey().notNull(), personId: text("person_id").notNull().references(() => persons.id), petId: text("pet_id").notNull().references(() => pets.id),
+  role: text("role").notNull(), status: text("status").notNull().default("active"), source: text("source").notNull(),
+  providerReference: text("provider_reference"), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_pet_authority_person").on(t.personId, t.petId), uniqueIndex("uq_pet_authority_pet").on(t.id, t.petId),
+  check("ck_pet_authority_role", sql`${t.role} in ('primary','co-guardian')`), check("ck_pet_authority_status", sql`${t.status} in ('active','inactive')`),
+  check("ck_pet_authority_source", sql`${t.source} in ('dev-test','verified-provider')`)]);
+export const consents = sqliteTable("consents", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
+  authorityId: text("authority_id").notNull(), petId: text("pet_id").notNull(), status: text("status").notNull(),
+  decidedAt: text("decided_at"), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_consent_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
+  foreignKey({ columns: [t.authorityId, t.petId], foreignColumns: [petAuthorities.id, petAuthorities.petId] }),
+  check("ck_consent_status", sql`${t.status} in ('pending','approved','denied')`)]);
+export const accessGrants = sqliteTable("access_grants", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), consentId: text("consent_id").notNull(),
+  tokenHash: text("token_hash").notNull(), purpose: text("purpose").notNull(), expiresAt: text("expires_at").notNull(), revokedAt: text("revoked_at"),
+  revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_access_grant_token").on(t.tokenHash), uniqueIndex("uq_access_grant_consent").on(t.consentId), uniqueIndex("uq_access_grant_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.consentId], foreignColumns: [consents.businessId, consents.branchId, consents.id] }),
+  index("idx_access_grant_expiry").on(t.businessId, t.branchId, t.expiresAt), check("ck_access_grant_token", sql`length(${t.tokenHash})=64`),
+  check("ck_access_grant_expiry", sql`${t.expiresAt}>${t.createdAt}`), check("ck_access_grant_purpose", sql`length(${t.purpose}) between 1 and 500`)]);
+export const accessGrantScopes = sqliteTable("access_grant_scopes", {
+  grantId: text("grant_id").notNull().references(() => accessGrants.id), scope: text("scope").notNull(),
+}, (t) => [primaryKey({ columns: [t.grantId, t.scope] }), check("ck_access_grant_scope", sql`${t.scope} in ('basicIdentity','photo','passportReference')`)]);
+export const accessEvents = sqliteTable("access_events", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), grantId: text("grant_id").notNull(),
+  kind: text("kind").notNull(), actorPersonId: text("actor_person_id").notNull().references(() => persons.id), metadata: text("metadata_json").notNull().default("{}"), occurredAt: text("occurred_at").notNull(),
+}, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.grantId], foreignColumns: [accessGrants.businessId, accessGrants.branchId, accessGrants.id] }),
+  index("idx_access_events_grant").on(t.businessId, t.branchId, t.grantId, t.occurredAt), check("ck_access_event_json", sql`json_valid(${t.metadata}) and length(${t.metadata})<=2000`)]);
+export const businessIntakes = sqliteTable("business_intakes", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), grantId: text("grant_id").notNull(), targetKey: text("target_key").notNull(),
+  customerId: text("customer_id"), petId: text("pet_id"), executionId: text("execution_id"), belongings: text("belongings_json").notNull().default("[]"),
+  businessNote: text("business_note").notNull().default(""), taskState: text("task_state").notNull().default("allowed-data"), checkedInAt: text("checked_in_at"),
+  createdBy: text("created_by").notNull().references(() => persons.id), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => [uniqueIndex("uq_intake_source").on(t.businessId, t.branchId, t.grantId, t.targetKey), uniqueIndex("uq_intake_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.grantId], foreignColumns: [accessGrants.businessId, accessGrants.branchId, accessGrants.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
+  foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
+  index("idx_intake_branch").on(t.businessId, t.branchId, t.updatedAt), check("ck_intake_belongings", sql`json_valid(${t.belongings}) and length(${t.belongings})<=2000`),
+  check("ck_intake_note", sql`length(${t.businessNote})<=4000`), check("ck_intake_task", sql`${t.taskState} in ('allowed-data','intake','review','complete')`)]);
+export const intakeCorrections = sqliteTable("intake_corrections", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), intakeId: text("intake_id").notNull(),
+  topic: text("topic").notNull(), currentValue: text("current_value").notNull(), suggestedValue: text("suggested_value").notNull(), note: text("note").notNull(),
+  actorPersonId: text("actor_person_id").notNull().references(() => persons.id), createdAt: text("created_at").notNull(),
+}, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.intakeId], foreignColumns: [businessIntakes.businessId, businessIntakes.branchId, businessIntakes.id] }),
+  index("idx_intake_corrections_source").on(t.businessId, t.branchId, t.intakeId, t.createdAt), check("ck_intake_correction_topic", sql`${t.topic} in ('name','species','passport-reference')`)]);
+
+// BE6: Business/Customer conversation identity; each context and message retains Branch privacy.
+export const conversations = sqliteTable("conversations", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), customerId: text("customer_id").notNull(), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_conversation_customer").on(t.businessId, t.customerId), uniqueIndex("uq_conversation_scope").on(t.businessId, t.id),
+  foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] })]);
+export const conversationContexts = sqliteTable("conversation_contexts", {
+  businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(),
+  petId: text("pet_id"), bookingId: text("booking_id"), executionId: text("execution_id"), revision: integer("revision").notNull().default(1), updatedAt: text("updated_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.conversationId] }),
+  foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
+  foreignKey({ columns: [t.businessId, t.conversationId], foreignColumns: [conversations.businessId, conversations.id] }),
+  foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.bookingId], foreignColumns: [bookings.businessId, bookings.branchId, bookings.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] })]);
+export const messages = sqliteTable("messages", {
+  sequence: integer("sequence").primaryKey({ autoIncrement: true }), id: text("id").notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(),
+  kind: text("kind").notNull(), direction: text("direction").notNull(), body: text("body").notNull(), petId: text("pet_id"), bookingId: text("booking_id"), executionId: text("execution_id"),
+  actorPersonId: text("actor_person_id").references(() => persons.id), occurredAt: text("occurred_at").notNull(), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_message_id").on(t.id), uniqueIndex("uq_message_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.conversationId], foreignColumns: [conversationContexts.businessId, conversationContexts.branchId, conversationContexts.conversationId] }),
+  foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.bookingId], foreignColumns: [bookings.businessId, bookings.branchId, bookings.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  index("idx_messages_conversation_order").on(t.businessId, t.conversationId, t.branchId, t.sequence),
+  check("ck_message_kind", sql`${t.kind} in ('text','add-service-request')`), check("ck_message_direction", sql`${t.direction} in ('business','customer')`), check("ck_message_length", sql`length(${t.body}) between 1 and 5000`)]);
+export const conversationReads = sqliteTable("conversation_reads", {
+  businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(), personId: text("person_id").notNull().references(() => persons.id),
+  throughSequence: integer("through_sequence").notNull(), readAt: text("read_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.conversationId, t.personId] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.conversationId], foreignColumns: [conversationContexts.businessId, conversationContexts.branchId, conversationContexts.conversationId] }),
+  check("ck_conversation_read_cursor", sql`${t.throughSequence}>=0`)]);
+export const messageApprovals = sqliteTable("message_approvals", {
+  messageId: text("message_id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), serviceName: text("service_name").notNull(),
+  additionalPrice: integer("additional_price").notNull(), additionalMinutes: integer("additional_minutes").notNull(), note: text("note").notNull(),
+  status: text("status").notNull().default("waiting"), revision: integer("revision").notNull().default(1), respondedAt: text("responded_at"), authorityId: text("authority_id").references(() => petAuthorities.id), responseSource: text("response_source"),
+}, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.messageId], foreignColumns: [messages.businessId, messages.branchId, messages.id] }),
+  check("ck_message_approval_status", sql`${t.status} in ('waiting','approved','declined','cancelled','expired')`), check("ck_message_approval_amounts", sql`${t.additionalPrice} between 0 and 10000000 and ${t.additionalMinutes} between 0 and 1440`)]);
+export const businessChannels = sqliteTable("business_channels", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), provider: text("provider").notNull(), state: text("state").notNull(),
+  externalAccountId: text("external_account_id").notNull(), secretRef: text("secret_ref").notNull(), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_business_channel_provider").on(t.businessId, t.provider), uniqueIndex("uq_channel_external_account").on(t.provider, t.externalAccountId), uniqueIndex("uq_channel_scope").on(t.businessId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }), check("ck_channel_provider", sql`${t.provider} in ('line','mock')`), check("ck_channel_state", sql`${t.state} in ('active','disconnected')`)]);
+export const customerChannelLinks = sqliteTable("customer_channel_links", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), channelId: text("channel_id").notNull(), customerId: text("customer_id").notNull(),
+  externalSubject: text("external_subject").notNull(), status: text("status").notNull(), verificationSource: text("verification_source").notNull(), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
+}, (t) => [uniqueIndex("uq_channel_customer").on(t.channelId, t.customerId), uniqueIndex("uq_channel_subject").on(t.channelId, t.externalSubject), uniqueIndex("uq_channel_link_scope").on(t.businessId, t.channelId, t.id),
+  foreignKey({ columns: [t.businessId, t.channelId], foreignColumns: [businessChannels.businessId, businessChannels.id] }), foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
+  check("ck_channel_link_status", sql`${t.status} in ('active','inactive')`), check("ck_channel_link_source", sql`${t.verificationSource} in ('dev-test','verified-provider')`)]);
+// Provider proof links Person only. It confers no Customer relationship or Pet authority.
+export const personExternalIdentities = sqliteTable("person_external_identities", {
+  id: text("id").primaryKey().notNull(), personId: text("person_id").notNull().references(() => persons.id), provider: text("provider").notNull(), issuer: text("issuer").notNull(),
+  subject: text("subject").notNull(), verifiedAt: text("verified_at").notNull(), status: text("status").notNull(),
+}, (t) => [uniqueIndex("uq_external_identity_subject").on(t.provider, t.issuer, t.subject), check("ck_external_identity_status", sql`${t.status} in ('active','inactive')`)]);
+export const messageOutbox = sqliteTable("message_outbox", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), messageId: text("message_id").notNull(), channelId: text("channel_id"), linkId: text("link_id"), recipient: text("recipient"),
+  retryKey: text("retry_key").notNull(), state: text("state").notNull(), attempts: integer("attempts").notNull().default(0), firstAttemptAt: text("first_attempt_at"), availableAt: text("available_at").notNull(),
+  leaseToken: text("lease_token"), leaseUntil: text("lease_until"), providerMessageId: text("provider_message_id"), providerRequestId: text("provider_request_id"), failureCode: text("failure_code"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => [uniqueIndex("uq_outbox_message").on(t.businessId, t.branchId, t.messageId), uniqueIndex("uq_outbox_retry_key").on(t.retryKey),
+  foreignKey({ columns: [t.businessId, t.branchId, t.messageId], foreignColumns: [messages.businessId, messages.branchId, messages.id] }),
+  foreignKey({ columns: [t.businessId, t.channelId, t.linkId], foreignColumns: [customerChannelLinks.businessId, customerChannelLinks.channelId, customerChannelLinks.id] }),
+  foreignKey({ columns: [t.businessId, t.channelId], foreignColumns: [businessChannels.businessId, businessChannels.id] }),
+  index("idx_outbox_due").on(t.state, t.availableAt, t.leaseUntil), check("ck_outbox_state", sql`${t.state} in ('blocked','queued','sending','retry','sent','failed')`)]);
+export const channelWebhookEvents = sqliteTable("channel_webhook_events", {
+  channelId: text("channel_id").notNull(), eventId: text("event_id").notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), eventHash: text("event_hash").notNull(),
+  providerMessageId: text("provider_message_id").notNull(), externalSubject: text("external_subject").notNull(), messageId: text("message_id"), state: text("state").notNull(), pendingBody: text("pending_body"), occurredAt: text("occurred_at").notNull(), receivedAt: text("received_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.channelId, t.eventId] }), uniqueIndex("uq_channel_provider_message").on(t.channelId, t.providerMessageId),
+  foreignKey({ columns: [t.businessId, t.channelId], foreignColumns: [businessChannels.businessId, businessChannels.id] }), foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.messageId], foreignColumns: [messages.businessId, messages.branchId, messages.id] }),
+  index("idx_channel_pending_events").on(t.channelId, t.state, t.receivedAt), check("ck_channel_event_state", sql`${t.state} in ('received','unlinked')`)]);
+export const outboxAttempts = sqliteTable("outbox_attempts", {
+  id: text("id").primaryKey().notNull(), outboxId: text("outbox_id").notNull().references(() => messageOutbox.id),
+  startedAt: text("started_at").notNull(), finishedAt: text("finished_at"), outcome: text("outcome").notNull().default("sending"), failureCode: text("failure_code"), providerRequestId: text("provider_request_id"),
+}, (t) => [index("idx_outbox_attempt_history").on(t.outboxId, t.startedAt), check("ck_outbox_attempt_outcome", sql`${t.outcome} in ('sending','accepted','retry','failed','not-connected')`)]);
+
+// BE7 stores integer satang. The current Product accepts whole THB only.
+// Charge items describe debt; Payments and Refunds describe money movement.
+export const charges = sqliteTable("charges", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), bookingId: text("booking_id").notNull(), customerId: text("customer_id").notNull(),
+  petId: text("pet_id"), executionId: text("execution_id"), module: text("module").notNull(), serviceLabel: text("service_label").notNull(), currency: text("currency").notNull().default("THB"),
+  cancelledAt: text("cancelled_at"), cancellationReason: text("cancellation_reason"), revision: integer("revision").notNull().default(1),
+  createdBy: text("created_by").notNull().references(() => persons.id), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => [uniqueIndex("uq_charge_booking").on(t.businessId, t.branchId, t.bookingId), uniqueIndex("uq_charge_scope").on(t.businessId, t.branchId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.bookingId], foreignColumns: [bookings.businessId, bookings.branchId, bookings.id] }),
+  foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
+  foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  index("idx_charge_customer").on(t.businessId, t.branchId, t.customerId, t.createdAt), check("ck_charge_currency", sql`${t.currency}='THB'`),
+  check("ck_charge_module", sql`${t.module} in ('grooming','hotel','daycare')`), check("ck_charge_revision", sql`${t.revision}>0`),
+  check("ck_charge_cancellation", sql`(${t.cancelledAt} is null and ${t.cancellationReason} is null) or (${t.cancelledAt} is not null and length(trim(${t.cancellationReason})) between 1 and 1000)`)]);
+export const chargeItems = sqliteTable("charge_items", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(), kind: text("kind").notNull(), label: text("label").notNull(),
+  amountMinor: integer("amount_minor").notNull(), reason: text("reason"), sourceEventId: text("source_event_id"), executionId: text("execution_id"), createdAt: text("created_at").notNull(),
+}, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.sourceEventId], foreignColumns: [executionEvents.businessId, executionEvents.branchId, executionEvents.id] }),
+  uniqueIndex("uq_charge_source_event").on(t.chargeId, t.sourceEventId), index("idx_charge_items").on(t.businessId, t.branchId, t.chargeId),
+  check("ck_charge_item_kind", sql`${t.kind} in ('base-service','add-on','manual-adjustment','discount')`),
+  check("ck_charge_item_amount", sql`typeof(${t.amountMinor})='integer' and abs(${t.amountMinor})<=1000000000 and ${t.amountMinor}%100=0 and ((${t.kind}='discount' and ${t.amountMinor}<0) or (${t.kind}<>'discount' and ${t.amountMinor}>=0))`),
+  check("ck_charge_item_label", sql`length(trim(${t.label})) between 1 and 160`), check("ck_charge_item_reason", sql`${t.kind} not in ('discount','manual-adjustment') or length(trim(${t.reason})) between 1 and 1000`)]);
+export const chargeEvents = sqliteTable("charge_events", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(),
+  kind: text("kind").notNull(), summary: text("summary").notNull(), actorPersonId: text("actor_person_id").notNull().references(() => persons.id), occurredAt: text("occurred_at").notNull(),
+}, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }),
+  index("idx_charge_events").on(t.businessId, t.branchId, t.chargeId, t.occurredAt), check("ck_charge_event_kind", sql`${t.kind} in ('created','adjusted','cancelled')`)]);
+export const paymentProviderAccounts = sqliteTable("payment_provider_accounts", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull().references(() => businesses.id), provider: text("provider").notNull(), externalAccountId: text("external_account_id").notNull(),
+  secretRef: text("secret_ref").notNull(), source: text("source").notNull(), status: text("status").notNull().default("active"), revision: integer("revision").notNull().default(1),
+}, (t) => [uniqueIndex("uq_payment_account_scope").on(t.businessId, t.id), uniqueIndex("uq_payment_external_account").on(t.provider, t.externalAccountId),
+  check("ck_payment_account_source", sql`${t.source} in ('dev-test','verified-provider')`), check("ck_payment_account_status", sql`${t.status} in ('active','inactive')`)]);
+export const paymentAttempts = sqliteTable("payment_attempts", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(), accountId: text("account_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(), currency: text("currency").notNull().default("THB"), idempotencyKey: text("idempotency_key").notNull(), state: text("state").notNull().default("created"),
+  providerReference: text("provider_reference"), attempts: integer("attempts").notNull().default(0), leaseToken: text("lease_token"), leaseUntil: text("lease_until"),
+  nextAttemptAt: text("next_attempt_at").notNull(), failureCode: text("failure_code"), revision: integer("revision").notNull().default(1),
+  createdBy: text("created_by").notNull().references(() => persons.id), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => [uniqueIndex("uq_payment_attempt_scope").on(t.businessId, t.branchId, t.id), uniqueIndex("uq_payment_attempt_key").on(t.idempotencyKey), uniqueIndex("uq_payment_attempt_provider_ref").on(t.accountId, t.providerReference),
+  foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }),
+  foreignKey({ columns: [t.businessId, t.accountId], foreignColumns: [paymentProviderAccounts.businessId, paymentProviderAccounts.id] }),
+  index("idx_payment_attempt_due").on(t.state, t.nextAttemptAt, t.leaseUntil), index("idx_payment_attempt_charge").on(t.businessId, t.branchId, t.chargeId, t.state),
+  check("ck_payment_attempt_amount", sql`typeof(${t.amountMinor})='integer' and ${t.amountMinor} between 100 and 1000000000 and ${t.amountMinor}%100=0 and ${t.currency}='THB'`),
+  check("ck_payment_attempt_state", sql`${t.state} in ('created','pending','retry','failed','succeeded','reconciliation')`)]);
+export const payments = sqliteTable("payments", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), customerId: text("customer_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(), currency: text("currency").notNull().default("THB"), method: text("method").notNull(), source: text("source").notNull(),
+  attemptId: text("attempt_id"), accountId: text("account_id"), providerReference: text("provider_reference"), note: text("note").notNull().default(""),
+  recordedBy: text("recorded_by").notNull().references(() => persons.id), recordedAt: text("recorded_at").notNull(), occurredAt: text("occurred_at").notNull(),
+}, (t) => [uniqueIndex("uq_payment_scope").on(t.businessId, t.branchId, t.id), uniqueIndex("uq_payment_attempt").on(t.attemptId), uniqueIndex("uq_payment_provider_ref").on(t.accountId, t.providerReference),
+  foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }), foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.attemptId], foreignColumns: [paymentAttempts.businessId, paymentAttempts.branchId, paymentAttempts.id] }),
+  foreignKey({ columns: [t.businessId, t.accountId], foreignColumns: [paymentProviderAccounts.businessId, paymentProviderAccounts.id] }),
+  index("idx_payment_branch_date").on(t.businessId, t.branchId, t.occurredAt), index("idx_payment_customer").on(t.businessId, t.customerId, t.branchId, t.occurredAt),
+  check("ck_payment_amount", sql`typeof(${t.amountMinor})='integer' and ${t.amountMinor} between 100 and 1000000000 and ${t.amountMinor}%100=0 and ${t.currency}='THB'`),
+  check("ck_payment_method", sql`${t.method} in ('cash','bank-transfer','other')`), check("ck_payment_source", sql`(${t.source}='manual' and ${t.attemptId} is null and ${t.accountId} is null and ${t.providerReference} is null) or (${t.source}='provider' and ${t.attemptId} is not null and ${t.accountId} is not null and ${t.providerReference} is not null)`)]);
+export const paymentAllocations = sqliteTable("payment_allocations", {
+  businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), paymentId: text("payment_id").notNull(), chargeId: text("charge_id").notNull(), amountMinor: integer("amount_minor").notNull(),
+}, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.paymentId, t.chargeId] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.paymentId], foreignColumns: [payments.businessId, payments.branchId, payments.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }), index("idx_payment_allocation_charge").on(t.businessId, t.branchId, t.chargeId),
+  check("ck_payment_allocation_amount", sql`typeof(${t.amountMinor})='integer' and ${t.amountMinor}>0 and ${t.amountMinor}%100=0`)]);
+export const paymentRefunds = sqliteTable("payment_refunds", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), paymentId: text("payment_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(), reason: text("reason").notNull(), recordedBy: text("recorded_by").notNull().references(() => persons.id), recordedAt: text("recorded_at").notNull(),
+}, (t) => [uniqueIndex("uq_refund_scope").on(t.businessId, t.branchId, t.id), uniqueIndex("uq_refund_payment_scope").on(t.businessId, t.branchId, t.paymentId, t.id),
+  foreignKey({ columns: [t.businessId, t.branchId, t.paymentId], foreignColumns: [payments.businessId, payments.branchId, payments.id] }), index("idx_refund_payment").on(t.businessId, t.branchId, t.paymentId), index("idx_refund_branch_date").on(t.businessId, t.branchId, t.recordedAt),
+  check("ck_refund_amount", sql`typeof(${t.amountMinor})='integer' and ${t.amountMinor}>0 and ${t.amountMinor}%100=0`), check("ck_refund_reason", sql`length(trim(${t.reason})) between 1 and 1000`)]);
+export const refundAllocations = sqliteTable("refund_allocations", {
+  businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), refundId: text("refund_id").notNull(), paymentId: text("payment_id").notNull(), chargeId: text("charge_id").notNull(), amountMinor: integer("amount_minor").notNull(),
+}, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.refundId, t.chargeId] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.paymentId, t.refundId], foreignColumns: [paymentRefunds.businessId, paymentRefunds.branchId, paymentRefunds.paymentId, paymentRefunds.id] }),
+  foreignKey({ columns: [t.businessId, t.branchId, t.paymentId, t.chargeId], foreignColumns: [paymentAllocations.businessId, paymentAllocations.branchId, paymentAllocations.paymentId, paymentAllocations.chargeId] }), index("idx_refund_allocation_charge").on(t.businessId, t.branchId, t.chargeId),
+  check("ck_refund_allocation_amount", sql`typeof(${t.amountMinor})='integer' and ${t.amountMinor}>0 and ${t.amountMinor}%100=0`)]);
+export const paymentWebhookEvents = sqliteTable("payment_webhook_events", {
+  accountId: text("account_id").notNull(), eventId: text("event_id").notNull(), businessId: text("business_id").notNull(), eventHash: text("event_hash").notNull(),
+  attemptId: text("attempt_id").references(() => paymentAttempts.id), state: text("state").notNull(), normalizedEvent: text("normalized_event_json").notNull(), failureCode: text("failure_code"), receivedAt: text("received_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.accountId, t.eventId] }), foreignKey({ columns: [t.businessId, t.accountId], foreignColumns: [paymentProviderAccounts.businessId, paymentProviderAccounts.id] }),
+  index("idx_payment_webhook_review").on(t.businessId, t.state, t.receivedAt), check("ck_payment_webhook_state", sql`${t.state} in ('applied','ignored','reconciliation')`), check("ck_payment_webhook_json", sql`json_valid(${t.normalizedEvent}) and length(${t.normalizedEvent})<=4000`)]);
+export const paymentAttemptEvents = sqliteTable("payment_attempt_events", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), attemptId: text("attempt_id").notNull(), kind: text("kind").notNull(),
+  failureCode: text("failure_code"), occurredAt: text("occurred_at").notNull(),
+}, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.attemptId], foreignColumns: [paymentAttempts.businessId, paymentAttempts.branchId, paymentAttempts.id] }), index("idx_payment_attempt_history").on(t.businessId, t.branchId, t.attemptId, t.occurredAt)]);

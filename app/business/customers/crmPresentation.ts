@@ -8,6 +8,8 @@ import type {
 } from "../../_prototype/businessState";
 import { getPrototypeChargeBalance } from "../../_prototype/businessState";
 import type { PrototypeConversation } from "../../_prototype/inboxState";
+import { BUSINESS_FIXTURE_TEST_MODE } from "../../_prototype/fixtureRuntime";
+import { readCrm } from "../../_backend/be8/client";
 
 export type CustomerCrmSegment =
   | "all"
@@ -22,6 +24,7 @@ export type CustomerCrmSegment =
 export type CustomerLifecycle = "new" | "active" | "regular" | "inactive";
 
 export type CustomerCrmDataset = {
+  scope?: { businessId: string; branchId: string };
   bookings: readonly PrototypeBooking[];
   serviceRecords: readonly PrototypeServiceRecord[];
   charges: readonly PrototypeCharge[];
@@ -102,6 +105,7 @@ function dayDistance(later: string, earlier: string) {
 }
 
 export function deriveCustomerCrmReferenceAt(customers: readonly PrototypeCustomer[], dataset: CustomerCrmDataset) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return new Date().toISOString();
   return newestValue([
     ...customers.map((customer) => customer.createdAt),
     ...dataset.serviceRecords.map((record) => record.completedAt),
@@ -122,6 +126,7 @@ export function deriveCustomerUpcomingBookings(
   dataset: CustomerCrmDataset,
   referenceAt = deriveCustomerCrmReferenceAt([customer], dataset),
 ): PrototypeBooking[] {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readCrm(dataset.scope, customer.id).upcoming;
   const completedPetsByBooking = new Map<string, Set<string>>();
   for (const record of dataset.serviceRecords) {
     if (record.businessId !== customer.businessId || record.customerId !== customer.id) continue;
@@ -156,6 +161,7 @@ export function deriveCustomerCrmProfile(
   dataset: CustomerCrmDataset,
   referenceAt = deriveCustomerCrmReferenceAt([customer], dataset),
 ): CustomerCrmProfile {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readCrm(dataset.scope, customer.id).profile;
   const bookings = dataset.bookings
     .filter((booking) => booking.businessId === customer.businessId && booking.customer.id === customer.id)
     .sort((first, second) => first.start.localeCompare(second.start));
@@ -273,6 +279,7 @@ function requestStatusLabel(status: "waiting" | "approved" | "declined" | "cance
 }
 
 export function deriveCustomerTimeline(customer: PrototypeCustomer, dataset: CustomerCrmDataset): CustomerTimelineItem[] {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readCrm(dataset.scope, customer.id).timeline;
   const customerCharges = dataset.charges.filter((charge) => charge.businessId === customer.businessId && charge.customerId === customer.id);
   const chargesById = new Map(customerCharges.map((charge) => [charge.chargeId, charge]));
   const bookingItems: CustomerTimelineItem[] = dataset.bookings

@@ -1,4 +1,5 @@
 import type { PetPassportConnectionState } from "./businessState";
+import { BUSINESS_FIXTURE_TEST_MODE } from "./fixtureRuntime";
 
 export type NonAuthoritativePassportCompatibility = {
   passportConnection: PetPassportConnectionState;
@@ -29,5 +30,5 @@ const UNLINKED_COMPATIBILITY: NonAuthoritativePassportCompatibility = {
 };
 
 export function readNonAuthoritativePassportCompatibility(petId: string) {
-  return PASSPORT_COMPATIBILITY_BY_PET_ID[petId] ?? UNLINKED_COMPATIBILITY;
+  return BUSINESS_FIXTURE_TEST_MODE ? PASSPORT_COMPATIBILITY_BY_PET_ID[petId] ?? UNLINKED_COMPATIBILITY : UNLINKED_COMPATIBILITY;
 }

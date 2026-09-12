@@ -1,0 +1,115 @@
+/* Quiet operational surfaces. Marketing pages and semantic status colors are
+   intentionally excluded. Overlay elevation and focus indicators remain. */
+.business-app-frame,
+.business-header--app {
+  --radius-control: 6px;
+  --radius-button: 6px;
+  --radius-panel: 10px;
+  --radius-card: 10px;
+  --shadow-card: none;
+  --shadow-lift: none;
+  --shadow-primary: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  font-variant-numeric: tabular-nums;
+}
+.business-app-frame .business-page-header { background-image: none; box-shadow: none; }
+.business-app-frame :is(.customer-overview, .business-customer-detail__profile) { background: var(--surface); box-shadow: none; }
+.business-app-frame .business-customer-detail__profile::before { display: none; }
+.business-app-frame .crm-overview { border: 1px solid var(--border); background: var(--surface); box-shadow: none; }
+.business-app-frame .crm-overview__icon { display: none; }
+.business-app-frame .crm-overview__metrics dd { font-size: 24px !important; }
+.business-app-frame .crm-overview__metrics > div:first-child dd { font-size: 34px !important; }
+.business-header--app { background: var(--surface); box-shadow: none; border-bottom: 1px solid var(--border); }
+.business-app-frame :is(.button, .business-segmented-control, .business-search-field),
+.business-header--app .button { background-image: none; box-shadow: none; }
+.business-app-frame .business-signature-sweep::before,
+.business-app-frame .business-signature-sweep::after { display: none; }
+.business-app-frame .button:hover { transform: none; box-shadow: none; }
+
+/* Flat containers: preserve existing layout, scrolling, and table behavior. */
+.business-app-frame :is(
+  .calendar-toolbar, .business-calendar__surface, .calendar-planning-board,
+  .customer-search-panel, .customer-results, .customer-detail-section, .customer-crm-panel,
+  .inbox-list-pane, .inbox-conversation-pane, .inbox-context-pane,
+  .billing-list-section, .reports-card, .reports-toolbar,
+  .team-directory, .team-member-card, .team-prototype-note,
+  .hotel-today-summary, .hotel-attention, .hotel-occupancy, .hotel-stays,
+  .daycare-summary, .daycare-zones, .daycare-card, .grooming-job-card,
+  .settings-form, .settings-branches, .settings-branch-card
+) { box-shadow: none; background-image: none; border-radius: 10px; }
+.business-app-frame :is(.reports-card, .team-member-card, .settings-branch-card, .grooming-job-card):hover { transform: none; box-shadow: none; }
+.business-app-frame :is(.reports-card, .customer-detail-section, .team-directory) { border: 1px solid var(--border); }
+
+/* Service icons identify service type. They do not need a colored tile. */
+.business-app-frame .business-service-icon,
+.business-app-frame :is(.settings-section-heading__icon, .settings-branch-card__mark, .reports-card__icon) {
+  color: var(--muted-foreground); background: transparent; border: 0; border-radius: 0; box-shadow: none;
+}
+.business-app-frame :is(.reports-card__metric-tag, .team-role-pill, .team-capability-list > span) {
+  color: var(--muted-foreground); background: transparent; border-color: var(--border); border-radius: 4px; font-weight: 400;
+}
+.business-app-frame :is(.settings-section-heading, .team-editor__intro, .booking-editor__relationship-intro, .daycare-detail__identity) { background: var(--surface); background-image: none; }
+.business-app-frame :is(.conversation-context-strip, .message-composer, .conversation-header) { box-shadow: none; background-image: none; }
+
+/* One primary metric; secondary figures share a quiet rule-separated row. */
+.business-app-frame :is(.reports-kpi-grid, .billing-summary, .team-summary-grid) {
+  display: grid; gap: 0; align-items: stretch; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden;
+}
+.business-app-frame .reports-kpi-grid,
+.business-app-frame .team-summary-grid { grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); }
+.business-app-frame .billing-summary { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+.business-app-frame :is(.reports-kpi-grid, .billing-summary, .team-summary-grid) > article {
+  min-width: 0; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: var(--surface); box-shadow: none; transform: none; padding: 20px;
+}
+.business-app-frame :is(.reports-kpi-grid, .billing-summary, .team-summary-grid) > article:last-child { border-right: 0; }
+.business-app-frame .business-reports .reports-card--kpi .reports-card__icon,
+.business-app-frame .business-billing .billing-summary-card__icon,
+.business-app-frame .team-summary-card__heading svg { display: none; }
+.business-app-frame .business-reports .reports-kpi__value,
+.business-app-frame .business-billing .billing-summary-card__value { font-size: 28px; font-weight: 600 !important; line-height: 1.25; overflow-wrap: anywhere; }
+.business-app-frame .business-reports .reports-card--kpi-revenue .reports-kpi__value,
+.business-app-frame .business-billing .billing-summary-card--revenue .billing-summary-card__value { font-size: clamp(32px, 3vw, 44px); }
+.business-app-frame .team-summary-card > strong { font-size: 28px !important; font-weight: 600; color: var(--foreground); }
+.business-app-frame .team-summary-card:first-child > strong { font-size: 44px !important; }
+.business-app-frame .business-reports .reports-kpi__footer,
+.business-app-frame .business-billing .billing-summary-card__footer { border: 0; padding-top: 0; }
+.business-app-frame .business-reports .reports-kpi__badge { padding: 0; border: 0; background: transparent; color: var(--status-warning); font-weight: 500 !important; }
+.business-app-frame :is(.hotel-today-summary, .daycare-summary) { border: 1px solid var(--border); }
+.business-app-frame :is(.hotel-today-summary__header, .daycare-summary > header) > svg { display: none; }
+.business-app-frame :is(.hotel-today-summary__stats, .daycare-summary__stats) { grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; }
+.business-app-frame :is(.hotel-summary-card, .daycare-summary__stats article) { min-width: 0; width: auto; }
+.business-app-frame :is(.hotel-summary-card, .daycare-summary__stats article) { background: transparent; box-shadow: none; border-radius: 0; }
+.business-app-frame .hotel-summary-card > span svg { display: none; }
+.business-app-frame :is(.hotel-summary-card, .daycare-summary__stats article) > strong { color: var(--foreground); font-size: 26px !important; font-weight: 600; }
+.business-app-frame :is(.hotel-summary-card, .daycare-summary__stats article):first-child > strong { font-size: 38px !important; }
+.business-app-frame :is(.reports-stat__value, .billing-summary-card__value, .reports-kpi__value, time, td, dd) { font-variant-numeric: tabular-nums; }
+
+/* Editors keep their labels, validation, and focus behavior. Only a dialog or
+   drawer sits above the page; fields and nested sections stay flat. */
+.business-app-frame :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { border-radius: 6px; box-shadow: none; background-image: none; }
+.business-app-frame :is(input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.business-app-frame :is(.business-modal, .customer-editor, .pet-relationship-editor, .booking-editor) { border-radius: 10px; background-image: none; box-shadow: var(--shadow-overlay); }
+.business-app-frame .customer-editor--embedded { box-shadow: none; }
+.business-app-frame :is(.business-modal__header, .business-modal__footer, .customer-editor__header, .customer-editor__actions, .booking-editor__header, .booking-editor__actions) { background: var(--surface); background-image: none; }
+.business-app-frame :is(.booking-fields, .daycare-detail-section, .team-editor fieldset, .hotel-detail-section, .grooming-detail-section) { border-radius: 8px; box-shadow: none; background-image: none; }
+.business-app-frame :is(.business-modal__close, .customer-editor__header > button, .settings-editor-close) { border-radius: 6px; min-width: 44px; min-height: 44px; box-shadow: none; }
+
+@media (max-width: 1199px) {
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid) > article { border-bottom: 1px solid var(--border); }
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid) > article:nth-child(even) { border-right: 0; }
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid) > article:nth-last-child(-n + 2) { border-bottom: 0; }
+  .business-app-frame :is(.hotel-today-summary__stats, .daycare-summary__stats) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .business-app-frame :is(.hotel-summary-card, .daycare-summary__stats article):first-child { grid-column: 1 / -1; border-right: 0; }
+}
+@media (max-width: 767px) {
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid, .billing-summary) { grid-template-columns: minmax(0, 1fr); }
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid, .billing-summary) > article { border-right: 0; border-bottom: 1px solid var(--border); padding: 16px; }
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid) > article:nth-last-child(2) { border-bottom: 1px solid var(--border); }
+  .business-app-frame :is(.reports-kpi-grid, .team-summary-grid, .billing-summary) > article:last-child { border-bottom: 0; }
+  .business-app-frame .business-reports .reports-card--kpi:not(:first-child) { gap: 8px; }
+  .business-app-frame :is(.hotel-summary-card, .daycare-summary__stats article) { padding: 16px; }
+  .business-app-frame :is(.business-modal, .customer-editor, .pet-relationship-editor, .booking-editor) { max-width: calc(100vw - 16px); }
+  .business-app-frame .customer-editor:not(.customer-editor--embedded) { width: 100%; max-width: 100vw; border-radius: 10px 10px 0 0; }
+}

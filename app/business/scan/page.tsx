@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BusinessScanner } from "./BusinessScanner";
+import "./scan.css";
 
 export const metadata: Metadata = {
   title: "สแกนรับเข้า",

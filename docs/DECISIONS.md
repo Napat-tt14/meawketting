@@ -16,6 +16,18 @@ Documentation and prototype behavior never close an OPEN question by convenience
 
 ## Active decisions
 
+### BE4–BE8 backend completion decisions — 2026-09-08 / 2026-09-09
+
+| ID | Decision |
+|---|---|
+| D-BE4-01 | **Product Owner confirmed a shared reservation within one Grooming Booking.** Staff select the total scheduled interval and Resource set for the group. Each Pet retains its own Job, lifecycle, notes and Service Record. Jobs from the same Booking do not consume the same Resource reservation repeatedly; other Bookings still conflict. This does not require all Pets to start or complete together. It resolves OQ-BF02/OQ-BF04 only for this resource-counting rule; separate per-Pet scheduling and other multi-service policies remain open. |
+| D-BE7-01 | **Product Owner confirmed financial mutation authority on 2026-09-09.** Active Staff may record payment up to the outstanding amount. Active Owner/Manager may adjust prices, apply discounts, cancel an unpaid Charge, and record a refund with a reason. Every action requires access to the record's Branch. This resolves OQ-BF15–17 for these permissions only. A recorded refund is evidence of returned money; it does not waive a Charge or reverse service completion. Provider selection, automated refund execution, tax/invoice rules and cross-Branch settlement remain undecided. |
+| D-BE5-01 | **Temporary Business QR is the only QR taxonomy that can authorize Business Intake.** Quick Passport QR and Public Safety QR are never accepted for Business Intake. Temporary tokens are opaque/high-entropy, stored as hashes, scoped to Business/Branch/purpose/fields, server-expiring and revocable. Customer relationship and LINE identity never infer Guardian/Pet authority. |
+| D-BE6-01 | **Each Business owns its own LINE Official Account adapter boundary.** Meawketting central LINE is not a chat proxy for every Business. Conversations, Messages, reads, approvals, outbox attempts and webhook event IDs are durable and tenant-scoped; provider credentials and real delivery remain external. Tests use a mock provider only. |
+| D-BE8-01 | **Reports and CRM are read-only derived projections.** BE8 queries canonical BE1–BE7 records for date/Branch/service/revenue/history metrics. No writable Reports/CRM tables, duplicate balances, occupancy, workload, unread counts or CRM scores are introduced. |
+
+The dated BF-4–BF-12 decision blocks below preserve historical UX choices. Any statement there that calls execution, Inbox, billing, Team or Reports “browser-local” or “not backend” is superseded by the active BE4–BE8 decisions above; product boundaries and external-provider exclusions remain in force.
+
 ### BE3 Booking / Calendar / planning Resource foundation — 2026-09-07
 
 | ID | Decision |
@@ -29,7 +41,7 @@ Documentation and prototype behavior never close an OPEN question by convenience
 | D-BE3-07 | **Equivalent create retries are idempotent.** A Business-scoped idempotency key is stored with a SHA-256 request hash. The same key and payload replay the original Booking; the same key with another payload is rejected. Edit/reschedule/assignment/cancel use the expected revision rather than pretending every mutation is freely repeatable. |
 | D-BE3-08 | **D1 is the only Booking planning truth after hydration.** Calendar/Home/Customer selectors use the authorized memory cache. Legacy session Booking rows are ignored, emptied and never backfilled or dual-written. A successful durable mutation may update still-local Job/Stay/Attendance projections by stable IDs as a best-effort BE4 compatibility step; that local update is not atomic and not Booking authority. |
 | D-BE3-09 | **Booking authorization, audit and privacy remain narrow.** Every operation follows actor → active membership → Business → Branch access → target. Cross-tenant Customer/Pet/Resource/Booking IDs and inactive grants are denied. Create/reschedule/resource/cancel audit records contain actor/scope/target/request/time and bounded structural before/after metadata, not contact, notes or protected Passport data. |
-| D-BE3-10 | **BE3 stops at planning.** Grooming Job, Hotel Stay, Daycare Attendance, Intake/Consent, Team/HR, Inbox/LINE, Billing/Payment, Service Record/Reports, media, production authentication and deployment remain outside the BE3 backend. **BE4 is not started.** BF1–BF12 UI stays frozen and `/workfiledesign` stays untouched. |
+| D-BE3-10 | **SUPERSEDED — historical BE3 checkpoint.** BE3 owns Booking/Calendar/planning Resource only. BE4–BE8 now provide the separately scoped D1 execution, Consent/Intake, Inbox, financial and read-only Reports/CRM domains. BF1–BF12 UI stays frozen and `/workfiledesign` stays untouched; production authentication, external providers, media and deployment remain outside this local foundation. |
 
 ### BE2 Customer / Pet foundation — 2026-09-07
 
@@ -42,8 +54,8 @@ Documentation and prototype behavior never close an OPEN question by convenience
 | D-BE2-05 | **Customer/Pet identity is Business-wide across Branches.** Customer, Business Pet profile and relationship tables deliberately have no Branch identity scope. BE3 Bookings now carry Branch context while referencing these same stable IDs; later service/payment records follow the same rule. |
 | D-BE2-06 | **Search and duplicate handling are server-side and non-destructive.** Business-scoped name/phone/Pet-name search supports bounded limit/offset. Exact normalized phone and Pet name/species candidates return a warning, including inactive records; only an explicit continue creates a separate record. No merge engine or automatic deduplication is implemented. |
 | D-BE2-07 | **BE2 reuses the active BE1 membership foundation.** OWNER, MANAGER and STAFF may use current Customer/Pet operational capabilities after actor → membership → active Business resolution. Branch grants neither hide another Branch's copy—there is none—nor expose another Business. A granular operational permission matrix remains open. |
-| D-BE2-08 | **D1 is the only Customer/Pet source of truth after hydration.** The frozen synchronous selectors read an in-memory compatibility cache; the former browser Customer slice is ignored, emptied on later writes and never backfilled/dual-written. This checkpoint's Booking-local clause is superseded by D-BE3-01–D-BE3-10; Inbox, Billing and service execution remain local and carry stable BE2/BE3 IDs. |
-| D-BE2-09 | **Passport presentation is compatibility data, never authority.** Seeded connection/access badges live in an explicit non-authoritative dev read model and are absent from BE2 tables/API. Guardian, Passport ownership, Consent, QR, access grants and protected Passport fields remain not implemented. |
+| D-BE2-08 | **D1 is the only Customer/Pet source of truth after hydration.** The frozen synchronous selectors read an in-memory compatibility cache; the former browser Customer slice is ignored, emptied on later writes and never backfilled/dual-written. This checkpoint's Booking-local clause is superseded by D-BE3-01–D-BE3-10; its dated Inbox, Billing and service-execution wording is historical and superseded by the active BE4–BE8 decisions. |
+| D-BE2-09 | **Passport presentation is compatibility data, never authority.** Seeded connection/access badges live in an explicit non-authoritative dev read model and are absent from BE2 tables/API. The checkpoint's statement that Consent, QR, access grants and protected Passport fields were not implemented is historical; BE5 now owns those scoped records while Guardian/Passport authority and production identity linking remain external. |
 | D-BE2-10 | **Mutations are durable and privacy-bounded.** Actor, membership, Business, target, request/correlation ID, time and bounded state shape are audited with the D1 write; names, contact values, notes and tag labels are not copied to audit JSON. Deterministic SQL fixtures are dev/test only. At its own checkpoint BE2 stopped before Booking; D-BE3-01–D-BE3-10 now supersede only that exclusion. |
 
 ### BE1 identity / Business / Branch foundation — 2026-09-06
@@ -57,7 +69,7 @@ Documentation and prototype behavior never close an OPEN question by convenience
 | D-BE1-05 | **The application boundary is typed and persistence-independent.** Frozen UI uses a same-origin `POST /api/be1` operation contract. Application validation/authorization is separate from D1 repository code, and database bindings are never exposed to the browser. |
 | D-BE1-06 | **Business/Branch configuration has one durable truth.** Text profile, Branch identity/contact/timezone/status, enabled modules and seven-day hours move from session state to D1. One in-memory compatibility cache feeds existing selectors after hydration; the selected context stays a harmless session preference. Legacy browser configuration is ignored, not backfilled or dual-written. This supersedes D-147's browser-envelope persistence only. |
 | D-BE1-07 | **Branch deactivation is non-destructive and guarded.** Historical records remain, and a guarded mutation cannot deactivate the final active Branch. Important mutations write actor, request/correlation and Business/Branch audit metadata. |
-| D-BE1-08 | **BE1 stops at the tenant foundation.** At that checkpoint Customer/Pet, Booking, service operations, Consent/Intake, Inbox/LINE, Billing/Payment, Reports, media/R2 and Consumer backends were not started. Customer/Pet and Booking planning are now superseded by D-BE2-01–D-BE2-10 and D-BE3-01–D-BE3-10; the remaining exclusions stay current. BF1–BF12 UI stays frozen, `/workfiledesign` stays untouched, and there is no production deployment. |
+| D-BE1-08 | **BE1 stopped at the tenant foundation.** At that historical checkpoint Customer/Pet, Booking, service operations, Consent/Intake, Inbox/LINE, Billing/Payment, Reports, media/R2 and Consumer backends were not started. Customer/Pet and Booking planning are now superseded by D-BE2-01–D-BE2-10 and D-BE3-01–D-BE3-10; BE4–BE8 now cover the local execution, privacy, communication, finance and read-only reporting scopes, while the remaining external exclusions stay current. BF1–BF12 UI stays frozen, `/workfiledesign` stays untouched, and there is no production deployment. |
 
 ### BE0 backend readiness and architecture freeze — 2026-09-05
 
@@ -189,7 +201,7 @@ See [BACKEND_READINESS](./BACKEND_READINESS.md) for the persistence map, applica
 | D-83 | The shared Calendar supports Day, Week, Month, and Custom 28/35/42-day views. A date-range Booking keeps its exclusive check-out domain model and renders as a continuous Hotel stay segment rather than duplicated daily cards. |
 | D-84 | Refined by D-111. Calendar drag, both-edge resize and duplication create a normal Booking draft, run the existing Branch/resource/capacity evaluator, and only then use the existing save path. Selecting the Booking and editing its fields remains the complete non-drag alternative. |
 
-### BF-4 Inbox & Customer Communication foundation — 2026-08-23
+### BF-4 Inbox & Customer Communication foundation — 2026-08-23 (historical UI decision; BE6 supersedes storage boundary)
 
 | ID | Decision |
 |---|---|
@@ -199,7 +211,7 @@ See [BACKEND_READINESS](./BACKEND_READINESS.md) for the persistence map, applica
 | D-88 | Structured `ขออนุมัติเพิ่มบริการ` is a local request message. Only the explicitly labeled Guardian-side test simulator can approve/decline; the decision is idempotent and BF-4 does not mutate Booking, Charge, Payment, or settlement state. |
 | D-89 | Refined by D-113. BF-4 supports browser-local text, quick replies, unread counts, search, request states and cookie-only presentation preferences. Real delivery/read synchronization, attachments/uploads, notifications, LINE/email/SMS, full Consumer Inbox, retention, and production authorization remain unimplemented/open. |
 
-### BF-5 Grooming Operations Foundation — 2026-08-27
+### BF-5 Grooming Operations Foundation — 2026-08-27 (historical UI decision; BE4 supersedes storage boundary)
 
 | ID | Decision |
 |---|---|
@@ -209,7 +221,7 @@ See [BACKEND_READINESS](./BACKEND_READINESS.md) for the persistence map, applica
 | D-118 | **Structured add-on approval stays Guardian-only.** The local Business UI can request/cancel but cannot approve. Only the explicitly labeled local Guardian-response simulator can approve/decline. A valid approval idempotently appends the add-on and added estimate to the linked Grooming Service Job only—never Booking, Charge, Payment, settlement, discount, refund, or pricing authority. |
 | D-119 | **Grooming visual/interaction treatment is workflow-first.** Pet visual anchors, Coral/Scissors module classification, semantic status/attention, guarded desktop/tablet drag, and a mobile detail/status alternative use the existing Warm White Design System and reduced-motion behavior. Coral never replaces semantic status, and drag never becomes the only state-change path. |
 
-### BF-6 Hotel / Boarding Operations Foundation — 2026-08-31
+### BF-6 Hotel / Boarding Operations Foundation — 2026-08-31 (historical UI decision; BE4 supersedes storage boundary)
 
 | ID | Decision |
 |---|---|
@@ -220,7 +232,7 @@ See [BACKEND_READINESS](./BACKEND_READINESS.md) for the persistence map, applica
 | D-124 | **Hotel integrates by derivation, not duplicated records.** Home derives arrivals, departures, occupancy and attention from shared Stay state; Customer/Pet detail derives active and historical stays; Calendar continues to render the Booking's continuous date range; Inbox carries optional Stay context. The Hotel operations view must not become another Booking, Customer, Pet, Inbox or Intake store. |
 | D-125 | **Hotel visual/interaction treatment is occupancy-first and responsive.** Desktop/tablet may use a continuous multi-day room/zone board and guarded drag-to-move with rollback feedback. Mobile uses grouped tabs/lists and a complete non-drag room assignment alternative rather than compressing the desktop board. Sky identifies Hotel, semantic colors identify status/attention, Brand Yellow remains the primary action, and reduced-motion behavior remains supported. |
 
-### BF-7 Billing, Payments & Revenue Foundation — 2026-09-01
+### BF-7 Billing, Payments & Revenue Foundation — 2026-09-01 (historical UI decision; BE7 supersedes storage boundary)
 
 | ID | Decision |
 |---|---|
@@ -252,7 +264,7 @@ The standalone module and handover workflow below are retained only as historica
 | D-139 | **Customer/Pet history is the only active Service Record view.** Customer and Pet detail use one inline `ประวัติบริการ` timeline/list with Pet visual anchor and expandable summary/details, activities, staff/resources, permitted photo metadata and completion time. A short BF7 payment reference may be shown read-only; Service completion ≠ Paid and Paid ≠ Service completion. |
 | D-140 | **Privacy, correction and Guardian boundaries remain narrow.** Service Records contain permitted Business service facts only and never copy Pet Passport, Guardian care, Intake, medication authorization, incident or ownership data. Lightweight corrections retain prior value, reason, staff, time and request key. Guardian visibility is planned for a future LINE Mini App; Consumer, LINE integration, Backend, real photo storage and certificate/print work remain out of scope. Legacy handover fields/history in old browser records are retained only for compatibility and are not advanced by current UI. |
 
-### BF-9 Team & Staff Operations Foundation — 2026-09-03
+### BF-9 Team & Staff Operations Foundation — 2026-09-03 (historical UI decision; BE4 supersedes storage boundary)
 
 | ID | Decision |
 |---|---|
@@ -401,12 +413,12 @@ The standalone module and handover workflow below are retained only as historica
 - Consent snapshots are versioned.
 - Business is Light / Warm White only with no dark-mode implementation or toggle; Consumer visual behavior remains unchanged during the pause.
 - Current Business, Branch, role, QR duration and checked-in references are Demo fixtures, not production policy.
-- BF-2 Booking planning, Pet links and the minimal schedulable Resource/capacity projection are durable BE3 data using stable BE2 Customer/Pet IDs. Grooming Job, Hotel Stay/room assignment and Daycare Attendance execution remain browser-local and reference the durable Booking identity.
+- BF-2 Booking planning, Pet links and the minimal schedulable Resource/capacity projection are durable BE3 data using stable BE2 Customer/Pet IDs. Grooming Job, Hotel Stay/room assignment and Daycare Attendance execution are durable BE4 records and reference the durable Booking identity.
 - BF-3 Customer, Business-local Pet profile/contact relationships, tags, notes, lifecycle, search and duplicate warnings are durable BE2 data. Seeded Passport connection/access presentation remains an explicit non-authoritative dev fixture. Guardian authority, Passport/Consent and Customer merge are not implemented.
-- BF-4 Conversation/message/unread/request data is same-tab browser-local state. Its minimum Guardian-response simulator is only a test boundary; real participant identity, delivery, authorization, retention, notifications, Booking add-on effects, and disputes remain unimplemented/open.
-- BF-5 Grooming Service Jobs, timing, resource assignment, internal notes, activity history, and Job-linked structured-request effects are same-tab browser-local data. The fixture date/time and attention wording are demonstration aids, not an operating-hours, SLA, pickup, or staff-scheduling policy.
-- BF-6 Hotel Stays, room/zone assignments, move history, care tasks, lightweight incidents and operational timing are same-tab browser-local data. Shared Calendar date-range Bookings remain the planning source; the Stay is a linked execution projection rather than a second Booking.
-- BF-7 Charges and Payments are same-tab browser-local data in the shared Business envelope. Amounts are whole Thai Baht integers; Cash, bank-transfer and Other are recorded locally with duplicate-safe request keys. Charges retain Branch attribution, but real payment processing, tax/invoice treatment, refund policy, provider confirmation, accounting/export and cross-Branch settlement remain OPEN/NOT IMPLEMENTED.
+- BF-4 Conversation/message/unread/request data is durable BE6 state. Its minimum Guardian-response simulator is only a test boundary; real participant identity, delivery, authorization policy, retention, notifications, Booking add-on effects and disputes remain unimplemented/open.
+- BF-5 Grooming Service Jobs, timing, resource assignment, internal notes, activity history and Job-linked structured-request effects are durable BE4 data. The fixture date/time and attention wording are demonstration aids, not an operating-hours, SLA, pickup or staff-scheduling policy.
+- BF-6 Hotel Stays, room/zone assignments, move history, care tasks, lightweight incidents and operational timing are durable BE4 data. Shared Calendar date-range Bookings remain the planning source; the Stay is a linked execution record rather than a second Booking.
+- BF-7 Charges and Payments are durable BE7 data in the shared Business envelope. Amounts are whole Thai Baht integers; Cash, bank-transfer and Other are recorded with duplicate-safe request keys. Charges retain Branch attribution, while real gateway processing, tax/invoice treatment, provider confirmation, accounting/export and cross-Branch settlement remain OPEN/NOT IMPLEMENTED.
 - A Charge holds a one-time Booking-level base amount plus source-aware add-on/adjustment/discount snapshots. Manual adjustments, discounts and unpaid cancellation require a stated reason. Charge status derives from Payment allocations/cancellation, so it is not a Booking, Job or Stay lifecycle field.
 - The local Hotel projection creates/links one Stay per booked Pet. This is a reversible prototype implementation, not a decision on the open multi-Pet Booking policy (OQ-BF02) or future Visit/Order parent (OQ-BF01).
 - Hotel capacity validation and movement history are UI safety foundations only. Room-sharing/capacity (OQ-BF09), move-history detail (OQ-BF10), overbooking authority (OQ-BF11), waitlist (OQ-BF12), cancellation/no-show policy (OQ-BF14), required care/exception policy (OQ-BF25), full medical authority and production incident policy remain OPEN.
@@ -414,7 +426,7 @@ The standalone module and handover workflow below are retained only as historica
 - The local Grooming projection creates/links one Job per booked Pet. This is a reversible prototype implementation, not a decision on the open multi-Pet Booking policy (OQ-BF02) or the future Visit/Order parent (OQ-BF01).
 - The local guarded Job transitions and Resource conflict check provide UI safety only. Grooming buffers/compatible services (OQ-BF13), cancellation/no-show (OQ-BF14), pricing override (OQ-BF15), discount authority (OQ-BF16), refund policy (OQ-BF17), resource hold/resolution (OQ-BF04), and structured approval identity/expiry/dispute policy (OQ-BF22) remain OPEN.
 - A local Guardian-simulator approval may update only a linked Grooming Service Job's add-ons and estimated duration. It neither proves Guardian identity nor authorizes a Booking, Charge, Payment, price, discount, refund, or settlement change.
-- BF-8 Reports metrics are derived dynamically in-memory from shared browser-local state, extended by BF10 Branch configuration and BF11 Daycare attendance. Date range math is client-side, using `BOOKING_DEMO_DATE` (2026-08-18) as the demo baseline for "today". Peak hours and busiest days are derived from appointment and booking schedules. This is a local reporting foundation, not a data warehouse, OLAP cube, or financial accounting system.
-- BF-9 Team Member, displayed role/capability and derived workload data remain browser-local in the existing Business envelope. BE3 separately owns Resource schedulability and planning availability; the opaque display link does not make Team data authoritative, and displayed roles never grant access.
-- BF10 Business/Branch configuration is durable BE1 data and BE3 enforces its active/module/appointment-hours rules. BF11 Daycare attendance remains same-tab execution data; detailed multi-day operating policy and production workforce rules remain open.
+- BF-8 Reports metrics are read-only BE8 queries over shared BE1–BE7 records, extended by Branch configuration and all three BE4 execution modules. Date range math is server-scoped to the requested range; the deterministic test baseline is `2026-08-18`. Peak hours and busiest days are derived from appointment and execution schedules. This is a local reporting foundation, not a data warehouse, OLAP cube or financial accounting system.
+- BF-9 Team Member, displayed role/capability and derived workload data are durable BE4 operation-staff records. BE3 separately owns Resource schedulability and planning availability; the opaque display link does not make Team data authoritative, and displayed roles never grant access.
+- BF10 Business/Branch configuration is durable BE1 data and BE3 enforces its active/module/appointment-hours rules. BF11 Daycare Attendance is durable BE4 execution data; detailed multi-day operating policy and production workforce rules remain open.
 - BF12 lifecycle and follow-up signals are deterministic local heuristics from existing records. Two distinct completed-Booking visits currently mean repeat/regular use; a last completed visit at least 45 days before the dataset reference date with no next Booking means inactive. The reference uses the latest recorded Customer/service/financial/conversation timestamp, not a live inactivity monitor. These reversible thresholds are prototype assumptions, not a business promise, customer risk score, automated campaign or loyalty contract.

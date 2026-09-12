@@ -1,5 +1,5 @@
+import { businessToday } from "../../_backend/shared/businessClock";
 import {
-  BOOKING_DEMO_DATE,
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
   listPrototypeBookingFixtures,
@@ -21,6 +21,7 @@ export type ConversationCustomerContext = { id: string; name: string };
 export type ConversationPetContext = { id: string; name: string; species: "cat" | "dog" };
 export type ConversationBookingContext = {
   bookingId: string;
+  businessId: string;
   customerId: string;
   branchId: string;
   branchName: string;
@@ -69,6 +70,7 @@ export function resolvePrototypeConversationContext(
   const branchName = branchContext ? getDemoBusinessContextDetails(branchContext).branch?.name ?? "สาขาที่เกี่ยวข้อง" : "สาขาที่เกี่ยวข้อง";
   const booking = validBooking ? {
     bookingId: validBooking.bookingId,
+    businessId: validBooking.businessId,
     customerId: validBooking.customer.id,
     branchId: validBooking.branchId,
     branchName,
@@ -126,8 +128,8 @@ export function conversationMatchesPrototypeSearch(
 export function conversationIsInService(context: ResolvedConversationContext) {
   const booking = context.booking;
   if (!booking || booking.status === "cancelled") return false;
-  if (booking.timeModel === "date-range") return booking.start <= BOOKING_DEMO_DATE && Boolean(booking.end && BOOKING_DEMO_DATE < booking.end);
-  return booking.start.slice(0, 10) === BOOKING_DEMO_DATE && (booking.status === "confirmed" || booking.status === "arrived");
+  if (booking.timeModel === "date-range") return booking.start <= businessToday(booking) && Boolean(booking.end && businessToday(booking) < booking.end);
+  return booking.start.slice(0, 10) === businessToday(booking) && (booking.status === "confirmed" || booking.status === "arrived");
 }
 
 const messageTimeFormatter = new Intl.DateTimeFormat("th-TH", {
@@ -151,7 +153,7 @@ export function prototypeConversationContextLabel(context: ResolvedConversationC
     bookingId: context.booking.bookingId,
     customer: { id: context.booking.customerId, name: context.customer?.name ?? "ลูกค้า" },
     pets: context.pet ? [context.pet] : [],
-    businessId: "",
+    businessId: context.booking.businessId,
     branchId: context.booking.branchId,
     serviceModule: context.booking.serviceModule,
     service: { id: "", label: context.booking.serviceLabel },

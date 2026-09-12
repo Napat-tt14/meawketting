@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BusinessHome } from "./BusinessHome";
+import "./dashboard.css";
 
 export const metadata: Metadata = {
   title: "หน้าหลักธุรกิจ",

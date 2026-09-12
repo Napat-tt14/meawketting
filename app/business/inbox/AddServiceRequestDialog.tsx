@@ -1,7 +1,8 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { createPrototypeAddServiceRequest, type PrototypeAddServiceRequestMessage } from "../../_prototype/inboxState";
+import { type PrototypeAddServiceRequestMessage } from "../../_prototype/inboxState";
+import { createDurableAddServiceRequest as createPrototypeAddServiceRequest } from "../../_backend/be6/client";
 import { Clock, Plus, X } from "../../_components/icons";
 import type { ConversationBookingContext } from "./inboxPresentation";
 
@@ -27,6 +28,7 @@ export function AddServiceRequestDialog({
   const [notice, setNotice] = useState<string | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const serviceRef = useRef<HTMLInputElement>(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -65,9 +67,11 @@ export function AddServiceRequestDialog({
     };
   }, [onClose]);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = createPrototypeAddServiceRequest({
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    const result = await createPrototypeAddServiceRequest({
       conversationId,
       businessId,
       bookingId: booking.bookingId,
@@ -77,6 +81,7 @@ export function AddServiceRequestDialog({
       additionalMinutes: Number(minutes),
       note,
     });
+    sendingRef.current = false;
     if (!result.ok) {
       setNotice(result.reason === "booking-mismatch"
         ? "การจองนี้ไม่พร้อมรับคำขอเพิ่มบริการจากบริบทปัจจุบัน"

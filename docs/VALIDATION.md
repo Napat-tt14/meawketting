@@ -1,11 +1,67 @@
 # Validation
 
-Status: **BE1 + BE2 + BE3 BACKEND FOUNDATIONS VALIDATED LOCALLY / BF1–BF12 UI FROZEN**
+Status: **BE1–BE8 BACKEND FOUNDATION VALIDATED LOCALLY / BE6 PROVIDER-NEUTRAL / BF1–BF12 UI FROZEN**
 
-Validation date: 2026-09-07
+Validation date: 2026-09-09
 Owner: Engineering / QA
 
 This document owns current test evidence. A passing local build is not a production-readiness claim.
+
+## Current BE1–BE8 validation — 2026-09-09
+
+| Phase | Result | Evidence |
+|---|---|---|
+| BE1 Identity / Business / Branch | **PASS — 8/8** | D1 migrations, membership/Branch authorization, configuration, audit, constraints and reopen durability |
+| BE2 Customer / Pet | **PASS — 11/11** | D1 Customer/Pet CRUD, relationships, search/duplicates, tenant/Branch guards, audit and reopen durability |
+| BE3 Booking / Calendar / Resources | **PASS — 9/9** | Durable multi-Pet planning, reservations/capacity, typed conflicts, revisions, idempotent create, concurrency and tenant guards |
+| BE4 Service Operations | **PASS — 13/13** | D1 Grooming Jobs, Hotel Stays, Daycare Attendance, lifecycle/assignment/care/capacity guards and Service Records |
+| BE5 Consent / Intake | **PASS — 7/7** | Temporary Business QR hash/expiry/revoke, scoped Consent/Intake, Guardian separation, protected fields, replay and tenant guards |
+| BE6 Inbox / LINE foundation | **PASS — 8/8** | Conversations/Messages/reads/approvals, outbox retry/lease, webhook signature/dedup and mock provider boundary |
+| BE7 Billing / Payments | **PASS — 10/10** | Charge/Payment separation, allocations, partial/full/refund, attempts, webhook dedup, reconciliation, idempotency and Branch/role guards |
+| BE8 Reports / History / CRM | **PASS — 3/3** | Populated Customer+Pet → Booking → Grooming/Hotel/Daycare → Service Record → Charge → Payment → Reports flow; non-zero module/revenue/Branch/date/refund metrics and CRM timeline/balance projections |
+| Frozen frontend/rendered regression | **PASS — 91/91** | `tests/rendered-html.test.mjs`; BE4–BE8 client/cache integrations retain BF1–BF12 UI and Consumer freeze |
+
+The BE8 populated test uses real migration-backed D1 records and verifies completed service count, payment-derived revenue less a refund, booking/customer counts, Grooming/Hotel/Daycare breakdown, Branch/date filtering, recent services, CRM last/next visit, completed visits, services used, outstanding balance and descending timeline ordering. It also asserts that no table name contains `report` or `crm`.
+
+## Cross-phase security and reliability evidence
+
+| Flow / boundary | Result | Evidence |
+|---|---|---|
+| Customer/Pet → Booking → execution → Service Record → Charge → Payment → Reports | **PASS** | `tests/be8.test.ts` completes one Grooming, one Hotel and one Daycare execution, explicitly records/allocates Payments, records a refund and reads populated BE8 Reports/CRM |
+| Temporary Business QR → Consent → Intake → expiry/revoke | **PASS** | BE5 migration-backed tests validate opaque token hashing, scope, expiry/revoke, wrong QR taxonomy, protected-field filtering and access denial after revoke/expiry |
+| Conversation → Message → outbox/mock adapter → retry/dedup | **PASS** | BE6 tests validate contextual persistence, ordering/read state, provider mock, signed webhook verification, duplicate event suppression and retry lease/failure states |
+| Tenant/Branch/target authorization | **PASS** | BE1–BE7 tests resolve Person → Membership → Business → Branch → target and reject foreign IDs, inactive memberships/grants and inaccessible Branches |
+| Booking/operation/capacity concurrency | **PASS** | BE3 reservation guards/revisions and BE4 room/zone/resource races leave one valid winner and preserve the authoritative record |
+| Financial idempotency/webhook dedup | **PASS** | BE7 request keys, allocation/refund replay, payment-attempt ledger and provider webhook ledger reject duplicate or mismatched mutations |
+
+## Current command and runtime validation
+
+| Check | Result | Evidence |
+|---|---|---|
+| `npm run lint` | **PASS** | ESLint exited 0 with one pre-existing `react-hooks/exhaustive-deps` warning in `app/business/team/TeamOperations.tsx:103`. |
+| `npm test` | **PASS** | Production build, rendered frontend regression (91/91) and BE1–BE8 suites all passed. |
+| Strict typechecks | **PASS** | `npm run typecheck:be1` through `npm run typecheck:be8` each exited 0. |
+| `npm run build` | **PASS** | Vinext production build emits `/api/be1` through `/api/be8`, the LINE webhook route and `/api/dev/guardian`; the first sandbox attempt hit Vite temp-file `EPERM`, then the same command passed with workspace filesystem permission. |
+| Migration/schema checks | **PASS** | `npx drizzle-kit check`, `npm run db:check`, local Wrangler migration ledger `0000`→`0014`, and idempotent DEV/TEST seed all passed. No BE8 tables or migration were added. |
+| Local API smoke | **PASS** | `smoke-be5.mjs`, `smoke-be6.mjs`, `smoke-be7.mjs`, plus read-only `/api/be4` and `/api/be8` checks passed on a local Worker; no remote provider or database was contacted. |
+| `git diff --check` | **PASS** | No whitespace errors; only Git LF/CRLF conversion warnings. |
+
+## Product Owner manual QA checklist
+
+Use the frozen Business UI with the local dev/test identity and record **PASS** or **FAIL** for each check:
+
+| Check | ACTION | EXPECTED RESULT | PASS/FAIL |
+|---|---|---|---|
+| Durable data | Create/edit a Customer, Pet or Booking, refresh the page and restart the local app | The same record and current Branch scope remain; no browser fixture becomes authoritative | ☐ |
+| Branch isolation | Switch between Ari, Thonglor and Onnut and open Customers, Calendar, operations and Finance | Only authorized Branch work/capabilities appear; Customer/Pet identity remains Business-wide and foreign targets are rejected | ☐ |
+| Booking concurrency | Open the same available slot in two windows and submit both | One write succeeds; the other shows a typed conflict and keeps the server record | ☐ |
+| Service completion | Complete a Grooming Job, Hotel Stay and Daycare Attendance through their lifecycle | Each creates/updates one Pet-specific Service Record; completion does not mark the Charge paid | ☐ |
+| Consent and Intake | Scan a Temporary Business QR, review allowed fields and complete Intake | Only granted fields appear and the explicit execution target checks in | ☐ |
+| Consent revoke/expiry | Revoke the grant, or wait past expiry, then reopen protected data | Protected Passport fields are inaccessible and the event is auditable | ☐ |
+| Inbox delivery boundary | Send a contextual message, trigger the local outbox/mock provider and retry it | Message order/read state persist; duplicate provider event is ignored and production LINE is not claimed | ☐ |
+| Partial payment/refund | Record a partial Payment, then complete allocation and record an authorized refund with a reason | Charge status/balance and refund/net revenue update independently of service completion | ☐ |
+| Reports | Open Reports for one Branch/date and then all Branches/date ranges | Totals match Payments, completed executions, bookings and customers; module breakdown and refund effect are visible | ☐ |
+| CRM history | Open a Customer detail after the flow above | Last visit, next Booking, completed visits, services, outstanding balance and descending timeline match canonical records | ☐ |
 
 ## BE3 Booking / Calendar / Resources validation — 2026-09-07
 
@@ -25,7 +81,7 @@ BE3 authorization tests call the public application capability boundary against 
 
 Concurrency is validated for this D1/SQLite design, not claimed as a distributed lock: conflicting reservation inserts deterministically leave one valid committed Booking, while create retries use a Business-scoped idempotency key/request hash and edits use optimistic revisions. Time values remain validated Branch-local civil strings/minutes; IANA timezone-to-UTC/DST conversion and full per-day Hotel/Daycare operating-hours policy remain open production work.
 
-**Scope truth:** BE1, BE2 and BE3 backend/database/server authorization are implemented locally. Booking planning is durable; Grooming Job, Hotel Stay and Daycare Attendance execution remain browser-local compatibility data linked by BE3 IDs. Guardian authority, Passport/Consent, BE4 service operations, Inbox/LINE, Billing/Payment backend, Reports backend, media/R2, production Auth and Cloudflare deployment are **NOT IMPLEMENTED**. **BE4 is NOT STARTED.**
+**Historical scope truth at this BE3 checkpoint (superseded):** BE1–BE3 were the only validated backend phases on 2026-09-07. BE4–BE8 are now covered by the current validation section above; production Auth, external LINE/payment providers, R2/media and Cloudflare deployment remain **NOT IMPLEMENTED**.
 
 ## BE2 Customer / Pet retained regression validation — 2026-09-07
 
@@ -60,9 +116,9 @@ BE2 authorization tests call the public application capability boundary against 
 
 Authorization tests use the public typed application boundary against a D1-compatible adapter, not mocked role booleans. Persistence tests close and reopen the database to prove durable read/write behavior. The development identity header is accepted only when the server mode is exactly `dev-test`; otherwise the boundary fails closed with production auth unconfigured.
 
-Frontend compatibility regression retains the frozen Business Shell, Branch switcher, Settings, Customers, Calendar, capability-aware navigation and BF1–BF12 behavior while asserting that legacy browser `businessProfiles`, `branches`, `customers` and `bookings` are no longer retained as truth. Excluded execution domains remain browser-local and reference stable BE2 Customer/Pet and BE3 Booking IDs.
+Frontend compatibility regression retains the frozen Business Shell, Branch switcher, Settings, Customers, Calendar, capability-aware navigation and BF1–BF12 behavior while asserting that legacy browser `businessProfiles`, `branches`, `customers` and `bookings` are no longer retained as truth. BE4–BE8 domains hydrate through typed clients; persistent compatibility is explicit fixture mode only, with pre-hydration snapshots treated as non-authoritative presentation.
 
-**Scope truth:** BE1 backend/database/server authorization remains implemented locally and green. BE2 adds Customer/Pet and BE3 adds Booking/Calendar planning plus minimal Resources. Production Auth, BE4 service execution, Guardian/Passport/Consent, LINE, Payment, media/R2 and Cloudflare production deployment are **NOT IMPLEMENTED**.
+**Historical scope truth at the BE1 checkpoint (superseded):** BE1 was green and BE2–BE8 were later added and validated as recorded above. Production Auth, external LINE/payment providers, R2/media and Cloudflare production deployment remain **NOT IMPLEMENTED**.
 
 ## Historical frozen Business UI audit
 
@@ -109,9 +165,11 @@ Local evidence: `tmp/business-ui-audit/final/` contains the viewport measurement
 
 ## Existing implementation checkpoint
 
-Before BE1, BF10–BF12 extended the existing BF1–BF9 shared browser-local Business envelope with Business profiles/Branches, pet-specific Daycare attendance and read-only derived CRM. BE1 replaces Business/Branch configuration truth; BE2 replaces Customer/Pet directory truth; BE3 replaces Booking planning and minimal Resource availability truth. Team/HR, Intake, Grooming Job, Hotel Stay/room, Daycare Attendance, Billing, Conversation, Service Record and Reports remain browser-local and reference stable BE2/BE3 IDs. These phases add no duplicate service-domain or CRM store. **Production Ready: NO.** Consumer remains frozen; Guardian/Passport/Consent authority, production auth, later backend domains, LINE, gateway/accounting, payroll, AI and deployment remain outside this checkpoint.
+Before BE1, BF10–BF12 extended the existing BF1–BF9 shared browser-local Business envelope. This paragraph is a historical checkpoint: BE1 replaced Business/Branch truth; BE2 replaced Customer/Pet truth; BE3 replaced Booking planning; BE4–BE7 now replace execution, Consent/Intake, Inbox and financial truth with D1 records; BE8 provides read-only Reports/CRM. These phases add no duplicate service-domain or CRM store. **Production Ready: NO.** Consumer remains frozen; production auth, external providers, R2/media and deployment remain outside this checkpoint.
 
-## Final command evidence
+## Historical command evidence — BE1–BE3 checkpoint (2026-09-07)
+
+The table below is retained for the earlier BE3 checkpoint. Current BE1–BE8 command outcomes, including environment-only build/migration limitations, are recorded in the current section at the top of this document.
 
 | Command | Result | Evidence |
 |---|---|---|
@@ -162,8 +220,8 @@ The historical whole-repository `npx tsc --noEmit --incremental false` report co
 
 | Contract | Result | Evidence |
 |---|---|---|
-| Charge ≠ Payment | **PASS** | `PrototypeCharge` holds the service amount/lines/history and `PrototypePayment` holds a separately recorded method, amount, allocation, request key, and time. Payment does not mutate the Charge into a paid record. |
-| Status and balance | **PASS** | `unpaid`, `partial`, `paid`, and `cancelled` are derived from Charge lines, Payment allocations, and cancellation state; UI always renders text with an icon/non-color cue. |
+| Charge ≠ Payment | **PASS** | BE7 D1 `charges` hold service amount/lines/history and `payments` hold separately recorded method, amount, allocation, request key and time. Payment does not mutate execution into a paid state. |
+| Status and balance | **PASS** | `unpaid`, `partial`, `paid`, `cancelled` and refund effects are derived from Charge lines, Payment allocations, refund allocations and cancellation state; UI renders text with an icon/non-color cue. |
 | Whole-THB amount boundary | **PASS** | Base prices, approved add-ons, adjustments, discounts, and Payments reject fractional values. The prototype uses integer Thai Baht only and makes no accounting-precision claim. |
 | Adjustment and cancellation reasons | **PASS** | Manual adjustment/discount require a label and reason; discount cannot produce a negative total. Cancellation requires a reason and is blocked once a Payment exists, with no automatic refund. |
 | Idempotency and overpayment | **PASS** | Approved Grooming add-ons are reconciled once by source request id; Payment uses a request key and duplicate submissions return the original record. Payments cannot exceed remaining balance. |
@@ -171,7 +229,7 @@ The historical whole-repository `npx tsc --noEmit --incremental false` report co
 | Hotel Checkout | **PASS** | Ready-for-checkout/checked-out/completed Hotel Stay opens `/business/billing?hotelStayId=…`. A Stay's operational lifecycle does not create a Payment or mark a Charge paid. |
 | Multi-pet booking protection | **PASS** | One booking-level base Charge is reused across per-Pet Jobs/Stays; the paired Hotel fixture proves the base estimate is not duplicated. |
 | Branch and Customer integration | **PASS** | Charges, Payments, balances, customer financial history, and Home revenue filter to the current Business+Branch context. Cross-Branch payment attempts are rejected. |
-| Shared revenue source | **PASS** | Home and Billing both use `getPrototypeRevenueSummary`; revenue is Payment-derived, while unpaid/partial balances remain separate. |
+| Shared revenue source | **PASS** | BE7/BE8 queries derive revenue from Payment allocations less refunds; Home, Billing and Reports consume the same Branch-scoped records while unpaid/partial balances remain separate. |
 | Inbox boundary | **PASS** | Billing may add a local text notification to the existing Business+Customer conversation only. Inbox does not own Charges or Payments, and no LINE delivery/integration was added. |
 | Responsive and accessibility | **PASS** | Desktop uses an accessible Charge table; mobile replaces it with labeled Charge cards. Inputs use 44px targets, status has text+icon, focus is visible, and reduced-motion handling is present. |
 
@@ -179,9 +237,9 @@ The historical whole-repository `npx tsc --noEmit --incremental false` report co
 
 | Contract | Result | Evidence |
 |---|---|---|
-| One shared Service Record per source | **PASS** | A completed Grooming Job with `actualCompletedAt` and a checked-out/completed Hotel Stay with `actualCheckOutAt` create/reuse deterministic source-keyed records in the existing Business envelope. Repeated opens never duplicate a record. |
-| Grooming completion evidence | **PASS** | The record captures permitted base service, approved add-ons, assigned staff/resources, Business note, actual completion time, activity timeline, and metadata-only photo foundation. Grooming detail confirms the record is saved; Customer/Pet detail is the active history view. |
-| Hotel checkout evidence | **PASS** | The record captures check-in/out dates, room/zone summary, ordinary daily-care completion summary, permitted Business note, and checkout time. Hotel detail confirms the record is saved; Customer/Pet detail is the active history view. Medication, Guardian instructions, Intake, and incident data are excluded. |
+| One shared Service Record per source | **PASS** | A completed Grooming Job, checked-out/completed Hotel Stay or completed Daycare Attendance creates/reuses a source-keyed D1 Service Record. Repeated completion never duplicates a record. |
+| Grooming completion evidence | **PASS** | BE4 records permitted base service, approved add-ons, assigned staff/resources, Business note, actual completion time, activity timeline and metadata-only photo references in D1. Customer/Pet detail reads the record through BE8/history clients. |
+| Hotel checkout evidence | **PASS** | BE4 records check-in/out dates, room/zone summary, ordinary daily-care completion summary, permitted Business note and checkout time in D1. Medication, Guardian instructions, Intake and incident data are excluded. |
 | No silent history loss | **PASS** | Reopening a completed Grooming source persists its prior visible record. Re-completion refreshes permitted execution facts in the same record and stores a source-revision snapshot; no duplicate record or active handover lock is introduced. |
 | Correction audit | **PASS** | Summary/Business-note corrections are append-only with prior value, reason, staff, timestamp, and duplicate-safe request key. Audit timestamps are monotonic relative to the record and prior events. |
 | BF7 reference versus Service Record | **PASS** | Customer/Pet history resolves existing source/Booking Charge status as a short read-only reference. `Paid` does not set service completion, and service completion does not set Paid; history does not mutate Charges, Payments, or revenue. |
@@ -196,7 +254,7 @@ The historical whole-repository `npx tsc --noEmit --incremental false` report co
 |---|---|---|
 | Team menu and route | **PASS** | `/business/team` is a live desktop Sidebar, mobile More and Command Palette destination. It renders one Team page with local-prototype, authorization and payroll/HR boundaries visible. |
 | Shared member identity and Branch context | **PASS** | The same Team Member record can carry several Branch IDs. Branch switching filters membership without cloning the person; the multi-Branch fixture resolves to one staff ID in Ari and Thonglor. |
-| Lightweight directory | **PASS** | The responsive Team list/table hybrid and stacked mobile cards show avatar, name, displayed role, Branch membership, capabilities, active/inactive state, availability and today workload. Local add/edit/active-state controls write the existing browser-local Business envelope. |
+| Lightweight directory | **PASS** | The responsive Team list/table hybrid and stacked mobile cards show avatar, name, displayed role, Branch membership, capabilities, active/inactive state, availability and derived workload. Add/edit/active-state commands use BE4 D1 operation-staff records. |
 | Capability and active-state filtering | **PASS** | Grooming and Hotel-care selectors derive from the shared Team Member capability. Inactive or incompatible members are disabled/rejected, while active eligible members remain assignable. |
 | Availability foundation | **PASS** | Working, unavailable, break and time-off intervals are evaluated against an assignment interval. An overlapping break/time-off produces an explicit local unavailable result rather than a silent assignment. |
 | Calendar / Booking integration | **PASS** | Existing linked Groomer Resources remain the canonical Booking assignment. The shared evaluator adds staff active, capability, availability and timing checks to Calendar/Booking conflict feedback. |
@@ -283,7 +341,7 @@ Earlier BF6 direct-manipulation checks are retained below; these do not imply na
 
 | Check | Result |
 |---|---|
-| Canonical Markdown owners | **PASS** — Product, Architecture, Backend Readiness, Module Map, Routes, User Flows, UX Rules, Decisions, Current Implementation, Roadmap, and Validation distinguish BE2 durable Customer/Pet truth from remaining local domains and unimplemented Guardian authority. |
+| Canonical Markdown owners | **PASS** — Product, Architecture, Backend Readiness, Module Map, Routes, User Flows, UX Rules, Decisions, Current Implementation, Roadmap and Validation now distinguish BE1–BE8 durable/derived truth from explicit fixture mode and unimplemented production/Guardian boundaries. |
 | Derived HTML manual | **PASS** — updated last after canonical BE2 Markdown and validation evidence, without becoming another source of truth. |
 | Manual structure and responsive QA | **PASS** — 14 panels, 14 matching tabs, 17 capabilities, 23 resolved internal anchors and 6 existing relative document/asset paths. All panels were exercised at 320/390/1440px; the reference table and Roadmap overflow were corrected and rechecked. Business typography specimens and 16px mobile input sizing match their labels; fresh manual console was clean. |
 | Broken relative Markdown links | **PASS — automated/source audit** |
@@ -299,18 +357,18 @@ Earlier BF6 direct-manipulation checks are retained below; these do not imply na
 
 | Boundary | Result |
 |---|---|
-| BF1–BF9 regression | **PASS** — Home, Calendar/Booking, Customers/Pets, Inbox, Shared Intake, Grooming, Hotel, Billing, Payment, Reports, Team, Service Record and revenue executable contracts remain green. |
+| BF1–BF12 regression | **PASS** — Home, Calendar/Booking, Customers/Pets, Inbox, Shared Intake, Grooming, Hotel, Daycare, Billing, Payment, Reports, Team, Service Record and revenue executable contracts remain green. |
 | Grooming and Hotel lifecycle | **PASS** — BF5/BF6 operational states remain guarded and distinct from BF7 Payment; completion/checkout creates the shared Service Record without a separate workflow. |
 | Consumer development | **PAUSED / unchanged** — existing Consumer routes and Noto Sans Thai visual system remain frozen; no LINE Mini App or Consumer Inbox was started. |
-| Billing / Payment foundation | **PASS — LOCAL ONLY** — Charge, Payment, checkout, shared revenue, customer history, and branch attribution are implemented without a gateway or accounting system. |
-| Shared Service Record foundation | **PASS — LOCAL ONLY** — source-keyed Service Records, permitted completion evidence, shared Customer/Pet history, correction/source-recompletion audit and BF7 read-only reference are implemented without a standalone module, handover workflow, Guardian delivery or a document system. |
-| Team & Staff Operations foundation | **PASS — LOCAL ONLY** — shared multi-Branch Team Members, capabilities, lightweight availability, active-state and workload are reused by Calendar/Booking, Grooming and Hotel care. Displayed roles are not real authorization; payroll/HR and full workforce scheduling are excluded. |
+| Billing / Payment foundation | **PASS — LOCAL D1 ONLY** — Charge, Payment, checkout, allocations/refunds, shared revenue, customer history and Branch attribution are implemented without a gateway or accounting system. |
+| Shared Service Record foundation | **PASS — LOCAL D1 ONLY** — source-keyed Service Records, permitted completion evidence, shared Customer/Pet history, correction/source-recompletion audit and BE7 read-only reference are implemented without a standalone module, handover workflow, Guardian delivery or a document system. |
+| Team & Staff Operations foundation | **PASS — LOCAL D1 ONLY** — shared multi-Branch operation staff, capabilities, lightweight availability, active-state and derived workload are reused by Calendar/Booking, Grooming, Hotel and Daycare. Displayed roles are not real authorization; payroll/HR and full workforce scheduling are excluded. |
 | BE1 Backend / Database / server authorization | **PASS — IMPLEMENTED LOCALLY** |
 | BE2 Customer / Pet Backend / tenant authorization | **PASS — IMPLEMENTED LOCALLY** |
 | Production authentication / deployment | **NOT IMPLEMENTED** |
 | Advanced room/dynamic pricing and full inventory | **NOT STARTED** |
 | Full medical/care, full Incident Management, certificate/print Service Records, Guardian visibility, and real photo storage | **NOT STARTED** — BF6 contains only authorized lightweight care and internal attention notes; BF8 remains a bounded Business-side service record. |
-| BF10–BF12 | **PASS — LOCAL FRONTEND COMPLETE**; no next phase started |
+| BE8 / BF10–BF12 | **PASS — READ-ONLY D1 / FROZEN UI**; no production phase started |
 
 ## Planning versus execution boundary
 
@@ -367,12 +425,12 @@ Calendar owns Booking dates, planning availability, continuous spans, move, and 
 
 ## Partially validated / not in scope
 
-- Backend domains after BE3 and signed QR cryptographic verification. BE1 identity/Business/Branch, BE2 Customer/Pet and BE3 Booking/Calendar/planning Resource persistence, migrations and server scope are validated above. BE4 service execution is not started.
-- Real payment gateway processing, bank confirmation/reconciliation, VAT invoice generation, refunds, General Ledger, and full accounting.
+- Production provider integration and signed Guardian identity/Passport authority remain outside this local foundation. BE1–BE8 persistence/read boundaries, migrations and server scope are validated above.
+- Real payment gateway processing, bank confirmation, VAT invoice generation, General Ledger, tax and full accounting. BE7 records local refunds and reconciliation state but does not call a provider.
 - Native mobile camera hardware permissions.
 - Real messaging transport, sockets, delivery/read synchronization, attachment storage, notifications, full Consumer Inbox, retention/deletion policy, and production Guardian response identity.
 - LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking; these are future Consumer-phase work and are not represented by repository routes.
-- Cloudflare Worker/Vinext + D1 is the BE1–BE3 local architecture; production resources, custom domain deployment and production verification remain not started.
+- Cloudflare Worker/Vinext + D1 is the BE1–BE8 local architecture; production resources, custom domain deployment and production verification remain not started.
 - Local browser QA is not a production device-lab, native camera-hardware, screen-reader, or assistive-technology certification.
 - The in-app browser controller did not synthesize a native Hotel desktop drag gesture. Native drag/drop handlers, capacity preview, rollback source contracts, and the mobile room selector are covered by executable tests plus direct conflict interaction; this is not a device-lab certification.
 - Billing visual checks are source/rendered/executable contracts rather than a payment-terminal, banking, or device-lab certification.
@@ -381,4 +439,4 @@ Calendar owns Booking dates, planning availability, continuous spans, move, and 
 
 ## Stop condition
 
-BE1 completes identity / Business / Branch, BE2 completes Customer / Pet and BE3 completes Booking / Calendar planning plus minimal Resource persistence. **Production Ready: NO.** BF1–BF12 remains frozen, standalone CareProof/Handover is superseded and Consumer remains paused. No commit, push or deployment was performed; `/workfiledesign` was not changed. Stop here: **BE4 is not started**. Production authentication, Guardian/Passport/Consent, service-operations backend, payroll/HR, payment-provider integration, production deployment, LINE, media/R2, certificate/print and Consumer work do not start automatically.
+BE1–BE8 local backend feature foundations are complete within their documented scope: execution, Consent/Intake, Inbox, financial records and read-only Reports/CRM are validated against D1-compatible migrations. **Production Ready: NO.** BF1–BF12 remains frozen, standalone CareProof/Handover is superseded and Consumer remains paused. No commit, push or deployment was performed; `/workfiledesign` was not changed. Production authentication, Guardian LINE authority, real LINE/payment providers, R2/media, certificate/print, tax/accounting and Cloudflare deployment remain external launch work.

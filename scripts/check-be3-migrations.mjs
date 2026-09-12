@@ -9,6 +9,7 @@ const migrationFiles = readdirSync(migrationRoot).filter((name) => name.endsWith
 const be1Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be1-dev.sql"), "utf8");
 const be2Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be2-dev.sql"), "utf8");
 const be3Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be3-dev.sql"), "utf8");
+const be4Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be4-dev.sql"), "utf8");
 assert.ok(migrationFiles.length >= 4, "BE3 expects the BE1/BE2 migrations plus a BE3 migration");
 
 function migrationSql(name) {
@@ -74,6 +75,7 @@ try {
   first.exec(be1Seed);
   first.exec(be2Seed);
   first.exec(be3Seed);
+  first.exec(be4Seed);
   const expectedCounts = { booking_services: 5, booking_resources: 13, bookings: 13, booking_pets: 15 };
   for (const [table, expected] of Object.entries(expectedCounts)) {
     assert.equal(first.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count, expected, `${table} fixture count`);
@@ -111,6 +113,7 @@ try {
   first.exec(be1Seed);
   first.exec(be2Seed);
   first.exec(be3Seed);
+  first.exec(be4Seed);
   const afterReplay = Object.fromEntries(Object.keys(expectedCounts).map((table) => [table, first.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count]));
   assert.deepEqual(afterReplay, beforeReplay, "deterministic DEV/TEST seeds are replay-safe");
 
@@ -119,6 +122,7 @@ try {
   upgraded.prepare("UPDATE customers SET business_notes = ? WHERE business_id = ? AND id = ?").run("pre-BE3 durable value", "business-whisker-rest", "booking-contact-nalin");
   upgraded.exec(migrationSql(migrationFiles.at(-1)));
   upgraded.exec(be3Seed);
+  upgraded.exec(be4Seed);
   assert.equal(
     upgraded.prepare("SELECT business_notes FROM customers WHERE business_id = ? AND id = ?").get("business-whisker-rest", "booking-contact-nalin").business_notes,
     "pre-BE3 durable value",

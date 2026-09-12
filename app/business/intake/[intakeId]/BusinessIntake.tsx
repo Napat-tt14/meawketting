@@ -1,33 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TemporaryAccess, TemporaryAccessGateState } from "../../../_prototype/sharingState";
+import type { TemporaryAccessGateState } from "../../../_prototype/sharingState";
 import {
-  evaluateTemporaryAccess,
   formatSharingDate,
-  readTemporaryAccess,
   scopeLabel,
 } from "../../../_prototype/sharingState";
-import { getPrototypePetBySlug, speciesLabel } from "../../../_prototype/consumerPets";
+import { speciesLabel } from "../../../_prototype/consumerPets";
+import type { AccessView, GrantedPassport, IntakeResult, IntakeView } from "../../../_backend/be5/contracts";
+import { intakeAccessGate, loadDurableIntake, mutateDurableIntake, readCachedIntake, saveDurableIntake } from "../../../_backend/be5/client";
 import type {
-  BusinessIntakeRecord,
   CorrectionTopic,
   DemoBusinessContext,
   IntakeTaskState,
 } from "../../../_prototype/businessState";
 import {
-  beginOwnerDecisionPrototype,
   businessRoleLabel,
   businessStaffLabel,
-  confirmPrototypeCheckIn,
   DEMO_BUSINESS_CONTEXTS,
   getDemoBusinessContextForBranch,
   getDemoBusinessContextDetails,
   readActiveBusinessContext,
-  readBusinessIntake,
   readPrototypeCustomer,
-  submitCorrectionSuggestion,
-  updateBusinessIntake,
 } from "../../../_prototype/businessState";
 import { PetPhoto } from "../../../my-pets/_components/PetPhoto";
 import {
@@ -58,8 +52,9 @@ const INTERRUPTION_COPY: Partial<Record<TemporaryAccessGateState, { title: strin
 };
 
 export function BusinessIntake({ intakeId }: { intakeId: string }) {
-  const [record, setRecord] = useState<BusinessIntakeRecord | null>(null);
-  const [access, setAccess] = useState<TemporaryAccess | null>(null);
+  const [record, setRecord] = useState<IntakeView | null>(null);
+  const [access, setAccess] = useState<AccessView | null>(null);
+  const [protectedPassport, setProtectedPassport] = useState<GrantedPassport | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [correctionOpen, setCorrectionOpen] = useState(false);
@@ -74,24 +69,33 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
   const suggestionInputRef = useRef<HTMLInputElement>(null);
   const correctionTriggerRef = useRef<HTMLButtonElement>(null);
   const correctionSheetRef = useRef<HTMLElement>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const saveSequenceRef = useRef(0);
+  const pendingSaveRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const queuedSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+  const loadingRef = useRef(false);
+  const scopeRef = useRef("");
 
-  const refresh = useCallback((announce = false) => {
-    setActiveContext(readActiveBusinessContext());
-    const currentRecord = readBusinessIntake(intakeId);
-    if (!currentRecord) {
-      setLoaded(true);
-      setRecord(null);
-      setAccess(null);
-      return;
+  const refresh = useCallback(async (announce = false) => {
+    const context = readActiveBusinessContext(), scopeKey = `${context.businessId}:${context.branchId}`;
+    setActiveContext(context);
+    if (scopeRef.current !== scopeKey) {
+      scopeRef.current = scopeKey; setAccess(null); setProtectedPassport(null); setRecord(null);
     }
-    let currentAccess = readTemporaryAccess(currentRecord.accessId);
-    if (currentAccess?.status === "ready" && currentAccess.consentStatus === "additional-decision-needed") {
-      currentAccess = beginOwnerDecisionPrototype(currentAccess.id, currentRecord.staffLabel);
-    }
-    setRecord(currentRecord);
-    setAccess(currentAccess);
-    setLoaded(true);
-    if (announce) setAnnouncement("ตรวจสถานะการอนุญาตล่าสุดแล้ว");
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    const sequence = saveSequenceRef.current;
+    try {
+      const current = await loadDurableIntake(context, intakeId);
+      if (scopeRef.current !== scopeKey) return;
+      if (sequence === saveSequenceRef.current && !queuedSaveRef.current) setRecord(current.record);
+      setAccess(current.access); setProtectedPassport(current.passport);
+      if (announce) setAnnouncement("ตรวจสถานะการอนุญาตล่าสุดแล้ว");
+    } catch {
+      if (scopeRef.current !== scopeKey) return;
+      setAccess(null); setProtectedPassport(null);
+      if (announce) setAnnouncement("ยังตรวจสิทธิ์ล่าสุดไม่ได้ กรุณาลองอีกครั้ง");
+    } finally { loadingRef.current = false; setLoaded(true); }
   }, [intakeId]);
 
   useEffect(() => {
@@ -99,14 +103,18 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     const onState = () => refresh();
     window.addEventListener("meawketting:sharing-state", onState);
     window.addEventListener("meawketting:business-state", onState);
-    const interval = window.setInterval(() => refresh(), 1_000);
+    const interval = window.setInterval(() => void refresh(), 5_000);
+    const leaseCheck = window.setInterval(() => {
+      if (!readCachedIntake(readActiveBusinessContext(), intakeId)?.passport) setProtectedPassport(null);
+    }, 1_000);
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("meawketting:sharing-state", onState);
       window.removeEventListener("meawketting:business-state", onState);
       window.clearInterval(interval);
+      window.clearInterval(leaseCheck);
     };
-  }, [refresh]);
+  }, [refresh, intakeId]);
 
   useEffect(() => {
     if (loaded) window.requestAnimationFrame(() => stateHeadingRef.current?.focus());
@@ -153,9 +161,9 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     record?.branchId,
   ), [record]);
   const details = useMemo(() => getDemoBusinessContextDetails(context), [context]);
-  const gate = record ? evaluateTemporaryAccess(access, activeContext.businessId, activeContext.branchId) : "invalid";
-  const consentActive = Boolean(access && gate === "valid" && access.status === "active");
-  const pet = consentActive && access ? getPrototypePetBySlug(access.petSlug) : null;
+  const gate = record ? intakeAccessGate(access, activeContext) : "invalid";
+  const consentActive = Boolean(access && gate === "valid" && access.status === "active" && protectedPassport);
+  const pet = consentActive ? protectedPassport : null;
   const knownCustomer = consentActive && record?.customerId ? readPrototypeCustomer(record.customerId) : null;
   const knownPet = knownCustomer && record?.petRelationshipId
     ? knownCustomer.pets.find((item) => item.id === record.petRelationshipId) ?? null
@@ -164,15 +172,39 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     ? INTERRUPTION_COPY[gate]
     : null;
 
-  function persist(update: (current: BusinessIntakeRecord) => BusinessIntakeRecord, message?: string) {
+  function applyResult(result: IntakeResult) {
+    const current = readActiveBusinessContext();
+    if (current.businessId !== result.record.businessId || current.branchId !== result.record.branchId) return;
+    setRecord(result.record); setAccess(result.access); setProtectedPassport(result.passport);
+  }
+
+  function persist(update: (current: IntakeView) => IntakeView, message?: string, debounce = false) {
     if (!record) return;
-    const next = updateBusinessIntake(record.id, update);
-    if (!next) {
-      setAnnouncement("บันทึกแบบร่างการรับเข้าไม่สำเร็จ กรุณาลองอีกครั้ง");
-      return;
-    }
+    const next = update(record), sequence = ++saveSequenceRef.current;
     setRecord(next);
-    if (message) setAnnouncement(message);
+    setAnnouncement("กำลังบันทึกแบบร่างการรับเข้า");
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    const save = async () => {
+      queuedSaveRef.current = null; saveTimerRef.current = null;
+      try {
+        const result = await saveDurableIntake(next);
+        if (sequence === saveSequenceRef.current) applyResult(result);
+        if (message) setAnnouncement(message);
+        return true;
+      } catch {
+        setProtectedPassport(null); setAnnouncement("บันทึกแบบร่างการรับเข้าไม่สำเร็จ กรุณาตรวจข้อมูลล่าสุดแล้วลองอีกครั้ง");
+        return false;
+      }
+    };
+    const run = () => { const promise = save(); pendingSaveRef.current = promise; return promise; };
+    if (debounce) { queuedSaveRef.current = run; saveTimerRef.current = window.setTimeout(run, 350); }
+    else { queuedSaveRef.current = null; void run(); }
+  }
+
+  async function flushDraft() {
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    if (queuedSaveRef.current) return queuedSaveRef.current();
+    return pendingSaveRef.current;
   }
 
   function moveTo(taskState: IntakeTaskState) {
@@ -200,50 +232,34 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     window.requestAnimationFrame(() => correctionTriggerRef.current?.focus());
   }
 
-  function submitCorrection(event: React.FormEvent<HTMLFormElement>) {
+  async function submitCorrection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!record || !pet || !suggestedValue.trim()) {
       setCorrectionError("กรอกข้อมูลที่ต้องการเสนอให้เจ้าของตรวจสอบ");
       suggestionInputRef.current?.focus();
       return;
     }
-    const currentValues: Record<CorrectionTopic, string> = {
-      name: pet.name,
-      species: speciesLabel(pet.species),
-      "passport-reference": pet.passportLabel,
-    };
-    const next = submitCorrectionSuggestion(record.id, {
-      topic: correctionTopic,
-      currentValue: currentValues[correctionTopic],
-      suggestedValue: suggestedValue.trim(),
-      note: correctionNote.trim(),
-    });
-    if (next) {
-      setRecord(next);
+    if (!await flushDraft()) return;
+    try {
+      const result = await mutateDurableIntake(activeContext, record.id, { type: "intake.correct", topic: correctionTopic, suggestedValue: suggestedValue.trim(), note: correctionNote.trim() });
+      applyResult(result);
       setAnnouncement("ส่งข้อเสนอแก้ไขแล้ว ข้อมูลต้นฉบับของน้องยังไม่เปลี่ยน");
       closeCorrection();
-    }
+    } catch { setCorrectionError("ส่งข้อเสนอไม่สำเร็จ กรุณาตรวจสิทธิ์ล่าสุดแล้วลองอีกครั้ง"); void refresh(); }
   }
 
-  function confirmCheckIn() {
+  async function confirmCheckIn() {
     if (!record || submitting || record.checkInState === "checked-in") return;
     setSubmitting(true);
     setCheckInError("");
-    window.setTimeout(() => {
-      const result = confirmPrototypeCheckIn(record.id, activeContext);
-      if (result.ok) {
-        setRecord(result.record);
-        setAnnouncement(result.duplicate ? "รายการนี้รับเข้าแล้ว จึงไม่สร้างซ้ำ" : "รับเข้าเรียบร้อย");
-      } else {
-        setCheckInError(result.reason === "expired"
-          ? "สิทธิ์เข้าถึงหมดอายุแล้ว จึงไม่สามารถยืนยันรับเข้าได้"
-          : result.reason === "revoked"
-            ? "เจ้าของยกเลิกสิทธิ์แล้ว จึงไม่สามารถยืนยันรับเข้าได้"
-            : "สิทธิ์ ร้าน หรือสาขาเปลี่ยนระหว่างยืนยัน กรุณาสแกนใหม่");
-        refresh();
-      }
-      setSubmitting(false);
-    }, 420);
+    try {
+      if (!await flushDraft()) return;
+      const result = await mutateDurableIntake(activeContext, record.id, { type: "intake.receive" });
+      applyResult(result); setAnnouncement("รับเข้าเรียบร้อย");
+    } catch {
+      setCheckInError("สิทธิ์ ร้าน หรือข้อมูลเปลี่ยนระหว่างยืนยัน กรุณาตรวจข้อมูลล่าสุดแล้วลองอีกครั้ง");
+      void refresh();
+    } finally { setSubmitting(false); }
   }
 
   if (!loaded) {
@@ -258,7 +274,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     return <div className="business-shell business-shell--narrow shell"><BusinessPageHeader title="รับน้องเข้าร้าน" /><section className="intake-blocked business-state-enter" role="alert"><LockKey size={40} weight="bold" /><h2 ref={stateHeadingRef} tabIndex={-1}>{interruption.title}</h2><p>{interruption.message}</p><div className="intake-draft-preserved"><Save size={20} weight="bold" /><span><strong>แบบร่างการรับเข้ายังอยู่</strong><small>ของที่นำมาด้วยและหมายเหตุของร้านเก็บแยกจากข้อมูลต้นฉบับของน้อง</small></span></div><div className="scanner-actions"><a className="button button--business" href="/business/scan">ขอและสแกน QR ใหม่</a><a className="button button--ghost" href="/business/scan">กลับหน้าสแกน</a></div></section></div>;
   }
 
-  if (!consentActive || access?.status === "awaiting-owner") {
+  if (access?.status === "awaiting-owner") {
     return <div className="business-shell business-shell--narrow shell"><BusinessPageHeader title="รับน้องเข้าร้าน" /><p className="sr-live" role="status" aria-live="polite">{announcement}</p><section className="awaiting-consent business-state-enter" aria-labelledby="awaiting-heading"><Clock size={40} weight="bold" /><h2 ref={stateHeadingRef} id="awaiting-heading" tabIndex={-1}>รอเจ้าของอนุมัติ</h2><p>ยังไม่แสดงชื่อ รูป หมายเลขอ้างอิง Passport หรือข้อมูลของน้องที่ต้องมีสิทธิ์</p><dl className="consent-facts"><div><dt>ร้าน</dt><dd>{details.business?.name}</dd></div><div><dt>สาขา</dt><dd>{details.branch?.name}</dd></div><div><dt>ใช้เพื่อ</dt><dd>{access?.purpose ?? record.servicePurpose}</dd></div><div><dt>ข้อมูลที่ขอ</dt><dd>{access?.scope.map(scopeLabel).join(" · ") ?? record.sharedScope.map(scopeLabel).join(" · ")}</dd></div><div><dt>สถานะ</dt><dd>รอการตอบกลับจากเจ้าของ</dd></div></dl><div className="awaiting-privacy"><LockKey size={22} weight="bold" /><span><strong>ข้อมูลของน้องยังถูกซ่อน</strong><small>พนักงานร้านไม่สามารถอนุมัติแทนเจ้าของได้</small></span></div><div className="scanner-actions"><button className="button button--business" type="button" onClick={() => refresh(true)}>ตรวจสถานะอีกครั้ง</button><a className="button button--ghost" href="/business/scan">ยกเลิกและกลับหน้าสแกน</a></div></section></div>;
   }
 
@@ -266,7 +282,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
     return <div className="business-shell business-shell--narrow shell"><BusinessPageHeader title="รับน้องเข้าร้าน" /><section className="intake-blocked business-state-enter" role="alert"><CircleAlert size={40} weight="bold" /><h2 ref={stateHeadingRef} tabIndex={-1}>เปิดข้อมูลที่ร้านได้รับไม่สำเร็จ</h2><p>ขั้นตอนถูกหยุดโดยไม่แสดงข้อมูลของน้อง กรุณาสแกน QR ใหม่</p><a className="button button--business" href="/business/scan">กลับหน้าสแกนรับเข้า</a></section></div>;
   }
 
-  const currentValue = correctionTopic === "name" ? pet.name : correctionTopic === "species" ? speciesLabel(pet.species) : pet.passportLabel;
+  const currentValue = correctionTopic === "name" ? pet.name : correctionTopic === "species" ? speciesLabel(pet.species) : pet.passportLabel ?? "";
 
   return (
     <div className="business-shell shell">
@@ -300,7 +316,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
           <form className="intake-form" onSubmit={(event) => { event.preventDefault(); moveTo("review"); }}>
             <div className="intake-state-heading"><h2 ref={stateHeadingRef} id="intake-form-heading" tabIndex={-1}>บันทึกรับเข้า</h2><p>ข้อมูลส่วนนี้เป็นของร้าน และไม่แก้ Pet Passport</p></div>
             <fieldset className="belongings-fieldset"><legend>ของที่เจ้าของนำมาด้วย</legend><p>เลือกเฉพาะสิ่งที่รับมอบจริง</p><div>{BELONGING_OPTIONS.map((item) => <label key={item}><input type="checkbox" checked={record.belongings.includes(item)} onChange={() => toggleBelonging(item)} /><span><Check size={18} weight="bold" /> {item}</span></label>)}</div></fieldset>
-            <label className="business-field" htmlFor="business-note"><span>หมายเหตุการรับเข้า</span><textarea id="business-note" rows={5} value={record.businessNote} aria-describedby="business-note-help" placeholder="ข้อเท็จจริงขณะรับเข้า เช่น มาถึงเวลาใด หรือฝากของไว้ตรงไหน" onChange={(event) => persist((current) => ({ ...current, businessNote: event.target.value }), "บันทึกหมายเหตุการรับเข้าแล้ว")} /><small id="business-note-help">หมายเหตุนี้เป็นข้อมูลของร้าน และไม่เพิ่มข้อมูลสุขภาพให้น้อง</small></label>
+            <label className="business-field" htmlFor="business-note"><span>หมายเหตุการรับเข้า</span><textarea id="business-note" rows={5} value={record.businessNote} aria-describedby="business-note-help" placeholder="ข้อเท็จจริงขณะรับเข้า เช่น มาถึงเวลาใด หรือฝากของไว้ตรงไหน" onChange={(event) => persist((current) => ({ ...current, businessNote: event.target.value }), "บันทึกหมายเหตุการรับเข้าแล้ว", true)} /><small id="business-note-help">หมายเหตุนี้เป็นข้อมูลของร้าน และไม่เพิ่มข้อมูลสุขภาพให้น้อง</small></label>
             <section className="relevant-instruction"><Info size={22} weight="bold" /><div><h3>คำแนะนำที่เกี่ยวข้อง</h3><p>สิทธิ์นี้ไม่มีคำแนะนำการดูแล จึงไม่มีการสร้างข้อมูลสุขภาพหรือคำแนะนำเพิ่ม</p></div></section>
             {record.correctionSuggestion ? <section className="correction-submitted"><CheckCircle size={22} weight="bold" /><div><h3>ส่งข้อเสนอแก้ไขแล้ว</h3><p>{record.correctionSuggestion.currentValue} → {record.correctionSuggestion.suggestedValue}</p><small>ข้อมูลต้นฉบับของน้องยังไม่เปลี่ยน</small></div></section> : null}
             <button ref={correctionTriggerRef} className="button button--ghost" type="button" onClick={() => setCorrectionOpen(true)}>เสนอแก้ไขข้อมูล</button>
@@ -319,7 +335,7 @@ export function BusinessIntake({ intakeId }: { intakeId: string }) {
       ) : null}
 
       {record.taskState === "complete" || record.checkInState === "checked-in" ? (
-        <section className="checkin-complete business-state-enter" aria-labelledby="checkin-complete-heading"><span className="checkin-complete__icon"><CheckCircle size={48} weight="bold" /></span><h2 ref={stateHeadingRef} id="checkin-complete-heading" tabIndex={-1}>รับเข้าเรียบร้อย</h2><p>{pet.name} เข้ารับบริการกับ {details.business?.name} · {details.branch?.name}</p><dl><div><dt>เวลารับเข้า</dt><dd>{formatSharingDate(record.checkedInAt)}</dd></div><div><dt>งานบริการ</dt><dd>{record.servicePurpose}</dd></div><div><dt>เลขอ้างอิงรายการ</dt><dd><code>{record.prototypeSessionReference}</code><small>ใช้ติดตามรายการในอุปกรณ์นี้</small></dd></div></dl><div className="scanner-actions">{record.daycareAttendanceId ? <a className="button button--business button--large" href={`/business/daycare?attendanceId=${encodeURIComponent(record.daycareAttendanceId)}`}>ไปที่รายการ Daycare</a> : null}{record.hotelStayId ? <a className="button button--business button--large" href={`/business/hotel?stayId=${encodeURIComponent(record.hotelStayId)}`}>ระบุห้องและไปที่โรงแรม</a> : null}{record.serviceJobId ? <a className="button button--business button--large" href={`/business/grooming?jobId=${encodeURIComponent(record.serviceJobId)}`}>ไปที่งานอาบน้ำ / ตัดขน</a> : null}<a className="button button--ghost" href="/business/scan">สแกนน้องตัวถัดไป</a></div></section>
+        <section className="checkin-complete business-state-enter" aria-labelledby="checkin-complete-heading"><span className="checkin-complete__icon"><CheckCircle size={48} weight="bold" /></span><h2 ref={stateHeadingRef} id="checkin-complete-heading" tabIndex={-1}>รับเข้าเรียบร้อย</h2><p>{pet.name} เข้ารับบริการกับ {details.business?.name} · {details.branch?.name}</p><dl><div><dt>เวลารับเข้า</dt><dd>{formatSharingDate(record.checkedInAt)}</dd></div><div><dt>งานบริการ</dt><dd>{record.servicePurpose}</dd></div><div><dt>เลขอ้างอิงรายการ</dt><dd><code>{record.prototypeSessionReference}</code><small>ใช้ติดตามรายการรับเข้าของร้าน</small></dd></div></dl><div className="scanner-actions">{record.daycareAttendanceId ? <a className="button button--business button--large" href={`/business/daycare?attendanceId=${encodeURIComponent(record.daycareAttendanceId)}`}>ไปที่รายการ Daycare</a> : null}{record.hotelStayId ? <a className="button button--business button--large" href={`/business/hotel?stayId=${encodeURIComponent(record.hotelStayId)}`}>ระบุห้องและไปที่โรงแรม</a> : null}{record.serviceJobId ? <a className="button button--business button--large" href={`/business/grooming?jobId=${encodeURIComponent(record.serviceJobId)}`}>ไปที่งานอาบน้ำ / ตัดขน</a> : null}<a className="button button--ghost" href="/business/scan">สแกนน้องตัวถัดไป</a></div></section>
       ) : null}
 
       {correctionOpen ? (

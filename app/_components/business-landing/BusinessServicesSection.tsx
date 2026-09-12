@@ -1,67 +1,23 @@
 import Image from "next/image";
-import { BedDouble, Flower, Scissors, Sparkle } from "../icons";
-
-const primaryServices = [
-  {
-    icon: Scissors,
-    title: "อาบน้ำ / ตัดขน",
-    copy: "จัดคิวช่าง เวลา และพื้นที่ให้บริการ",
-  },
-  {
-    icon: BedDouble,
-    title: "โรงแรมสัตว์เลี้ยง",
-    copy: "มองเห็นช่วงเข้าพักและความจุของห้อง",
-  },
-  {
-    icon: Flower,
-    title: "Daycare",
-    copy: "วางแผนรอบดูแล กิจกรรม และความจุรายวัน",
-  },
+import { ArrowRight } from "../icons";
+const services = [
+  { name: "โรงแรมสัตว์เลี้ยง", label: "STAY & CARE", copy: "จองห้อง เช็กอิน ดูแลตลอดการเข้าพัก", tone: "hotel", alt: "ห้องพักโรงแรมจำลอง มีแมวและสุนัขนอนในเตียงนุ่ม", image: "pet-hotel-room" },
+  { name: "อาบน้ำ & ตัดขน", label: "FRESH & FLUFFY", copy: "จัดคิวช่าง พร้อมบันทึกงานบริการ", tone: "grooming", alt: "สุนัขในอ่างอาบน้ำและแมวห่มผ้าข้างอุปกรณ์กรูมมิ่ง", image: "pet-grooming-transparent" },
+  { name: "เดย์แคร์", label: "PLAY & GROW", copy: "จัดรอบกิจกรรมและจำนวนรับรายวัน", tone: "daycare", alt: "แมวและสุนัขเล่นในพื้นที่กิจกรรมเดย์แคร์", image: "pet-daycare-transparent" },
 ] as const;
-
 export function BusinessServicesSection() {
   return (
-    <section id="services" className="business-services-section" aria-labelledby="business-services-title">
-      <div className="shell business-services-section__layout">
-        <figure className="business-services-section__visual">
-          <Image
-            src="/images/business/pet-business-services-photo.png"
-            alt="ภาพถ่ายแมวสามสีบนโต๊ะดูแลในพื้นที่บริการสัตว์เลี้ยง"
-            width={1024}
-            height={1024}
-            sizes="(max-width: 1023px) 100vw, 36vw"
-          />
-          <div className="business-services-section__visual-badge" aria-label="ภาพรวมงานบริการวันนี้">
-            <strong>วันนี้</strong>
-            <span>8 งานกำลังเดินต่อ</span>
-          </div>
-        </figure>
-
-        <div className="business-services-section__content business-section-intro">
-          <p className="business-eyebrow">ธุรกิจเดียว หลายบริการ</p>
-          <h2 id="business-services-title">ออกแบบให้เข้ากับรูปแบบร้านที่ต่างกัน</h2>
-          <p>
-            หนึ่งธุรกิจสามารถมีหลายบริการ และแต่ละสาขาเลือกเปิดบริการต่างกันได้
-            โดยยังเห็นภาพรวมจากพื้นที่ทำงานเดียวกัน
-          </p>
-
-          <ul className="business-services-list">
-            {primaryServices.map(({ icon: Icon, title, copy }) => (
-              <li key={title}>
-                <span><Icon size={24} /></span>
-                <div><h3>{title}</h3><p>{copy}</p></div>
-              </li>
-            ))}
-            <li className="business-services-list__supplemental">
-              <span><Sparkle size={24} /></span>
-              <div>
-                <h3>บริการเสริม</h3>
-                <p>Training · Transport · Retail</p>
-                <small>วางแผนไว้สำหรับอนาคต · ยังไม่เปิดใช้งาน</small>
-              </div>
-            </li>
-          </ul>
-        </div>
+    <section id="services" className="hotel-services shell" aria-labelledby="business-services-title">
+      <div className="hotel-section-heading"><div><p className="business-eyebrow">MADE FOR YOUR KIND OF CARE</p><h2 id="business-services-title">ร้านแบบไหน ก็ใส่ใจได้เต็มที่</h2></div></div>
+      <div className="hotel-services__grid">
+        {services.map(({name, label, copy, tone, alt, image}) => (
+          <article className={`hotel-service hotel-service--${tone}`} key={tone}>
+            <span className="hotel-service__label">{label}</span>
+            <div className="hotel-service__picture"><Image className="hotel-service__art clay-float" src={`/images/landing/${image}.png`} alt={alt} width={1200} height={800} sizes="(max-width: 800px) 90vw, 30vw" unoptimized /></div>
+            <h3>{name}</h3><p>{copy}</p>
+            <a href="#business-core">ดูตัวช่วยจัดการร้าน <ArrowRight size={17} /></a>
+          </article>
+        ))}
       </div>
     </section>
   );

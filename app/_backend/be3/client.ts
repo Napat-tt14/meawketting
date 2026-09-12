@@ -4,6 +4,7 @@ import {
   type Be1ApiResponse,
 } from "../be1/contracts";
 import { Be1ClientError } from "../be1/client";
+import { ensureDurableOperations } from "../be4/client";
 import {
   BE3_API_PATH,
   type AssignBookingResourcesInput,
@@ -166,11 +167,12 @@ export function checkDurableBookingAvailability(input: BookingAvailabilityInput)
   return enqueueBusinessRequest(input.businessId, () => requestBe3({ type: "booking.availability", input }));
 }
 
-function patchMutationResult(result: BookingMutationResult) {
+async function patchMutationResult(result: BookingMutationResult) {
   if (result.outcome === "conflict") {
     if (result.current) patchBe3Booking(result.current);
   } else {
     patchBe3Booking(result.booking);
+    try { await ensureDurableOperations(result.booking.businessId, result.booking.branchId, true); } catch { /* The atomic Booking/execution commit has already succeeded. */ }
   }
   return result;
 }

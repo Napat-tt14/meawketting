@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SettingsScreen } from "./SettingsScreen";
+import "./settings.css";
 
 export const metadata: Metadata = {
   title: "ตั้งค่าธุรกิจและสาขา",

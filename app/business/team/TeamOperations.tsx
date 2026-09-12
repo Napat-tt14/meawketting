@@ -1,18 +1,17 @@
 "use client";
 
+import { businessToday } from "../../_backend/shared/businessClock";
+import { formatBusinessCount, formatBusinessDate } from "../_components/businessDisplay";
+
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  BOOKING_DEMO_DATE,
   TEAM_MEMBER_CAPABILITY_LABELS,
-  createPrototypeTeamMember,
   evaluatePrototypeTeamMemberAvailability,
   getDemoBusinessContextDetails,
   getPrototypeTeamMemberWorkload,
   listPrototypeTeamMemberFixtures,
   listPrototypeTeamMembers,
   listPrototypeBusinessContexts,
-  setPrototypeTeamMemberActive,
-  updatePrototypeTeamMember,
   type PrototypeTeamMember,
   type PrototypeTeamMemberAvailabilityWindow,
   type PrototypeTeamMemberDraft,
@@ -22,6 +21,7 @@ import {
   type TeamMemberCapability,
   type TeamMemberRole,
 } from "../../_prototype/businessState";
+import { createPrototypeTeamMember, setPrototypeTeamMemberActive, updatePrototypeTeamMember } from "../../_backend/be4/facade";
 import {
   CheckCircle,
   CircleAlert,
@@ -99,14 +99,14 @@ export function TeamOperations() {
   const availabilityByStaffId = useMemo(
     () => new Map(allMembers.map((member) => [
       member.staffId,
-      evaluatePrototypeTeamMemberAvailability(member, BOOKING_DEMO_DATE),
+      evaluatePrototypeTeamMemberAvailability(member, businessToday(context)),
     ])),
-    [allMembers],
+    [allMembers, context],
   );
   const workloadByStaffId = useMemo(
     () => new Map(allMembers.map((member) => [
       member.staffId,
-      getPrototypeTeamMemberWorkload(member.staffId, context, BOOKING_DEMO_DATE, !stateReady),
+      getPrototypeTeamMemberWorkload(member.staffId, context, businessToday(context), !stateReady),
     ])),
     [allMembers, context, stateReady],
   );
@@ -135,10 +135,10 @@ export function TeamOperations() {
     return { total: allMembers.length, active: active.length, working, unavailable, attention };
   }, [allMembers, availabilityByStaffId, workloadByStaffId]);
 
-  function handleSave(draft: PrototypeTeamMemberDraft) {
+  async function handleSave(draft: PrototypeTeamMemberDraft) {
     const result = editor?.mode === "edit"
-      ? updatePrototypeTeamMember(editor.member.staffId, draft, context)
-      : createPrototypeTeamMember(draft, context);
+      ? await updatePrototypeTeamMember(editor.member.staffId, draft, context)
+      : await createPrototypeTeamMember(draft, context);
     if (!result.ok) {
       setNotice({
         tone: "critical",
@@ -155,8 +155,8 @@ export function TeamOperations() {
     });
   }
 
-  function handleActiveChange(member: PrototypeTeamMember) {
-    const result = setPrototypeTeamMemberActive(member.staffId, !member.active, context);
+  async function handleActiveChange(member: PrototypeTeamMember) {
+    const result = await setPrototypeTeamMemberActive(member.staffId, !member.active, context);
     if (!result.ok) {
       setNotice({
         tone: "critical",
@@ -176,7 +176,7 @@ export function TeamOperations() {
     <div className="business-team shell" key={context.key}>
       <BusinessPageHeader
         title="ทีม"
-        context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"} · ดูคนที่ทำงานและความพร้อมของวันนี้`}
+        context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"} · ${formatBusinessDate(businessToday(context))}`}
         actions={<button className="button button--business" type="button" onClick={() => setEditor({ mode: "create" })}><Plus size={18} />เพิ่มพนักงาน</button>}
       />
 
@@ -194,7 +194,7 @@ export function TeamOperations() {
         <SummaryCard icon={<UsersRound size={18} />} label="ทีมสาขานี้" value={summary.total} detail={`ใช้งาน ${summary.active} คน`} />
         <SummaryCard tone="working" icon={<CheckCircle size={18} />} label="พร้อมรับงาน" value={summary.working} detail="ตามความพร้อมของวันนี้" />
         <SummaryCard tone="unavailable" icon={<Clock size={18} />} label="ไม่พร้อมตอนนี้" value={summary.unavailable} detail="พัก หยุด หรือไม่อยู่ในเวลางาน" />
-        <SummaryCard tone="attention" icon={<TriangleAlert size={18} />} label="ต้องดู workload" value={summary.attention} detail="มี conflict หรือภาระงานที่ต้องตรวจ" />
+        <SummaryCard tone="attention" icon={<TriangleAlert size={18} />} label="ภาระงานที่ต้องตรวจ" value={summary.attention} detail="มีงานซ้อนหรือภาระงานที่ต้องจัดการ" />
       </section>
 
       <section className="team-directory" aria-labelledby="team-directory-title">
@@ -312,7 +312,7 @@ function SummaryCard({
   return (
     <article className={`team-summary-card${tone ? ` team-summary-card--${tone}` : ""}`}>
       <span className="team-summary-card__heading">{icon}{label}</span>
-      <strong>{value}</strong>
+      <strong>{formatBusinessCount(value)}</strong>
       <small>{detail}</small>
     </article>
   );
@@ -442,6 +442,7 @@ function TeamMemberEditor({
   onClose: () => void;
   onSave: (draft: PrototypeTeamMemberDraft) => void;
 }) {
+  const { context } = useBusinessContext();
   const nameRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(member?.name ?? "");
   const [role, setRole] = useState<TeamMemberRole>(member?.role ?? "staff");
@@ -449,7 +450,7 @@ function TeamMemberEditor({
   const [capabilities, setCapabilities] = useState<TeamMemberCapability[]>(member?.capabilities ?? []);
   const [active, setActive] = useState(member?.active ?? true);
   const [availability, setAvailability] = useState<PrototypeTeamMemberAvailabilityWindow[]>(() => (
-    member?.availability.map((item) => ({ ...item })) ?? [newAvailabilityWindow(0)]
+    member?.availability.map((item) => ({ ...item })) ?? [newAvailabilityWindow(0, context)]
   ));
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -545,7 +546,7 @@ function TeamMemberEditor({
               <button type="button" aria-label={`ลบช่วงเวลาที่ ${index + 1}`} onClick={() => setAvailability((current) => current.filter((_, itemIndex) => itemIndex !== index))}><CircleOff size={18} /></button>
             </div>
           ))}
-          <button className="team-editor__add-availability" type="button" onClick={() => setAvailability((current) => [...current, newAvailabilityWindow(current.length)])}><Plus size={16} />เพิ่มช่วงเวลา</button>
+          <button className="team-editor__add-availability" type="button" onClick={() => setAvailability((current) => [...current, newAvailabilityWindow(current.length, context)])}><Plus size={16} />เพิ่มช่วงเวลา</button>
         </section>
 
         <label className="team-editor__active"><input type="checkbox" checked={active} onChange={(event) => setActive(event.currentTarget.checked)} />เปิดใช้งานพนักงานคนนี้สำหรับงานใหม่</label>
@@ -565,12 +566,12 @@ function getBusinessBranchOptions(businessId: string, fixtureOnly = false): Bran
   return [...options.values()];
 }
 
-function newAvailabilityWindow(index: number): PrototypeTeamMemberAvailabilityWindow {
+function newAvailabilityWindow(index: number, context: { businessId: string; branchId: string }): PrototypeTeamMemberAvailabilityWindow {
   return {
     id: `team-ui-availability-${Date.now()}-${index}`,
     state: "working",
-    start: `${BOOKING_DEMO_DATE}T08:00`,
-    end: `${BOOKING_DEMO_DATE}T18:00`,
+    start: `${businessToday(context)}T08:00`,
+    end: `${businessToday(context)}T18:00`,
     note: null,
   };
 }

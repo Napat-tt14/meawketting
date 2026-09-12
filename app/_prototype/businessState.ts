@@ -1,4 +1,5 @@
 import type { ShareableScopeKey, TemporaryAccess } from "./sharingState";
+import { readReport } from "../_backend/be8/client";
 import {
   addAccessEvent,
   BUSINESS_FIXTURES,
@@ -42,6 +43,11 @@ import {
   readBe3ResourceByStableId,
 } from "../_backend/be3/bookingCache";
 import { readNonAuthoritativePassportCompatibility } from "./be2PassportCompatibility";
+import { BUSINESS_FIXTURE_TEST_MODE } from "./fixtureRuntime";
+import { readExecutions, readOperationDirectory, readOperationStaff, readServiceRecords } from "../_backend/be4/operationsCache";
+import { readAllFinancialDirectories, readFinancialDirectory } from "../_backend/be7/client";
+import { dateInZone } from "../_backend/shared/time";
+import { businessTimezone } from "../_backend/shared/businessClock";
 
 export type DemoBusinessContext = {
   key: string;
@@ -2296,7 +2302,7 @@ export type CorrectionSuggestion = {
   suggestedValue: string;
   note: string;
   submittedAt: string;
-  status: "submitted-prototype";
+  status: "submitted" | "submitted-prototype";
 };
 
 export type BusinessIntakeRecord = {
@@ -2377,30 +2383,29 @@ function readStore(): BusinessStore {
     const parsed = JSON.parse(raw) as Partial<BusinessStore>;
     return {
       activeContextKey: typeof parsed.activeContextKey === "string" ? parsed.activeContextKey : DEFAULT_BUSINESS_CONTEXT_KEY,
-      intakes: parsed.intakes && typeof parsed.intakes === "object" && !Array.isArray(parsed.intakes) ? parsed.intakes : {},
+      intakes: BUSINESS_FIXTURE_TEST_MODE && parsed.intakes && typeof parsed.intakes === "object" && !Array.isArray(parsed.intakes) ? parsed.intakes : {},
       // BF-9 is additive; a BF-1–BF-8 browser session has no Team slice until
       // the first Team mutation and therefore remains compatible.
-      teamMembers: parsed.teamMembers && typeof parsed.teamMembers === "object" && !Array.isArray(parsed.teamMembers) ? parsed.teamMembers : {},
+      teamMembers: BUSINESS_FIXTURE_TEST_MODE && parsed.teamMembers && typeof parsed.teamMembers === "object" && !Array.isArray(parsed.teamMembers) ? parsed.teamMembers : {},
       // BE3 has no browser backfill. A pre-BE3 session Booking is deliberately
       // ignored instead of being merged into the durable D1 directory.
       bookings: {},
       // BF-5 extends the same local Business envelope. Existing BF-1–BF-4
       // tabs keep their state when no Service Job slice exists yet.
-      serviceJobs: parsed.serviceJobs && typeof parsed.serviceJobs === "object" && !Array.isArray(parsed.serviceJobs) ? parsed.serviceJobs : {},
+      serviceJobs: BUSINESS_FIXTURE_TEST_MODE && parsed.serviceJobs && typeof parsed.serviceJobs === "object" && !Array.isArray(parsed.serviceJobs) ? parsed.serviceJobs : {},
       // BF-6 uses the same envelope for Hotel execution. Existing browser
       // tabs remain compatible until their first Hotel mutation.
-      hotelStays: parsed.hotelStays && typeof parsed.hotelStays === "object" && !Array.isArray(parsed.hotelStays) ? parsed.hotelStays : {},
-      daycareAttendances: parsed.daycareAttendances && typeof parsed.daycareAttendances === "object" && !Array.isArray(parsed.daycareAttendances) ? parsed.daycareAttendances : {},
+      hotelStays: BUSINESS_FIXTURE_TEST_MODE && parsed.hotelStays && typeof parsed.hotelStays === "object" && !Array.isArray(parsed.hotelStays) ? parsed.hotelStays : {},
+      daycareAttendances: BUSINESS_FIXTURE_TEST_MODE && parsed.daycareAttendances && typeof parsed.daycareAttendances === "object" && !Array.isArray(parsed.daycareAttendances) ? parsed.daycareAttendances : {},
       // BE2 intentionally ignores the former browser Customer/Pet slice. It is
       // neither backfilled nor overlaid onto server-authoritative identities.
       customers: {},
-      // BF-7 keeps financial records in the same local envelope. Older tabs
-      // remain readable until their first Billing mutation.
-      charges: parsed.charges && typeof parsed.charges === "object" && !Array.isArray(parsed.charges) ? parsed.charges : {},
-      payments: parsed.payments && typeof parsed.payments === "object" && !Array.isArray(parsed.payments) ? parsed.payments : {},
+      // BE7 never reads or imports browser financial records into runtime truth.
+      charges: BUSINESS_FIXTURE_TEST_MODE && parsed.charges && typeof parsed.charges === "object" && !Array.isArray(parsed.charges) ? parsed.charges : {},
+      payments: BUSINESS_FIXTURE_TEST_MODE && parsed.payments && typeof parsed.payments === "object" && !Array.isArray(parsed.payments) ? parsed.payments : {},
       // BF-8 is an additive Service Record slice. BF-1–BF-7 browser sessions
       // keep their existing local state when no record exists yet.
-      serviceRecords: parsed.serviceRecords && typeof parsed.serviceRecords === "object" && !Array.isArray(parsed.serviceRecords) ? parsed.serviceRecords : {},
+      serviceRecords: BUSINESS_FIXTURE_TEST_MODE && parsed.serviceRecords && typeof parsed.serviceRecords === "object" && !Array.isArray(parsed.serviceRecords) ? parsed.serviceRecords : {},
     };
   } catch {
     return emptyStore();
@@ -2412,7 +2417,8 @@ function writeStore(store: BusinessStore) {
   try {
     // Keep migrated identity/planning slices empty while remaining BE4+
     // browser-local execution domains retain only stable BE2/BE3 references.
-    window.sessionStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify({ ...store, customers: {}, bookings: {} }));
+    window.sessionStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify({ ...store, customers: {}, bookings: {},
+      ...(!BUSINESS_FIXTURE_TEST_MODE ? { intakes: {}, teamMembers: {}, serviceJobs: {}, hotelStays: {}, daycareAttendances: {}, serviceRecords: {}, charges: {}, payments: {} } : {}) }));
     window.dispatchEvent(new CustomEvent("meawketting:business-state"));
     return true;
   } catch {
@@ -3049,6 +3055,7 @@ function isPrototypeTeamMember(value: unknown): value is PrototypeTeamMember {
 }
 
 function mergedPrototypeTeamMembers(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readOperationStaff().map(clonePrototypeTeamMember);
   const members = new Map<string, PrototypeTeamMember>();
   for (const fixture of DEMO_TEAM_MEMBER_FIXTURES) members.set(fixture.staffId, clonePrototypeTeamMember(fixture));
   for (const stored of Object.values(store.teamMembers)) {
@@ -3077,7 +3084,7 @@ export function listPrototypeTeamMemberFixtures(
   context?: DemoBusinessContext | null,
   options: ListPrototypeTeamMembersOptions = {},
 ) {
-  return filterAndSortPrototypeTeamMembers(DEMO_TEAM_MEMBER_FIXTURES.map(clonePrototypeTeamMember), context, options);
+  return filterAndSortPrototypeTeamMembers(BUSINESS_FIXTURE_TEST_MODE ? DEMO_TEAM_MEMBER_FIXTURES.map(clonePrototypeTeamMember) : readOperationStaff(), context, options);
 }
 
 export function listPrototypeTeamMembers(
@@ -3797,6 +3804,7 @@ function buildGroomingServiceJobFromBooking(
 }
 
 function mergedPrototypeServiceJobs(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readExecutions().flatMap((e) => e.kind === "grooming" ? [clonePrototypeServiceJob(e.record)] : []);
   const jobs = new Map<string, PrototypeServiceJob>();
   for (const fixture of DEMO_GROOMING_SERVICE_JOB_FIXTURES) jobs.set(fixture.serviceJobId, clonePrototypeServiceJob(fixture));
   for (const stored of Object.values(store.serviceJobs)) {
@@ -4034,7 +4042,7 @@ export function evaluatePrototypeGroomingServiceJobResources(
       continue;
     }
     const overlapping = sourceJobs.filter((candidate) => {
-      if (candidate.serviceJobId === job.serviceJobId || candidate.status === "cancelled") return false;
+      if (candidate.bookingId === job.bookingId || candidate.serviceJobId === job.serviceJobId || candidate.status === "cancelled") return false;
       if (!candidate.assignedResourceIds.includes(resourceId)) return false;
       const candidateInterval = getBookingInterval("appointment", candidate.scheduledStart, candidate.scheduledEnd);
       return Boolean(candidateInterval && bookingIntervalsOverlap(currentInterval, candidateInterval));
@@ -4377,6 +4385,7 @@ function buildHotelStayFromBooking(booking: PrototypeBooking, pet: DemoBookingPe
 }
 
 function mergedPrototypeHotelStays(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readExecutions().flatMap((e) => e.kind === "hotel" ? [clonePrototypeHotelStay(e.record)] : []);
   const stays = new Map<string, PrototypeHotelStay>();
   for (const fixture of DEMO_HOTEL_STAY_FIXTURES) stays.set(fixture.hotelStayId, clonePrototypeHotelStay(fixture));
   for (const stored of Object.values(store.hotelStays)) {
@@ -4598,6 +4607,7 @@ export function findPrototypeHotelStayForBooking(bookingId: string, petId?: stri
 }
 
 export function getHotelRooms(context: DemoBusinessContext, fixtureOnly = false) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readOperationDirectory(context.businessId, context.branchId)?.rooms ?? [];
   // Physical room/zone assignment is explicitly BE4-local. BE3 exposes only
   // the aggregate planning-capacity resource, so keep this isolated fixture
   // adapter instead of treating execution rooms as durable scheduling truth.
@@ -5268,6 +5278,7 @@ function buildDaycareAttendanceFromBooking(booking: PrototypeBooking, pet: DemoB
 }
 
 function mergedPrototypeDaycareAttendances(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readExecutions().flatMap((e) => e.kind === "daycare" ? [clonePrototypeDaycareAttendance(e.record)] : []);
   const attendances = new Map<string, PrototypeDaycareAttendance>();
   for (const fixture of DEMO_DAYCARE_ATTENDANCE_FIXTURES) attendances.set(fixture.daycareAttendanceId, clonePrototypeDaycareAttendance(fixture));
   for (const stored of Object.values(store.daycareAttendances)) {
@@ -5668,6 +5679,7 @@ function isPrototypePayment(value: unknown): value is PrototypePayment {
 }
 
 function mergedPrototypeCharges(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readAllFinancialDirectories().flatMap((d) => d.balances.map((b) => b.charge));
   const charges = new Map<string, PrototypeCharge>();
   for (const fixture of DEMO_BILLING_CHARGE_FIXTURES) charges.set(fixture.chargeId, clonePrototypeCharge(fixture));
   for (const stored of Object.values(store.charges)) {
@@ -5677,6 +5689,7 @@ function mergedPrototypeCharges(store: BusinessStore) {
 }
 
 function mergedPrototypePayments(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readAllFinancialDirectories().flatMap((d) => d.payments);
   const payments = new Map<string, PrototypePayment>();
   for (const fixture of DEMO_BILLING_PAYMENT_FIXTURES) payments.set(fixture.paymentId, clonePrototypePayment(fixture));
   for (const stored of Object.values(store.payments)) {
@@ -5708,6 +5721,7 @@ function sortPrototypePayments(payments: readonly PrototypePayment[], context?: 
 }
 
 export function listPrototypeChargeFixtures(context?: DemoBusinessContext | null) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   return sortPrototypeCharges(mergedPrototypeCharges(emptyStore()), context);
 }
 
@@ -5720,6 +5734,7 @@ export function readPrototypeCharge(chargeId: string) {
 }
 
 export function listPrototypePaymentFixtures(context?: DemoBusinessContext | null) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   return sortPrototypePayments(mergedPrototypePayments(emptyStore()), context);
 }
 
@@ -5737,6 +5752,11 @@ export function getPrototypeChargeBalance(
   charge: PrototypeCharge,
   payments: readonly PrototypePayment[] = listPrototypePayments(null),
 ): PrototypeChargeBalance {
+  if (!BUSINESS_FIXTURE_TEST_MODE) {
+    const balance = readFinancialDirectory(charge.businessId, charge.branchId)?.balances.find((b) => b.charge.chargeId === charge.chargeId);
+    if (balance) return balance;
+    return { charge, total: 0, paid: 0, remaining: 0, status: "unpaid", paymentCount: 0 };
+  }
   const total = Math.max(0, charge.lineItems.reduce((sum, line) => sum + line.amount, 0));
   const paid = Math.min(total, allocatedPaymentAmountForCharge(charge.chargeId, payments));
   const remaining = charge.cancelledAt ? 0 : Math.max(0, total - paid);
@@ -5777,11 +5797,12 @@ export function getPrototypeRevenueSummary(
   date: string = BOOKING_DEMO_DATE,
   fixtureOnly = false,
 ): PrototypeRevenueSummary {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readReport(context, date === dateInZone(new Date(), businessTimezone(context)) ? {} : { dateRangePreset: "custom", customStartDate: date, customEndDate: date }).revenueSummary;
   const charges = fixtureOnly ? listPrototypeChargeFixtures(context) : listPrototypeCharges(context);
   const payments = fixtureOnly ? listPrototypePaymentFixtures(context) : listPrototypePayments(context);
   const balances = charges.map((charge) => getPrototypeChargeBalance(charge, payments));
   const chargesById = new Map(charges.map((charge) => [charge.chargeId, charge]));
-  const paymentsToday = payments.filter((payment) => payment.recordedAt.slice(0, 10) === date);
+  const paymentsToday = payments.filter((payment) => (BUSINESS_FIXTURE_TEST_MODE ? payment.recordedAt.slice(0, 10) : dateInZone(payment.recordedAt, businessTimezone(context))) === date);
   const breakdownByModule = new Map<BusinessServiceModule, PrototypeRevenueBreakdown>();
   for (const payment of paymentsToday) {
     for (const allocation of payment.allocations) {
@@ -5904,6 +5925,7 @@ export function getOrCreatePrototypeChargeForGroomingJob(
   serviceJobId: string,
   context: DemoBusinessContext,
 ): GetOrCreatePrototypeChargeResult {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { ok: false, reason: "storage" };
   const store = readStore();
   const job = mergedPrototypeServiceJobs(store).find((item) => item.serviceJobId === serviceJobId) ?? null;
   if (!job) return { ok: false, reason: "missing" };
@@ -5925,6 +5947,7 @@ export function getOrCreatePrototypeChargeForHotelStay(
   hotelStayId: string,
   context: DemoBusinessContext,
 ): GetOrCreatePrototypeChargeResult {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { ok: false, reason: "storage" };
   const store = readStore();
   const stay = mergedPrototypeHotelStays(store).find((item) => item.hotelStayId === hotelStayId) ?? null;
   if (!stay) return { ok: false, reason: "missing" };
@@ -5943,6 +5966,7 @@ export function getOrCreatePrototypeChargeForDaycareAttendance(
   daycareAttendanceId: string,
   context: DemoBusinessContext,
 ): GetOrCreatePrototypeChargeResult {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { ok: false, reason: "storage" };
   const store = readStore();
   const attendance = mergedPrototypeDaycareAttendances(store).find((item) => item.daycareAttendanceId === daycareAttendanceId) ?? null;
   if (!attendance) return { ok: false, reason: "missing" };
@@ -5974,6 +5998,7 @@ export function addPrototypeChargeAdjustment(input: {
   amount: number;
   reason: string;
 }) : AddPrototypeChargeAdjustmentResult {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { ok: false, reason: "storage" };
   const label = input.label.trim();
   const reason = input.reason.trim();
   const normalizedAmount = Math.round(input.amount);
@@ -6016,6 +6041,7 @@ export function cancelPrototypeCharge(
   reason: string,
   context: DemoBusinessContext,
 ): CancelPrototypeChargeResult {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { ok: false, reason: "storage" };
   const normalizedReason = reason.trim();
   if (!normalizedReason) return { ok: false, reason: "invalid" };
   const store = readStore();
@@ -6049,6 +6075,7 @@ export function recordPrototypePayment(input: {
   requestKey: string;
   recordedAt?: string;
 }): RecordPrototypePaymentResult {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { ok: false, reason: "storage" };
   const requestKey = input.requestKey.trim();
   const amount = Math.round(input.amount);
   if (!requestKey || !isPrototypePaymentMethod(input.method) || !Number.isFinite(input.amount) || !Number.isInteger(input.amount) || amount <= 0) return { ok: false, reason: "invalid" };
@@ -6513,6 +6540,7 @@ function buildPrototypeServiceRecordFromDaycareAttendance(
 }
 
 function mergedPrototypeServiceRecords(store: BusinessStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readServiceRecords().map(clonePrototypeServiceRecord);
   const records = new Map<string, PrototypeServiceRecord>();
   for (const stored of Object.values(store.serviceRecords)) {
     if (isPrototypeServiceRecord(stored)) records.set(stored.serviceRecordId, clonePrototypeServiceRecord(stored));
@@ -6937,6 +6965,7 @@ function synchronizePrototypeHotelStaysForBooking(store: BusinessStore, booking:
  * cannot become planning truth. Call only with an authoritative BE3 result.
  */
 export function synchronizePrototypeExecutionCompatibilityForBooking(booking: PrototypeBooking) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return true; // BE3 and BE4 already committed atomically.
   const store = readStore();
   const now = booking.updatedAt || new Date().toISOString();
   synchronizePrototypeGroomingJobsForBooking(store, booking, now);
@@ -6946,6 +6975,7 @@ export function synchronizePrototypeExecutionCompatibilityForBooking(booking: Pr
 }
 
 export function getBusinessHomeDemo(context: DemoBusinessContext) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return { today: { waitingIntake: readReport(context).waitingIntake, readyForPickup: 0 }, attention: [], moduleSummaries: {} } as BusinessHomeDemo;
   return DEMO_BUSINESS_HOME[context.key] ?? DEMO_BUSINESS_HOME[DEFAULT_BUSINESS_CONTEXT_KEY];
 }
 
@@ -6965,7 +6995,7 @@ export function detectQrContract(value: string): QrContractType {
   const upper = normalized.toUpperCase();
   if (/\/quick-passport\//i.test(normalized) || upper.startsWith("QUICK-PASSPORT")) return "quick-passport";
   if (/\/safety\//i.test(normalized) || upper.startsWith("PUBLIC-SAFETY")) return "public-safety";
-  if (/\/temporary-access\//i.test(normalized) || upper.startsWith("DEMO-TEMP-")) return "temporary-business";
+  if (/\/temporary-access\//i.test(normalized) || /^tb_[A-Za-z0-9_-]{43}$/.test(normalized) || (BUSINESS_FIXTURE_TEST_MODE && upper.startsWith("DEMO-TEMP-"))) return "temporary-business";
   return "unknown";
 }
 
@@ -7426,6 +7456,7 @@ export function getBusinessReportsSummary(
   context: DemoBusinessContext,
   options: GetBusinessReportsOptions = {},
 ): BusinessReportsSummary {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return readReport(context, options);
   const {
     dateRangePreset = "today",
     customStartDate,

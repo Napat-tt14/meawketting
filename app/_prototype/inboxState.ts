@@ -1,11 +1,14 @@
 import {
   DEMO_BUSINESS_CONTEXTS,
+  readActiveBusinessContext as readDemoBusinessContext,
   applyPrototypeApprovedGroomingAddOn,
   type DemoBusinessContext,
   readPrototypeBooking,
   readPrototypeCustomer,
   readPrototypeGroomingServiceJob,
 } from "./businessState";
+import { BUSINESS_FIXTURE_TEST_MODE } from "./fixtureRuntime";
+import { readInboxDirectory } from "../_backend/be6/client";
 
 // BF-4 stores only Business communication records and opaque relationship
 // references. Customer, Pet, Booking, Branch, and Passport data stay in their
@@ -13,7 +16,7 @@ import {
 export const INBOX_STORAGE_KEY = "meawketting:business-inbox:prototype-v1";
 
 export type PrototypeMessageDirection = "business" | "customer";
-export type PrototypeMessageDeliveryState = "local-sent" | "local-read" | null;
+export type PrototypeMessageDeliveryState = "local-sent" | "local-read" | "not-connected" | "queued" | "sent" | "test-sent" | "failed" | null;
 export type PrototypeStructuredRequestStatus = "waiting" | "approved" | "declined" | "cancelled" | "expired";
 
 type PrototypeMessageBase = {
@@ -42,7 +45,7 @@ export type PrototypeAddServiceRequestMessage = PrototypeMessageBase & {
   note: string;
   requestStatus: PrototypeStructuredRequestStatus;
   respondedAt: string | null;
-  responseSource: "guardian-local-preview" | null;
+  responseSource: "guardian-local-preview" | "verified-guardian" | "dev-test-guardian" | null;
 };
 
 export type PrototypeInboxMessage = PrototypeTextMessage | PrototypeAddServiceRequestMessage;
@@ -310,7 +313,7 @@ function isPrototypeConversation(value: unknown): value is PrototypeConversation
 }
 
 function readInboxStore(): PrototypeInboxStore {
-  if (typeof window === "undefined") return emptyInboxStore();
+  if (!BUSINESS_FIXTURE_TEST_MODE || typeof window === "undefined") return emptyInboxStore();
   try {
     const raw = window.sessionStorage.getItem(INBOX_STORAGE_KEY);
     if (!raw) return emptyInboxStore();
@@ -326,7 +329,7 @@ function readInboxStore(): PrototypeInboxStore {
 }
 
 function writeInboxStore(store: PrototypeInboxStore) {
-  if (typeof window === "undefined") return false;
+  if (!BUSINESS_FIXTURE_TEST_MODE || typeof window === "undefined") return false;
   try {
     window.sessionStorage.setItem(INBOX_STORAGE_KEY, JSON.stringify(store));
     window.dispatchEvent(new CustomEvent("meawketting:business-state"));
@@ -337,6 +340,9 @@ function writeInboxStore(store: PrototypeInboxStore) {
 }
 
 function mergedPrototypeConversations(store: PrototypeInboxStore) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) {
+    const context = readDemoBusinessContext(); return readInboxDirectory(context.businessId, context.branchId);
+  }
   const conversations = new Map<string, PrototypeConversation>();
   for (const fixture of DEMO_CONVERSATION_FIXTURES) conversations.set(fixture.conversationId, clonePrototypeConversation(fixture));
   for (const stored of Object.values(store.conversations)) {
@@ -353,12 +359,14 @@ export function filterPrototypeConversationsForBusiness(conversations: readonly 
 }
 
 export function listPrototypeConversationFixtures(contextOrBusinessId: DemoBusinessContext | string) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   const businessId = typeof contextOrBusinessId === "string" ? contextOrBusinessId : contextOrBusinessId.businessId;
   return filterPrototypeConversationsForBusiness(DEMO_CONVERSATION_FIXTURES, businessId);
 }
 
 export function listPrototypeConversations(contextOrBusinessId: DemoBusinessContext | string) {
   const businessId = typeof contextOrBusinessId === "string" ? contextOrBusinessId : contextOrBusinessId.businessId;
+  if (!BUSINESS_FIXTURE_TEST_MODE) return filterPrototypeConversationsForBusiness(readInboxDirectory(businessId, typeof contextOrBusinessId === "string" ? readDemoBusinessContext().branchId : contextOrBusinessId.branchId), businessId);
   return filterPrototypeConversationsForBusiness(mergedPrototypeConversations(readInboxStore()), businessId);
 }
 

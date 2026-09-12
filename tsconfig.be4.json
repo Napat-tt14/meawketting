@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.be3.json",
+  "include": [
+    "next-env.d.ts", "worker-configuration.d.ts", "app/_backend/**/*.ts",
+    "app/api/**/*.ts", "db/**/*.ts", "worker/**/*.ts", "vite.config.ts",
+    "drizzle.config.ts", "tests/be4.test.ts", "app/business/grooming/GroomingOperations.tsx",
+    "app/business/grooming/GroomingJobDetail.tsx", "app/business/hotel/HotelOperations.tsx",
+    "app/business/hotel/HotelStayDetail.tsx", "app/business/daycare/DaycareAttendanceDetail.tsx",
+    "app/business/team/TeamOperations.tsx", "app/business/_components/BusinessPortalFrame.tsx"
+  ],
+  "exclude": ["node_modules", "workfiledesign"]
+}

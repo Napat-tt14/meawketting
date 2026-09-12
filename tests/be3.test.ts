@@ -18,6 +18,7 @@ const migrations = readdirSync(resolve(projectRoot, "drizzle")).filter((name) =>
 const be1Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be1-dev.sql"), "utf8");
 const be2Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be2-dev.sql"), "utf8");
 const be3Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be3-dev.sql"), "utf8");
+const be4Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be4-dev.sql"), "utf8");
 
 const OWNER = "prs_01k47meawketting000000001";
 const MANAGER = "prs_01k47meawketting000000002";
@@ -103,6 +104,7 @@ function fixture(file?: string) {
   sqlite.exec(be1Seed);
   sqlite.exec(be2Seed);
   sqlite.exec(be3Seed);
+  sqlite.exec(be4Seed);
   const database = new NodeD1Database(sqlite);
   return { sqlite, database, ...applicationFor(database) };
 }

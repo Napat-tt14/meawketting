@@ -266,14 +266,20 @@ export function SettingsScreen() {
         context={`${details.business?.name ?? "ร้าน"} · จัดการข้อมูลร้าน สาขา และบริการที่เปิดใช้`}
       />
 
+      <div className="settings-layout">
+      <aside className="settings-rail">
+      <span className="settings-rail__label">พื้นที่จัดการร้าน</span>
       <nav className="settings-section-nav" aria-label="ส่วนการตั้งค่า">
         <button type="button" className={section === "profile" ? "is-active" : ""} aria-current={section === "profile" ? "page" : undefined} onClick={() => selectSection("profile")}>
-          <Settings size={19} />ข้อมูลร้าน
+          <Settings size={19} /><span className="settings-nav-copy"><strong>ข้อมูลร้าน</strong><small>ชื่อ โลโก้ และผู้ติดต่อ</small></span>
         </button>
         <button type="button" className={section === "branches" ? "is-active" : ""} aria-current={section === "branches" ? "page" : undefined} onClick={() => selectSection("branches")}>
-          <Storefront size={19} />สาขา <span>{branches.length}</span>
+          <Storefront size={19} /><span className="settings-nav-copy"><strong>สาขา <span>{branches.length}</span></strong><small>บริการและเวลาทำการ</small></span>
         </button>
       </nav>
+      <div className="settings-rail__note"><h2>ตั้งค่าให้ตรงกับหน้าร้าน</h2><p>ข้อมูลร้านใช้ร่วมกันทุกสาขา ส่วนบริการและเวลาทำการกำหนดแยกในแต่ละสาขา</p><a href="/business/team">จัดการทีมงาน <ChevronRight size={16} /></a></div>
+      </aside>
+      <div className="settings-content">
 
       {currentNotice ? <BusinessAlert tone={currentNotice.tone} title={currentNotice.title} className="business-settings__notice"><p>{currentNotice.detail}</p></BusinessAlert> : null}
 
@@ -302,6 +308,8 @@ export function SettingsScreen() {
           ) : null}
         </section>
       )}
+      </div>
+      </div>
     </div>
   );
 }

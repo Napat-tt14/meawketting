@@ -2,24 +2,20 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
-  BILLING_DEMO_NOW,
-  BOOKING_DEMO_DATE,
-  addPrototypeChargeAdjustment,
-  cancelPrototypeCharge,
-  getOrCreatePrototypeChargeForGroomingJob,
-  getOrCreatePrototypeChargeForDaycareAttendance,
-  getOrCreatePrototypeChargeForHotelStay,
   getPrototypeRevenueSummary,
   listPrototypeChargeBalances,
   listPrototypePaymentFixtures,
   listPrototypePayments,
-  recordPrototypePayment,
   readPrototypeCustomer,
   type PrototypeChargeBalance,
   type PrototypeChargeStatus,
   type PrototypePaymentMethod,
 } from "../../_prototype/businessState";
-import { ensurePrototypeConversation, sendPrototypeTextMessage } from "../../_prototype/inboxState";
+import { businessToday, businessTimezone } from "../../_backend/shared/businessClock";
+import { ensureDurableReport } from "../../_backend/be8/client";
+import { adjustDurableCharge as addPrototypeChargeAdjustment, cancelDurableCharge as cancelPrototypeCharge, checkoutDurableCharge,
+  recordDurablePayment as recordPrototypePayment, ensureDurableBilling, readFinancialDirectory, canManageFinance } from "../../_backend/be7/client";
+import { ensureDurableConversation as ensurePrototypeConversation, sendDurableTextMessage as sendPrototypeTextMessage } from "../../_backend/be6/client";
 import {
   CheckCircle,
   CircleAlert,
@@ -35,6 +31,7 @@ import { BusinessDataTable } from "../_components/BusinessDataTable";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { BusinessModal } from "../_components/BusinessModal";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { formatBusinessCount, formatBusinessDate } from "../_components/businessDisplay";
 import { BusinessSegmentedControl } from "../_components/BusinessSegmentedControl";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
 import {
@@ -139,27 +136,39 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
   const handledLaunchRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const formRevision = useRef<number | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
   void revision;
 
-  const billingReady = stateReady && isContextReady;
+  const { businessId, branchId } = context;
+  const billingReady = stateReady && isContextReady && readFinancialDirectory(businessId, branchId) !== null;
   const balances = listPrototypeChargeBalances(context, !billingReady);
-  const revenue = getPrototypeRevenueSummary(context, BOOKING_DEMO_DATE, !billingReady);
+  const revenue = getPrototypeRevenueSummary(context, businessToday(context), !billingReady);
   const payments = billingReady ? listPrototypePayments(context) : listPrototypePaymentFixtures(context);
   const selected = balances.find((item) => item.charge.chargeId === selectedChargeId) ?? null;
+  const financialDirectory = readFinancialDirectory(businessId, branchId);
+  const collectible = financialDirectory?.balances.find((b) => b.charge.chargeId === selectedChargeId)?.availableToCollect ?? selected?.remaining ?? 0;
   const visibleBalances = balances.filter((balance) => filter === "all" || balance.status === filter);
 
   useEffect(() => {
+    if (!stateReady || !isContextReady) return;
+    let stopped = false;
+    const load = async () => {
+      try { await ensureDurableBilling(businessId, branchId, true); await ensureDurableReport({ businessId, branchId }); if (!stopped) setNotice((old) => old?.title === "โหลดการเงินล่าสุดไม่สำเร็จ" ? null : old); }
+      catch { if (!stopped) setNotice({ tone: "critical", title: "โหลดการเงินล่าสุดไม่สำเร็จ", detail: "กรุณาลองโหลดหน้าอีกครั้ง" }); }
+    };
+    void load(); const timer = window.setInterval(() => void load(), 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [businessId, branchId, stateReady, isContextReady]);
+
+  useEffect(() => {
     if (!billingReady || !launchRequest || handledLaunchRef.current === launchRequest.key) return;
-    const timer = window.setTimeout(() => {
+    const timer = window.setTimeout(async () => {
       if (handledLaunchRef.current === launchRequest.key) return;
       handledLaunchRef.current = launchRequest.key;
-      const result = launchRequest.serviceJobId
-        ? getOrCreatePrototypeChargeForGroomingJob(launchRequest.serviceJobId, context)
-        : launchRequest.hotelStayId
-          ? getOrCreatePrototypeChargeForHotelStay(launchRequest.hotelStayId, context)
-          : launchRequest.daycareAttendanceId
-            ? getOrCreatePrototypeChargeForDaycareAttendance(launchRequest.daycareAttendanceId, context)
-            : null;
+      const executionId = launchRequest.serviceJobId ?? launchRequest.hotelStayId ?? launchRequest.daycareAttendanceId;
+      const result = executionId ? await checkoutDurableCharge(executionId, { businessId, branchId }) : null;
       if (result?.ok) {
         setSelectedChargeId(result.charge.chargeId);
         setMode("review");
@@ -174,13 +183,13 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         setNotice({ tone: "critical", title: "เปิด Checkout ไม่ได้", detail: result.reason === "wrong-context" ? "งานนี้ไม่ได้อยู่ในสาขาปัจจุบัน" : result.reason === "invalid-amount" ? "ยอดบริการต้องเป็นจำนวนเต็มบาทก่อน Checkout" : "ไม่พบรายการบริการที่พร้อมสร้างยอด" });
         return;
       }
-      if (launchRequest.chargeId && balances.some((balance) => balance.charge.chargeId === launchRequest.chargeId)) {
+      if (launchRequest.chargeId && readFinancialDirectory(businessId, branchId)?.balances.some((balance) => balance.charge.chargeId === launchRequest.chargeId)) {
         setSelectedChargeId(launchRequest.chargeId);
         setMode("review");
       }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [balances, billingReady, context, launchRequest]);
+  }, [businessId, branchId, billingReady, launchRequest]);
 
   function openCharge(balance: PrototypeChargeBalance) {
     setSelectedChargeId(balance.charge.chargeId);
@@ -195,28 +204,36 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
 
   function beginPayment() {
     if (!selected) return;
-    setPaymentAmount(String(selected.remaining));
+    beginFinancialForm("payment");
+    setPaymentAmount(String(collectible));
     setPaymentMethod("cash");
     setPaymentNote("");
     setPaymentKey(localPaymentKey(selected.charge.chargeId));
-    setMode("payment");
   }
 
-  function submitPayment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function beginFinancialForm(next: "payment" | "adjustment" | "cancel") {
     if (!selected) return;
-    const result = recordPrototypePayment({
+    formRevision.current = readFinancialDirectory(businessId, branchId)?.balances.find((b) => b.charge.chargeId === selected.charge.chargeId)?.charge.revision;
+    setMode(next);
+  }
+
+  async function submitPayment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || savingRef.current) return;
+    savingRef.current = true; setSaving(true);
+    const result = await recordPrototypePayment({
       chargeId: selected.charge.chargeId,
       context,
       amount: Number(paymentAmount),
       method: paymentMethod,
       note: paymentNote,
       requestKey: paymentKey,
-      recordedAt: BILLING_DEMO_NOW,
+      expectedRevision: formRevision.current,
     });
+    savingRef.current = false; setSaving(false);
     if (!result.ok) {
-      const detail = result.reason === "overpayment"
-        ? `ยอดที่รับได้สูงสุดคือ ${formatBusinessMoney(selected.remaining)}`
+      const detail = result.reason === "version-conflict" ? "ยอดเปลี่ยนจากอีกหน้าต่างแล้ว กลับไปตรวจยอดล่าสุดก่อนรับชำระ" : result.reason === "overpayment"
+        ? `ยอดที่รับได้สูงสุดคือ ${formatBusinessMoney(collectible)}`
         : result.reason === "cancelled"
           ? "ยอดนี้ถูกยกเลิกแล้ว จึงบันทึกรับชำระไม่ได้"
           : "ตรวจยอดและวิธีชำระเงินก่อนบันทึกอีกครั้ง";
@@ -227,19 +244,22 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
     setNotice({ tone: "success", title: result.duplicate ? "รายการชำระนี้ถูกบันทึกไว้แล้ว" : "บันทึกการรับชำระแล้ว", detail: "สถานะยอดคำนวณจากการจัดสรรเงินชำระในรายการนี้" });
   }
 
-  function submitAdjustment(event: FormEvent<HTMLFormElement>) {
+  async function submitAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected) return;
-    const result = addPrototypeChargeAdjustment({
+    if (!selected || savingRef.current) return;
+    savingRef.current = true; setSaving(true);
+    const result = await addPrototypeChargeAdjustment({
       chargeId: selected.charge.chargeId,
       context,
       kind: adjustmentKind,
       label: adjustmentLabel,
       amount: Number(adjustmentAmount),
       reason: adjustmentReason,
+      expectedRevision: formRevision.current,
     });
+    savingRef.current = false; setSaving(false);
     if (!result.ok) {
-      const detail = result.reason === "invalid-total" ? "ส่วนลดทำให้ยอดรวมติดลบไม่ได้" : "ระบุชื่อรายการ จำนวนเต็มบาท และเหตุผลก่อนบันทึก";
+      const detail = result.reason === "version-conflict" ? "ยอดเปลี่ยนจากอีกหน้าต่างแล้ว กลับไปตรวจยอดล่าสุดก่อนปรับยอด" : result.reason === "FORBIDDEN" ? "บัญชีนี้ไม่มีสิทธิ์ปรับยอดในสาขานี้" : result.reason === "invalid-total" ? "ส่วนลดต้องไม่ทำให้ยอดต่ำกว่าเงินที่รับหรือกำลังรอผล" : "ระบุชื่อรายการ จำนวนเต็มบาท และเหตุผลก่อนบันทึก";
       setNotice({ tone: "critical", title: "ปรับยอดไม่สำเร็จ", detail });
       return;
     }
@@ -250,10 +270,12 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
     setNotice({ tone: "success", title: "ปรับยอดแล้ว", detail: "บันทึกเหตุผลไว้กับรายการนี้แล้ว" });
   }
 
-  function submitCancellation(event: FormEvent<HTMLFormElement>) {
+  async function submitCancellation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected) return;
-    const result = cancelPrototypeCharge(selected.charge.chargeId, cancellationReason, context);
+    if (!selected || savingRef.current) return;
+    savingRef.current = true; setSaving(true);
+    const result = await cancelPrototypeCharge(selected.charge.chargeId, cancellationReason, context, formRevision.current);
+    savingRef.current = false; setSaving(false);
     if (!result.ok) {
       const detail = result.reason === "has-payments"
         ? "ยอดที่มีการรับชำระแล้วต้องใช้กระบวนการคืนเงินในอนาคต ไม่ยกเลิกอัตโนมัติ"
@@ -266,13 +288,13 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
     setNotice({ tone: "warning", title: result.duplicate ? "ยอดนี้ถูกยกเลิกไว้แล้ว" : "ยกเลิกยอดแล้ว", detail: "การยกเลิกยอดไม่สร้างการคืนเงินอัตโนมัติ" });
   }
 
-  function sendBillingMessage(balance: PrototypeChargeBalance) {
+  async function sendBillingMessage(balance: PrototypeChargeBalance) {
     const customer = readPrototypeCustomer(balance.charge.customerId);
     if (!customer) {
       setNotice({ tone: "critical", title: "ส่งข้อความไม่ได้", detail: "ไม่พบความสัมพันธ์ลูกค้าสำหรับยอดนี้" });
       return;
     }
-    const conversation = ensurePrototypeConversation({
+    const conversation = await ensurePrototypeConversation({
       businessId: context.businessId,
       branchId: context.branchId,
       customerId: customer.id,
@@ -289,7 +311,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
       : balance.status === "paid"
       ? `ร้านบันทึกการรับชำระ ${formatBusinessMoney(balance.paid)} สำหรับ ${balance.charge.serviceLabel} เรียบร้อยแล้ว`
       : `แจ้งยอด ${balance.charge.serviceLabel} ${formatBusinessMoney(balance.total)} · คงเหลือ ${formatBusinessMoney(balance.remaining)}`;
-    const sent = sendPrototypeTextMessage(conversation.conversation.conversationId, context.businessId, text);
+    const sent = await sendPrototypeTextMessage(conversation.conversation.conversationId, context.businessId, text);
     setNotice(sent.ok
       ? { tone: "success", title: "ส่งข้อความใน Inbox แล้ว", detail: "เปิดบทสนทนาใน Inbox เพื่อติดตามกับลูกค้า" }
       : { tone: "critical", title: "ส่งข้อความไม่ได้", detail: "ไม่สามารถบันทึกข้อความได้ กรุณาลองอีกครั้ง" });
@@ -302,7 +324,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
     <div className="business-billing shell">
       <BusinessPageHeader
         title="การเงิน"
-        context="สาขาปัจจุบัน"
+        context={`สาขาปัจจุบัน · ${formatBusinessDate(businessToday(context))}`}
       />
 
       {notice ? <BusinessAlert tone={notice.tone} title={notice.title} className="business-billing__notice">{notice.detail ? <p>{notice.detail}</p> : null}</BusinessAlert> : null}
@@ -316,13 +338,13 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
             </div>
           </header>
           <div className="billing-summary-card__value">{formatBusinessMoney(revenue.revenueToday)}</div>
-          <footer className="billing-summary-card__footer"><span>จาก Payment {revenue.paymentCountToday} รายการ</span></footer>
+          <footer className="billing-summary-card__footer"><span>รับชำระ {formatBusinessCount(revenue.paymentCountToday)} รายการ</span></footer>
         </article>
         <article className="billing-summary-card billing-summary-card--unpaid">
           <header className="billing-summary-card__header">
             <div className="billing-summary-card__title-row">
               <span className="billing-summary-card__icon billing-summary-card__icon--unpaid" aria-hidden="true"><Clock size={18} /></span>
-              <span className="billing-summary-card__label">ยอดค้างชำระ</span>
+              <span className="billing-summary-card__label">ยอดค้างชำระสะสม</span>
             </div>
           </header>
           <div className="billing-summary-card__value">{formatBusinessMoney(revenue.unpaidBalance)}</div>
@@ -336,13 +358,13 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
             </div>
           </header>
           <div className="billing-summary-card__value">{revenue.breakdown.length} <small>กลุ่ม</small></div>
-          <footer className="billing-summary-card__footer"><span>{revenue.breakdown.length > 0 ? revenue.breakdown.map((item) => `${item.module === "grooming" ? "อาบน้ำ / ตัดขน" : item.module === "hotel" ? "โรงแรม" : "Daycare"} ${formatBusinessMoney(item.revenue)}`).join(" · ") : "ยังไม่มี Payment วันนี้"}</span></footer>
+          <footer className="billing-summary-card__footer"><span>{revenue.breakdown.length > 0 ? revenue.breakdown.map((item) => `${item.module === "grooming" ? "อาบน้ำ / ตัดขน" : item.module === "hotel" ? "โรงแรม" : "Daycare"} ${formatBusinessMoney(item.revenue)}`).join(" · ") : "ยังไม่มีรายการรับชำระวันนี้"}</span></footer>
         </article>
       </section>
 
       <section className="billing-list-section" aria-labelledby="billing-charges-title">
         <header className="billing-list-section__header">
-          <div><span>ยอดที่ต้องชำระ</span><h2 id="billing-charges-title">Charge และสถานะการชำระ</h2><p>การสร้างยอดยังไม่เท่ากับรับชำระเงิน</p></div>
+          <div><span>ยอดที่ต้องชำระ</span><h2 id="billing-charges-title">รายการเรียกเก็บ</h2><p>ตรวจยอดคงเหลือและสถานะการชำระ</p></div>
           <div className="billing-list-section__filter">
             <span className="billing-list-section__filter-label">กรองสถานะ</span>
             <BusinessSegmentedControl value={filter} options={FILTER_OPTIONS} ariaLabel="กรองสถานะยอด" onChange={setFilter} className="billing-filter" />
@@ -351,7 +373,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
 
         {visibleBalances.length > 0 ? (
           <>
-            <BusinessDataTable caption="รายการ Charge ของสาขาปัจจุบัน" className="billing-charge-table">
+            <BusinessDataTable caption="รายการเรียกเก็บของสาขาปัจจุบัน" className="billing-charge-table">
               <thead>
                 <tr>
                   <th scope="col">รายการ</th>
@@ -386,22 +408,22 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         description="ตรวจรายละเอียดรายการ ยอดคงเหลือ และประวัติการรับชำระเงิน"
         footer={mode === "review" ? <div className="billing-modal-actions">
           <button className="button button--business-ghost" type="button" onClick={() => sendBillingMessage(selected)}><MessageCircle size={17} />ส่งข้อความ</button>
-          {selected.status !== "cancelled" ? <button className="button button--business-ghost" type="button" onClick={() => { setAdjustmentKind("manual-adjustment"); setMode("adjustment"); }}><Plus size={17} />ปรับยอด</button> : null}
-          {selected.status !== "cancelled" && selected.paid === 0 ? <button className="button button--business-ghost" type="button" onClick={() => setMode("cancel")}>ยกเลิกยอด</button> : null}
+          {selected.status !== "cancelled" ? <button className="button button--business-ghost" type="button" disabled={!canManageFinance(businessId) || saving} onClick={() => { setAdjustmentKind("manual-adjustment"); beginFinancialForm("adjustment"); }}><Plus size={17} />ปรับยอด</button> : null}
+          {selected.status !== "cancelled" && selected.paymentCount === 0 ? <button className="button button--business-ghost" type="button" disabled={!canManageFinance(businessId) || saving} onClick={() => beginFinancialForm("cancel")}>ยกเลิกยอด</button> : null}
           {selected.status !== "paid" && selected.status !== "cancelled" ? <button className="button button--business billing-modal-actions__primary" type="button" onClick={beginPayment}><Wallet size={17} />รับชำระ</button> : null}
         </div> : <button className="button button--business-ghost" type="button" onClick={() => setMode("review")}>กลับไปตรวจยอด</button>}
       >
         {mode === "review" ? <>
           <section className="billing-checkout-overview" aria-labelledby="billing-checkout-overview-title"><div><span>รายการ</span><h3 id="billing-checkout-overview-title">{selected.charge.serviceLabel}</h3><ChargeFacts balance={selected} /></div><StatusPill status={selected.status} /></section>
           <section className="billing-breakdown" aria-labelledby="billing-breakdown-title"><header><h3 id="billing-breakdown-title">รายละเอียด Charge</h3><small>ยอดรวม {formatBusinessMoney(selected.total)}</small></header><ul>{selected.charge.lineItems.map((line) => <li key={line.id}><span><strong>{line.label}</strong>{line.reason ? <small>{line.reason}</small> : null}</span><b className={line.amount < 0 ? "is-discount" : ""}>{formatBusinessSignedMoney(line.amount)}</b></li>)}</ul><dl><div><dt>ยอดรวม</dt><dd>{formatBusinessMoney(selected.total)}</dd></div><div><dt>รับแล้ว</dt><dd>{formatBusinessMoney(selected.paid)}</dd></div><div><dt>คงเหลือ</dt><dd>{formatBusinessMoney(selected.remaining)}</dd></div></dl></section>
-          <section className="billing-payment-history" aria-labelledby="billing-payment-history-title"><header><h3 id="billing-payment-history-title">Payment record</h3><small>{selected.paymentCount} รายการ</small></header>{paymentRecords.length > 0 ? <ol>{paymentRecords.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"} · {payment.recordedAt.slice(11, 16)}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มีการรับชำระสำหรับยอดนี้</p>}</section>
+          <section className="billing-payment-history" aria-labelledby="billing-payment-history-title"><header><h3 id="billing-payment-history-title">Payment record</h3><small>{selected.paymentCount} รายการ</small></header>{paymentRecords.length > 0 ? <ol>{paymentRecords.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"} · {new Date(payment.recordedAt).toLocaleTimeString("th-TH", { timeZone: businessTimezone(context), hour: "2-digit", minute: "2-digit" })}{(financialDirectory?.payments.find((p) => p.paymentId === payment.paymentId)?.refunded ?? 0) > 0 ? ` · คืนเงิน ${formatBusinessMoney(financialDirectory!.payments.find((p) => p.paymentId === payment.paymentId)!.refunded)}` : ""}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มีการรับชำระสำหรับยอดนี้</p>}</section>
         </> : null}
 
-        {mode === "payment" ? <form className="billing-form" onSubmit={submitPayment}><p>คงเหลือให้รับชำระ {formatBusinessMoney(selected.remaining)}</p><label><span>ยอดที่รับชำระ</span><input inputMode="numeric" min="1" max={selected.remaining} step="1" type="number" value={paymentAmount} onChange={(event) => setPaymentAmount(event.currentTarget.value)} required /></label><label><span>วิธีชำระ</span><select value={paymentMethod} onChange={(event) => setPaymentMethod(event.currentTarget.value as PrototypePaymentMethod)}>{(Object.entries(PAYMENT_METHOD_LABELS) as [PrototypePaymentMethod, string][]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>หมายเหตุ <small>ไม่บังคับ</small></span><input maxLength={160} value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="เช่น เลขอ้างอิงการโอน" /></label><button className="button button--business" type="submit"><Wallet size={17} />บันทึกรับชำระ</button></form> : null}
+        {mode === "payment" ? <form className="billing-form" onSubmit={submitPayment}><p>คงเหลือให้รับชำระ {formatBusinessMoney(collectible)}</p><label><span>ยอดที่รับชำระ</span><input inputMode="numeric" min="1" max={collectible} step="1" type="number" value={paymentAmount} onChange={(event) => setPaymentAmount(event.currentTarget.value)} required /></label><label><span>วิธีชำระ</span><select value={paymentMethod} onChange={(event) => setPaymentMethod(event.currentTarget.value as PrototypePaymentMethod)}>{(Object.entries(PAYMENT_METHOD_LABELS) as [PrototypePaymentMethod, string][]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>หมายเหตุ <small>ไม่บังคับ</small></span><input maxLength={160} value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="เช่น เลขอ้างอิงการโอน" /></label><button className="button button--business" type="submit" disabled={saving}><Wallet size={17} />บันทึกรับชำระ</button></form> : null}
 
-        {mode === "adjustment" ? <form className="billing-form" onSubmit={submitAdjustment}><label><span>ประเภท</span><select value={adjustmentKind} onChange={(event) => setAdjustmentKind(event.currentTarget.value as "manual-adjustment" | "discount")}><option value="manual-adjustment">ปรับเพิ่มยอด</option><option value="discount">ส่วนลด</option></select></label><label><span>ชื่อรายการ</span><input maxLength={80} value={adjustmentLabel} onChange={(event) => setAdjustmentLabel(event.currentTarget.value)} placeholder="เช่น ค่าบริการเพิ่มเติม" required /></label><label><span>จำนวนเต็มบาท</span><input inputMode="numeric" min="1" step="1" type="number" value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.currentTarget.value)} required /></label><label><span>เหตุผล</span><textarea maxLength={240} rows={3} value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.currentTarget.value)} placeholder="บอกเหตุผลของการปรับยอด" required /></label><button className="button button--business" type="submit"><Plus size={17} />บันทึกการปรับยอด</button></form> : null}
+        {mode === "adjustment" ? <form className="billing-form" onSubmit={submitAdjustment}><label><span>ประเภท</span><select value={adjustmentKind} onChange={(event) => setAdjustmentKind(event.currentTarget.value as "manual-adjustment" | "discount")}><option value="manual-adjustment">ปรับเพิ่มยอด</option><option value="discount">ส่วนลด</option></select></label><label><span>ชื่อรายการ</span><input maxLength={80} value={adjustmentLabel} onChange={(event) => setAdjustmentLabel(event.currentTarget.value)} placeholder="เช่น ค่าบริการเพิ่มเติม" required /></label><label><span>จำนวนเต็มบาท</span><input inputMode="numeric" min="1" step="1" type="number" value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.currentTarget.value)} required /></label><label><span>เหตุผล</span><textarea maxLength={240} rows={3} value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.currentTarget.value)} placeholder="บอกเหตุผลของการปรับยอด" required /></label><button className="button button--business" type="submit" disabled={saving}><Plus size={17} />บันทึกการปรับยอด</button></form> : null}
 
-        {mode === "cancel" ? <form className="billing-form billing-form--cancel" onSubmit={submitCancellation}><p>ยกเลิกได้เฉพาะรายการที่ยังไม่มีการรับชำระเงิน</p><label><span>เหตุผลที่ยกเลิกยอด</span><textarea maxLength={240} rows={3} value={cancellationReason} onChange={(event) => setCancellationReason(event.currentTarget.value)} placeholder="เช่น ยกเลิกบริการก่อนเริ่ม" required /></label><button className="button button--destructive" type="submit">ยืนยันยกเลิกยอด</button></form> : null}
+        {mode === "cancel" ? <form className="billing-form billing-form--cancel" onSubmit={submitCancellation}><p>ยกเลิกได้เฉพาะรายการที่ยังไม่มีการรับชำระเงิน</p><label><span>เหตุผลที่ยกเลิกยอด</span><textarea maxLength={240} rows={3} value={cancellationReason} onChange={(event) => setCancellationReason(event.currentTarget.value)} placeholder="เช่น ยกเลิกบริการก่อนเริ่ม" required /></label><button className="button button--destructive" type="submit" disabled={saving}>ยืนยันยกเลิกยอด</button></form> : null}
       </BusinessModal> : null}
     </div>
   );

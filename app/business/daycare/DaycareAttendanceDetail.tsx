@@ -3,12 +3,7 @@
 import { type FormEvent, useState } from "react";
 import {
   DAYCARE_ATTENDANCE_STATUS_LABELS,
-  addPrototypeDaycareCareEvent,
-  assignPrototypeDaycareStaff,
-  assignPrototypeDaycareZone,
   getPrototypeDaycareZoneAvailability,
-  transitionPrototypeDaycareAttendance,
-  updatePrototypeDaycareNote,
   type BusinessLocalPetRelationship,
   type DaycareAttendanceStatus,
   type DemoBookingResource,
@@ -18,6 +13,7 @@ import {
   type PrototypeDaycareCareKind,
   type PrototypeTeamMember,
 } from "../../_prototype/businessState";
+import { addPrototypeDaycareCareEvent, assignPrototypeDaycareStaff, assignPrototypeDaycareZone, transitionPrototypeDaycareAttendance, updatePrototypeDaycareNote } from "../../_backend/be4/facade";
 import {
   CalendarDays,
   CheckCircle,
@@ -100,9 +96,9 @@ export function DaycareAttendanceDetail({
     if (ok) onChanged(message);
   }
 
-  function advanceLifecycle() {
+  async function advanceLifecycle() {
     if (!nextAction) return;
-    const result = transitionPrototypeDaycareAttendance(attendance.daycareAttendanceId, nextAction.status, context);
+    const result = await transitionPrototypeDaycareAttendance(attendance.daycareAttendanceId, nextAction.status, context);
     if (!result.ok) {
       publish(transitionFailureMessage(result.reason), false);
       return;
@@ -110,9 +106,9 @@ export function DaycareAttendanceDetail({
     publish(result.duplicate ? "สถานะนี้ถูกบันทึกไว้แล้ว" : `เปลี่ยนสถานะเป็น ${DAYCARE_ATTENDANCE_STATUS_LABELS[nextAction.status]} แล้ว`, true);
   }
 
-  function cancelAttendance() {
+  async function cancelAttendance() {
     if (!window.confirm(`ยกเลิกรายการ Daycare ของ ${pet.name} ใช่ไหม`)) return;
-    const result = transitionPrototypeDaycareAttendance(attendance.daycareAttendanceId, "cancelled", context);
+    const result = await transitionPrototypeDaycareAttendance(attendance.daycareAttendanceId, "cancelled", context);
     if (!result.ok) {
       publish(transitionFailureMessage(result.reason), false);
       return;
@@ -120,9 +116,9 @@ export function DaycareAttendanceDetail({
     publish("ยกเลิกรายการ Daycare แล้ว", true);
   }
 
-  function changeZone(zoneId: string) {
+  async function changeZone(zoneId: string) {
     if (!zoneId) return;
-    const result = assignPrototypeDaycareZone(attendance.daycareAttendanceId, zoneId, context);
+    const result = await assignPrototypeDaycareZone(attendance.daycareAttendanceId, zoneId, context);
     if (!result.ok) {
       publish(result.message ?? (result.reason === "capacity" ? "โซนนี้เต็มแล้ว" : "บันทึกโซนไม่สำเร็จ"), false);
       return;
@@ -131,8 +127,8 @@ export function DaycareAttendanceDetail({
     publish(result.duplicate ? "รายการอยู่ในโซนนี้แล้ว" : `ย้ายไป${zone?.label ?? "โซนที่เลือก"}แล้ว`, true);
   }
 
-  function changeStaff(staffId: string) {
-    const result = assignPrototypeDaycareStaff(attendance.daycareAttendanceId, staffId || null, context);
+  async function changeStaff(staffId: string) {
+    const result = await assignPrototypeDaycareStaff(attendance.daycareAttendanceId, staffId || null, context);
     if (!result.ok) {
       publish(result.message ?? "มอบหมายผู้ดูแลไม่สำเร็จ", false);
       return;
@@ -141,9 +137,9 @@ export function DaycareAttendanceDetail({
     publish(result.duplicate ? "ผู้ดูแลตรงกับรายการเดิม" : member ? `มอบหมายให้ ${member.name} แล้ว` : "นำผู้ดูแลออกจากรายการแล้ว", true);
   }
 
-  function recordCare(event: FormEvent<HTMLFormElement>) {
+  async function recordCare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const updated = addPrototypeDaycareCareEvent(attendance.daycareAttendanceId, careKind, careNote, context);
+    const updated = await addPrototypeDaycareCareEvent(attendance.daycareAttendanceId, careKind, careNote, context);
     if (!updated) {
       publish("บันทึกกิจกรรมได้เมื่อรับน้องเข้า Daycare แล้ว", false);
       return;
@@ -152,8 +148,8 @@ export function DaycareAttendanceDetail({
     publish(`บันทึก${CARE_KIND_OPTIONS.find((item) => item.value === careKind)?.label ?? "กิจกรรม"}แล้ว`, true);
   }
 
-  function saveBusinessNote() {
-    const updated = updatePrototypeDaycareNote(attendance.daycareAttendanceId, businessNote, context);
+  async function saveBusinessNote() {
+    const updated = await updatePrototypeDaycareNote(attendance.daycareAttendanceId, businessNote, context);
     publish(updated ? "บันทึกหมายเหตุของร้านแล้ว" : "บันทึกหมายเหตุไม่สำเร็จ", Boolean(updated));
   }
 

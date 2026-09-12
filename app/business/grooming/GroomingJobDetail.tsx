@@ -13,10 +13,10 @@ import {
   type ServiceJobStatus,
 } from "../../_prototype/businessState";
 import {
-  ensurePrototypeConversation,
   listPrototypeConversations,
   type PrototypeAddServiceRequestMessage,
 } from "../../_prototype/inboxState";
+import { ensureDurableConversation as ensurePrototypeConversation } from "../../_backend/be6/client";
 import {
   CheckCircle,
   CircleAlert,
@@ -61,9 +61,9 @@ export function GroomingJobDetail({
   job: PrototypeServiceJob;
   context: DemoBusinessContext;
   onClose: () => void;
-  onTransition: (serviceJobId: string, status: ServiceJobStatus) => DetailMutationResult;
-  onAssign: (serviceJobId: string, assignments: readonly string[]) => DetailMutationResult;
-  onSaveNote: (serviceJobId: string, note: string) => DetailMutationResult;
+  onTransition: (serviceJobId: string, status: ServiceJobStatus) => Promise<DetailMutationResult>;
+  onAssign: (serviceJobId: string, assignments: readonly string[]) => Promise<DetailMutationResult>;
+  onSaveNote: (serviceJobId: string, note: string) => Promise<DetailMutationResult>;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -154,28 +154,28 @@ export function GroomingJobDetail({
       : { enabled: true, suffix: "" };
   }
 
-  function changeStatus(nextStatus: ServiceJobStatus) {
+  async function changeStatus(nextStatus: ServiceJobStatus) {
     if (nextStatus === job.status || !availableTransitions.includes(nextStatus)) return;
-    const result = onTransition(job.serviceJobId, nextStatus);
+    const result = await onTransition(job.serviceJobId, nextStatus);
     setNotice(result.notice);
   }
 
-  function saveAssignments() {
-    const result = onAssign(job.serviceJobId, assignments);
+  async function saveAssignments() {
+    const result = await onAssign(job.serviceJobId, assignments);
     setNotice(result.notice);
   }
 
-  function saveNote() {
-    const result = onSaveNote(job.serviceJobId, note);
+  async function saveNote() {
+    const result = await onSaveNote(job.serviceJobId, note);
     setNotice(result.notice);
   }
 
-  function openAddOnRequest() {
+  async function openAddOnRequest() {
     if (!booking || !customer || !pet) {
       setNotice("งานนี้ยังไม่มีบริบทการจองที่พร้อมส่งคำขอเพิ่มบริการ");
       return;
     }
-    const result = ensurePrototypeConversation({
+    const result = await ensurePrototypeConversation({
       businessId: context.businessId,
       branchId: context.branchId,
       customerId: customer.id,

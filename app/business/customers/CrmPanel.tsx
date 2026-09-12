@@ -116,7 +116,7 @@ export function CustomerCrmPanel({
         <div>
           <dt><CheckCircle size={16} />จำนวนครั้ง</dt>
           <dd>{profile.visitCount} ครั้ง</dd>
-          <small>{profile.returned ? "กลับมาใช้บริการแล้ว" : "นับจาก Service Record ที่เสร็จแล้ว"}</small>
+          <small>{profile.returned ? "กลับมาใช้บริการแล้ว" : "นับจากบริการที่เสร็จแล้ว"}</small>
         </div>
         <div>
           <dt><Wallet size={16} />ยอดคงเหลือ</dt>
@@ -156,7 +156,7 @@ export function CustomerCrmPanel({
         <header>
           <div>
             <h3>ไทม์ไลน์ลูกค้า</h3>
-            <p>แยกนัดหมาย บริการ การชำระ และข้อความจาก Inbox อย่างชัดเจน</p>
+            <p>นัดหมาย บริการ การชำระ และข้อความของลูกค้า</p>
           </div>
           <div className="customer-crm-timeline__filters" role="toolbar" aria-label="กรองไทม์ไลน์ลูกค้า">
             {TIMELINE_FILTERS.map((filter) => (

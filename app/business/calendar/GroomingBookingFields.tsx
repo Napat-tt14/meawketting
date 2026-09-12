@@ -1,3 +1,4 @@
+import { businessToday } from "../../_backend/shared/businessClock";
 import { type FormEvent } from "react";
 import {
   evaluatePrototypeTeamMemberAvailability,
@@ -36,7 +37,7 @@ export function GroomingBookingFields({ draft, service, resources, describedBy, 
   const assignmentInterval = getBookingInterval("appointment", draft.start, draft.end);
 
   const updateDate = (event: FormEvent<HTMLInputElement>) => onDraftChange(withAppointmentStart(draft, service, event.currentTarget.value, time || "09:00"));
-  const updateTime = (event: FormEvent<HTMLInputElement>) => onDraftChange(withAppointmentStart(draft, service, date || "2026-08-18", event.currentTarget.value));
+  const updateTime = (event: FormEvent<HTMLInputElement>) => onDraftChange(withAppointmentStart(draft, service, date || businessToday(service), event.currentTarget.value));
 
   function staffOptionState(resourceId: string) {
     const staff = getBookingResourceStaffMember(resourceId);

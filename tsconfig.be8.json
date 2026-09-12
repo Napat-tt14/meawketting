@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.be7.json",
+  "include": ["next-env.d.ts", "worker-configuration.d.ts", "app/_backend/**/*.ts", "app/api/**/*.ts", "db/**/*.ts", "worker/**/*.ts", "vite.config.ts", "drizzle.config.ts", "tests/be8.test.ts", "app/business/**/*.tsx", "app/business/**/*.ts"],
+  "exclude": ["node_modules", "workfiledesign"]
+}

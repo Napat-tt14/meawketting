@@ -1,9 +1,9 @@
 "use client";
 
+import { businessToday } from "../../_backend/shared/businessClock";
+
 import { type DragEvent, type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BOOKING_DEMO_DATE,
-  assignPrototypeGroomingServiceJobResources,
   getBookingResources,
   getEnabledBusinessModules,
   listPrototypeGroomingServiceJobFixtures,
@@ -12,11 +12,10 @@ import {
   readPrototypeCustomerFixture,
   serviceJobCanTransition,
   summarizeGroomingServiceJobs,
-  transitionPrototypeGroomingServiceJob,
   type PrototypeServiceJob,
   type ServiceJobStatus,
-  updatePrototypeGroomingServiceJobNote,
 } from "../../_prototype/businessState";
+import { assignPrototypeGroomingServiceJobResources, transitionPrototypeGroomingServiceJob, updatePrototypeGroomingServiceJobNote } from "../../_backend/be4/facade";
 import {
   listPrototypeConversationFixtures,
   listPrototypeConversations,
@@ -92,8 +91,8 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
 
   const groomingEnabled = getEnabledBusinessModules(context, !stateReady).includes("grooming");
   const jobs = stateReady
-    ? listPrototypeGroomingServiceJobs(context, { date: BOOKING_DEMO_DATE, includeCancelled: false })
-    : listPrototypeGroomingServiceJobFixtures(context, { date: BOOKING_DEMO_DATE, includeCancelled: false });
+    ? listPrototypeGroomingServiceJobs(context, { date: businessToday(context), includeCancelled: false })
+    : listPrototypeGroomingServiceJobFixtures(context, { date: businessToday(context), includeCancelled: false });
   const conversations = stateReady ? listPrototypeConversations(context) : listPrototypeConversationFixtures(context);
   const requests = conversations.flatMap((conversation) => conversation.messages)
     .filter((message): message is PrototypeAddServiceRequestMessage => message.kind === "add-service-request");
@@ -107,7 +106,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     return [{ job, customer, pet, resources, waitingApproval }];
   }), [context, jobs, requests, stateReady]);
 
-  const summary = summarizeGroomingServiceJobs(jobs, BOOKING_DEMO_DATE);
+  const summary = summarizeGroomingServiceJobs(jobs, businessToday(context));
   const selectedJob = jobs.find((job) => job.serviceJobId === selectedJobId || job.bookingId === selectedJobId) ?? null;
 
   function openJob(job: PrototypeServiceJob, source?: HTMLElement) {
@@ -125,7 +124,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     window.requestAnimationFrame(() => openerRef.current?.focus());
   }
 
-  function finishDrop(serviceJobId: string, lane: GroomingBoardLane) {
+  async function finishDrop(serviceJobId: string, lane: GroomingBoardLane) {
     const current = jobs.find((job) => job.serviceJobId === serviceJobId) ?? null;
     const next = current ? statusForDestination(current, lane) : null;
     draggingJobIdRef.current = null;
@@ -136,7 +135,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
       setNotice("ย้ายงานไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว");
       return { ok: false, notice: "ย้ายงานไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว" };
     }
-    const result = transitionPrototypeGroomingServiceJob(serviceJobId, next, context);
+    const result = await transitionPrototypeGroomingServiceJob(serviceJobId, next, context);
     if (!result.ok) {
       const message = result.reason === "invalid-transition"
         ? "ย้ายงานไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว"
@@ -152,10 +151,10 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     return { ok: true, notice: message };
   }
 
-  function transitionFromDetail(serviceJobId: string, nextStatus: ServiceJobStatus) {
+  async function transitionFromDetail(serviceJobId: string, nextStatus: ServiceJobStatus) {
     const current = jobs.find((job) => job.serviceJobId === serviceJobId) ?? null;
     if (!current) return { ok: false, notice: "เปลี่ยนสถานะงานไม่สำเร็จ" };
-    const result = transitionPrototypeGroomingServiceJob(serviceJobId, nextStatus, context);
+    const result = await transitionPrototypeGroomingServiceJob(serviceJobId, nextStatus, context);
     if (!result.ok) {
       const message = result.reason === "invalid-transition"
         ? "เปลี่ยนสถานะนี้ไม่ได้ · งานกลับอยู่สถานะเดิมแล้ว"
@@ -173,8 +172,8 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     return { ok: true, notice: message };
   }
 
-  function assignResources(serviceJobId: string, assignments: readonly string[]) {
-    const result = assignPrototypeGroomingServiceJobResources(serviceJobId, assignments, context);
+  async function assignResources(serviceJobId: string, assignments: readonly string[]) {
+    const result = await assignPrototypeGroomingServiceJobResources(serviceJobId, assignments, context);
     if (!result.ok) {
       const detail = result.availability?.conflicts.map((conflict) => conflict.message).join(" · ");
       const message = detail || "ทรัพยากรนี้ไม่พร้อมในช่วงเวลางาน";
@@ -186,8 +185,8 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     return { ok: true, notice: message };
   }
 
-  function saveNote(serviceJobId: string, note: string) {
-    const updated = updatePrototypeGroomingServiceJobNote(serviceJobId, note, context);
+  async function saveNote(serviceJobId: string, note: string) {
+    const updated = await updatePrototypeGroomingServiceJobNote(serviceJobId, note, context);
     const message = updated ? "บันทึกหมายเหตุของร้านแล้ว" : "บันทึกหมายเหตุไม่สำเร็จ ลองอีกครั้ง";
     setNotice(message);
     return { ok: Boolean(updated), notice: message };
@@ -231,7 +230,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     setDropTarget(null);
   }
 
-  function moveWithKeyboard(job: PrototypeServiceJob, event: KeyboardEvent<HTMLElement>) {
+  async function moveWithKeyboard(job: PrototypeServiceJob, event: KeyboardEvent<HTMLElement>) {
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
     if (job.status === "cancelled") return;
     const currentLane = groomingBoardLaneForStatus(job.status);
@@ -241,7 +240,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     const destination = GROOMING_BOARD_LANES[currentIndex + direction];
     if (!destination || !statusForDestination(job, destination.key)) return;
     event.preventDefault();
-    const result = finishDrop(job.serviceJobId, destination.key);
+    const result = await finishDrop(job.serviceJobId, destination.key);
     if (result.ok) window.requestAnimationFrame(() => {
       const card = [...document.querySelectorAll<HTMLElement>("[data-service-job-id]")]
         .find((element) => element.dataset.serviceJobId === job.serviceJobId && element.getClientRects().length > 0);
@@ -344,7 +343,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     <div className={`business-grooming shell${dragging ? " is-dragging" : ""}`}>
       <BusinessPageHeader
         title="อาบน้ำ / ตัดขน"
-        context={`${summary.total} งาน · ${summary.readyForPickup} พร้อมรับกลับ`}
+        context={`${new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${businessToday(context)}T12:00:00Z`))} · ${summary.total.toLocaleString("th-TH")} งาน · ${summary.readyForPickup.toLocaleString("th-TH")} พร้อมรับกลับ`}
         actions={<Link className="button button--business business-signature-sweep" href="/business/calendar?new=1"><Plus size={18} /><span>เพิ่มการจอง</span></Link>}
       />
 
@@ -365,7 +364,7 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
       {jobItems.length === 0 ? (
         <section className="grooming-empty-state" aria-labelledby="grooming-empty-title">
           <ScissorsPlaceholder />
-          <div><h2 id="grooming-empty-title">วันนี้ยังไม่มีงานอาบน้ำ / ตัดขน</h2><p>เพิ่มการจองจาก Calendar เพื่อเริ่มงานบริการในบอร์ดนี้</p></div>
+          <div><h2 id="grooming-empty-title">วันนี้ยังไม่มีงานอาบน้ำ / ตัดขน</h2><p>เพิ่มการจองในปฏิทินเพื่อเริ่มงานบริการ</p></div>
           <Link className="button button--business business-signature-sweep" href="/business/calendar?new=1"><Plus size={18} /><span>เพิ่มการจอง</span></Link>
         </section>
       ) : (

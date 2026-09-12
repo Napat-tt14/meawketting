@@ -23,7 +23,7 @@ export class DevTestIdentityAdapter implements IdentityAdapter {
   }
 
   async resolve(request: Request): Promise<AuthenticatedIdentity> {
-    if (this.mode !== "dev-test") throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
+    if (process.env.NODE_ENV === "production" || this.mode !== "dev-test") throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
     const personId = request.headers.get(BE1_DEV_ACTOR_HEADER)?.trim();
     if (!personId) throw be1Error("UNAUTHENTICATED");
     return { personId, provider: "dev-test" };

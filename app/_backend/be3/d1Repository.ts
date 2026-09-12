@@ -13,6 +13,7 @@ import type {
   BookingView,
 } from "./contracts";
 import { Be3WriteConflict, be3WriteConflict } from "./errors";
+import { D1Be4Repository } from "../be4/d1Repository";
 import type {
   Be3Repository,
   BookingPersistenceWrite,
@@ -100,6 +101,10 @@ function bookingAuditShape(booking: BookingView) {
 function constraintAware(error: unknown): never {
   const message = error instanceof Error ? error.message : String(error);
   const markers: [RegExp, Parameters<typeof be3WriteConflict>[0]][] = [
+    [/ck_backend_version|BE4_VERSION|BE5_SCOPE|BE7_SCOPE/i, "VERSION_CONFLICT"],
+    [/BE4_CAPACITY/i, "CAPACITY_CONFLICT"],
+    [/BE4_RESOURCE/i, "RESOURCE_UNAVAILABLE"],
+    [/BE4_STAFF/i, "STAFF_UNAVAILABLE"],
     [/BE3_TIME_CONFLICT/i, "TIME_CONFLICT"],
     [/BE3_CAPACITY_CONFLICT/i, "CAPACITY_CONFLICT"],
     [/BE3_BRANCH_INACTIVE/i, "BRANCH_INACTIVE"],
@@ -161,6 +166,11 @@ export class D1Be3Repository implements Be3Repository {
           ) VALUES (?, ?, ?, ?, ?, ?)
         `).bind(service.businessId, service.branchId, service.id, kind, occurredAt, actorPersonId));
       }
+      if (service.module === "hotel") statements.push(this.database.prepare(`
+        INSERT INTO hotel_spaces(id,business_id,branch_id,service_id,label,kind,capacity,status)
+        SELECT ?,?,?,?,'โซนพักหลัก','zone',4,'active'
+        WHERE NOT EXISTS(SELECT 1 FROM hotel_spaces WHERE business_id=? AND branch_id=? AND service_id=?)
+      `).bind(`space_${crypto.randomUUID()}`, service.businessId, service.branchId, service.id, service.businessId, service.branchId, service.id));
     }
     for (const resource of catalog.resources) {
       statements.push(this.database.prepare(`
@@ -193,6 +203,8 @@ export class D1Be3Repository implements Be3Repository {
         ));
       }
     }
+    const scopes = new Map(catalog.services.map((s) => [`${s.businessId}:${s.branchId}`, s]));
+    for (const scope of scopes.values()) statements.push(...new D1Be4Repository(this.database).catalogStatements(scope.businessId, scope.branchId, occurredAt, actorPersonId));
     if (!statements.length) return;
     try {
       const results = await this.database.batch(statements);
@@ -313,6 +325,7 @@ export class D1Be3Repository implements Be3Repository {
       ...this.reservationStatements(write, false),
       this.commitStatement(write, context, false),
       this.auditStatement("booking.created", null, booking, context, false),
+      ...await new D1Be4Repository(this.database).bookingStatements(booking, context),
     ];
     try {
       const results = await this.database.batch(statements);
@@ -342,6 +355,7 @@ export class D1Be3Repository implements Be3Repository {
     const scopeBindings = [booking.businessId, booking.branchId, booking.id, context.metadata.requestId] as const;
     const statements: D1PreparedStatementLike[] = [
       update,
+      this.database.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,changes()=1").bind(`booking-${context.metadata.requestId}`),
       this.database.prepare(`DELETE FROM booking_resource_reservations WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings),
       this.database.prepare(`DELETE FROM booking_resource_assignments WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings),
       this.database.prepare(`DELETE FROM booking_pets WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings),
@@ -350,6 +364,8 @@ export class D1Be3Repository implements Be3Repository {
       ...this.reservationStatements(write, true, context.metadata.requestId),
       this.commitStatement(write, context, true),
       this.auditStatement(action, before, booking, context, true),
+      ...await new D1Be4Repository(this.database).bookingStatements(booking, context),
+      this.database.prepare("DELETE FROM backend_guards WHERE id=?").bind(`booking-${context.metadata.requestId}`),
     ];
     try {
       const results = await this.database.batch(statements);
@@ -461,20 +477,21 @@ export class D1Be3Repository implements Be3Repository {
       current.push({ id: row.id, state: row.state, start: row.start_local, end: row.end_local });
       availability.set(row.resource_id, current);
     }
+    const staff = new Map((await new D1Be4Repository(this.database).staff(businessId, branchId)).map((s) => [s.staffId, s]));
     return rows.map((row): BookingResourceView => ({
       id: row.id,
       businessId: row.business_id,
       branchId: row.branch_id,
       module: row.module,
       kind: row.kind,
-      label: row.label,
+      label: row.compatibility_staff_id ? staff.get(row.compatibility_staff_id)?.name ?? row.label : row.label,
       capacityMode: row.capacity_mode,
       capacity: row.capacity,
       serviceIds: services.get(row.id) ?? [],
       compatibilityStaffId: row.compatibility_staff_id,
       hotelRole: row.hotel_role,
-      availability: availability.get(row.id) ?? [],
-      status: row.status,
+      availability: row.compatibility_staff_id ? (staff.get(row.compatibility_staff_id)?.availability ?? []).map((w) => ({ id: w.id, state: w.state, start: w.start, end: w.end })) : availability.get(row.id) ?? [],
+      status: row.compatibility_staff_id && (!staff.get(row.compatibility_staff_id)?.active || !staff.get(row.compatibility_staff_id)?.capabilities.includes("grooming")) ? "inactive" : row.status,
     }));
   }
 

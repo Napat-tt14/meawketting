@@ -1,12 +1,24 @@
-# Backend Readiness — BE0 baseline / BE1 + BE2 + BE3 implementation
+# Backend Readiness — BE0 baseline / BE1–BE8 implementation
 
-Status: **BE1 IDENTITY / BUSINESS / BRANCH + BE2 CUSTOMER / PET + BE3 BOOKING / CALENDAR / RESOURCES IMPLEMENTED LOCALLY**  
-Date: 2026-09-07  
+Status: **BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY; BE6 PROVIDER-NEUTRAL; BE7 GATEWAY-NEUTRAL; PRODUCTION BOUNDARIES OPEN**
+Date: 2026-09-09
 Owner: Product Architecture / Engineering
 
-This is the canonical backend-readiness document for the frozen Business frontend (BF1–BF12). BE0 established the boundary; BE1 implements identity/tenant scope, BE2 implements Business-scoped Customer/Pet persistence and BE3 implements Booking/Calendar planning plus the minimal Resource availability foundation locally. Guardian/Passport authority, service execution and every later backend domain remain outside the database and application implementation.
+This is the canonical backend-readiness document for the frozen Business frontend (BF1–BF12). BE1–BE8 now provide local D1-backed application boundaries for identity/tenant scope, Customer/Pet, Booking/planning Resources, service execution, Consent/Intake, Inbox foundation, financial records and read-only Reports/CRM projections. Production authentication, external LINE/payment providers, media storage and deployment remain outside this local validation.
 
 Read [ARCHITECTURE](./ARCHITECTURE.md) for product-domain authority, [DECISIONS](./DECISIONS.md) for unresolved policy, and [CURRENT_IMPLEMENTATION](./CURRENT_IMPLEMENTATION.md) for repository facts. Where they conflict, the latest Product Owner direction and DECISIONS prevail.
+
+## Current BE4–BE8 implementation status
+
+| Phase | Local status | Authority and boundary |
+|---|---|---|
+| **BE4 Service Operations** | **VALIDATED LOCALLY** | D1 Grooming Jobs, Hotel Stays, Daycare Attendance, assignments, lifecycle events and source-keyed Service Records. Booking remains planning and completion never marks a Charge paid. |
+| **BE5 Consent / Intake** | **VALIDATED LOCALLY** | D1 authority, Consent, Temporary Business QR grants, scoped expiry/revoke, Intake and audit. Passport fields are returned only inside a valid server grant. |
+| **BE6 Inbox / LINE foundation** | **VALIDATED PROVIDER-NEUTRAL** | D1 Conversation/Message/read state, approvals, outbox/attempts and signed webhook ledger. Business-owned LINE OA adapter boundary is tested with a mock; no production credential or connection exists. |
+| **BE7 Billing / Payments** | **VALIDATED BACKEND FINANCIAL MODEL** | D1 Charge, Payment, allocation, refund, attempts, idempotency and reconciliation state. Manual payment and mock provider paths are tested; no gateway is selected or connected. |
+| **BE8 Reports / History** | **VALIDATED LOCALLY** | Read-only queries derive revenue from Payments, service/booking/customer metrics and CRM timeline/balances from canonical records. No report or CRM write tables exist. |
+
+BE4–BE8 use the same server path `Person → active Membership → Business → Branch → target` and all migrations replay through `0014_be7_settlement_guards.sql`. The frozen Business UI consumes typed clients; persistent fixture/sessionStorage compatibility is explicitly gated to `MEAWKETTING_FIXTURE_MODE=test`, while deterministic pre-hydration snapshots are presentation-only and replaced by D1 data.
 
 ## BE1 implemented foundation
 
@@ -24,7 +36,7 @@ Person
 - **Authorization:** every protected operation resolves an authenticated Person, active membership and active Business, then checks role/action and Branch access. Inaccessible cross-tenant/cross-Branch targets return safe generic failures.
 - **Configuration:** Business text profile, Branch identity/contact/timezone/status, enabled Grooming/Hotel/Daycare modules and all seven operating days are durable. Deactivation keeps history and atomically guards the final active Branch.
 - **Traceability:** important mutations persist actor, membership, Business/Branch scope, request ID, correlation ID, target and bounded before/after metadata.
-- **Frontend compatibility:** the active Business/Branch selection remains a session display preference, while the authorized workspace/configuration graph is hydrated from the server into one memory cache. Legacy browser Business/Branch values are neither trusted nor backfilled. Other BF domains remain browser-local fixtures.
+- **Frontend compatibility:** the active Business/Branch selection remains a session display preference, while the authorized workspace/configuration graph is hydrated from the server into one memory cache. Legacy browser Business/Branch values are neither trusted nor backfilled. BE2–BE8 domains hydrate through typed clients; only explicit `MEAWKETTING_FIXTURE_MODE=test` may provide compatibility fixtures.
 - **Auth boundary:** `dev-test` mode may use the explicit development identity header. Production mode fails closed because a production authentication provider is **NOT IMPLEMENTED**.
 - **Cloudflare:** the local Worker build declares logical D1 binding `DB`; migrations and seed are reproducible against local D1. No production resource or deployment exists. No R2, KV, Queue or Durable Object was added.
 
@@ -57,7 +69,7 @@ authenticated actor
 - **Duplicate UX:** exact normalized phone or Pet name/species produces a warning and no write unless staff explicitly continues. Existing active or inactive records are candidates. There is no merge or destructive deduplication.
 - **Authorization:** all BE2 commands and queries reuse BE1 actor → active membership → active Business resolution, then fetch targets with Business predicates. Active OWNER/MANAGER/STAFF reuse the current operational foundation; Branch grants cannot widen Business scope or fragment a Business-wide identity.
 - **Frontend compatibility:** `/business/customers`, detail, add/edit Customer, add Pet, notes/tags and search use `POST /api/be2` after hydration. One memory cache supplies the frozen synchronous selectors and other browser-local domains keep only stable Customer/Pet references. The former session Customer slice is ignored, emptied on writes and never backfilled or dual-written.
-- **Passport boundary:** seeded Passport/access presentation is isolated in an explicit **DEV PROTOTYPE / NON-AUTHORITATIVE READ MODEL ONLY**. It is not returned by BE2 or persisted in D1. Guardian, Passport ownership, Consent, QR and protected fields remain not implemented.
+- **Passport boundary:** seeded Passport/access presentation remains an explicit **DEV PROTOTYPE / NON-AUTHORITATIVE READ MODEL ONLY** for the frozen UI. BE5 now persists Guardian authority, Consent, QR grants and protected-field scopes separately; BE2 still returns no Passport snapshot and Customer/LINE relationships never infer authority.
 - **Audit:** Customer/Pet/relationship mutations batch actor, membership, Business, target, request/correlation ID, time and bounded state shapes with the data change. Contact values, names, notes and tag labels are deliberately omitted from audit JSON.
 - **Fixtures:** `seed-be2-dev.sql` deterministically preserves the frozen Customer/Pet IDs for dev/test only. Browser/session state is not an import source.
 
@@ -90,7 +102,7 @@ authenticated actor
 - **Atomic conflict protection:** the complete aggregate, reservation rows, commit marker and audit run in one D1 `batch()`. SQLite/D1 serializes writers; reservation triggers abort the losing exclusive overlap or capacity write after it observes the winner. Commit triggers repeat critical Branch/module/service/identity/relationship/Resource/hours/availability/reservation-integrity checks. Expected revision compare-and-swap plus a per-request write token prevents stale update sub-statements from partially replacing an aggregate. A rejected batch returns typed `TIME_CONFLICT`, `CAPACITY_CONFLICT`, availability/configuration conflict or `VERSION_CONFLICT`; no client availability result is trusted.
 - **Idempotency:** create requires a key unique within Business and a SHA-256 normalized-request hash. Same key/same request replays the stored Booking; same key/different request returns `IDEMPOTENCY_KEY_REUSED`, including racing retries. Edit/reschedule/Resource mutations intentionally use expected revision rather than a durable idempotency key; cancel of an already-cancelled Booking is replay-safe.
 - **Resource/Team boundary:** BE3 Resource is only the Branch-local schedulable/capacity projection required for planning. An optional `compatibilityStaffId` and copied planning availability windows bridge the frozen BF9 fixture; they do not create Person, Membership, Team/HR or payroll truth. Hotel `planning-capacity` is not a durable room/zone execution assignment. Full Team and Hotel execution migrate later.
-- **Frontend compatibility:** the Business shell hydrates a paginated Business Booking directory and each permitted Branch catalogue into memory. Frozen Calendar/Home/Customer selectors switch to BE3 records after hydration; the legacy browser Booking slice is ignored, written empty and never imported or dual-written. Authoritative Booking success may trigger a best-effort local execution projection so BE4 fixtures retain stable references, but that cross-store projection is not atomic and never becomes Booking truth.
+- **Frontend compatibility:** the Business shell hydrates a paginated Business Booking directory and each permitted Branch catalogue into memory. Frozen Calendar/Home/Customer selectors switch to BE3 records after hydration; the legacy browser Booking slice is ignored, written empty and never imported or dual-written. BE4 execution, BE5 Intake, BE6 Inbox, BE7 finance and BE8 Reports/CRM hydrate through their typed clients; any compatibility refresh is best-effort and never source of truth.
 - **Authorization/audit:** every operation resolves Person → active membership → active Business → Branch access → scoped target. Wrong Business/Branch, inaccessible grant, foreign Customer/Pet/Resource and spoofed IDs are denied server-side. Booking create/update/reschedule/Resource change/cancel audit actor, membership, Business/Branch, target, request/correlation ID, time and bounded structural before/after metadata without duplicating contact values or notes.
 - **Time limitation:** validated local strings are converted to comparable civil-minute integers with `Date.UTC`-style arithmetic; they are not UTC instants. The stored Branch IANA timezone is not yet applied and DST/offset transitions are not modeled. Hours enforcement uses the start weekday and applies open/close times to appointments; complete per-day Hotel/Daycare opening policy remains open.
 
@@ -102,17 +114,17 @@ authenticated actor
 | Booking query | list by permitted Branches with range/Customer/module/status/Resource filters and pagination; get scoped Booking |
 | Booking mutation | create, edit, reschedule, assign/change Resources, cancel; return authoritative result or typed conflict |
 
-BE3 stops before BE4 service execution. Grooming Job, Hotel Stay, Daycare Attendance, full Team/HR, Intake/Consent, Inbox/LINE, Charge/Payment, Service Record/Reports, media and deployment remain unimplemented backends.
+The original BE3 checkpoint stopped before service execution. BE4–BE8 now extend that same architecture; media bytes remain outside this backend scope while operation staff and execution records are durable.
 
 ## BE0 historical readiness baseline
 
 ## 1. Current frontend architecture
 
-The application is React/Vinext with file-based routes. Before BE1–BE3, Business pages imported domain functions directly from `app/_prototype/businessState.ts`; that file remains the in-browser aggregate for excluded execution/operational domains. BE1 removes Business profile/Branch configuration truth, BE2 removes Customer/Pet truth and BE3 removes Booking planning truth from that envelope, routing each through typed backend clients.
+The application is React/Vinext with file-based routes. Before BE1–BE8, Business pages imported domain functions directly from `app/_prototype/businessState.ts`; that file remains only as an explicit fixture compatibility source for tests and excluded presentation preferences. BE1–BE7 remove Business backend-domain truth from that envelope, while BE8 reads D1 records through typed clients.
 
-Explicit fixtures remain deterministic development/test defaults. BE2 Customer/Pet and BE3 Booking reads switch to authorized memory caches after hydration and never merge their legacy session slices. `app/_prototype/inboxState.ts` has a separate session store for Conversations/messages. `app/_prototype/sharingState.ts` has a separate session store for Guardian temporary-access drafts and grants. Calendar view and quick-reply visibility are preference cookies. Consumer prototype stores are separate and frozen.
+Explicit fixtures remain deterministic development/test defaults. BE2 Customer/Pet and BE3 Booking reads switch to authorized memory caches after hydration and never merge their legacy session slices. When `MEAWKETTING_FIXTURE_MODE=test` is enabled, `app/_prototype/inboxState.ts` and `app/_prototype/sharingState.ts` provide isolated Conversation/message and Guardian temporary-access compatibility stores; normal Business runtime reads BE5/BE6 D1 records. Calendar view and quick-reply visibility are preference cookies. Consumer prototype stores are separate and frozen.
 
-The remaining browser-local arrangement is a UI/domain discovery tool, not security. BE1–BE3 add durable storage, server clock, tenant authorization and audit for their scopes only; BE3 makes Booking planning authoritative but does not make execution, Team/HR, Intake, messaging, finance or other local domains production-ready.
+The remaining browser-local arrangement is a UI/domain discovery tool, not security. BE1–BE8 add durable storage or read-only derived queries, server clock, tenant authorization and audit for their scopes. Only Consumer prototype stores, presentation preferences, explicitly gated fixture mode and non-authoritative pre-hydration snapshots remain browser-local; they are never production authority.
 
 The Vinext Worker now exposes a typed D1 `DB` binding to the server API, and `.openai/hosting.json` declares that logical binding so the build packages generated migrations. `r2` remains `null`. Production resources and deployment are absent.
 
@@ -123,18 +135,18 @@ The Vinext Worker now exposes a typed D1 `DB` binding to the server API, and `.o
 | Business profile / Branch configuration | BE1 typed application/API boundary + D1; memory cache after hydration | Implemented for BE1; production auth/deployment remain pending |
 | Customer / Business-local Pet profile / contact relationship / notes / tags | BE2 typed application/API boundary + D1; memory compatibility cache after hydration | Implemented for BE2; stable Business-wide identity, no Guardian/ownership authority |
 | Booking / Calendar planning / planning Resources | BE3 typed application/API boundary + D1; Business directory and Branch catalogue memory cache after hydration | Implemented for BE3; browser preview is advisory and session Booking rows are ignored |
-| Service execution and other Business operations | `businessState.ts` fixtures + same-tab `sessionStorage` overrides | Future staged application commands/queries backed by authoritative persistence |
-| Inbox | `inboxState.ts` fixtures + separate same-tab store | Conversation/message service behind the same application boundary |
-| Temporary consent/QR | `sharingState.ts` fixtures + separate same-tab store | Server-authoritative grant/token/audit service |
+| Service execution and other Business operations | BE4 typed application/API boundary + D1 (`service_executions`, assignments, care/events, Service Records) | Implemented locally; fixture mode is compatibility-only |
+| Inbox | BE6 typed application/API boundary + D1 Conversation/Message/read/outbox/webhook records | Implemented locally; real provider delivery remains external |
+| Temporary consent/QR | BE5 typed application/API boundary + D1 grants/Consent/Intake/audit | Implemented locally; production Guardian authority remains external |
 | Passport/access display on Business Pet cards | Explicit non-authoritative dev compatibility fixture only | Future Guardian/Pet authority and consent records; BE2 stores no Passport snapshot |
-| Reporting/CRM/Home | Pure client selectors over operational state | Read models/queries derived from authoritative source records |
+| Reporting/CRM/Home | BE8 read-only queries and typed projections over BE1–BE7 records | Implemented locally; no writable Reports/CRM store |
 | Branch context and UI preferences | Authorized BE1 Branch list plus browser-local selected-context/cookies | Server list is authority; harmless selection preferences remain client-side |
 
 ## 2. Domain inventory and authority
 
 | Domain | Current identity and relationships | Scope / authority | Mutable or derived | Production persistence and dependency |
 |---|---|---|---|---|
-| Person | Durable BE1 Person; UI Team Member remains a separate local operational identity | Global human identity; not inferred from Customer or LINE | Persistent in BE1 | `persons`; later external identities/Guardian relationships require explicit records |
+| Person | Durable BE1 Person; BE4 operation staff remains a separate operational record | Global human identity; not inferred from Customer or LINE | Persistent in BE1 | `persons`; later external identities/Guardian relationships require explicit records |
 | Business | Durable BE1 `businessId`, profile and enabled-module configuration | Organization/tenant boundary | Persistent in BE1 | `businesses`; memberships, Branches and Customers depend on it |
 | Branch | Durable BE1 `branchId`, Business, hours, active state and modules | Operational, privacy and financial attribution scope | Persistent in BE1 | `branches`; commands authorize both Business and Branch where Branch scope applies |
 | Business membership | Durable BE1 Person→Business membership and explicit Branch grants; BF9 Team role remains display-only | Person-to-Business access, then Branch access for Branch-scoped capabilities | Persistent in BE1 | `business_memberships` + `membership_branch_access`; granular operational policy remains open |
@@ -142,18 +154,18 @@ The Vinext Worker now exposes a typed D1 `DB` binding to the server API, and `.o
 | Pet and Business Pet relationship | Durable identity-only `pet`, Business-local profile and neutral Customer contact associations; BE3 Bookings and local execution reference stable `petId` | Pet identity is shared across service modules; Business stores only its local profile, relationships and notes | Persistent in BE2 | Global `pets` plus `business_pet_profiles` and `customer_pet_relationships`; module tables reference rather than copy identity |
 | Guardian relationship | Current Consumer prototype only; no real linking | Guardian authority remains separate from customer/contact | Persistent when Guardian work begins | `guardian_pet_authority` with explicit permissions and effective dates |
 | Booking | Durable BE3 `bookingId`; canonical BE2 Customer, one-or-more Pets, Business/Branch, service, planning time/resources/status and revision | Branch planning record | Persistent in BE3 | `bookings`, `booking_pets`, Resource assignments/reservations; planning status remains distinct from execution |
-| Grooming Service Job | `serviceJobId` → Booking/Pet/Customer/Branch; lifecycle/resources/history/add-ons | Branch execution record | Persistent + append-only operational events | `grooming_job`, assignments, add-ons and events |
-| Hotel Stay | `hotelStayId` → Booking/Pet/Customer/Branch; room assignment/moves/care/incidents | Branch execution and occupancy record | Persistent + append-only operational events | `hotel_stay`, assignment intervals, care events and restricted incident data |
-| Daycare Attendance | `daycareAttendanceId` → Booking/Pet/Customer/Branch/date; zone/staff/care | Branch execution/capacity record | Persistent + append-only operational events | `daycare_attendance`, care events and assignments |
-| Resource | Durable BE3 planning IDs for groomers, stations, dryers and Hotel/Daycare capacity; local execution may retain room/zone fixtures | Branch capacity/scheduling; optional `compatibilityStaffId` is opaque and a person-linked Resource is still distinct from Team/Person truth | Planning projection persistent in BE3 | `booking_resources`, service links, availability windows, assignments and reservations; full Team/room execution remains future |
-| Team | `staffId`, multiple Branch IDs, capabilities, availability | Person membership and staffing metadata; display role is not authorization | Persistent | Person + memberships + capability/availability records; avoid a module-specific staff registry |
-| Intake | `intakeId` links temporary access and optional Job/Stay/Attendance | Branch operational record created after active consent gate | Persistent, time-bound and audited | `intake`; references a grant snapshot and execution target |
-| Consent / Access Grant | Temporary access has scope, recipient Business/Branch, expiry/revoke/events | Guardian-controlled disclosure gate; recipient scope is exact | Persistent for validity/audit period | Versioned `access_grant`, token hash and immutable audit events |
-| Conversation | `conversationId` with Business/Customer plus contextual references | Business communication record; no Passport access | Persistent when real messaging starts | `conversation`, `message`, delivery/participant records |
-| Charge | `chargeId`, Branch attribution, source references, line snapshots/history | What is owed; not execution and not Payment | Persistent, auditable | `charge`, immutable/append-only lines and adjustments |
-| Payment | `paymentId`, allocation, request key, method/time | Money received/recorded; not Charge status storage | Persistent, auditable | `payment`, allocations, idempotency key and provider-attempt references |
-| Service Record | Source-keyed from completed execution; Pet/Branch/customer/Booking; permitted snapshot/corrections | Shared Business history, never Passport/CareProof | Persistent + append-only corrections | `service_record`, source revision/correction/audit records and private media metadata |
-| Reports and CRM | Client-side selectors over Bookings, execution, Charges/Payments, messages and records | Read-only Business insights | Derived | Queries/read models; no independent mutable report or CRM score table initially |
+| Grooming Service Job | `serviceJobId` → Booking/Pet/Customer/Branch; lifecycle/resources/history/add-ons | Branch execution record | Persistent + append-only operational events | `service_executions` (`module='grooming'`), `execution_assignments`, `execution_events`, Service Record tables |
+| Hotel Stay | `hotelStayId` → Booking/Pet/Customer/Branch; room assignment/moves/care/incidents | Branch execution and occupancy record | Persistent + append-only operational events | `service_executions` (`module='hotel'`), `hotel_spaces`, assignments, care tasks/events and Service Record tables |
+| Daycare Attendance | `daycareAttendanceId` → Booking/Pet/Customer/Branch/date; zone/staff/care | Branch execution/capacity record | Persistent + append-only operational events | `service_executions` (`module='daycare'`), assignments, care/events and Service Record tables |
+| Resource | Durable BE3 planning IDs for groomers, stations, dryers and coarse Hotel/Daycare capacity; BE4 owns operation-staff, room/zone and execution assignments | Branch capacity/scheduling; optional `compatibilityStaffId` is opaque and a person-linked Resource is still distinct from Team/Person truth | Planning and execution projections persistent in BE3/BE4 | `booking_resources`, service links, availability windows, assignments/reservations plus BE4 operation resources; full workforce policy remains future |
+| Team | `staffId`, multiple Branch IDs, capabilities, availability | Person membership and staffing metadata; display role is not authorization | Persistent | `operation_staff`, `operation_staff_branches`, `operation_staff_windows`; avoid a module-specific staff registry |
+| Intake | `intakeId` links temporary access and optional Job/Stay/Attendance | Branch operational record created after active consent gate | Persistent, time-bound and audited | `business_intakes`, `intake_corrections`; references a grant snapshot and execution target |
+| Consent / Access Grant | Temporary access has scope, recipient Business/Branch, expiry/revoke/events | Guardian-controlled disclosure gate; recipient scope is exact | Persistent for validity/audit period | `access_grants`, `access_grant_scopes`, `consents`, `access_events`; token hash and immutable audit events |
+| Conversation | `conversationId` with Business/Customer plus contextual references | Business communication record; no Passport access | Persistent | `conversations`, `conversation_contexts`, `messages`, `conversation_reads`, approvals, outbox attempts and webhook ledger |
+| Charge | `chargeId`, Branch attribution, source references, line snapshots/history | What is owed; not execution and not Payment | Persistent, auditable | `charges`, `charge_items`, `charge_events`, refund allocations and audit metadata |
+| Payment | `paymentId`, allocation, request key, method/time | Money received/recorded; not Charge status storage | Persistent, auditable | `payments`, `payment_allocations`, attempts, provider references, webhook ledger and reconciliation state |
+| Service Record | Source-keyed from completed execution; Pet/Branch/customer/Booking; permitted snapshot/corrections | Shared Business history, never Passport/CareProof | Persistent + append-only corrections | `service_records`, `service_record_revisions`; no media bytes or public links |
+| Reports and CRM | BE8 read-only queries over Bookings, execution, Charges/Payments, messages and records | Read-only Business insights | Derived | Queries/read models; no independent mutable report or CRM score table |
 
 ### Rules locked by BE0
 
@@ -181,14 +193,14 @@ Browser-local records and fixtures are not production migration input. They are 
 
 ### Immutable, append-only and mutable treatment
 
-- Business profile, Branch configuration, Customer contact/tags and open Booking planning details are mutable through BE1–BE3 with authorization and bounded audit where policy requires it. Future full Team member capabilities remain outside this durable scope.
+- Business profile, Branch configuration, Customer contact/tags and Booking planning details are mutable through BE1–BE3; execution/staff/Consent/Inbox/financial mutations are owned by BE4–BE7 with authorization and bounded audit. BE8 Reports/CRM remains read-only.
 - Execution events, room/zone moves, care completion, Intake receipt, consent decisions/revocation, Charge adjustments/cancellation, Payment recording, Service Record correction and webhook handling need append-only event/audit entries even if a current-state row is maintained.
 - Charges retain line snapshots. Changing a future service catalog must not silently rewrite historical money.
 - Service Record corrections retain prior value, reason, actor and time. The source-keyed record is updated only through its permitted correction/recompletion rules.
 
 ## 4. Application and API boundary
 
-The frozen UI must talk to an application-facing contract, never a database binding, SQL client, R2 bucket or provider SDK. BE1–BE3 use adapters behind the current selectors/actions without requiring a route or visual redesign.
+The frozen UI must talk to an application-facing contract, never a database binding, SQL client, R2 bucket or provider SDK. BE1–BE8 use typed adapters behind the current selectors/actions without requiring a route or visual redesign.
 
 ```text
 Frozen React UI
@@ -230,7 +242,7 @@ BE1 uses `POST /api/be1` for identity/Business/Branch capabilities and BE2 uses 
 5. A Guardian relationship is a separate Person-to-Pet authority record with permissions, status, evidence policy and effective dates.
 6. `ExternalIdentity(provider, subject)` links a verified login provider subject to Person only through an explicit server-side linking flow. Future LINE Login creates or links this identity; it never creates a Guardian relationship by itself.
 
-BE1 defines Owner/Manager/Staff for its narrow Business/Branch foundation. Owner can read all Branches and change Business/Branch configuration; Manager and Staff can read their explicit Branches but cannot change BE1 configuration. BE2 lets every active membership role use the current Business-wide Customer/Pet operational capabilities because no finer permission rule is approved. BF9 Team role labels remain separate browser-local operational data and never authorize requests. No larger permission matrix is implied.
+BE1 defines Owner/Manager/Staff for its narrow Business/Branch foundation. Owner can read all Branches and change Business/Branch configuration; Manager and Staff can read their explicit Branches but cannot change BE1 configuration. BE2 lets every active membership role use the current Business-wide Customer/Pet operational capabilities because no finer permission rule is approved. BE4 operation-staff role labels remain display data and never authorize requests; BE4–BE7 commands still require the BE1 membership/Branch boundary. No larger production permission matrix is implied.
 
 ### Authorization and security rules
 
@@ -249,14 +261,14 @@ Temporary grant expiry is a read-time enforcement condition, so a cron job is no
 
 ### Implemented local direction — not production-provisioned
 
-BE1–BE3 use the existing Cloudflare-compatible Worker/Vinext runtime and **one relational D1 database with strict Business/Branch predicates and migrations** locally. BE3 additionally uses transactional `batch()` writes, optimistic revisions and SQLite triggers over a reservation ledger; it does not add a Durable Object or distributed lock. Private R2 remains only a later media candidate. Do not add KV, Queues, Durable Objects, Cron or Analytics Engine until a specific approved workload needs each one.
+BE1–BE8 use the existing Cloudflare-compatible Worker/Vinext runtime and **one relational D1 database with strict Business/Branch predicates and migrations** locally. BE3 additionally uses transactional `batch()` writes, optimistic revisions and SQLite triggers over a reservation ledger; BE4–BE7 use bounded transactions, revisions, idempotency and event ledgers. No Durable Object or distributed lock is claimed. Private R2 remains only a later media candidate. Do not add KV, Queues, Durable Objects, Cron or Analytics Engine until a specific approved workload needs each one.
 
 D1 is an appropriate initial fit because the Business model is relational and transaction-sensitive: memberships, Customer/Pet relationships, Bookings, execution, Charges and Payments need joins, indexes and transactions. It is not an automatic final choice. Cloudflare documents a 10 GB maximum per paid D1 database and single-threaded execution per individual database; capacity/load tests and reporting needs must be reviewed before committing to it for high-volume production. [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)
 
 | Capability | Recommended use | Why / trade-off |
 |---|---|---|
 | Runtime | Cloudflare Workers with the current Vinext app | Existing build has a Worker entry and Cloudflare Vite plugin. Keep application/domain code portable so this is not a database coupling. |
-| Relational persistence | D1 implemented locally through BE3; production/load acceptance still pending | Fits normalized operational records and transactional Booking reservations. Per-database single-threaded throughput and 10 GB limit mean measure contention, hot resources, heavy reports and tenant growth; move to a managed Postgres-compatible service if those constraints dominate. |
+| Relational persistence | D1 implemented locally through BE7; BE8 is read-only over those canonical records; production/load acceptance still pending | Fits normalized operational records and transactional Booking, execution, consent, inbox and financial reservations. Per-database single-threaded throughput and 10 GB limit mean measure contention, hot resources, heavy reports and tenant growth; move to a managed Postgres-compatible service if those constraints dominate. |
 | Object/image storage | Private R2 bucket after image policy is approved | Keeps binaries outside relational rows. Workers can bind R2 directly; use short-lived, purpose-scoped uploads and authorized reads. [R2 Workers API](https://developers.cloudflare.com/r2/get-started/workers-api/) |
 | KV/cache | None through BE3; later cache only disposable public/config/read models | KV must not be membership, consent, financial, Booking or revocation source of truth because those need consistent authoritative reads. |
 | Queues/events | None through BE3; introduce with transactional outbox for LINE, payment webhook follow-up, image processing and noncritical notifications | Queues support retries/batching but delivery order is not guaranteed, so every consumer needs idempotency. [Queues overview](https://developers.cloudflare.com/queues/) and [delivery model](https://developers.cloudflare.com/queues/reference/how-queues-work/) |
@@ -273,7 +285,7 @@ D1 is an appropriate initial fit because the Business model is relational and tr
 - **R2 public bucket/custom domain for media:** suitable only for intentionally public marketing assets. Pet, service and Business-uploaded images require private delivery and authorization.
 - **Queues from the outset:** would add retry and event complexity before an asynchronous use case exists. Use an outbox once LINE, payments or image work actually needs reliable decoupling.
 
-Cloudflare is the target platform, not an instruction to use every Cloudflare service. BE1–BE3 have local D1 binding/configuration only; no production service has been provisioned or deployed.
+Cloudflare is the target platform, not an instruction to use every Cloudflare service. BE1–BE8 have local D1 binding/configuration only; no production service has been provisioned or deployed.
 
 ## 7. LINE boundary
 
@@ -297,7 +309,7 @@ Business-owned LINE OA
 - Outgoing messages create a canonical Message and Delivery Attempt first. Provider delivery/retry state is external integration state; queue delivery only after an outbox is available.
 - Define retention, attachment access, staff authority, template policy, customer opt-in and failure/retry behavior before coding.
 
-LINE Login and the Mini App remain not implemented after BE3.
+LINE Login and the Mini App remain not implemented as production Guardian integrations.
 
 ## 8. Payment boundary
 
@@ -371,44 +383,50 @@ Each production-bound package or CI job must fail on its own boundary. The root 
 10. Thailand PDPA/legal retention, deletion/export, backup/recovery and audit retention requirements.
 11. D1 acceptance criteria: expected tenant size, concurrency, reporting volume, recovery needs and the threshold for managed Postgres.
 
-Existing open questions in [DECISIONS](./DECISIONS.md) remain open; BE1–BE3 resolve only their explicitly recorded foundation decisions. In particular, BE3 preserves the prototype's multi-Pet aggregate but does not close the future Visit/Order, pricing, overbooking, waitlist, buffer or cancellation-policy questions.
+Existing open questions in [DECISIONS](./DECISIONS.md) remain open where they are not covered by BE4–BE8. D-BE4-01 closes the shared-resource counting rule for multi-Pet Grooming Bookings, and D-BE7-01 closes local payment/refund mutation roles. BE3 still preserves the multi-Pet aggregate without deciding a future Visit/Order parent, and production pricing, overbooking, waitlist, buffer, cancellation, tax, provider and settlement policy remain open.
 
 ## 13. Risks before later backend stages
 
 - Current state is UI-shaped nested JSON. Normalize carefully while retaining history/source snapshots; a direct object-to-table dump would duplicate or lose authority boundaries.
 - BE3 validates and persists Branch-local civil date/time strings plus comparable minutes, but does not yet convert with the stored IANA timezone or handle DST/offset changes. Production needs UTC instants for appointment semantics plus explicit date-only/exclusive-checkout and multi-day operating policy.
 - Browser-local role/context, storage guards and QR fallback codes are not security controls.
-- The current local stores have no cross-store transaction. BE3 Booking and reservation writes are atomic inside D1, but the best-effort synchronization into local BE4 execution fixtures is not; Intake, grant use, execution capacity and financial writes still need explicit atomic boundaries.
-- BE1–BE3 servers own high-entropy IDs, time and request/correlation metadata. Deterministic legacy Customer/Pet/Booking IDs exist only in explicit dev/test seeds; later browser-local modules still need server-owned identity and idempotency when migrated.
+- Each BE4–BE7 mutation owns a D1 transaction/idempotency boundary; no cross-domain browser write is authoritative. The frozen UI may refresh compatibility caches after a successful response, but those refreshes are not source-of-truth transactions.
+- BE1–BE7 servers own high-entropy IDs, time and request/correlation metadata. Deterministic legacy IDs exist only in explicit dev/test seeds; BE8 report/CRM reads are derived and do not allocate new identity.
 - Offset pagination gives a bounded query foundation but not a point-in-time directory snapshot if another device reorders Bookings between pages. The in-tab client serializes its own reads/writes; production synchronization/cursors and multi-device refresh policy remain to be designed and load-tested.
-- Payment request keys currently protect repeated local clicks only; provider events and reconciliation need independent durable duplicate handling.
-- Current reporting and CRM selectors are correct read-time directions, but expensive production queries need indexes, measured query budgets and rebuildable projections.
+- Payment request keys, provider webhook ledgers and reconciliation attempts have independent durable duplicate handling; provider confirmation remains unconfigured.
+- Current reporting and CRM queries are correct read-time directions over the local D1 workload, but production volume still needs measured query budgets, further indexes and rebuildable projection policy.
 - No approved retention/visibility policy exists for messages, operational photos, Service Records, incident data and consent audit. Storage must wait for policy.
 
-## 14. BE1 / BE2 / BE3 completion boundary
+## 14. BE1–BE8 completion boundary
 
-BE1 is deliberately small: Person identity, Business/Branch membership and server-enforced scope; typed application/query-command boundary; durable Business/Branch configuration; audit/correlation; and a compatibility migration for only the active Business context. BE2 adds only durable Customer/Pet identity, Business-local profile/contact relationship, notes/tags, lifecycle, search/duplicate warnings and frozen-selector compatibility. BE3 adds only durable Booking planning, minimal service/Resource availability, typed conflicts, transactional reservation guards, create idempotency, optimistic revision control and frozen Booking projection compatibility. Service execution and every later backend remain separate. Migration, persistence and authorization tests cover tenant isolation, Branch access, cross-Business spoof/link denial, durable reopen behavior and BE3 conflict/idempotency scenarios; exact current evidence is recorded only in VALIDATION.
+BE1 provides identity/tenant scope; BE2 provides Business-scoped Customer/Pet identity; BE3 provides Booking/planning Resource persistence; BE4 provides execution and Service Record sources; BE5 provides Consent/Intake access control; BE6 provides Inbox/outbox foundations; BE7 provides Charge/Payment financial truth; and BE8 derives Reports/CRM without writable projections. Migration, persistence, authorization, concurrency and idempotency evidence is recorded in VALIDATION.
 
 ## Current boundary
 
 - BE1 backend: **IMPLEMENTED LOCALLY**
 - BE2 Customer/Pet backend: **IMPLEMENTED LOCALLY**
 - BE3 Booking/Calendar/Resource backend: **IMPLEMENTED LOCALLY**
-- Database: **IMPLEMENTED — BE1 + BE2 + BE3 SCOPE ONLY**
+- Database: **IMPLEMENTED — BE1–BE7 TABLES; BE8 READ-ONLY QUERIES**
 - Production authentication: **NOT IMPLEMENTED**
 - BE1 server authorization: **IMPLEMENTED**
 - Customer/Pet server authorization: **IMPLEMENTED**
-- Guardian authority / Passport / Consent: **NOT IMPLEMENTED**
+- BE5 temporary Consent / Passport-access grant / Intake backend: **IMPLEMENTED LOCALLY**; production Guardian authority/linking and Passport ownership integration are **NOT IMPLEMENTED**
 - Booking planning backend: **IMPLEMENTED LOCALLY**
-- BE4 Service Operations backend: **NOT IMPLEMENTED / NOT STARTED**
-- LINE / Mini App / OA integration: **NOT IMPLEMENTED**
+- BE4 Service Operations backend: **VALIDATED LOCALLY**
+- BE5 Consent / Intake backend: **VALIDATED LOCALLY**
+- BE6 Inbox / LINE foundation: **VALIDATED PROVIDER-NEUTRAL**
+- BE7 Billing / Payments model: **VALIDATED LOCALLY; PROVIDER-NEUTRAL**
+- BE8 Reports / CRM backend: **VALIDATED LOCALLY; READ-ONLY / DERIVED**
+- LINE production / Mini App / OA credentials: **NOT IMPLEMENTED**
 - Payment gateway: **NOT IMPLEMENTED**
+- R2/private media storage: **NOT IMPLEMENTED**
 - Cloudflare provisioning/deployment: **NOT IMPLEMENTED**
 - Business frontend BF1–BF12: **FROZEN BASELINE**
 - Business font: **LINE Seed Sans TH**
 - Consumer: **PAUSED**; future target is a LINE Mini App
 - `/workfiledesign`: **UNTOUCHED**
 - Commit/push/deploy: **NONE**
+- Latest safe migration: **0014_be7_settlement_guards.sql**
 - BE2: **IMPLEMENTED LOCALLY**
 - BE3: **IMPLEMENTED LOCALLY**
-- BE4: **NOT STARTED**
+- BE4–BE8: **IMPLEMENTED LOCALLY / VALIDATED PER TABLE ABOVE**

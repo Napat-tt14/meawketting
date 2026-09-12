@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ensureDurableReport, readReport } from "../../_backend/be8/client";
+import { businessToday } from "../../_backend/shared/businessClock";
+import { addDays } from "../../_backend/shared/time";
 import {
-  BOOKING_DEMO_DATE,
   getBusinessReportsSummary,
   type BusinessServiceModule,
   type ReportBranchScope,
@@ -23,6 +25,7 @@ import {
 } from "../../_components/icons";
 import { BusinessDataTable } from "../_components/BusinessDataTable";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
+import { formatBusinessCount } from "../_components/businessDisplay";
 import { BusinessSegmentedControl } from "../_components/BusinessSegmentedControl";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
 import {
@@ -42,13 +45,22 @@ const SERVICE_MODULE_ICON: Record<BusinessServiceModule, typeof Scissors> = {
 };
 
 export function ReportsScreen() {
-  const { context, revision } = useBusinessContext();
+  const { context, revision, isContextReady } = useBusinessContext();
   const stateReady = useBusinessStateReady();
 
   const [dateRangePreset, setDateRangePreset] = useState<ReportDateRangePreset>("today");
-  const [customStartDate, setCustomStartDate] = useState("2026-08-12");
-  const [customEndDate, setCustomEndDate] = useState<string>(BOOKING_DEMO_DATE);
+  const [customStartDate, setCustomStartDate] = useState(() => addDays(businessToday(context), -6));
+  const [customEndDate, setCustomEndDate] = useState(() => businessToday(context));
   const [branchScope, setBranchScope] = useState<ReportBranchScope>("current");
+  const [error, setError] = useState(false);
+  const { businessId, branchId } = context;
+  useEffect(() => {
+    if (!isContextReady) return;
+    let stopped = false;
+    const load = async () => { try { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }); if (!stopped) setError(false); } catch { if (!stopped) setError(true); } };
+    void load(); const timer = window.setInterval(() => void load(), 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope, isContextReady]);
 
   const report = useMemo(() => {
     void revision;
@@ -62,6 +74,10 @@ export function ReportsScreen() {
   }, [context, revision, dateRangePreset, customStartDate, customEndDate, branchScope, stateReady]);
 
   const { keyMetrics, serviceBreakdown, operationalInsights, customerInsights, branchComparison } = report;
+
+  // The report cache is populated in the browser. Keep the first render
+  // consistent with SSR until the business state is ready.
+  if (!stateReady) return <div className="business-reports shell"><BusinessPageHeader title="รายงานและข้อมูลเชิงลึก" /><p role="status">กำลังโหลดข้อมูลรายงาน…</p></div>;
 
   return (
     <div className="business-reports shell" key={context.key}>
@@ -79,6 +95,10 @@ export function ReportsScreen() {
           </div>
         }
       />
+
+      {error ? <p role="status">โหลดรายงานล่าสุดไม่สำเร็จ กำลังลองใหม่</p> : null}
+      {readReport(context, { dateRangePreset, customStartDate, customEndDate, branchScope }).financials.refunded > 0 ? <p role="status">รายรับสุทธิหักเงินคืนที่บันทึกในช่วงนี้แล้ว</p> : null}
+      {readReport(context, { dateRangePreset, customStartDate, customEndDate, branchScope }).financials.unallocated > 0 ? <p role="status">มีเงินรับที่รอตรวจสอบการจัดสรร ยอดรายรับรวมจึงอาจมากกว่ายอดตามประเภทบริการ</p> : null}
 
       {/* Date Range Toolbar */}
       <section className="reports-toolbar" aria-label="ช่วงเวลาของรายงาน">
@@ -152,7 +172,7 @@ export function ReportsScreen() {
               <span className="reports-card__label">บริการที่เสร็จสิ้น</span>
             </div>
           </header>
-          <div className="reports-kpi__value">{keyMetrics.completedServices} <small>งาน</small></div>
+          <div className="reports-kpi__value">{formatBusinessCount(keyMetrics.completedServices)} <small>งาน</small></div>
           <footer className="reports-kpi__footer">
             <span className="reports-kpi__footer-main">
               อาบน้ำ/ตัดขน {keyMetrics.completedGrooming} · โรงแรม {keyMetrics.completedHotel} · Daycare {keyMetrics.completedDaycare}
@@ -168,7 +188,7 @@ export function ReportsScreen() {
               <span className="reports-card__label">การจองทั้งหมด</span>
             </div>
           </header>
-          <div className="reports-kpi__value">{keyMetrics.totalBookings} <small>รายการ</small></div>
+          <div className="reports-kpi__value">{formatBusinessCount(keyMetrics.totalBookings)} <small>รายการ</small></div>
           <footer className="reports-kpi__footer">
             <span className="reports-kpi__footer-main">
               ยืนยัน {keyMetrics.confirmedBookings} · มาถึง {keyMetrics.arrivedBookings} · ยกเลิก {keyMetrics.cancelledBookings}
@@ -184,7 +204,7 @@ export function ReportsScreen() {
               <span className="reports-card__label">ลูกค้าที่ใช้บริการ</span>
             </div>
           </header>
-          <div className="reports-kpi__value">{keyMetrics.totalCustomers} <small>ราย</small></div>
+          <div className="reports-kpi__value">{formatBusinessCount(keyMetrics.totalCustomers)} <small>ราย</small></div>
           <footer className="reports-kpi__footer">
             <span className="reports-kpi__footer-main">
               ลูกค้าใหม่ {keyMetrics.newCustomers} · ลูกค้าเดิม {keyMetrics.returningCustomers}

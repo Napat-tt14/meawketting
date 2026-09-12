@@ -29,6 +29,83 @@
       "when": 1788770453668,
       "tag": "0003_same_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788808118949,
+      "tag": "0004_curious_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788808922324,
+      "tag": "0005_peaceful_patch",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788843401410,
+      "tag": "0006_be4_booking_execution_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788844138624,
+      "tag": "0007_be5_consent_intake",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788860650027,
+      "tag": "0008_be5_relational_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788862560791,
+      "tag": "0009_be6_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788882760630,
+      "tag": "0010_be6_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788883874040,
+      "tag": "0011_be6_outbox_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788901454564,
+      "tag": "0012_be7_financial_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788901825844,
+      "tag": "0013_be7_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1788920404169,
+      "tag": "0014_be7_settlement_guards",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { businessToday } from "../../_backend/shared/businessClock";
+
 import { type DragEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import {
   cancelDurableBooking,
@@ -12,7 +14,6 @@ import {
 } from "../../_backend/be3/client";
 import type { BookingStatus, BusinessServiceModule, PrototypeBooking } from "../../_prototype/businessState";
 import {
-  BOOKING_DEMO_DATE,
   BOOKING_STATUS_LABELS,
   durableCreateBookingInputFromDraft,
   durableUpdateBookingInputFromDraft,
@@ -110,7 +111,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const launchCustomerId = launchRequest?.customerId ?? null;
   const launchPetId = launchRequest?.petId ?? null;
   const launchBookingId = launchRequest?.bookingId ?? null;
-  const [selectedDate, setSelectedDate] = useState<string>(BOOKING_DEMO_DATE);
+  const [selectedDate, setSelectedDate] = useState<string>(businessToday(context));
   const [view, setView] = useState<CalendarView>("week");
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
   const [customRangeDays, setCustomRangeDays] = useState<CustomRangeDays>(28);
@@ -388,9 +389,9 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   function goToToday() {
-    setSelectedDate(BOOKING_DEMO_DATE);
-    setAnnouncement(`ไปที่วันนี้ ${calendarDateLabel(BOOKING_DEMO_DATE)}`);
-    focusCalendarDate(BOOKING_DEMO_DATE);
+    setSelectedDate(businessToday(context));
+    setAnnouncement(`ไปที่วันนี้ ${calendarDateLabel(businessToday(context))}`);
+    focusCalendarDate(businessToday(context));
   }
 
   function completeSave(booking: PrototypeBooking, created: boolean) {
@@ -829,9 +830,9 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
             <input type="date" value={selectedDate} onInput={(event) => { if (event.currentTarget.value) setSelectedDate(event.currentTarget.value); }} />
           </label>
           <button type="button" aria-label="ดูช่วงถัดไป" onClick={() => moveDate(1)}><ArrowRight size={18} /></button>
-          <button className="calendar-toolbar__demo-day" type="button" aria-label={`ไปวันนี้ ${calendarDateLabel(BOOKING_DEMO_DATE, { day: "numeric", month: "short" })}`} onClick={goToToday}>
+          <button className="calendar-toolbar__demo-day" type="button" aria-label={`ไปวันนี้ ${calendarDateLabel(businessToday(context), { day: "numeric", month: "short" })}`} onClick={goToToday}>
             <strong>วันนี้</strong>
-            <span>{calendarDateLabel(BOOKING_DEMO_DATE, { day: "numeric", month: "short" })}</span>
+            <span>{calendarDateLabel(businessToday(context), { day: "numeric", month: "short" })}</span>
           </button>
         </div>
         <CalendarViewControl

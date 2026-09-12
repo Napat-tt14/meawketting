@@ -1,3 +1,4 @@
+import { businessToday } from "../../_backend/shared/businessClock";
 import type {
   BusinessLocalPetRelationship,
   BusinessPetDataSource,
@@ -61,7 +62,7 @@ export function petDataSourceLabel(source: BusinessPetDataSource) {
 }
 
 export function bookingOccursAfterDemoStart(booking: PrototypeBooking) {
-  return booking.status !== "cancelled" && booking.start.slice(0, 10) >= "2026-08-18";
+  return booking.status !== "cancelled" && booking.start.slice(0, 10) >= businessToday(booking);
 }
 
 export function customerBookings(customer: PrototypeCustomer, bookings: readonly PrototypeBooking[]) {

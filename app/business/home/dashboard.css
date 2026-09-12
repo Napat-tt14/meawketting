@@ -1,0 +1,88 @@
+/* Operational hierarchy, scoped to the dashboard; shared brand tokens remain intact. */
+.business-home .dashboard-banner { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); touch-action: pan-y; }
+.dashboard-banner__link { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+.dashboard-banner__picture { display: block; min-width: 0; overflow: hidden; aspect-ratio: 16 / 7; }
+.dashboard-banner__picture img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 60%; }
+.dashboard-banner__copy { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 24px 32px; gap: 12px; }
+.dashboard-banner__eyebrow { color: var(--ink-soft); font-size: 12px; }
+.business-home .dashboard-banner__copy h2 { margin: 0; font-size: 22px; line-height: 1.45; font-weight: 600; }
+.dashboard-banner__cta { display: inline-flex; gap: 8px; align-items: center; min-height: 36px; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+.dashboard-banner__controls { display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-top: 1px solid var(--border); }
+.dashboard-banner__section-label { margin-right: auto; color: var(--ink-soft); font-size: 12px; }
+.dashboard-banner__counter { margin-right: 8px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.business-home .dashboard-banner__controls button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--foreground); box-shadow: none; cursor: pointer; }
+.business-home .dashboard-banner__controls button:hover { background: var(--accent); }
+.dashboard-banner__link:hover .dashboard-banner__cta { color: var(--dashboard-accent); }
+@media (max-width: 767px) {
+  .dashboard-banner__link { grid-template-columns: 1fr; }
+  .dashboard-banner__picture { aspect-ratio: 16 / 9; }
+  .dashboard-banner__copy { padding: 16px 20px; gap: 6px; }
+  .business-home .dashboard-banner__copy h2 { font-size: 19px; }
+  .dashboard-banner__controls { padding-inline: 12px; }
+}
+.business-home.shell { --dashboard-accent: var(--color-meaw-yellow-800); display: grid; gap: 24px; font-variant-numeric: tabular-nums; }
+.business-home .business-page-header { margin-bottom: 0; }
+.business-home .business-page-header h1 { font-size: 28px; letter-spacing: -.025em; }
+.dashboard-overview { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.dashboard-overview__date { display: flex; justify-content: space-between; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--ink-soft); }
+.dashboard-overview__metrics { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.dashboard-primary { display: flex; align-items: center; gap: 28px; padding: 28px 24px; border-right: 1px solid var(--border); }
+.business-home .dashboard-primary h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.business-home .dashboard-primary__value { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 56px; line-height: 1.15; font-weight: 600; letter-spacing: -.045em; }
+.dashboard-primary__value span, .dashboard-secondary dd span { font-size: 13px; font-weight: 400; color: var(--ink-soft); letter-spacing: normal; }
+/* Global main typography locks descendants to body size with !important. */
+.business-home.shell .dashboard-primary__value strong { font-size: 56px !important; line-height: 1.15; font-weight: 600; }
+.business-home.shell .dashboard-secondary dd strong { font-size: 30px !important; line-height: 1.4; font-weight: 600; }
+.dashboard-primary a, .dashboard-secondary a { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 4px; }
+.dashboard-trend { flex: 1; min-width: 100px; margin: 0; }
+.dashboard-trend svg { width: 100%; max-height: 85px; color: var(--dashboard-accent); }
+.dashboard-trend figcaption { margin-top: 8px; color: var(--ink-soft); font-size: 11px; line-height: 1.6; }
+.dashboard-secondary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 20px; margin: 0; padding: 24px; }
+.dashboard-secondary dt { min-height: 40px; font-size: 13px; color: var(--ink-soft); }
+.business-home .dashboard-secondary dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 6px 0 0; font-size: 30px; font-weight: 600; line-height: 1.4; }
+.dashboard-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.dashboard-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 14px; font-weight: 600; }
+.dashboard-actions .dashboard-actions__primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.business-home .business-home__layout { grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 24px; }
+.business-home :is(.business-home__main, .business-home__summary) { gap: 20px; }
+.business-home .business-home-section { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: none; transform: none; padding: 20px; }
+.business-home .business-home-section__heading h2 { font-size: 17px; font-weight: 600; }
+.business-home .business-attention__cue { background: none; border: 0; color: var(--ink-soft); width: 24px; height: 24px; }
+.business-home .business-attention__item--waiting .business-attention__cue { color: var(--status-warning); }
+.business-home .business-attention__item { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; }
+.business-home .business-attention__item > a { grid-template-columns: 24px minmax(0, 1fr) auto; }
+.business-home :is(.business-attention__item strong, .business-next-work__copy strong, .business-module-summary li strong) { font-size: 14px; font-weight: 600; }
+.business-home :is(.business-attention__item small, .business-next-work__copy small, .business-module-summary li small) { font-size: 13px; }
+.business-home .business-next-work__icon { border: 0; background: none; color: var(--ink-soft); }
+.business-home .business-next-work__list time { color: var(--foreground); font-weight: 500; font-size: 13px; }
+.business-home .business-next-work__line { background: var(--border); }
+.business-home .business-module-summary .business-service-icon { color: var(--ink-soft); background: none; border: 0; border-radius: 0; box-shadow: none; }
+.business-home .business-module-summary li b { font-weight: 600; }
+.business-home .business-home-revenue .business-home-section__heading a { color: var(--ink-soft); }
+.business-home .business-home-revenue dt svg { color: var(--ink-soft); }
+.business-home .dashboard-empty { display: block; margin: 0; padding: 20px 0; color: var(--ink-soft); font-size: 14px; }
+@media (hover: hover) {
+  .dashboard-actions a:hover { border-color: var(--dashboard-accent); }
+  .dashboard-primary a:hover, .dashboard-secondary a:hover { color: var(--foreground); }
+}
+@media (max-width: 1150px) {
+  .dashboard-overview__metrics { grid-template-columns: 1fr; }
+  .dashboard-primary { border-right: 0; border-bottom: 1px solid var(--border); }
+  .dashboard-trend { max-width: 280px; margin-left: auto; }
+  .dashboard-secondary dt { min-height: auto; }
+}
+@media (max-width: 767px) {
+  .business-home .business-home__layout { grid-template-columns: 1fr; }
+  .business-home .business-page-header h1 { font-size: 24px; }
+  .dashboard-overview__date { flex-wrap: wrap; gap: 4px 12px; padding: 12px 16px; }
+  .dashboard-primary { padding: 20px 16px; gap: 16px; }
+  .business-home .dashboard-primary__value { font-size: 48px; }
+  .business-home.shell .dashboard-primary__value strong { font-size: 48px !important; }
+  .business-home.shell .dashboard-secondary dd strong { font-size: 26px !important; }
+  .dashboard-secondary { padding: 16px; gap: 12px; }
+  .dashboard-secondary dt { min-height: 40px; }
+  .business-home .dashboard-secondary dd { font-size: 26px; }
+  .dashboard-secondary dd span { width: 100%; font-size: 11px; }
+  .dashboard-actions a { flex: 1 1 auto; padding-inline: 12px; }
+  .business-home .business-home-section { padding: 16px; }
+}

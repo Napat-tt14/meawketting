@@ -3,29 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { rescheduleDurableBooking } from "../../_backend/be3/client";
 import {
-  addPrototypeHotelIncidentNote,
-  assignPrototypeHotelCareTaskStaff,
-  assignPrototypeHotelStayRoom,
-  checkInPrototypeHotelStay,
-  completePrototypeHotelCareTask,
   evaluatePrototypeHotelStayDateChange,
   getHotelRooms,
   getTeamMembersForCapability,
   getPrototypeHotelStayRoomAssignment,
   listPrototypeHotelLinkedGroomingJobs,
-  movePrototypeHotelStayRoom,
-  projectDurableBooking,
   readPrototypeBooking,
   readPrototypeCustomer,
   readPrototypeCustomerFixture,
-  resolvePrototypeHotelIncidentNote,
-  synchronizePrototypeExecutionCompatibilityForBooking,
-  transitionPrototypeHotelStay,
-  updatePrototypeHotelStayNote,
   type DemoBusinessContext,
   type PrototypeHotelStay,
 } from "../../_prototype/businessState";
-import { ensurePrototypeConversation } from "../../_prototype/inboxState";
+import { addPrototypeHotelIncidentNote, assignPrototypeHotelCareTaskStaff, assignPrototypeHotelStayRoom, checkInPrototypeHotelStay, completePrototypeHotelCareTask, movePrototypeHotelStayRoom, resolvePrototypeHotelIncidentNote, transitionPrototypeHotelStay, updatePrototypeHotelStayNote } from "../../_backend/be4/facade";
+import { ensureDurableOperations } from "../../_backend/be4/client";
+import { ensureDurableConversation as ensurePrototypeConversation } from "../../_backend/be6/client";
 import {
   BedDouble,
   CalendarDays,
@@ -54,7 +45,7 @@ function operationalDate(stay: PrototypeHotelStay, referenceDate: string) {
   return referenceDate;
 }
 
-function transitionNotice(result: ReturnType<typeof transitionPrototypeHotelStay>, label: string): DetailMutationResult {
+function transitionNotice(result: Awaited<ReturnType<typeof transitionPrototypeHotelStay>>, label: string): DetailMutationResult {
   if (result.ok) return { ok: true, notice: result.duplicate ? "สถานะนี้ถูกบันทึกไว้แล้ว" : label };
   const notices: Record<Exclude<typeof result.reason, never>, string> = {
     missing: "ไม่พบรายการเข้าพักนี้",
@@ -65,7 +56,7 @@ function transitionNotice(result: ReturnType<typeof transitionPrototypeHotelStay
     "care-incomplete": "ยังมีงานดูแลที่ต้องทำให้เสร็จก่อนเช็กเอาต์",
     storage: "บันทึกสถานะไม่สำเร็จ ลองอีกครั้ง",
   };
-  return { ok: false, notice: notices[result.reason] };
+  return { ok: false, notice: notices[result.reason] ?? result.message };
 }
 
 export function HotelStayDetail({
@@ -153,14 +144,14 @@ export function HotelStayDetail({
     onChanged(result);
   }
 
-  function assignOrMoveRoom() {
+  async function assignOrMoveRoom() {
     if (!roomId) {
       publish({ ok: false, notice: "เลือกห้องหรือโซนก่อนบันทึก" });
       return;
     }
     const result = currentAssignment
-      ? movePrototypeHotelStayRoom(stay.hotelStayId, roomId, context, moveReason, operationDate)
-      : assignPrototypeHotelStayRoom(stay.hotelStayId, roomId, context);
+      ? await movePrototypeHotelStayRoom(stay.hotelStayId, roomId, context, moveReason, operationDate)
+      : await assignPrototypeHotelStayRoom(stay.hotelStayId, roomId, context);
     if (!result.ok) {
       const detail = result.availability?.conflicts.map((conflict) => conflict.message).join(" · ");
       publish({ ok: false, notice: detail || "ห้องหรือโซนนี้ไม่พร้อมในช่วงวันที่เลือก" });
@@ -201,33 +192,31 @@ export function HotelStayDetail({
         });
         return;
       }
-      const authoritative = projectDurableBooking(result.booking);
-      const compatibilitySaved = synchronizePrototypeExecutionCompatibilityForBooking(authoritative);
-      publish({
-        ok: compatibilitySaved,
-        notice: compatibilitySaved
-          ? "ปรับวันเข้าพักและตารางการจองแล้ว"
-          : "บันทึกตารางการจองแล้ว แต่ข้อมูลปฏิบัติการในเบราว์เซอร์ยังอัปเดตไม่สำเร็จ",
-      });
+      try { await ensureDurableOperations(context.businessId, context.branchId, true); }
+      catch {
+        publish({ ok: true, notice: "บันทึกวันเข้าพักแล้ว กรุณาโหลดหน้าใหม่เพื่อดูข้อมูลล่าสุด" });
+        return;
+      }
+      publish({ ok: true, notice: "ปรับวันเข้าพักและตารางการจองแล้ว" });
     } catch {
-      publish({ ok: false, notice: "ปรับวันเข้าพักไม่สำเร็จ รายการเดิมยังไม่เปลี่ยน" });
+      publish({ ok: false, notice: "ยังยืนยันผลการบันทึกไม่ได้ กรุณาโหลดข้อมูลล่าสุดก่อนลองอีกครั้ง" });
     } finally {
       setSavingDates(false);
     }
   }
 
-  function saveNote() {
-    const updated = updatePrototypeHotelStayNote(stay.hotelStayId, note, context);
+  async function saveNote() {
+    const updated = await updatePrototypeHotelStayNote(stay.hotelStayId, note, context);
     publish({ ok: Boolean(updated), notice: updated ? "บันทึกหมายเหตุของร้านแล้ว" : "บันทึกหมายเหตุไม่สำเร็จ ลองอีกครั้ง" });
   }
 
-  function completeCare(taskId: string) {
-    const updated = completePrototypeHotelCareTask(stay.hotelStayId, taskId, context);
+  async function completeCare(taskId: string) {
+    const updated = await completePrototypeHotelCareTask(stay.hotelStayId, taskId, context);
     publish({ ok: Boolean(updated), notice: updated ? "บันทึกงานดูแลเป็นเสร็จแล้ว" : "บันทึกงานดูแลไม่สำเร็จ ลองอีกครั้ง" });
   }
 
-  function assignCareStaff(taskId: string, staffId: string) {
-    const result = assignPrototypeHotelCareTaskStaff(stay.hotelStayId, taskId, staffId || null, context);
+  async function assignCareStaff(taskId: string, staffId: string) {
+    const result = await assignPrototypeHotelCareTaskStaff(stay.hotelStayId, taskId, staffId || null, context);
     if (!result.ok) {
       const fallback = result.reason === "invalid-staff"
         ? "พนักงานคนนี้ไม่อยู่ในสาขาหรือไม่มีความสามารถงานดูแล"
@@ -240,18 +229,18 @@ export function HotelStayDetail({
     publish({ ok: true, notice: staffId ? "มอบหมายงานดูแลให้ทีมแล้ว" : "ยกเลิกการมอบหมายงานดูแลแล้ว" });
   }
 
-  function addIncident() {
-    const updated = addPrototypeHotelIncidentNote(stay.hotelStayId, incidentSummary, context);
+  async function addIncident() {
+    const updated = await addPrototypeHotelIncidentNote(stay.hotelStayId, incidentSummary, context);
     if (updated) setIncidentSummary("");
     publish({ ok: Boolean(updated), notice: updated ? "เพิ่ม incident / note ที่ต้องติดตามแล้ว" : "กรอกเหตุที่ต้องติดตามก่อนบันทึก" });
   }
 
-  function resolveIncident(incidentId: string) {
-    const updated = resolvePrototypeHotelIncidentNote(stay.hotelStayId, incidentId, context);
+  async function resolveIncident(incidentId: string) {
+    const updated = await resolvePrototypeHotelIncidentNote(stay.hotelStayId, incidentId, context);
     publish({ ok: Boolean(updated), notice: updated ? "ปิด incident / note แล้ว" : "อัปเดตรายการนี้ไม่สำเร็จ" });
   }
 
-  function advanceLifecycle() {
+  async function advanceLifecycle() {
     let result: DetailMutationResult;
     if (stay.status === "booked" || stay.status === "expected-today") {
       if (!stay.intakeId) {
@@ -259,16 +248,16 @@ export function HotelStayDetail({
       } else if (!currentAssignment) {
         result = { ok: false, notice: "ระบุห้องหรือโซนก่อนรับเข้า" };
       } else {
-        result = transitionNotice(checkInPrototypeHotelStay(stay.hotelStayId, context), "รับน้องเข้าพักแล้ว");
+        result = transitionNotice(await checkInPrototypeHotelStay(stay.hotelStayId, context), "รับน้องเข้าพักแล้ว");
       }
     } else if (stay.status === "checked-in") {
-      result = transitionNotice(transitionPrototypeHotelStay(stay.hotelStayId, "in-stay", context), "เริ่มสถานะพักอยู่แล้ว");
+      result = transitionNotice(await transitionPrototypeHotelStay(stay.hotelStayId, "in-stay", context), "เริ่มสถานะพักอยู่แล้ว");
     } else if (stay.status === "in-stay") {
-      result = transitionNotice(transitionPrototypeHotelStay(stay.hotelStayId, "ready-for-checkout", context), "ตั้งสถานะพร้อมรับกลับแล้ว");
+      result = transitionNotice(await transitionPrototypeHotelStay(stay.hotelStayId, "ready-for-checkout", context), "ตั้งสถานะพร้อมรับกลับแล้ว");
     } else if (stay.status === "ready-for-checkout") {
-      result = transitionNotice(transitionPrototypeHotelStay(stay.hotelStayId, "checked-out", context), "เช็กเอาต์แล้ว · รอตรวจปิดรายการ");
+      result = transitionNotice(await transitionPrototypeHotelStay(stay.hotelStayId, "checked-out", context), "เช็กเอาต์แล้ว · รอตรวจปิดรายการ");
     } else if (stay.status === "checked-out") {
-      result = transitionNotice(transitionPrototypeHotelStay(stay.hotelStayId, "completed", context), "ปิดการเข้าพักเป็นเสร็จสิ้นแล้ว");
+      result = transitionNotice(await transitionPrototypeHotelStay(stay.hotelStayId, "completed", context), "ปิดการเข้าพักเป็นเสร็จสิ้นแล้ว");
     } else {
       result = { ok: false, notice: "สถานะนี้ไม่มีขั้นตอนถัดไป" };
     }
@@ -284,12 +273,12 @@ export function HotelStayDetail({
     return null;
   }
 
-  function openAddServiceRequest() {
+  async function openAddServiceRequest() {
     if (!booking) {
       publish({ ok: false, notice: "รายการเข้าพักนี้ไม่มีบริบทการจองที่พร้อมส่งคำขอ" });
       return;
     }
-    const result = ensurePrototypeConversation({
+    const result = await ensurePrototypeConversation({
       businessId: context.businessId,
       branchId: context.branchId,
       customerId: customer!.id,

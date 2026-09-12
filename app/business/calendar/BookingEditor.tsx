@@ -1,5 +1,7 @@
 "use client";
 
+import { businessToday } from "../../_backend/shared/businessClock";
+
 import { type FormEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   cancelDurableBooking,
@@ -18,7 +20,6 @@ import type {
   PrototypeCustomer,
 } from "../../_prototype/businessState";
 import {
-  BOOKING_DEMO_DATE,
   durableBookingAvailabilityInput,
   durableCreateBookingInputFromDraft,
   durableUpdateBookingInputFromDraft,
@@ -105,7 +106,7 @@ function reviewTimeLabel(draft: PrototypeBookingDraft, service: DemoBookingServi
   if (service.timeModel === "appointment") {
     const start = draft.start.slice(11, 16);
     const end = draft.end.slice(11, 16);
-    return `${calendarDateLabel(draftDate(draft, BOOKING_DEMO_DATE))} · ${start}${end ? `–${end}` : ""}`;
+    return `${calendarDateLabel(draftDate(draft, businessToday(service)))} · ${start}${end ? `–${end}` : ""}`;
   }
   if (service.timeModel === "day") return `${calendarDateLabel(draft.start)} · เต็มวัน`;
   return `${calendarDateLabel(draft.start)} – ${calendarDateLabel(draft.end)}`;

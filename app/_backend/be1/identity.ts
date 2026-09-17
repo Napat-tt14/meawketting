@@ -1,13 +1,27 @@
 import { BE1_DEV_ACTOR_HEADER } from "./contracts";
 import { be1Error } from "./errors";
+import { ServerSessionIdentityAdapter } from "./session";
+import { D1SessionRepository } from "./sessionRepository";
+import type { D1DatabaseLike } from "./repository";
 
 export type AuthenticatedIdentity = {
   personId: string;
-  provider: "dev-test";
+  provider: "dev-test" | "server-session";
 };
 
 export interface IdentityAdapter {
   resolve(request: Request): Promise<AuthenticatedIdentity>;
+}
+
+/** Selects the only identity provider allowed by the server environment. */
+export function resolveIdentityAdapter(mode: string | undefined, database?: D1DatabaseLike): IdentityAdapter {
+  if (mode === "dev-test") return new DevTestIdentityAdapter(mode);
+  if (mode === "google" && database) return new ServerSessionIdentityAdapter(new D1SessionRepository(database));
+  throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
+}
+
+export async function resolveIdentity(request: Request, mode: string | undefined, database?: D1DatabaseLike) {
+  return resolveIdentityAdapter(mode, database).resolve(request);
 }
 
 /**

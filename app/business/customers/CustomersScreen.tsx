@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { searchDurableCustomers } from "../../_backend/be2/client";
 import { ensureDurableCrm } from "../../_backend/be8/client";
+import { BUSINESS_FIXTURE_TEST_MODE } from "../../_prototype/fixtureRuntime";
 import {
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
@@ -19,7 +20,7 @@ import {
 } from "../../_prototype/businessState";
 import { listPrototypeConversationFixtures, listPrototypeConversations } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
-import { CalendarDays, ChevronRight, Info, Phone, Plus } from "../../_components/icons";
+import { CalendarDays, ChevronRight, Clock, CircleDashed, Info, Phone, Plus, UsersRound, UserRound, UserRoundCheck } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { CustomerEditor } from "./CustomerEditor";
@@ -55,18 +56,21 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const [revision, setRevision] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [crmLoadedKey, setCrmLoadedKey] = useState("");
   const [searchResult, setSearchResult] = useState<{ businessId: string; query: string; customerIds: string[] } | null>(null);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const relationshipStateReady = useIsClient();
   const { businessId, branchId } = context;
+  const crmKey = JSON.stringify([businessId, branchId]);
+  const crmReady = BUSINESS_FIXTURE_TEST_MODE || crmLoadedKey === crmKey;
   useEffect(() => {
     if (!isContextReady) return;
     let stopped = false;
-    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }); if (!stopped) setNotice((v) => v === "โหลด CRM ล่าสุดไม่สำเร็จ" ? null : v); } catch { if (!stopped) setNotice("โหลด CRM ล่าสุดไม่สำเร็จ"); } };
+    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }); if (!stopped) { setCrmLoadedKey(crmKey); setNotice((v) => v === "โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ" ? null : v); } } catch { if (!stopped) setNotice("โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ"); } };
     void load(); const timer = window.setInterval(() => void load(), 5000);
     return () => { stopped = true; window.clearInterval(timer); };
-  }, [businessId, branchId, isContextReady]);
+  }, [businessId, branchId, isContextReady, crmKey]);
 
   useEffect(() => {
     const sync = () => setRevision((current) => current + 1);
@@ -141,7 +145,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
     : null;
   const visibleCustomers = customers.filter((customer) => (
     (!normalizedQuery || backendSearchIds?.has(customer.id) === true)
-    && customerMatchesCrmSegment(crmProfilesByCustomer.get(customer.id)!, filter)
+    && (!crmReady || customerMatchesCrmSegment(crmProfilesByCustomer.get(customer.id)!, filter))
   ));
   return (
     <div className="business-customers shell">
@@ -150,7 +154,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
         actions={<button className="button button--business business-signature-sweep" type="button" onClick={() => { setNotice(null); setEditorOpen(true); }}><Plus size={19} /><span>เพิ่มลูกค้า</span></button>}
       />
 
-      <CustomerCrmOverview profiles={crmProfiles} />
+      {crmReady ? <CustomerCrmOverview profiles={crmProfiles} /> : <p role="status">กำลังโหลดข้อมูลความสัมพันธ์ลูกค้า…</p>}
 
       <section className="customer-search-panel" aria-label="ค้นหาและกรองลูกค้า">
         <BusinessSearchField
@@ -169,19 +173,25 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
           placeholder="ค้นหาชื่อลูกค้า ชื่อน้อง หรือเบอร์โทร"
           autoComplete="off"
         />
-        <div className="crm-segment-filter">
+        {crmReady ? <div className="crm-segment-filter">
           <span>กลุ่มลูกค้า</span>
           <BusinessSegmentedControl
             className="customer-filter-group"
             value={filter}
             options={CUSTOMER_CRM_SEGMENTS.map((option) => ({
               ...option,
-              label: `${option.label} ${crmProfiles.filter((profile) => customerMatchesCrmSegment(profile, option.value)).length}`,
+              count: crmProfiles.filter((profile) => customerMatchesCrmSegment(profile, option.value)).length,
+              icon: option.value === "grooming" || option.value === "hotel" || option.value === "daycare"
+                ? <BusinessServiceIcon module={option.value} size={16} />
+                : option.value === "all" ? <UsersRound size={16} />
+                : option.value === "new" ? <UserRound size={16} />
+                : option.value === "regular" ? <UserRoundCheck size={16} />
+                : option.value === "inactive" ? <Clock size={16} /> : <CircleDashed size={16} />,
             }))}
             ariaLabel="กรองกลุ่มลูกค้า"
             onChange={setFilter}
           />
-        </div>
+        </div> : null}
       </section>
 
       {notice ? <p className="business-customers__notice" role="status"><Info size={18} />{notice}</p> : null}
@@ -230,7 +240,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
                       <span className="customer-list-item__identity">
                         <BusinessCustomerAvatar name={customer.name} />
                         <span>
-                          <span className="crm-customer-name"><strong>{customer.name}</strong><small className={`crm-lifecycle-badge crm-lifecycle-badge--${crmProfile.lifecycle}`}>{CUSTOMER_LIFECYCLE_LABELS[crmProfile.lifecycle]}</small></span>
+                          <span className="crm-customer-name"><strong>{customer.name}</strong>{crmReady ? <small className={`crm-lifecycle-badge crm-lifecycle-badge--${crmProfile.lifecycle}`}>{CUSTOMER_LIFECYCLE_LABELS[crmProfile.lifecycle]}</small> : null}</span>
                           {customer.phone ? <small><Phone size={15} />{customer.phone}</small> : <small>ผู้ติดต่อหลัก</small>}
                         </span>
                       </span>
@@ -244,10 +254,10 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
                         {hiddenPetCount > 0 ? <small className="customer-list-item__more">+{hiddenPetCount} ตัว</small> : null}
                         {customer.pets.length === 0 ? <small className="customer-list-item__empty">ยังไม่มีสัตว์เลี้ยง</small> : null}
                       </span>
-                      <span className="customer-list-item__activity">
+                      {crmReady ? <span className="customer-list-item__activity">
                         <small>{nextBooking ? "นัดถัดไป" : "ความสัมพันธ์"}</small>
                         {nextBooking ? <><strong><BusinessServiceIcon module={nextBooking.serviceModule} size={16} />{nextPet?.name ?? "น้อง"} · {nextBooking.service.label}</strong><span><CalendarDays size={16} />{bookingDateLabel(nextBooking)}{nextBranch ? ` · ${nextBranch}` : ""}</span><span className="crm-customer-list-signal">ใช้บริการเสร็จแล้ว {crmProfile.visitCount} ครั้ง</span></> : <><strong className="customer-list-item__empty">{crmProfile.visitCount > 0 ? `ใช้บริการเสร็จแล้ว ${crmProfile.visitCount} ครั้ง` : "ยังไม่มีประวัติบริการ"}</strong><span>{crmProfile.lastVisitAt ? `ล่าสุด ${calendarDateLabel(crmProfile.lastVisitAt.slice(0, 10), { day: "numeric", month: "short" })}` : "เพิ่มนัดหมายเพื่อเริ่มความสัมพันธ์"}</span></>}
-                      </span>
+                      </span> : null}
                       <span className="customer-list-item__tags">
                         {visibleTags.map((tag) => <span key={tag}>{customerTagLabel(tag)}</span>)}
                         {hiddenTagCount > 0 ? <small className="customer-list-item__more">+{hiddenTagCount}</small> : null}

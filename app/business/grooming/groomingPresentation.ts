@@ -4,6 +4,8 @@ import {
   type PrototypeServiceJob,
   type ServiceJobStatus,
 } from "../../_prototype/businessState";
+import { BUSINESS_FIXTURE_TEST_MODE } from "../../_prototype/fixtureRuntime";
+import { businessTimezone } from "../../_backend/shared/businessClock";
 
 export type GroomingBoardLane = "booked" | "waiting" | "in-service" | "ready-for-pickup" | "completed";
 
@@ -49,7 +51,7 @@ export function groomingDurationLabel(minutes: number) {
   return remainder ? `${hours} ชม. ${remainder} นาที` : `${hours} ชม.`;
 }
 
-export function groomingJobLateMinutes(job: Pick<PrototypeServiceJob, "status" | "scheduledEnd">, reference = GROOMING_DEMO_NOW) {
+export function groomingJobLateMinutes(job: Pick<PrototypeServiceJob, "status" | "scheduledEnd"> & Partial<Pick<PrototypeServiceJob, "businessId" | "branchId">>, reference = BUSINESS_FIXTURE_TEST_MODE ? GROOMING_DEMO_NOW : new Intl.DateTimeFormat("sv-SE", { timeZone: businessTimezone({ businessId: job.businessId ?? "", branchId: job.branchId ?? "" }), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).replace(" ", "T")) {
   if (!job.scheduledEnd || job.status === "completed" || job.status === "cancelled") return 0;
   const due = new Date(`${job.scheduledEnd}:00`).getTime();
   const current = new Date(`${reference}:00`).getTime();

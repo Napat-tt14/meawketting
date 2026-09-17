@@ -28,6 +28,7 @@ export function BusinessContextSwitcher() {
       <span className="sr-only">เปลี่ยนร้านและสาขา</span>
       <select
         aria-label="เปลี่ยนร้านและสาขา"
+        disabled={contexts.length === 0}
         value={context.key}
         onChange={(event) => selectContext(event.target.value)}
       >

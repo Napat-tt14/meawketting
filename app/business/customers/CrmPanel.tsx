@@ -9,7 +9,6 @@ import {
   Clock,
   MessageCircle,
   PawPrint,
-  Ticket,
   UserRoundCheck,
   Wallet,
 } from "../../_components/icons";
@@ -33,9 +32,9 @@ const TIMELINE_FILTERS: readonly { value: "all" | CustomerTimelineKind; label: s
 ] as const;
 
 const SERVICE_LABELS = {
-  grooming: "Grooming",
-  hotel: "Hotel",
-  daycare: "Daycare",
+  grooming: "อาบน้ำตัดขน",
+  hotel: "ฝากค้างคืน",
+  daycare: "รับเลี้ยงรายวัน",
 } as const;
 
 function crmDateLabel(value: string | null, includeTime = false) {
@@ -96,8 +95,7 @@ export function CustomerCrmPanel({
             <UserRoundCheck size={15} />
             {CUSTOMER_LIFECYCLE_LABELS[profile.lifecycle]}
           </span>
-          <h2 id={headingId}>ความสัมพันธ์ลูกค้า</h2>
-          <p>ข้อมูลนี้คำนวณใหม่จากงานที่เกิดขึ้นจริง และไม่ใช่คะแนนคาดการณ์</p>
+          <h2 id={headingId}>สรุปลูกค้า</h2>
         </div>
         <PawPrint size={22} aria-hidden="true" />
       </header>
@@ -106,22 +104,18 @@ export function CustomerCrmPanel({
         <div>
           <dt><Clock size={16} />มาครั้งล่าสุด</dt>
           <dd>{crmDateLabel(profile.lastVisitAt)}</dd>
-          <small>{profile.lastVisitAt ? `${profile.daysSinceLastVisit ?? 0} วันที่ผ่านมาในข้อมูลปัจจุบัน` : "ยังไม่มีบริการที่เสร็จแล้ว"}</small>
         </div>
         <div>
           <dt><CalendarDays size={16} />นัดถัดไป</dt>
           <dd>{nextBooking ? crmDateLabel(nextBooking.start) : "ยังไม่มีนัด"}</dd>
-          <small>{nextBooking?.service.label ?? "เพิ่มนัดได้จากปุ่มด้านล่าง"}</small>
         </div>
         <div>
           <dt><CheckCircle size={16} />จำนวนครั้ง</dt>
           <dd>{profile.visitCount} ครั้ง</dd>
-          <small>{profile.returned ? "กลับมาใช้บริการแล้ว" : "นับจากบริการที่เสร็จแล้ว"}</small>
         </div>
         <div>
           <dt><Wallet size={16} />ยอดคงเหลือ</dt>
           <dd>{formatBusinessMoney(profile.outstandingBalance)}</dd>
-          <small>{profile.outstandingBalance > 0 ? "เปิด Billing เพื่อตรวจรายละเอียด" : "ไม่มียอดค้างในข้อมูลปัจจุบัน"}</small>
         </div>
       </dl>
 
@@ -139,19 +133,21 @@ export function CustomerCrmPanel({
         ) : <span>ยังไม่มีบริการที่เสร็จแล้ว</span>}
       </div>
 
-      <div className="customer-crm-panel__insights">
-        <div>
-          <h3>สัญญาณที่ช่วยติดตาม</h3>
-          <ul>{profile.signals.map((signal) => <li key={signal}><CheckCircle size={15} />{signal}</li>)}</ul>
-        </div>
+      <div className="customer-crm-panel__focus">
         <div className={`customer-crm-next-action customer-crm-next-action--${profile.nextAction.kind}`}>
-          <span>งานถัดไปที่แนะนำ</span>
+          <span>แนะนำให้ทำต่อ</span>
           <strong>{profile.nextAction.label}</strong>
-          <small>{profile.nextAction.detail}</small>
           <Link href={profile.nextAction.href}>ไปทำรายการ<ArrowUpRight size={16} /></Link>
         </div>
       </div>
 
+      <details className="customer-detail-disclosure">
+        <summary>รายละเอียดการใช้บริการ</summary>
+        <ul>{profile.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+        <p>{profile.nextAction.detail}</p>
+      </details>
+      <details className="customer-detail-disclosure">
+        <summary>กิจกรรมย้อนหลัง <span>{timeline.length} รายการ</span></summary>
       <div className="customer-crm-timeline">
         <header>
           <div>
@@ -190,11 +186,7 @@ export function CustomerCrmPanel({
         ) : <p className="customer-crm-timeline__empty">ยังไม่มีรายการในหมวดนี้</p>}
       </div>
 
-      <div className="customer-crm-loyalty" aria-label="สถานะระบบ Loyalty">
-        <Ticket size={18} />
-        <span><strong>Loyalty</strong><small>วางแผนไว้ · ยังไม่กำหนดคะแนน ระดับสมาชิก หรือสิทธิประโยชน์</small></span>
-        <em>Planned</em>
-      </div>
+      </details>
     </section>
   );
 }

@@ -859,6 +859,18 @@ export const personExternalIdentities = sqliteTable("person_external_identities"
   id: text("id").primaryKey().notNull(), personId: text("person_id").notNull().references(() => persons.id), provider: text("provider").notNull(), issuer: text("issuer").notNull(),
   subject: text("subject").notNull(), verifiedAt: text("verified_at").notNull(), status: text("status").notNull(),
 }, (t) => [uniqueIndex("uq_external_identity_subject").on(t.provider, t.issuer, t.subject), check("ck_external_identity_status", sql`${t.status} in ('active','inactive')`)]);
+export const authSessions = sqliteTable("auth_sessions", {
+  tokenHash: text("token_hash").primaryKey().notNull(),
+  personId: text("person_id").notNull().references(() => persons.id),
+  issuedAt: integer("issued_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  revokedAt: integer("revoked_at"),
+}, (t) => [
+  index("idx_auth_sessions_person").on(t.personId, t.revokedAt, t.expiresAt),
+  check("ck_auth_session_token_hash", sql`length(${t.tokenHash}) = 64`),
+  check("ck_auth_session_window", sql`${t.issuedAt} > 0 and ${t.expiresAt} > ${t.issuedAt}`),
+  check("ck_auth_session_revoked_at", sql`${t.revokedAt} is null or ${t.revokedAt} >= ${t.issuedAt}`),
+]);
 export const messageOutbox = sqliteTable("message_outbox", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), messageId: text("message_id").notNull(), channelId: text("channel_id"), linkId: text("link_id"), recipient: text("recipient"),
   retryKey: text("retry_key").notNull(), state: text("state").notNull(), attempts: integer("attempts").notNull().default(0), firstAttemptAt: text("first_attempt_at"), availableAt: text("available_at").notNull(),

@@ -196,7 +196,7 @@ export function BookingEditor({
     document.body.style.overflow = "hidden";
     const frame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || relationshipEditorOpenRef.current) return;
+      if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (relationshipEditorOpenRef.current) setRelationshipEditor(null);

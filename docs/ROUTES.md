@@ -20,7 +20,7 @@ No LINE Mini App route is created in this audit. The future LINE channel is an e
 ## Route count summary
 
 ```text
-CURRENT ROUTE AUDIT: 34 route entries / 30 active local routes / 3 compatibility redirects / 1 legacy demo route
+CURRENT ROUTE AUDIT: 36 route entries / 32 active local routes / 3 compatibility redirects / 1 legacy demo route
 ```
 
 The route table below is the canonical route contract. Matching build/test evidence is recorded in [VALIDATION](./VALIDATION.md).
@@ -36,6 +36,8 @@ BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch confi
 | Route | Context / goal | Status and boundary |
 |---|---|---|
 | `/` | **Business-first Landing (Canonical Commercial Homepage)** | LIVE LOCAL; primary CTA `/business/login`; owner entry secondary |
+| `/privacy` | Thai privacy notice with summary and section navigation | LOCAL DRAFT added 2026-09-17; noindex until operator/contact, retention and provider details are confirmed |
+| `/terms` | Thai platform terms with summary and section navigation | LOCAL DRAFT added 2026-09-17; no effective date or implied acceptance; linked from the landing footer |
 | `/business/login` | Business Login with mock Google auth | LIVE MOCK; no real membership |
 | `/business/home` | Branch-aware Business Home with square three-image carousel, arrow/click navigation, touch swipe and operational overview | LIVE FROZEN HYBRID; next-work/Booking summaries use BE3 truth and execution/attention/finance hydrate from BE4/BE7/BE8 D1 projections |
 | `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, server-backed move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE FROZEN UI / BE3 D1 TRUTH; range/create/edit/reschedule/Resource/cancel use typed backend operations and server conflict recovery |

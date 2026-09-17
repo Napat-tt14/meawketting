@@ -53,6 +53,7 @@ export function BookingItem({
       aria-describedby="calendar-shortcut-guide"
       aria-label={`เลือกการจอง ${petLabel} ${booking.service.label} สถานะ ${bookingStatusLabel(booking.status)} กด Enter เพื่อแก้ไข`}
       aria-pressed={selected}
+      title={`${petLabel} · ${booking.service.label} · ${bookingTimeLabel(booking)} · ${bookingStatusLabel(booking.status)}`}
       data-calendar-keyboard="booking"
     >
       <BusinessServiceIcon module={booking.serviceModule} size={18} className="booking-item__module" />
@@ -62,6 +63,7 @@ export function BookingItem({
       </span>
       <span className="booking-item__meta">
         <time>{bookingTimeLabel(booking)}</time>
+        <time className="booking-item__screen-time">{booking.timeModel === "appointment" ? booking.start.slice(11, 16) : "เต็มวัน"}</time>
         <BookingStatusBadge status={booking.status} />
       </span>
     </button>

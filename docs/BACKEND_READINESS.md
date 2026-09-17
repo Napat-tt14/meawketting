@@ -4,6 +4,8 @@ Status: **BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY; BE6 PROVIDER-NEUTRAL
 Date: 2026-09-09
 Owner: Product Architecture / Engineering
 
+Production update 2026-09-12: [PROD0–PROD6 handoff](./PRODUCTION_TRACK_REPORT.md) records restored baseline and safe local hardening. Secure session primitives are **PROVIDER-NEUTRAL / NOT WIRED**, all production BE routes still fail closed without an authentication integration, and the remote rate-binding/configuration gate is **IMPLEMENTED / NOT PROVISIONED**. Local restore/HTTP simulations and documented launch procedures do not establish pilot readiness. Auth onboarding/recovery, staging D1 acceptance, real restore/alert rehearsal and actual shop QA remain mandatory.
+
 This is the canonical backend-readiness document for the frozen Business frontend (BF1–BF12). BE1–BE8 now provide local D1-backed application boundaries for identity/tenant scope, Customer/Pet, Booking/planning Resources, service execution, Consent/Intake, Inbox foundation, financial records and read-only Reports/CRM projections. Production authentication, external LINE/payment providers, media storage and deployment remain outside this local validation.
 
 Read [ARCHITECTURE](./ARCHITECTURE.md) for product-domain authority, [DECISIONS](./DECISIONS.md) for unresolved policy, and [CURRENT_IMPLEMENTATION](./CURRENT_IMPLEMENTATION.md) for repository facts. Where they conflict, the latest Product Owner direction and DECISIONS prevail.

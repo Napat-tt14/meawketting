@@ -9,7 +9,7 @@ function Heart({ size }: { size: number }) {
 const capabilities = [
   { icon: CalendarDays, title: "จองห้อง & จัดตาราง", copy: "เห็นห้องว่างและงานของทีม" },
   { icon: BadgeCheck, title: "เช็กอิน & ดูแล", copy: "รับน้อง พร้อมข้อมูลที่จำเป็น" },
-  { icon: MessageCircle, title: "คุยกับเจ้าของ", copy: "ส่งรูปและอัปเดตในบริบทของงาน" },
+  { icon: MessageCircle, title: "ข้อความลูกค้า", copy: "ติดตามข้อความในบริบทของงาน" },
   { icon: Wallet, title: "รายรับ & รายงาน", copy: "ติดตามค่าบริการและการชำระ" },
 ];
 
@@ -47,7 +47,7 @@ export function BusinessTrustSection() {
         <p className="business-eyebrow">SMALL PAWS, BIG TRUST</p>
         <h2 id="business-trust-title">รู้จักน้องมากขึ้น<br />ดูแลได้ตรงใจขึ้น</h2>
         <p>Pet Passport เชื่อมข้อมูลการดูแล<br />เฉพาะส่วนที่เจ้าของอนุญาต</p>
-        <ul><li><CheckCircle size={18} /> เจ้าของเลือกข้อมูลที่แชร์</li><li><CheckCircle size={18} /> ทีมส่งต่อประวัติบริการได้</li></ul>
+        <ul><li><CheckCircle size={18} /> เจ้าของเลือกข้อมูลที่แชร์</li><li><CheckCircle size={18} /> ทีมเปิดดูประวัติบริการของร้านได้</li></ul>
         <a className="hotel-text-link" href="/create-passport">รู้จัก Pet Passport <ArrowRight size={17} /></a>
       </div>
       <div className="visual-art visual-art--passport parallax-layer" data-parallax="18">
@@ -66,7 +66,7 @@ export function BusinessWorkflowSection() {
       <div className="visual-journey">
         <article><span className="visual-step">01</span><div className="journey-object journey-object--calendar" aria-hidden="true"><CalendarDays size={64} /><span><QrCode size={25} /></span></div><h3>จอง & เช็กอิน</h3><p>เตรียมห้องพร้อมต้อนรับน้อง</p></article>
         <article><span className="visual-step">02</span><div className="journey-object journey-object--care" aria-hidden="true"><PawPrint size={64} /><span><Heart size={25} /></span></div><h3>พัก เล่น อาบน้ำ</h3><p>หลายบริการ ประวัติเดียวกัน</p></article>
-        <article><span className="visual-step">03</span><div className="journey-object journey-object--home" aria-hidden="true"><ShieldCheck size={64} /><span><CheckCircle size={25} /></span></div><h3>รับกลับ & ส่งต่อประวัติ</h3><p>บันทึกไว้ให้การดูแลครั้งถัดไป</p></article>
+        <article><span className="visual-step">03</span><div className="journey-object journey-object--home" aria-hidden="true"><ShieldCheck size={64} /><span><CheckCircle size={25} /></span></div><h3>รับกลับ & บันทึกประวัติ</h3><p>บันทึกไว้ให้การดูแลครั้งถัดไป</p></article>
       </div>
     </section>
   );

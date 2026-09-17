@@ -50,6 +50,43 @@ async function htmlFor(pathname) {
   return response.text();
 }
 
+test("production Business routes never render fixture identity, records or fake zero metrics before server data", async () => {
+  for (const route of ["home", "calendar", "customers", "customers/customer-pim", "inbox", "scan", "intake/missing", "grooming", "hotel", "daycare", "billing", "reports", "team", "settings", "settings?section=branches"]) {
+    const html = await htmlFor(`/business/${route}`);
+    const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+    assert.match(markup, /กำลังโหลดข้อมูลร้าน/);
+    assert.doesNotMatch(markup, /Whisker|Paw Partner|คุณพิม|Mochi|Luna|booking-fixture|grooming-job-fixture|hello@whisker|ยอดค้างชำระสะสม|ไม่มีรายการที่ต้องจัดการ/);
+    assert.doesNotMatch(markup, /site-footer|business-marketing-footer/);
+  }
+  const login = await htmlFor("/business/login");
+  assert.match(login, /href="\/api\/auth\/google\/start\?returnTo=%2Fbusiness%2Fhome"/);
+  assert.match(login, /ใช้บัญชี Google ที่ได้รับอนุญาตสำหรับร้านเท่านั้น/);
+  assert.equal((await render("/__debug")).status, 404);
+  // The separate built-Worker API test supplies the Workers binding and checks
+  // /api/dev/guardian; importing that API without its binding is not an HTTP test.
+});
+
+test("fixture-off selectors ignore poisoned browser records and never invent Business, catalog or customer truth", async () => {
+  const previousWindow = globalThis.window;
+  const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-no-fixtures-"));
+  const server = await createViteServer({ configFile: false, cacheDir: cacheDirectory, server: { middlewareMode: true }, appType: "custom", logLevel: "silent", define: { "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("off") } });
+  globalThis.window = { sessionStorage: { getItem: () => JSON.stringify({ activeContextKey: "whisker-ari-frontdesk", customers: { bad: { name: "Injected Customer" } }, bookings: { bad: {} }, charges: { bad: {} }, payments: { bad: {} }, intakes: { bad: {} }, serviceJobs: { bad: {} }, teamMembers: { bad: {} } }) } };
+  try {
+    const state = await server.ssrLoadModule("/app/_prototype/businessState.ts");
+    const context = state.DEMO_BUSINESS_CONTEXTS[0];
+    for (const selector of ["listPrototypeCustomers", "listPrototypeCustomerFixtures", "listPrototypeBookings", "listPrototypeBookingFixtures", "listPrototypeTeamMembers", "listPrototypeGroomingServiceJobs", "listPrototypeHotelStays", "listPrototypeDaycareAttendances", "listPrototypeCharges", "listPrototypePayments", "listPrototypeServiceRecords", "getBookingServices", "getBookingResources"]) assert.deepEqual(state[selector](context), [], selector);
+    assert.equal(state.getPrototypeBusinessProfile(context.businessId), null);
+    assert.deepEqual(state.listPrototypeBusinessContexts(), []);
+    assert.equal(state.getDemoBusinessContextDetails(context).business, null);
+    assert.equal(state.readActiveBusinessContext().businessId, "");
+    const inbox = await server.ssrLoadModule("/app/_prototype/inboxState.ts");
+    assert.deepEqual(inbox.listPrototypeConversations(context), []);
+    const presentation = await server.ssrLoadModule("/app/business/grooming/groomingPresentation.ts");
+    const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.now() - 120 * 60000)).replace(" ", "T");
+    assert.ok(presentation.groomingJobLateMinutes({ status: "in-service", scheduledEnd: parts }) >= 119);
+  } finally { globalThis.window = previousWindow; await server.close(); await rm(cacheDirectory, { recursive: true, force: true }); }
+});
+
 test("production build fails closed for development identity and Guardian test adapters", async () => {
   // Node does not implement the Workers binding module. Supply only that binding;
   // execute the actual production bundle, and fail if it tries to use the database.
@@ -57,7 +94,7 @@ test("production build fails closed for development identity and Guardian test a
   const bindingUrl = `data:text/javascript,${encodeURIComponent(binding)}`;
   register(`data:text/javascript,${encodeURIComponent(`export async function resolve(specifier, context, next) { return specifier === "cloudflare:workers" ? { url: ${JSON.stringify(bindingUrl)}, shortCircuit: true } : next(specifier, context); }`)}`, import.meta.url);
   const { default: worker } = await import(new URL("../dist/server/index.js?production-auth-check", import.meta.url).href);
-  for (const path of ["/api/be1", "/api/be2", "/api/be3", "/api/be4", "/api/be5", "/api/be6", "/api/dev/guardian"]) {
+  for (const path of ["/api/be1", "/api/be2", "/api/be3", "/api/be4", "/api/be5", "/api/be6", "/api/be7", "/api/be8", "/api/dev/guardian"]) {
     const response = await worker.fetch(new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json", "x-meawketting-dev-person-id": "prs_01k47meawketting000000001" }, body: "{}" }),
       { MEAWKETTING_AUTH_MODE: "dev-test", DB: { prepare() { throw new Error("Production must reject dev identity before querying D1"); } } }, { waitUntil() {}, passThroughOnException() {} });
     assert.equal(response.status, path === "/api/dev/guardian" ? 404 : 501, path);
@@ -207,33 +244,17 @@ async function installBe1ConfigurationFixture(state, vite) {
   return cache;
 }
 
-test("renders the Index as the Business Operating Platform landing page", async () => {
+test("renders the committed Business landing with explicit illustrative content", async () => {
   const html = await htmlFor("/");
-  const hero = html.match(/<section class="business-homepage-hero[\s\S]*?<\/section>/)?.[0] ?? "";
-
-  assert.match(html, /ทุกงานของร้านสัตว์เลี้ยง[\s\S]*จัดการง่ายในที่เดียว/);
+  const hero = html.match(/<section class="hotel-hero[\s\S]*?<\/section>/)?.[0] ?? "";
   assert.equal(countRenderedElements(html, "h1"), 1);
-  assert.match(html, /เข้าสู่ระบบสำหรับธุรกิจ/);
-  assert.match(html, /href="\/business\/login"/);
-  assert.match(html, /href="\/my-pets"/);
-  assert.match(html, /href="\/create-passport"/);
-  assert.match(html, /logo\.svg/);
-  assert.match(html, /Whisker Rest/);
-  assert.match(html, /ธุรกิจเดียว หลายบริการ/);
-  assert.match(html, /อาบน้ำ \/ ตัดขน/);
-  assert.match(html, /โรงแรมสัตว์เลี้ยง/);
-  assert.match(html, /Daycare/);
-  assert.match(html, /งานสำคัญของร้าน เชื่อมกันในระบบเดียว/);
-  assert.match(html, /Mochi/);
-  assert.match(html, /ข้อมูลของน้องยังอยู่ภายใต้การควบคุมของเจ้าของ/);
-  assert.match(html, /เป็นเจ้าของสัตว์เลี้ยง\?/);
-  assert.match(html, /Pet Passport/);
-  assert.match(html, /ภาพรวมงานประจำวัน · Whisker Rest/);
-  assert.match(html, /งานถัดไป[s\S]*Mochi/);
-  assert.doesNotMatch(html, /ข้อมูลจำลอง|ในเครื่อง|กำลังพัฒนา|ต้นแบบ|ทิศทางผลิตภัณฑ์|repository|Product prototype/i);
-  assert.match(hero, /href="\/business\/login"[\s\S]*เข้าสู่ระบบสำหรับธุรกิจ/);
-  assert.match(hero, /href="#business-core"[\s\S]*ดูว่าระบบช่วยอะไรได้บ้าง/);
+  for (const label of ["ให้ทุกการเข้าพัก", "น่ารัก", "โรงแรมสัตว์เลี้ยง", "อาบน้ำ", "เดย์แคร์", "Pet Passport", "เจ้าของเลือกข้อมูลที่แชร์", "ภาพประกอบและข้อมูลตัวอย่าง"]) assert.ok(html.includes(label), label);
+  for (const href of ["/business/login", "/my-pets", "/create-passport", "#business-core"]) assert.ok(html.includes('href="' + href + '"'), href);
+  assert.match(hero, /href="\/business\/login"[\s\S]*เริ่มต้นใช้งานสำหรับธุรกิจ/);
+  assert.match(hero, /href="#business-core"[\s\S]*มาดูกันว่าช่วยอะไรได้บ้าง/);
+  assert.match(hero, /pet-hotel-transparent\.png/);
   assert.doesNotMatch(hero, /href="\/create-passport"|สร้าง Pet Passport/);
+  assert.match(html, /logo\.svg/);
 });
 
 test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Yellow-primary", async () => {
@@ -287,7 +308,7 @@ test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Y
   assert.match(homepageCss, /prefers-reduced-motion:\s*reduce/);
 });
 
-test("keeps landing imagery photographic and compact at desktop", async () => {
+test("keeps committed clay landing assets explicit and independent from legacy photos", async () => {
   const [heroSource, servicesSource, hybridSource, workflowSource, closingSource, css] = await Promise.all([
     readFile(new URL("_components/business-landing/BusinessLandingHero.tsx", appRoot), "utf8"),
     readFile(new URL("_components/business-landing/BusinessServicesSection.tsx", appRoot), "utf8"),
@@ -308,8 +329,13 @@ test("keeps landing imagery photographic and compact at desktop", async () => {
     "pet-business-services-photo.png",
     "pet-business-workflow-photo.png",
   ]);
-  assert.match(heroSource, /pet-business-hero-wide\.png/);
-  assert.match(servicesSource, /pet-business-services-photo\.png/);
+  assert.match(heroSource, /pet-hotel-transparent\.png/);
+  assert.match(heroSource, /width=\{1200\} height=\{800\}/);
+  assert.match(heroSource, /priority unoptimized/);
+  await access(new URL("../public/images/landing/pet-hotel-transparent.png", import.meta.url));
+  assert.match(servicesSource, /pet-hotel-room/);
+  assert.match(servicesSource, /pet-grooming-transparent/);
+  assert.match(servicesSource, /pet-daycare-transparent/);
   assert.doesNotMatch(landingSources + css, /images\/cats|stickers|business-hero-scene|business-services-scene|cali-laptop-hero/);
   assert.doesNotMatch(landingSources, /ภาพถ่ายประกอบ|ภาพประกอบแนวคิด/);
   assert.match(css, /\.business-homepage \.shell,[\s\S]*?width: min\(1200px, calc\(100% - 64px\)\)/);
@@ -966,7 +992,7 @@ test("redirects /business to / as the canonical Business Landing page", async ()
   assert.equal(response.headers.get("location"), "/");
   assert.match(source, /redirect\("\/"\)/);
   assert.match(hero, /href="\/business\/login"/);
-  assert.match(hero, /ทุกงานของร้านสัตว์เลี้ยง/);
+  assert.match(hero, /ให้ทุกการเข้าพัก/);
   assert.doesNotMatch(hero, /Today|Sessions|Customers|Documents|Team|Settings/);
 });
 
@@ -981,10 +1007,10 @@ test("keeps Business Login visually separate while reusing the Google behavior p
   assert.match(html, /พื้นที่ทำงานสำหรับร้านและทีมดูแลสัตว์/);
   assert.match(html, /เข้าสู่ระบบ/);
   assert.equal(countRenderedElements(html, "h1"), 1);
-  assert.match(businessLogin, /requested\?\.startsWith\("\/business\/"\)/);
-  assert.match(businessLogin, /: "\/business\/home"/);
+  assert.doesNotMatch(businessLogin, /router\.push|setTimeout|continueWithGoogle/);
+  assert.match(businessLogin, /api\/auth\/google\/start/);
   assert.doesNotMatch(businessLogin, /eyebrow|ดำเนินการต่อด้วยบัญชีของคุณ|บัญชีบุคคลเดียวสามารถเป็นทั้งผู้ดูแลสัตว์และสมาชิกของร้านได้/);
-  assert.match(businessLogin, /<GoogleAuthButton/);
+  assert.doesNotMatch(businessLogin, /disabled aria-disabled="true"/);
   assert.match(consumerLogin, /<GoogleAuthButton/);
   assert.match(googleButton, /ดำเนินการต่อด้วย Google/);
   assert.doesNotMatch(businessLogin, /DRAFT_PASSPORT_STORAGE_KEY|prototypeClaimed/);
@@ -992,7 +1018,7 @@ test("keeps Business Login visually separate while reusing the Google behavior p
 
 test("renders Business Home as a priority-first local prototype with booking-derived work and shared revenue", async () => {
   const [html, source, spotlight, serviceVisual, state, businessCss] = await Promise.all([
-    htmlFor("/business/home"),
+    businessFixtureHtml("/business/home"),
     readFile(new URL("business/home/BusinessHome.tsx", appRoot), "utf8"),
     readFile(new URL("business/home/BusinessHomeSpotlight.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessServiceVisual.tsx", appRoot), "utf8"),
@@ -1000,11 +1026,11 @@ test("renders Business Home as a priority-first local prototype with booking-der
     readFile(businessCssUrl, "utf8"),
   ]);
 
-  assert.match(html, /<h1[^>]*>หน้าหลัก<\/h1>/);
+  assert.match(html, /<h1[^>]*>ภาพรวมวันนี้<\/h1>/);
   assert.match(html, /Whisker Rest/);
   assert.match(html, /สาขาอารีย์/);
   assert.match(html, /สิ่งที่ต้องจัดการ/);
-  assert.match(html, /งานถัดไป/);
+  assert.match(html, /ตารางงานวันนี้/);
   assert.match(html, /อาบน้ำ \/ ตัดขน/);
   assert.match(html, /โรงแรม/);
   assert.match(html, /รายรับวันนี้/);
@@ -1021,7 +1047,8 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(source, /enabledModules\.map/);
   assert.match(source, /listPrototypeBookings\(context/);
   assert.match(source, /getPrototypeInboxUnreadCount\(context/);
-  assert.match(source, /\.\.\.demo\.attention/);
+  assert.match(source, /groomingSummary\.readyForPickup/);
+  assert.match(source, /id: booking\.bookingId/);
   assert.doesNotMatch(state, /newMessages|ระบบข้อความยังไม่เปิดใช้/);
   assert.match(source, /bookingsToday/);
   assert.match(state, /"whisker-ari-frontdesk": \["grooming", "hotel"\]/);
@@ -1036,16 +1063,16 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(spotlight, /business-banner-care-lounge\.png/);
   assert.match(spotlight, /business-banner-grooming\.png/);
   assert.match(spotlight, /business-banner-hotel\.png/);
-  assert.match(spotlight, /business-home-banner__arrow--previous/);
-  assert.match(spotlight, /business-home-banner__arrow--next/);
+  assert.match(spotlight, /aria-label="แบนเนอร์ก่อนหน้า" onClick=\{showPrevious\}/);
+  assert.match(spotlight, /aria-label="แบนเนอร์ถัดไป" onClick=\{showNext\}/);
   assert.match(spotlight, /SWIPE_THRESHOLD_PX = 48/);
   assert.doesNotMatch(spotlight, /window\.setInterval/);
   assert.match(businessCss, /prefers-reduced-motion/);
   assert.match(spotlight, /onPointerDown=\{handlePointerDown\}/);
   assert.match(spotlight, /onPointerUp=\{handlePointerUp\}/);
-  assert.match(spotlight, /business-home-banner__track/);
-  assert.match(spotlight, /--business-banner-index/);
-  assert.match(spotlight, /variants\.map/);
+  assert.match(spotlight, /dashboard-banner__picture/);
+  assert.match(spotlight, /activeIndex \+ 1/);
+  assert.match(spotlight, /src=\{active\.imageSrc\}/);
   assert.match(businessCss, /\.business-home-hero \.business-home-banner__image\s*\{[\s\S]*?aspect-ratio:\s*1 \/ 1 !important/);
   assert.match(businessCss, /\.business-home-banner__track\s*\{[\s\S]*?transform:\s*translate3d\(calc\(var\(--business-banner-index, 0\) \* -100%\), 0, 0\);[\s\S]*?transition:\s*transform/);
   assert.match(businessCss, /@media \(min-width: 1024px\) \{[\s\S]*?\.business-home-hero\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
@@ -1053,7 +1080,7 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.doesNotMatch(businessCss, /@keyframes business-banner-slide-(?:next|previous)/);
   assert.doesNotMatch(spotlight, /setDirection|slide--\$\{direction\}/);
   assert.doesNotMatch(spotlight, /role="tablist"|aria-selected=/);
-  assert.doesNotMatch(spotlight, /วันนี้|ตารางงาน|หลายบริการ|ความไว้ใจ/);
+  assert.match(spotlight, /aria-live="polite" aria-atomic="true"/);
   assert.doesNotMatch(spotlight, /autoPlay|autoplay/);
   assert.match(serviceVisual, /Scissors/);
   assert.match(serviceVisual, /Bed/);
@@ -1182,7 +1209,7 @@ test("switches the shared Business and Branch context through one keyboard-usabl
 
 test("renders BF-2 Business Calendar over durable BE3 planning truth", async () => {
   const [html, page, calendar, planningBoard, staySpan, dayTimeline, mutation, presentation, editor, state, agenda, css] = await Promise.all([
-    htmlFor("/business/calendar"),
+    businessFixtureHtml("/business/calendar"),
     readFile(new URL("business/calendar/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/calendar/BusinessCalendar.tsx", appRoot), "utf8"),
     readFile(new URL("business/calendar/CalendarPlanningBoard.tsx", appRoot), "utf8"),
@@ -1459,7 +1486,7 @@ test("keeps shared Business Core routes live with capability-aware Grooming, Hot
 
 test("renders BF-5 Grooming as a visual, capability-aware execution board with a mobile status alternative", async () => {
   const [html, page, operations, card, detail, presentation, css, state, desktopNav, mobileNav] = await Promise.all([
-    htmlFor("/business/grooming"),
+    businessFixtureHtml("/business/grooming"),
     readFile(new URL("business/grooming/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/grooming/GroomingOperations.tsx", appRoot), "utf8"),
     readFile(new URL("business/grooming/GroomingJobCard.tsx", appRoot), "utf8"),
@@ -1474,7 +1501,7 @@ test("renders BF-5 Grooming as a visual, capability-aware execution board with a
   assert.match(html, /<h1[^>]*>อาบน้ำ \/ ตัดขน<\/h1>/);
   for (const lane of ["รอรับเข้า", "รอเริ่ม", "กำลังทำ", "พร้อมรับกลับ", "เสร็จแล้ว"]) assert.match(presentation, new RegExp(lane));
   // Protected execution rows arrive only after the authorized backend directory loads.
-  assert.doesNotMatch(html, /Mochi|grooming-job-fixture/);
+  assert.doesNotMatch(await htmlFor("/business/grooming"), /Mochi|grooming-job-fixture/);
   assert.match(operations, /_backend\/be4\/facade/);
   assert.match(page, /GroomingOperations/);
   assert.match(operations, /getEnabledBusinessModules\(context(?:, !stateReady)?\)\.includes\("grooming"\)/);
@@ -1510,7 +1537,7 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
     .map((entry) => entry.parentPath.replaceAll("\\", "/"));
   const [html, page, operations, detail, presentation, desktopNav, mobileNav, model, command, home, scanner, intake, customerDetail, state, inboxState, css, calendar] = await Promise.all([
-    htmlFor("/business/hotel"),
+    businessFixtureHtml("/business/hotel"),
     readFile(new URL("business/hotel/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/hotel/HotelOperations.tsx", appRoot), "utf8"),
     readFile(new URL("business/hotel/HotelStayDetail.tsx", appRoot), "utf8"),
@@ -1532,7 +1559,7 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
   assert.equal(routePaths.some((path) => /business\/hotel$/.test(path)), true);
   assert.match(html, /<h1[^>]*>โรงแรม<\/h1>/);
   for (const label of ["เข้าพักวันนี้", "ออกวันนี้", "การใช้พื้นที่", "ต้องดูแล", "ต้องจัดการ", "ห้องและโซน", "การเข้าพัก"]) assert.match(html, new RegExp(label));
-  assert.doesNotMatch(html, /Luna|ห้อง A01/);
+  assert.doesNotMatch(await htmlFor("/business/hotel"), /Luna|ห้อง A01/);
   assert.match(operations, /_backend\/be4\/facade/);
   assert.match(page, /HotelOperations/);
   assert.match(operations, /getEnabledBusinessModules\(context(?:, !stateReady)?\)\.includes\("hotel"\)/);
@@ -1750,7 +1777,7 @@ test("keeps Grooming Service Jobs distinct from Bookings with verified lifecycle
 
 test("renders BF-7 Billing as a branch-scoped Charge, Payment, and shared revenue foundation", async () => {
   const [html, page, screen, state, home, customerDetail, groomingDetail, hotelDetail, desktopNav, mobileNav, command, inboxState, css, contextHook, bookingEditor] = await Promise.all([
-    htmlFor("/business/billing"),
+    businessFixtureHtml("/business/billing"),
     readFile(new URL("business/billing/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/billing/BillingScreen.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
@@ -1769,8 +1796,8 @@ test("renders BF-7 Billing as a branch-scoped Charge, Payment, and shared revenu
 
   assert.match(html, /<h1[^>]*>การเงิน<\/h1>/);
   assert.match(html, /รายรับวันนี้/);
-  assert.match(html, /Charge และสถานะการชำระ/);
-  assert.match(html, /การสร้างยอดยังไม่เท่ากับรับชำระเงิน/);
+  assert.match(html, /รายการเรียกเก็บ/);
+  assert.match(html, /ตรวจยอดคงเหลือและสถานะการชำระ/);
   for (const status of ["ยังไม่ชำระ", "บางส่วน", "ชำระแล้ว"]) assert.match(html, new RegExp(status));
   assert.equal(countRenderedElements(html, "h1"), 1);
   assert.match(page, /serviceJobId/);
@@ -1823,7 +1850,7 @@ test("renders BF-7 Billing as a branch-scoped Charge, Payment, and shared revenu
 
 test("renders BF-8 Reports as a branch-aware business insights route derived from shared state", async () => {
   const [html, page, screen, presentation, state, desktopNav, mobileNav, command, css] = await Promise.all([
-    htmlFor("/business/reports"),
+    businessFixtureHtml("/business/reports"),
     readFile(new URL("business/reports/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/reports/ReportsScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/reports/reportsPresentation.ts", appRoot), "utf8"),
@@ -1834,15 +1861,30 @@ test("renders BF-8 Reports as a branch-aware business insights route derived fro
     readFile(businessCssUrl, "utf8"),
   ]);
 
+  assert.match(html, /role="status">กำลังโหลดข้อมูลรายงาน/);
+  const reportCache = await mkdtemp(join(tmpdir(), "meawketting-report-test-"));
+  const fixtureServer = await createServer({ configFile: false, cacheDir: reportCache, server: { middlewareMode: true }, appType: "custom", logLevel: "silent",
+    plugins: [{ name: "report-browser-ready-simulation", enforce: "pre", transform(code, id) {
+      if (id.replaceAll("\\", "/").endsWith("/useBusinessContext.ts")) return code.replace("useSyncExternalStore(emptySubscribe, () => true, () => false)", "useSyncExternalStore(emptySubscribe, () => true, () => true)");
+    } }],
+  });
+  let loadedReport;
+  try {
+    const { ReportsScreen } = await fixtureServer.ssrLoadModule("/app/business/reports/ReportsScreen.tsx");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    loadedReport = renderToStaticMarkup(createElement(ReportsScreen));
+  } finally { await fixtureServer.close(); await rm(reportCache, { recursive: true, force: true, maxRetries: 3 }); }
+
   assert.match(html, /<h1[^>]*>รายงานและข้อมูลเชิงลึก<\/h1>/);
   assert.equal(countRenderedElements(html, "h1"), 1);
-  assert.match(html, /รายรับรวม/);
-  assert.match(html, /บริการที่เสร็จสิ้น/);
-  assert.match(html, /การจองทั้งหมด/);
-  assert.match(html, /ลูกค้าที่ใช้บริการ/);
-  assert.match(html, /ภาพรวมตามประเภทบริการ/);
-  assert.match(html, /ข้อมูลเชิงลึกการดำเนินงาน/);
-  assert.doesNotMatch(html, /1,350 บาท/); // Production SSR never renders browser financial fixtures.
+  assert.match(loadedReport, /รายรับรวม/);
+  assert.match(loadedReport, /บริการที่เสร็จสิ้น/);
+  assert.match(loadedReport, /การจองทั้งหมด/);
+  assert.match(loadedReport, /ลูกค้าที่ใช้บริการ/);
+  assert.match(loadedReport, /ภาพรวมตามประเภทบริการ/);
+  assert.match(loadedReport, /ข้อมูลเชิงลึกการดำเนินงาน/);
+  assert.doesNotMatch(await htmlFor("/business/reports"), /1,350 บาท/); // Production SSR never renders browser financial fixtures.
   assert.doesNotMatch(html, /3,050 บาท/);
 
   assert.match(screen, /getBusinessReportsSummary/);
@@ -1867,7 +1909,7 @@ test("collapses BF-8 into shared Service Record history without a standalone Car
     .filter((entry) => entry.isFile() && entry.name === "page.tsx")
     .map((entry) => entry.parentPath.replaceAll("\\", "/"));
   const [html, state, customerDetail, groomingDetail, hotelDetail, desktopNav, mobileNav, command, model, css] = await Promise.all([
-    htmlFor("/business/customers/booking-contact-pim"),
+    businessFixtureHtml("/business/customers/booking-contact-pim"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/grooming/GroomingJobDetail.tsx", appRoot), "utf8"),
@@ -2312,7 +2354,7 @@ test("keeps BF-8 Service Records source-keyed, private, correction-safe, and sep
 
 test("renders a backend-searchable Customers & Pets route for Business frontdesk work", async () => {
   const [html, page, screen, avatars, state, durableClient, desktopNav, mobileNav, css] = await Promise.all([
-    htmlFor("/business/customers"),
+    businessFixtureHtml("/business/customers"),
     readFile(new URL("business/customers/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomersScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessIdentityAvatar.tsx", appRoot), "utf8"),
@@ -2356,7 +2398,7 @@ test("renders a backend-searchable Customers & Pets route for Business frontdesk
 
 test("renders stable Customer detail with Pets, Bookings, local notes, and Passport boundaries", async () => {
   const [html, page, detail, badges, petEditor] = await Promise.all([
-    htmlFor("/business/customers/booking-contact-pim"),
+    businessFixtureHtml("/business/customers/booking-contact-pim"),
     readFile(new URL("business/customers/[customerId]/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomerDetailScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/customers/CustomerBadges.tsx", appRoot), "utf8"),
@@ -2461,7 +2503,7 @@ test("reuses the Customer relationship source for Booking context and responsive
 
 test("renders BF-4 Inbox as a contextual Business communication route", async () => {
   const [html, page, inbox, list, pane, timeline, composer, presentation, state] = await Promise.all([
-    htmlFor("/business/inbox?conversation=conversation-fixture-pim"),
+    businessFixtureHtml("/business/inbox?conversation=conversation-fixture-pim"),
     readFile(new URL("business/inbox/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/inbox/BusinessInbox.tsx", appRoot), "utf8"),
     readFile(new URL("business/inbox/ConversationList.tsx", appRoot), "utf8"),
@@ -2480,8 +2522,8 @@ test("renders BF-4 Inbox as a contextual Business communication route", async ()
   assert.match(html, /กำลังใช้บริการ/);
   assert.doesNotMatch(html, /จบงานแล้ว/);
   // Production SSR has no authenticated inbox data. Hydration reads the scoped API.
-  assert.doesNotMatch(html, /คุณพิม|ได้รับข้อมูลแล้วค่ะ ขอบคุณค่ะ|แกะสางขน/);
-  assert.match(html, /เลือกบทสนทนาเพื่อเริ่มงาน/);
+  assert.doesNotMatch(await htmlFor("/business/inbox"), /คุณพิม|ได้รับข้อมูลแล้วค่ะ ขอบคุณค่ะ|แกะสางขน/);
+  assert.match(await businessFixtureHtml("/business/inbox", { empty: true }), /เลือกบทสนทนาเพื่อเริ่มงาน/);
   assert.match(inbox, /ensureDurableInbox/);
   assert.match(inbox, /loadDurableConversation/);
   assert.match(timeline, /ร้านขอเพิ่มบริการ/);
@@ -2800,7 +2842,7 @@ test("uses everyday Thai task language across the Business flow", async () => {
 
 test("renders the Phase E Business Scanner as a reachable operational route", async () => {
   const [html, source, siteHeader, hero] = await Promise.all([
-    htmlFor("/business/scan"),
+    businessFixtureHtml("/business/scan"),
     readFile(new URL("business/scan/BusinessScanner.tsx", appRoot), "utf8"),
     readFile(new URL("_components/SiteHeader.tsx", appRoot), "utf8"),
     readFile(new URL("_components/business-landing/BusinessLandingHero.tsx", appRoot), "utf8"),
@@ -2955,7 +2997,7 @@ test("keeps Phase E responsive, accessible, and free of Marketing Footer", async
 
 test("renders BF-9 Team as a shared, branch-aware operations foundation", async () => {
   const [html, page, operations, state, desktopNav, mobileNav, command, model, bookingEditor, groomingFields, groomingDetail, hotelDetail, css] = await Promise.all([
-    htmlFor("/business/team"),
+    businessFixtureHtml("/business/team"),
     readFile(new URL("business/team/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/team/TeamOperations.tsx", appRoot), "utf8"),
     readFile(new URL("_prototype/businessState.ts", appRoot), "utf8"),
@@ -3321,10 +3363,10 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
 
 test("renders BF10 Settings, BF11 Daycare, and BF12 CRM with shared state and honest scope boundaries", async () => {
   const [settingsHtml, daycareHtml, customersHtml, detailHtml, settings, daycare, daycareDetail, billing, customerDetail, crm, css] = await Promise.all([
-    htmlFor("/business/settings"),
-    htmlFor("/business/daycare"),
-    htmlFor("/business/customers"),
-    htmlFor("/business/customers/booking-contact-nalin"),
+    businessFixtureHtml("/business/settings"),
+    businessFixtureHtml("/business/daycare"),
+    businessFixtureHtml("/business/customers"),
+    businessFixtureHtml("/business/customers/booking-contact-nalin"),
     readFile(new URL("business/settings/SettingsScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/daycare/DaycareScreen.tsx", appRoot), "utf8"),
     readFile(new URL("business/daycare/DaycareAttendanceDetail.tsx", appRoot), "utf8"),
@@ -3373,11 +3415,11 @@ test("renders BF10 Settings, BF11 Daycare, and BF12 CRM with shared state and ho
   assert.match(daycareDetail, /daycareAttendanceId=/);
   assert.match(customersHtml, /ภาพรวมความสัมพันธ์ลูกค้า/);
   assert.match(customersHtml, /ไม่มีนัดถัดไป/);
-  assert.match(detailHtml, /ความสัมพันธ์ลูกค้า/);
+  assert.match(detailHtml, /สรุปลูกค้า/);
   assert.match(detailHtml, /ไทม์ไลน์ลูกค้า/);
-  assert.match(detailHtml, /งานถัดไปที่แนะนำ/);
-  assert.match(detailHtml, /Loyalty/);
-  assert.match(detailHtml, /Planned/);
+  assert.match(detailHtml, /แนะนำให้ทำต่อ/);
+  assert.match(detailHtml, /กิจกรรมย้อนหลัง/);
+  assert.doesNotMatch(detailHtml, /crm-loyalty/);
   assert.match(customerDetail, /deriveCustomerCrmProfile/);
   assert.match(customerDetail, /deriveCustomerTimeline/);
   assert.match(crm, /aria-pressed=\{timelineFilter === filter.value\}/);
@@ -4110,3 +4152,4 @@ test("contains no Emoji or Dingbat UI characters in app source", async () => {
 
   assert.ok(sourceFiles.length > 0);
 });
+import { businessFixtureHtml } from "./business-render-fixture.mjs";

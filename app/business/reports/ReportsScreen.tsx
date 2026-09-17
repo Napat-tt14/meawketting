@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ensureDurableReport, readReport } from "../../_backend/be8/client";
 import { businessToday } from "../../_backend/shared/businessClock";
+import { BUSINESS_FIXTURE_TEST_MODE } from "../../_prototype/fixtureRuntime";
 import { addDays } from "../../_backend/shared/time";
 import {
   getBusinessReportsSummary,
@@ -53,14 +54,16 @@ export function ReportsScreen() {
   const [customEndDate, setCustomEndDate] = useState(() => businessToday(context));
   const [branchScope, setBranchScope] = useState<ReportBranchScope>("current");
   const [error, setError] = useState(false);
+  const [loadedQuery, setLoadedQuery] = useState("");
   const { businessId, branchId } = context;
+  const queryKey = JSON.stringify([businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope]);
   useEffect(() => {
     if (!isContextReady) return;
     let stopped = false;
-    const load = async () => { try { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }); if (!stopped) setError(false); } catch { if (!stopped) setError(true); } };
+    const load = async () => { try { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }); if (!stopped) { setError(false); setLoadedQuery(queryKey); } } catch { if (!stopped) setError(true); } };
     void load(); const timer = window.setInterval(() => void load(), 5000);
     return () => { stopped = true; window.clearInterval(timer); };
-  }, [businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope, isContextReady]);
+  }, [businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope, isContextReady, queryKey]);
 
   const report = useMemo(() => {
     void revision;
@@ -77,7 +80,7 @@ export function ReportsScreen() {
 
   // The report cache is populated in the browser. Keep the first render
   // consistent with SSR until the business state is ready.
-  if (!stateReady) return <div className="business-reports shell"><BusinessPageHeader title="รายงานและข้อมูลเชิงลึก" /><p role="status">กำลังโหลดข้อมูลรายงาน…</p></div>;
+  if (!stateReady || (!BUSINESS_FIXTURE_TEST_MODE && loadedQuery !== queryKey)) return <div className="business-reports shell"><BusinessPageHeader title="รายงานและข้อมูลเชิงลึก" /><p role="status">{error ? "โหลดรายงานล่าสุดไม่สำเร็จ กำลังลองใหม่" : "กำลังโหลดข้อมูลรายงาน…"}</p></div>;
 
   return (
     <div className="business-reports shell" key={context.key}>

@@ -1,22 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { GoogleAuthButton } from "../../_components/GoogleAuthButton";
-import { LockKey, ShieldCheck, UserRoundCheck } from "../../_components/icons";
+import { Google, LockKey, ShieldCheck, UserRoundCheck } from "../../_components/icons";
 
 export function BusinessLoginScreen() {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-
-  function continueWithGoogle() {
-    if (busy) return;
-    setBusy(true);
-    const requested = new URLSearchParams(window.location.search).get("returnTo");
-    const returnTo = requested?.startsWith("/business/") && requested !== "/business/login" ? requested : "/business/home";
-    window.setTimeout(() => router.push(returnTo), 420);
-  }
-
   return (
     <section className="business-login shell" aria-labelledby="business-login-title">
       <div className="business-login__story">
@@ -30,8 +16,8 @@ export function BusinessLoginScreen() {
       <div className="business-login__card">
         <span className="business-login__icon"><LockKey size={28} weight="bold" /></span>
         <h2>เข้าสู่ระบบ</h2>
-        <GoogleAuthButton busy={busy} onClick={continueWithGoogle} className="button--business-google" />
-        <small>การเชื่อมต่อ Google อยู่ระหว่างเตรียมใช้งาน</small>
+        <a className="button button--google button--large button--business-google" href="/api/auth/google/start?returnTo=%2Fbusiness%2Fhome"><Google size={20} aria-hidden="true" />ดำเนินการต่อด้วย Google</a>
+        <small id="business-login-available">ใช้บัญชี Google ที่ได้รับอนุญาตสำหรับร้านเท่านั้น</small>
       </div>
     </section>
   );

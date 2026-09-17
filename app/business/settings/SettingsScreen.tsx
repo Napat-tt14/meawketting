@@ -347,6 +347,7 @@ function ProfileEditor({
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onLogoChange} />
             </label>
             <small>PNG, JPG หรือ WebP ขนาดไม่เกิน 1.5 MB</small>
+            <small>แสดงเฉพาะหน้านี้ ยังไม่บันทึกโลโก้</small>
             {draft.logoDataUrl ? <button className="settings-text-action" type="button" onClick={() => onChange({ ...draft, logoDataUrl: null })}>นำโลโก้ออก</button> : null}
           </div>
         </div>

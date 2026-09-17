@@ -2,6 +2,8 @@
 
 Status: **CANONICAL / BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY / BF1–BF12 UI FROZEN**
 
+Latest production handoff (2026-09-12): [PROD0–PROD6 report](./PRODUCTION_TRACK_REPORT.md), [operations/auth/D1 runbook](./PRODUCTION_RUNBOOK.md), [Product Owner pilot QA](./PILOT_QA.md). **NOT PRODUCTION READY**. These current results supersede the regression counts in the historical PROD0 report.
+
 This directory is the source of truth for Product direction, UX architecture, repository status, and validation. Read only the documents needed for the task.
 
 > Do not read all canonical documents unless the task genuinely spans all ownership areas.

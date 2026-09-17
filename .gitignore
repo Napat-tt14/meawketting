@@ -11,6 +11,8 @@
 # Secrets and local environment files
 .env
 .env.*
+.dev.vars
+.dev.vars.*
 !.env.example
 .evn
 .evn.*

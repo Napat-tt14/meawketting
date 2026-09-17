@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DemoBusinessContext } from "../../_prototype/businessState";
 import {
-  DEMO_BUSINESS_CONTEXTS,
+  getDemoBusinessContext,
   getDemoBusinessContextDetails,
   readActiveBusinessContext,
 } from "../../_prototype/businessState";
@@ -13,7 +13,7 @@ import { useBusinessStateReady } from "./useBusinessContext";
 export function BusinessUserMenu() {
   const stateReady = useBusinessStateReady();
   const [open, setOpen] = useState(false);
-  const [context, setContext] = useState<DemoBusinessContext>(DEMO_BUSINESS_CONTEXTS[0]);
+  const [context, setContext] = useState<DemoBusinessContext>(() => getDemoBusinessContext(null));
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -90,7 +90,10 @@ export function BusinessUserMenu() {
               <span><Storefront size={20} weight="bold" /><span><small>ร้านและสาขา</small><strong>{details.business?.name}<br />{details.branch?.name}</strong></span></span>
               <span><UserRoundCheck size={20} weight="bold" /><span><small>หน้าที่ปัจจุบัน</small><strong>{context.role}</strong></span></span>
             </section>
-            <button className="business-user-menu__signout" type="button" onClick={() => window.location.assign("/business/login")}><LogOut size={18} weight="bold" /> ออกจากระบบ</button>
+            <button className="business-user-menu__signout" type="button" onClick={() => {
+              void fetch("/api/auth/google/logout", { method: "POST", credentials: "same-origin" })
+                .finally(() => window.location.assign("/business/login"));
+            }}><LogOut size={18} weight="bold" /> ออกจากระบบ</button>
           </div>
         </>
       ) : null}

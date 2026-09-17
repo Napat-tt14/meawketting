@@ -26,7 +26,7 @@ export function SiteFooter() {
 
         <div className="business-public-footer__bottom">
           <span>Meawketting · Pet business operating platform</span>
-          <span>ข้อมูลสำหรับการดูแลสัตว์เลี้ยงและการทำงานของร้าน</span>
+          <nav aria-label="นโยบายและข้อกำหนด"><a href="/privacy">นโยบายความเป็นส่วนตัว</a><span aria-hidden="true"> · </span><a href="/terms">ข้อกำหนดการใช้งาน</a></nav>
           <span>© 2026 Meawketting</span>
         </div>
       </div>

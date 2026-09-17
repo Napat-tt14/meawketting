@@ -56,7 +56,7 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
           {variant === "app" ? (
             <>
               <BusinessCommandPalette />
-              <Link className={`business-header__scan${scannerActive ? " is-active" : ""}`} href="/business/scan" aria-current={pathname === "/business/scan" ? "page" : undefined}>
+              <Link className={`business-header__scan${scannerActive ? " is-active" : ""}`} href="/business/scan" aria-label="สแกนรับเข้า" aria-current={pathname === "/business/scan" ? "page" : undefined}>
                 <Scan size={18} weight="bold" /> <span>สแกนรับเข้า</span>
               </Link>
               <BusinessUserMenu />

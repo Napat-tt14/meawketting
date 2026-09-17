@@ -70,9 +70,9 @@ export const CUSTOMER_CRM_SEGMENTS: readonly { value: CustomerCrmSegment; label:
   { value: "new", label: "ลูกค้าใหม่" },
   { value: "regular", label: "ลูกค้าประจำ" },
   { value: "no-next-booking", label: "ไม่มีนัดถัดไป" },
-  { value: "grooming", label: "Grooming" },
-  { value: "hotel", label: "Hotel" },
-  { value: "daycare", label: "Daycare" },
+  { value: "grooming", label: "อาบน้ำตัดขน" },
+  { value: "hotel", label: "ฝากค้างคืน" },
+  { value: "daycare", label: "รับเลี้ยงรายวัน" },
   { value: "inactive", label: "ไม่ได้มาสักพัก" },
 ] as const;
 

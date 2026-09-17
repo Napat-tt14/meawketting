@@ -1,11 +1,13 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 export type BusinessSegmentedOption<Value extends string> = {
   value: Value;
   label: string;
   disabled?: boolean;
+  icon?: ReactNode;
+  count?: number;
 };
 
 export function BusinessSegmentedControl<Value extends string>({
@@ -58,7 +60,9 @@ export function BusinessSegmentedControl<Value extends string>({
           disabled={option.disabled}
           onClick={() => onChange(option.value)}
         >
-          {option.label}
+          {option.icon ? <span aria-hidden="true">{option.icon}</span> : null}
+          <span>{option.label}</span>
+          {option.count !== undefined ? <span className="business-segmented-control__count">{option.count}</span> : null}
         </button>
       ))}
     </div>

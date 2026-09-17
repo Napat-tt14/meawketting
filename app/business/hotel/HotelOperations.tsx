@@ -309,7 +309,7 @@ export function HotelOperations({
           <article className="hotel-summary-card hotel-summary-card--arrivals"><span><CalendarDays size={18} />เข้าพักวันนี้</span><strong>{summary.arrivals}</strong><small>รอรับเข้า {summary.unassignedArrivals} ตัว</small></article>
           <article className="hotel-summary-card hotel-summary-card--departures"><span><Clock size={18} />ออกวันนี้</span><strong>{summary.departures}</strong><small>เตรียมรับกลับตามรายการ</small></article>
           <article className="hotel-summary-card hotel-summary-card--care"><span><CheckCircle size={18} />ต้องดูแล</span><strong>{summary.careDue}</strong><small>งานดูแลที่ยังค้างวันนี้</small></article>
-          <article className="hotel-summary-card hotel-summary-card--attention"><span><CircleAlert size={18} />ต้องจัดการ</span><strong>{summary.attention}</strong><small>งานดูแล {summary.careDue} · incident {summary.incidents} · พร้อมกลับ {summary.readyForPickup}</small></article>
+          <article className="hotel-summary-card hotel-summary-card--attention"><span><CircleAlert size={18} />ต้องจัดการ</span><strong>{summary.attention}</strong><small>งานดูแล {summary.careDue} · เหตุที่ต้องดูแล {summary.incidents} · พร้อมกลับ {summary.readyForPickup}</small></article>
         </div>
       </section>
 

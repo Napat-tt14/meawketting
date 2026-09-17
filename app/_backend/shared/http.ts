@@ -1,11 +1,13 @@
 import { asBe1Error, be1Error } from "../be1/errors";
-import { DevTestIdentityAdapter } from "../be1/identity";
+import { resolveIdentity } from "../be1/identity";
 import { createRequestMetadata, type RequestMetadata } from "../be1/metadata";
+import type { D1DatabaseLike } from "../be1/repository";
 import { BackendConflict } from "./errors";
+import { requireSameOrigin } from "./requestSecurity";
 
 /** Reads a bounded body before parsing. Does not log credentials, notes or tokens. */
 export async function readJson(request: Request, limit = 65536): Promise<unknown> {
-  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw be1Error("INVALID_INPUT");
+  if (request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() !== "application/json") throw be1Error("INVALID_INPUT");
   if (Number(request.headers.get("content-length") ?? 0) > limit) throw be1Error("INVALID_INPUT");
   const reader = request.body?.getReader();
   if (!reader) throw be1Error("INVALID_INPUT");
@@ -28,13 +30,15 @@ export async function readJson(request: Request, limit = 65536): Promise<unknown
 }
 
 export async function businessRequest(request: Request, authMode: string | undefined,
-  execute: (personId: string, body: unknown, metadata: RequestMetadata) => Promise<unknown>) {
+  execute: (personId: string, body: unknown, metadata: RequestMetadata) => Promise<unknown>,
+  database?: D1DatabaseLike) {
   const metadata = createRequestMetadata(request.headers);
   const headers = { "cache-control": "no-store", "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff",
     "x-request-id": metadata.requestId, "x-correlation-id": metadata.correlationId };
   const meta = { requestId: metadata.requestId, correlationId: metadata.correlationId };
   try {
-    const identity = await new DevTestIdentityAdapter(authMode).resolve(request);
+    requireSameOrigin(request);
+    const identity = await resolveIdentity(request, authMode, database);
     const data = await execute(identity.personId, await readJson(request), metadata);
     return new Response(JSON.stringify({ ok: true, data, meta }), { headers });
   } catch (error) {

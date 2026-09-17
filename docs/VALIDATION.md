@@ -5,6 +5,18 @@ Status: **BE1–BE8 BACKEND FOUNDATION VALIDATED LOCALLY / BE6 PROVIDER-NEUTRAL 
 Validation date: 2026-09-09
 Owner: Engineering / QA
 
+## Latest Business cleanliness validation — 2026-09-14
+
+See [final Business UX/UI and demo leakage audit](./FINAL_BUSINESS_UX_UI_DEMO_LEAKAGE_AUDIT.md) for route coverage, fixes, limitations and exact commands. Frontend/rendered **93/93**; backend **69/69** (BE1 8, BE2 11, BE3 9, BE4 13, BE5 7, BE6 8, BE7 10, BE8 3); production/security **7/7**. Lint has 0 errors/warnings; all eight BE scoped typechecks and production typecheck pass; build and git diff whitespace checks pass. Explicit fixture rendering preserves populated workflow tests while separate production tests assert neutral pre-hydration states and reject poisoned fixture storage. Local D1 CRM SELECT was verified after fixing its compound-query limit failure. Browser responsive checks used 320/375/390/430/768/820/1024/1200/1440 widths.
+
+**Audit verdict: FAIL — CLEANUP REQUIRED BEFORE AUTH.** Existing passing suites do not cover two independently reproduced Customer defects: duplicate no-phone creation on request replay and accepted stale-form overwrite. BE1/BE2 need focused retry/concurrency correctness work. Production-preview browser navigation was blocked by the browser client; do not represent SSR/API tests as hydrated production-browser acceptance. Full-root TypeScript was not rerun here; previous Consumer diagnostics below remain historical evidence. No tests were weakened or skipped. No Auth/provider/deployment work occurred.
+
+## Latest production validation — 2026-09-12
+
+**NOT PRODUCTION READY.** See [PROD0–PROD6 report](./PRODUCTION_TRACK_REPORT.md) for exact commands and limitations. Current: frontend/rendered **91/91**; backend **69/69**; new production security **7/7**; BE1–BE8 and production scoped typechecks **PASS**; lint **0 errors / 0 warnings**; build **PASS**; 15 migrations / 65-table schema **PASS**; 41 isolated HTTP-handler requests across 10 routes **PASS**; disposable backup/restore **PASS** (299 seeded rows, every table hash, integrity, FK and failed-migration rollback). No production/network-provider/real-shop validation occurred. Full root TypeScript still reports five frozen Consumer diagnostics; they remain visible, not excluded. Protected reference files are now outside root product typechecking and `.ts` test imports are explicitly supported by the no-emit contract.
+
+The initial six rendered failures were stale committed UI/SSR contracts; the BE8 failure was a real `booking.id`/`bookingId` regression. No tests were skipped or financial/privacy assertions removed. Current landing/spotlight assertions track the committed UI; Reports also renders its browser-ready view in an isolated test module graph. Historical counts below do not override this checkpoint.
+
 This document owns current test evidence. A passing local build is not a production-readiness claim.
 
 ## Current BE1–BE8 validation — 2026-09-09

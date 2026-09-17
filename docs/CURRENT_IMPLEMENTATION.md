@@ -4,11 +4,21 @@ Status: **BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY; BF1–BF12 UI FROZEN
 Audit date: 2026-09-09
 Owner: Engineering
 
+## Final Business cleanliness audit — 2026-09-14
+
+**FAIL — CLEANUP REQUIRED BEFORE AUTH.** See [final Business UX/UI and demo leakage audit](./FINAL_BUSINESS_UX_UI_DEMO_LEAKAGE_AUDIT.md). Normal Business rendering now uses neutral pre-hydration states and cannot silently fall back to static fixtures; Business login no longer simulates authentication. CRM D1 query compatibility, projection loading/failure presentation, nested Booking dialog Escape, current Grooming time and small copy/accessibility defects were corrected. Frontend/rendered 93/93, backend 69/69, production/security 7/7, lint, build and all BE/production scoped typechecks pass. Isolated probes nevertheless reproduce duplicate Customer creation on replay and stale Customer overwrite; BE1/BE2 write-contract correctness must be resolved before Auth. Frozen design, Consumer source and protected reference remain untouched. No commit/push/deploy.
+
+## Production track checkpoint — 2026-09-12
+
+**NOT PRODUCTION READY.** [Current production report](./PRODUCTION_TRACK_REPORT.md) owns this run's evidence and launch gaps. Rendered tests are 91/91, backend tests 69/69, production tests 7/7, BE1–BE8 and production scoped typechecks pass. JSON limits/origin protection now cover BE1–BE8; Worker response security/logging and a fail-closed remote rate-binding boundary are implemented. Opaque session helpers are provider-neutral and **not wired**; real login/onboarding/recovery remains absent. No Cloudflare resources or providers were connected. Local restore and HTTP-handler smoke are simulations, not real-shop acceptance.
+
+The starting committed `b75b843` UI is authoritative: root landing uses clay hotel imagery documented in `public/images/landing/ARTWORK.md`; Business Home says `ภาพรวมวันนี้`, renders `DashboardOverview`, and loads one active spotlight image. Billing uses current Thai labels. Reports SSR deliberately renders loading until browser state is ready; its loaded report is tested separately. Earlier photographic landing descriptions below are historical and superseded by this checkpoint. Consumer stays PAUSED; the shared React runtime received security patch updates and its rendered tests still pass.
+
 ## Current backend status after BE8 recovery
 
 BE1–BE7 are durable D1-backed domains and BE8 is a read-only projection layer. BE4 persists Grooming Jobs, Hotel Stays, Daycare Attendance, lifecycle events and source-keyed Service Records. BE5 persists authority, Consent, Temporary Business QR grants and Intake with server-side scope/expiry/revoke. BE6 persists Conversations, Messages, read state, approvals, outbox attempts and webhook deduplication around a Business-owned LINE OA adapter boundary. BE7 persists Charge, Payment, allocations, refunds, provider attempts and reconciliation state while keeping service completion separate from payment. BE8 derives Reports and CRM from those canonical records without report/CRM tables.
 
-Local validation is complete through BE8 using deterministic D1-compatible migrations and populated end-to-end records. Production Auth, real LINE credentials, a payment gateway, R2 media and Cloudflare deployment remain **NOT IMPLEMENTED**. `MEAWKETTING_FIXTURE_MODE=test` is the only supported persistent browser fixture compatibility mode; production SSR may render a deterministic, non-authoritative snapshot before D1 hydration.
+Local validation is complete through BE8 using deterministic D1-compatible migrations and populated end-to-end records. Production Auth, real LINE credentials, a payment gateway, R2 media and Cloudflare deployment remain **NOT IMPLEMENTED**. `MEAWKETTING_FIXTURE_MODE=test` is the only supported persistent browser fixture compatibility mode; normal production SSR now renders a neutral loading state before durable data is available, with no static fixture snapshot.
 
 ## BE1 identity / Business / Branch implementation — 2026-09-06
 

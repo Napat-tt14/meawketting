@@ -52,6 +52,7 @@ import { chargeStatusLabel, formatBusinessMoney, paymentMethodLabel } from "../b
 import { CustomerCrmPanel } from "./CrmPanel";
 import { deriveCustomerCrmProfile, deriveCustomerCrmReferenceAt, deriveCustomerTimeline, deriveCustomerUpcomingBookings } from "./crmPresentation";
 import { ensureDurableCrm } from "../../_backend/be8/client";
+import { BUSINESS_FIXTURE_TEST_MODE } from "../../_prototype/fixtureRuntime";
 
 const emptySubscribe = () => () => {};
 function useIsClient() {
@@ -130,15 +131,17 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
   const [editor, setEditor] = useState<"customer" | "pet" | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [crmLoadedKey, setCrmLoadedKey] = useState("");
   const relationshipStateReady = useIsClient();
   const { businessId, branchId } = context;
+  const crmKey = JSON.stringify([businessId, branchId, customerId]);
   useEffect(() => {
     if (!isContextReady) return;
     let stopped = false;
-    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }, customerId); if (!stopped) setNotice((v) => v === "โหลด CRM ล่าสุดไม่สำเร็จ" ? null : v); } catch { if (!stopped) setNotice("โหลด CRM ล่าสุดไม่สำเร็จ"); } };
+    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }, customerId); if (!stopped) { setCrmLoadedKey(crmKey); setNotice((v) => v === "โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ" ? null : v); } } catch { if (!stopped) setNotice("โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ"); } };
     void load(); const timer = window.setInterval(() => void load(), 5000);
     return () => { stopped = true; window.clearInterval(timer); };
-  }, [businessId, branchId, customerId, isContextReady]);
+  }, [businessId, branchId, customerId, isContextReady, crmKey]);
 
   useEffect(() => {
     const sync = () => setRevision((current) => current + 1);
@@ -261,7 +264,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
           {customer.email ? <span>{customer.email}</span> : null}
         </div>}
         actions={<nav className="business-customer-detail__actions" aria-label="การทำงานกับลูกค้า">
-          <Link className="customer-detail-icon-action customer-detail-icon-action--primary" href={`/business/calendar?customerId=${encodeURIComponent(customer.id)}`} title="เพิ่มการจอง" aria-label={`เพิ่มการจองให้ ${customer.name}`}><CalendarDays size={20} /></Link>
+          <Link className="button button--business" href={`/business/calendar?customerId=${encodeURIComponent(customer.id)}`} title="เพิ่มการจอง" aria-label={`เพิ่มการจองให้ ${customer.name}`}><CalendarDays size={20} /><span>เพิ่มการจอง</span></Link>
           <a className="customer-detail-icon-action" href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}`} title="ส่งข้อความ" aria-label={`ส่งข้อความถึง ${customer.name}`}><MessageCircle size={20} /></a>
         </nav>}
       />
@@ -270,11 +273,11 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
 
       <div className="business-customer-detail__layout">
         <div className="business-customer-detail__main">
-          <CustomerCrmPanel profile={crmProfile} timeline={customerTimeline} />
+          {BUSINESS_FIXTURE_TEST_MODE || crmLoadedKey === crmKey ? <CustomerCrmPanel profile={crmProfile} timeline={customerTimeline} /> : <p role="status">ยังแสดงข้อมูลความสัมพันธ์ลูกค้าไม่ได้ กำลังลองโหลดข้อมูล</p>}
 
           <section className="customer-detail-section customer-detail-section--pets" aria-labelledby="customer-pets-title">
             <header>
-              <div><h2 id="customer-pets-title">สัตว์เลี้ยง</h2><p>เลือกดูข้อมูลและเพิ่มการจองแยกตามตัว</p></div>
+              <div><h2 id="customer-pets-title">สัตว์เลี้ยง</h2></div>
               <div className="customer-pets-heading-actions">
                 <span>{customer.pets.length} ตัว</span>
                 <button className="customer-detail-icon-action" type="button" title="เพิ่มสัตว์เลี้ยง" aria-label={`เพิ่มสัตว์เลี้ยงให้ ${customer.name}`} onClick={() => setEditor("pet")}><Plus size={20} /></button>
@@ -346,17 +349,17 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
             ) : <p className="customer-section-empty">ยังไม่มีนัดหมายของลูกค้ารายนี้</p>}
           </section>
 
-          <section className="customer-detail-section customer-detail-section--service-history" aria-labelledby="customer-service-history-title">
-            <header><div><h2 id="customer-service-history-title">ประวัติบริการ</h2><p>บันทึกจาก Grooming, Hotel และ Daycare ที่เสร็จแล้ว · เปิดรายละเอียดในรายการนี้</p></div><Clock size={22} /></header>
+          <details className="customer-detail-section customer-detail-section--service-history" aria-labelledby="customer-service-history-title">
+            <summary id="customer-service-history-title">ประวัติบริการ</summary>
             {recentServiceRecords.length > 0 ? <ol className="customer-service-history">{recentServiceRecords.map((record) => <ServiceRecordHistoryItem key={record.serviceRecordId} record={record} context={context} fixtureOnly={!relationshipStateReady} customer={customer} />)}</ol> : <p className="customer-section-empty">ยังไม่มีประวัติบริการที่เสร็จสมบูรณ์ของลูกค้ารายนี้ในสาขานี้</p>}
-          </section>
+          </details>
 
-          <section className="customer-detail-section customer-detail-section--billing" aria-labelledby="customer-billing-title">
-            <header><div><h2 id="customer-billing-title">ยอดและการชำระ</h2><p>ข้อมูลการเงินของสาขาปัจจุบัน</p></div><Wallet size={22} /></header>
+          <details className="customer-detail-section customer-detail-section--billing" aria-labelledby="customer-billing-title">
+            <summary id="customer-billing-title">ยอดและการชำระ</summary>
             <div className="customer-financial-summary"><span><small>ยอดค้างชำระ</small><strong>{formatBusinessMoney(unpaidFinancialBalance)}</strong></span><Link href="/business/billing">เปิดการเงิน</Link></div>
             {financialBalances.length > 0 ? <ol className="customer-financial-list">{financialBalances.map((balance) => <li key={balance.charge.chargeId}><div><BusinessServiceIcon module={balance.charge.serviceModule} size={18} /><span><strong>{balance.charge.serviceLabel}</strong><small>{balance.charge.petId ? customer.pets.find((pet) => pet.id === balance.charge.petId)?.name ?? "น้อง" : "หลายตัวตามการจอง"} · คงเหลือ {formatBusinessMoney(balance.remaining)}</small></span></div><span><CustomerChargeStatus status={balance.status} /><Link href={`/business/billing?chargeId=${encodeURIComponent(balance.charge.chargeId)}`}>ตรวจยอด</Link></span></li>)}</ol> : <p className="customer-section-empty">ยังไม่มี Charge ของลูกค้ารายนี้ในสาขานี้</p>}
             <div className="customer-payment-history"><h3>การรับชำระล่าสุด</h3>{financialPayments.length > 0 ? <ol>{financialPayments.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มีรายการรับชำระในสาขานี้</p>}</div>
-          </section>
+          </details>
         </div>
 
         <aside className="business-customer-detail__aside">

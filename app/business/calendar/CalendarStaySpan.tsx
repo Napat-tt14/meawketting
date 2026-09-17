@@ -78,6 +78,8 @@ export function CalendarStaySpan({
         onClick={() => onSelect(booking)}
         onDoubleClick={() => onOpen?.(booking)}
         aria-pressed={selected}
+        aria-label={`${petLabel} ${booking.service.label} ${bookingTimeLabel(booking)} ${bookingStatusLabel(booking.status)}`}
+        title={`${petLabel} · ${booking.service.label} · ${bookingTimeLabel(booking)} · ${bookingStatusLabel(booking.status)}`}
       >
         <BusinessServiceIcon module="hotel" size={17} />
         <span className="calendar-stay-span__copy"><strong>{petLabel}</strong><small>{booking.service.label} · {bookingTimeLabel(booking)}</small></span>

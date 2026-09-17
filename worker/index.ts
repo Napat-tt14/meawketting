@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import type { D1DatabaseLike } from "../app/_backend/be1/repository";
 import { InboxTransport } from "../app/_backend/be6/transport";
 import { lineSecretResolver } from "../app/_backend/be6/lineSecrets";
+import { secureFetch } from "./security";
 
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -23,6 +24,7 @@ const worker = {
     await new InboxTransport(env.DB as unknown as D1DatabaseLike, lineSecretResolver(env.MEAWKETTING_LINE_CREDENTIALS)).drain(20);
   },
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext): Promise<Response> {
+    return secureFetch(request, env, async () => {
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {
@@ -37,6 +39,7 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+    });
   },
 };
 

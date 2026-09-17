@@ -7,21 +7,20 @@ import {
 } from "../../_backend/be1/configurationCache";
 import { ensureBusinessSession } from "../../_backend/be1/client";
 import {
-  DEMO_BUSINESS_CONTEXTS,
+  getDemoBusinessContext,
   readActiveBusinessContext,
   writeActiveBusinessContext,
 } from "../../_prototype/businessState";
 
 const emptySubscribe = () => () => {};
 
-// Browser-local Business slices render deterministic fixtures on the server,
-// then opt into session state after hydration through this shared gate.
+// Hydration gate only. Fixtures are available exclusively to the test harness.
 export function useBusinessStateReady() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false);
 }
 
 export function useBusinessContext() {
-  const [context, setContext] = useState(DEMO_BUSINESS_CONTEXTS[0]);
+  const [context, setContext] = useState(() => getDemoBusinessContext(null));
   const [revision, setRevision] = useState(0);
   const [isContextReady, setIsContextReady] = useState(false);
   const configurationRevision = useSyncExternalStore(
@@ -32,9 +31,7 @@ export function useBusinessContext() {
 
   useEffect(() => {
     void ensureBusinessSession().catch(() => {
-      // The frozen prototype remains usable with DEV/TEST fixtures when its
-      // explicitly local backend is not initialized. No browser write becomes
-      // an authorization or Business/Branch source of truth.
+      // The portal frame owns loading/error feedback; no fixture fallback.
     });
   }, []);
 

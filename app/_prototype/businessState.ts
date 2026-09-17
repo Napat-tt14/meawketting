@@ -57,6 +57,10 @@ export type DemoBusinessContext = {
   memberLabel: string;
 };
 
+export const UNAVAILABLE_BUSINESS_CONTEXT: DemoBusinessContext = {
+  key: "", businessId: "", branchId: "", role: "ยังไม่ได้เข้าสู่ระบบ", memberLabel: "",
+};
+
 export type BusinessServiceModule = "grooming" | "hotel" | "daycare";
 
 export const BUSINESS_SERVICE_MODULES: Record<BusinessServiceModule, { label: string }> = {
@@ -2470,6 +2474,7 @@ function normalizeOperatingHours(hours: readonly PrototypeOperatingHoursEntry[] 
 }
 
 export function getPrototypeBusinessProfile(businessId: string, fixtureOnly = false) {
+  if (!BUSINESS_FIXTURE_TEST_MODE && fixtureOnly) return null;
   if (!fixtureOnly && hasBusinessSession()) {
     const business = readCachedBusiness(businessId);
     return business ? {
@@ -2484,7 +2489,7 @@ export function getPrototypeBusinessProfile(businessId: string, fixtureOnly = fa
       updatedAt: business.updatedAt,
     } : null;
   }
-  return BUSINESS_PROFILE_FIXTURES.find((profile) => profile.businessId === businessId)
+  return BUSINESS_FIXTURE_TEST_MODE && BUSINESS_PROFILE_FIXTURES.find((profile) => profile.businessId === businessId)
     ? cloneBusinessProfile(BUSINESS_PROFILE_FIXTURES.find((profile) => profile.businessId === businessId)!)
     : null;
 }
@@ -2493,6 +2498,7 @@ export function listPrototypeBusinessBranches(
   businessId: string,
   options: { includeInactive?: boolean; fixtureOnly?: boolean } = {},
 ) {
+  if (!BUSINESS_FIXTURE_TEST_MODE && options.fixtureOnly) return [];
   const branches = !options.fixtureOnly && hasBusinessSession()
     ? readCachedBranches(businessId).map((branch): PrototypeBusinessBranch => ({
         branchId: branch.id,
@@ -2508,7 +2514,7 @@ export function listPrototypeBusinessBranches(
         createdAt: branch.createdAt,
         updatedAt: branch.updatedAt,
       }))
-    : BUSINESS_BRANCH_FIXTURES.map(cloneBusinessBranch);
+    : BUSINESS_FIXTURE_TEST_MODE ? BUSINESS_BRANCH_FIXTURES.map(cloneBusinessBranch) : [];
   return branches
     .filter((branch) => branch.businessId === businessId && (options.includeInactive || branch.active))
     .sort((first, second) => first.createdAt.localeCompare(second.createdAt) || first.name.localeCompare(second.name, "th"))
@@ -2525,9 +2531,10 @@ function contextKeyForBranch(businessId: string, branchId: string) {
 }
 
 export function listPrototypeBusinessContexts(businessId?: string | null, fixtureOnly = false) {
+  if (!BUSINESS_FIXTURE_TEST_MODE && fixtureOnly) return [];
   const branches = !fixtureOnly && hasBusinessSession()
     ? (readBusinessSession()?.workspaces.flatMap((workspace) => listPrototypeBusinessBranches(workspace.business.id, { includeInactive: true })) ?? [])
-    : BUSINESS_BRANCH_FIXTURES.map(cloneBusinessBranch);
+    : BUSINESS_FIXTURE_TEST_MODE ? BUSINESS_BRANCH_FIXTURES.map(cloneBusinessBranch) : [];
   const baseline = new Map<string, DemoBusinessContext>();
   const durableSession = !fixtureOnly ? readBusinessSession() : null;
   const roleForBusiness = (targetBusinessId: string) => {
@@ -2560,7 +2567,7 @@ export function listPrototypeBusinessContexts(businessId?: string | null, fixtur
 
 export function getDemoBusinessContext(contextKey: string | null | undefined) {
   const contexts = listPrototypeBusinessContexts();
-  return contexts.find((context) => context.key === contextKey) ?? contexts[0] ?? DEMO_BUSINESS_CONTEXTS[0];
+  return contexts.find((context) => context.key === contextKey) ?? contexts[0] ?? (BUSINESS_FIXTURE_TEST_MODE ? DEMO_BUSINESS_CONTEXTS[0] : UNAVAILABLE_BUSINESS_CONTEXT);
 }
 
 export function getDemoBusinessContextForBranch(businessId: string | null | undefined, branchId: string | null | undefined, fixtureOnly = false) {
@@ -2570,10 +2577,16 @@ export function getDemoBusinessContextForBranch(businessId: string | null | unde
   const contexts = listPrototypeBusinessContexts(businessId, fixtureOnly);
   return contexts.find((context) => context.branchId === branchId)
     ?? contexts[0]
-    ?? DEMO_BUSINESS_CONTEXTS[0];
+    ?? (BUSINESS_FIXTURE_TEST_MODE ? DEMO_BUSINESS_CONTEXTS[0] : UNAVAILABLE_BUSINESS_CONTEXT);
 }
 
 export function getDemoBusinessContextDetails(context: DemoBusinessContext, fixtureOnly = false) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) {
+    if (fixtureOnly) return { context, business: null, branch: null };
+    const profile = getPrototypeBusinessProfile(context.businessId);
+    const branch = getPrototypeBusinessBranch(context.businessId, context.branchId);
+    return { context, business: profile, branch: branch ? { ...branch, id: branch.branchId } : null };
+  }
   const fixture = getBusinessFixture(context.businessId);
   const profile = getPrototypeBusinessProfile(context.businessId, fixtureOnly);
   const branchProfile = getPrototypeBusinessBranch(context.businessId, context.branchId, fixtureOnly);
@@ -2640,6 +2653,7 @@ function sortPrototypeCustomers(customers: readonly PrototypeCustomer[], context
 }
 
 export function listPrototypeCustomerFixtures(context?: DemoBusinessContext | null) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   return sortPrototypeCustomers(DEMO_CUSTOMER_FIXTURES.map(cloneCustomer), context);
 }
 
@@ -2653,7 +2667,7 @@ export function listPrototypeCustomers(context?: DemoBusinessContext | null) {
   if (!readyDirectories.length) return listPrototypeCustomerFixtures(null);
   const readyBusinessIds = new Set(readyDirectories.map((entry) => entry.businessId));
   const durable = readyDirectories.flatMap((entry) => entry.customers.map(projectDurableCustomer));
-  const compatibility = DEMO_CUSTOMER_FIXTURES
+  const compatibility = (BUSINESS_FIXTURE_TEST_MODE ? DEMO_CUSTOMER_FIXTURES : [])
     .filter((customer) => !readyBusinessIds.has(customer.businessId))
     .map(cloneCustomer);
   return sortPrototypeCustomers([...durable, ...compatibility], null);
@@ -2736,6 +2750,7 @@ function projectDurableBookingResource(resource: BookingResourceView): DemoBooki
 }
 
 export function getBookingServices(context: DemoBusinessContext, fixtureOnly = false) {
+  if (!BUSINESS_FIXTURE_TEST_MODE && fixtureOnly) return [];
   const enabledModules = getEnabledBusinessModules(context, fixtureOnly);
   const durableCatalog = fixtureOnly ? null : readBe3Catalog(context.businessId, context.branchId);
   if (durableCatalog) {
@@ -2743,6 +2758,7 @@ export function getBookingServices(context: DemoBusinessContext, fixtureOnly = f
       .filter((service) => service.status === "active" && enabledModules.includes(service.module))
       .map(projectDurableBookingService);
   }
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   const services: DemoBookingService[] = DEMO_BOOKING_SERVICES.filter((service) => (
     service.businessId === context.businessId
     && service.branchId === context.branchId
@@ -2768,6 +2784,7 @@ export function getBookingServices(context: DemoBusinessContext, fixtureOnly = f
 }
 
 export function getBookingResources(context: DemoBusinessContext, serviceId?: string, fixtureOnly = false) {
+  if (!BUSINESS_FIXTURE_TEST_MODE && fixtureOnly) return [];
   const enabledModules = getEnabledBusinessModules(context, fixtureOnly);
   const durableCatalog = fixtureOnly ? null : readBe3Catalog(context.businessId, context.branchId);
   if (durableCatalog) {
@@ -2775,6 +2792,7 @@ export function getBookingResources(context: DemoBusinessContext, serviceId?: st
       .filter((resource) => enabledModules.includes(resource.module) && (!serviceId || resource.serviceIds.includes(serviceId)))
       .map(projectDurableBookingResource);
   }
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   const services = getBookingServices(context, fixtureOnly);
   const resources: DemoBookingResource[] = DEMO_BOOKING_RESOURCES.filter((resource) => (
     resource.businessId === context.businessId
@@ -2851,10 +2869,10 @@ export function projectDurableBooking(booking: BookingView): PrototypeBooking {
 
 function mergedPrototypeBookings() {
   const readyDirectories = readAllReadyBe3Directories();
-  if (!readyDirectories.length) return DEMO_BOOKING_FIXTURES.map(cloneBooking);
+  if (!readyDirectories.length) return BUSINESS_FIXTURE_TEST_MODE ? DEMO_BOOKING_FIXTURES.map(cloneBooking) : [];
   const readyBusinessIds = new Set(readyDirectories.map((entry) => entry.businessId));
   const durable = readyDirectories.flatMap((entry) => entry.bookings.map(projectDurableBooking));
-  const compatibility = DEMO_BOOKING_FIXTURES
+  const compatibility = (BUSINESS_FIXTURE_TEST_MODE ? DEMO_BOOKING_FIXTURES : [])
     .filter((booking) => !readyBusinessIds.has(booking.businessId))
     .map(cloneBooking);
   return [...durable, ...compatibility];
@@ -2884,6 +2902,7 @@ function filterAndSortPrototypeBookings(
 // initial server/client pass, then replace it with the durable BE3 directory.
 // Fixtures are never imported, backfilled, or accepted as mutation truth.
 export function listPrototypeBookingFixtures(context?: DemoBusinessContext | null, options: ListPrototypeBookingsOptions = {}) {
+  if (!BUSINESS_FIXTURE_TEST_MODE) return [];
   return filterAndSortPrototypeBookings(DEMO_BOOKING_FIXTURES.map(cloneBooking), context, options);
 }
 

@@ -1,3 +1,41 @@
+/* Customer scanning and compact monitor presentation. */
+.business-app-frame .business-customers .crm-segment-filter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.business-app-frame .business-customers .crm-segment-filter .customer-filter-group { display: flex; flex-wrap: wrap; min-width: 0; width: 100%; gap: 6px; background: transparent; border: 0; border-radius: 0; padding: 0; overflow: visible; }
+.business-app-frame .business-customers .customer-filter-group.business-segmented-control > button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; min-height: 40px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; white-space: nowrap; }
+.customer-filter-group > button > span:first-child { display: inline-flex; }
+.business-app-frame .business-customers .customer-filter-group.business-segmented-control > button[aria-selected="true"] { background: var(--accent); border-color: var(--primary); color: var(--foreground); }
+.business-segmented-control__count { padding: 1px 6px; border-radius: 5px; background: var(--background); font-size: 11px; font-variant-numeric: tabular-nums; }
+.business-app-frame .business-customer-detail__main { grid-template-columns: minmax(0, 1fr); }
+.business-app-frame .customer-crm-panel__header > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.business-app-frame .customer-crm-panel__facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.business-app-frame .customer-crm-panel__facts dd { white-space: normal; }
+.business-app-frame .customer-crm-next-action { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 16px; border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: 8px; background: var(--accent); }
+.business-app-frame .customer-crm-next-action > span { font-size: 12px; }
+.business-app-frame .customer-crm-next-action > a { margin: 0 0 0 auto; }
+.business-app-frame .business-customer-detail details.customer-detail-section { display: block; border-top-width: 1px; }
+.business-customer-detail :is(.customer-detail-section, .customer-detail-disclosure) > summary { cursor: pointer; padding-block: 10px; font-size: 14px; font-weight: 600; color: var(--foreground); }
+.business-customer-detail :is(.customer-detail-section, .customer-detail-disclosure) > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.customer-detail-disclosure { border-top: 1px solid var(--border); }
+.customer-detail-disclosure > summary > span { margin-left: 8px; color: var(--muted-foreground); font-size: 12px; font-weight: 400; }
+.customer-detail-disclosure > :is(ul, p) { font-size: 13px; line-height: 1.7; color: var(--muted-foreground); }
+.business-customer-detail details.customer-detail-section[open] > summary { margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.booking-item__screen-time { display: none; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .booking-item { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 4px; min-height: 24px; padding: 3px 5px; border-radius: 4px; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .booking-item__module { display: block; width: 14px; height: 14px; padding: 0; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .booking-item__copy strong { display: block; font-size: 12px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) :is(.booking-item__copy > span, .booking-item__meta > time:not(.booking-item__screen-time), .booking-status-label, .calendar-stay-span__copy small) { display: none; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .booking-item__meta { display: block; grid-column: auto; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .booking-item__screen-time { display: block; font-size: 10px; line-height: 1.4; white-space: nowrap; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .calendar-stay-span__content { min-width: 0; min-height: 22px; gap: 4px; padding: 2px 5px; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .calendar-stay-span__copy { min-width: 0; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .calendar-stay-span__copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.4; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .calendar-planning-week__body { overflow-y: auto; grid-template-rows: repeat(var(--calendar-lane-count, 0), 24px) minmax(28px, 1fr) !important; }
+.business-calendar:is(:fullscreen, .is-calendar-fullscreen) .calendar-planning-day-stack { overflow-y: auto; align-content: start; gap: 3px; }
+@media (max-width: 640px) {
+  .business-app-frame .customer-crm-panel__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .business-app-frame .customer-filter-group > button { min-height: 44px; font-size: 12px; }
+}
+
 /* Quiet operational surfaces. Marketing pages and semantic status colors are
    intentionally excluded. Overlay elevation and focus indicators remain. */
 .business-app-frame,

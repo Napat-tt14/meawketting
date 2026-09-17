@@ -10,9 +10,9 @@ import { businessRequest } from "../../_backend/shared/http";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
+  const db = env.DB as unknown as D1DatabaseLike;
   return businessRequest(request, env.MEAWKETTING_AUTH_MODE, async (personId, body, metadata) => {
-    const db = env.DB as unknown as D1DatabaseLike;
     const application = new Be4Application(new D1Be1Repository(db), new D1Be2Repository(db), new D1Be3Repository(db), new D1Be4Repository(db));
     return application.executeBe4(await application.resolvePerson(personId), parseBe4Operation(body), metadata);
-  });
+  }, db);
 }

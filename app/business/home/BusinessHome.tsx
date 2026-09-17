@@ -1,7 +1,7 @@
 "use client";
 
 import { businessToday } from "../../_backend/shared/businessClock";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ensureDurableReport } from "../../_backend/be8/client";
 
 import {
@@ -54,11 +54,13 @@ function bookingPetName(booking: ReturnType<typeof listPrototypeBookings>[number
 export function BusinessHome() {
   const { context, revision, isContextReady } = useBusinessContext();
   const { businessId, branchId } = context;
+  const [refreshFailed, setRefreshFailed] = useState(false);
   useEffect(() => {
     if (!isContextReady) return;
-    const load = () => ensureDurableReport({ businessId, branchId }).catch(() => undefined);
+    let active = true;
+    const load = () => ensureDurableReport({ businessId, branchId }).then(() => { if (active) setRefreshFailed(false); }).catch(() => { if (active) setRefreshFailed(true); });
     void load(); const timer = window.setInterval(() => void load(), 5000);
-    return () => window.clearInterval(timer);
+    return () => { active = false; window.clearInterval(timer); };
   }, [businessId, branchId, isContextReady]);
   const businessStateReady = useBusinessStateReady();
   const details = getDemoBusinessContextDetails(context, !businessStateReady);
@@ -107,7 +109,7 @@ export function BusinessHome() {
     }] : []),
   ];
   const nextWork = branchBookings.filter(bookingIsOnDemoDay).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 5).map((booking) => ({
-    id: booking.id,
+    id: booking.bookingId,
     time: bookingWorkLabel(booking),
     petName: bookingPetName(booking),
     task: booking.service.label,
@@ -124,6 +126,7 @@ export function BusinessHome() {
   return (
     <div className="business-home shell" key={context.key}>
       <BusinessPageHeader title="ภาพรวมวันนี้" context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"}`} />
+      {refreshFailed ? <p role="status">อัปเดตข้อมูลล่าสุดไม่สำเร็จ กำลังแสดงข้อมูลที่โหลดไว้และลองใหม่</p> : null}
 
       <DashboardOverview today={businessToday(context)} bookings={branchBookings} summary={todaySummary} />
       <nav className="dashboard-actions" aria-label="งานด่วน">

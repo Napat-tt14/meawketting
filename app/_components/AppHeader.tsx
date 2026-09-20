@@ -5,7 +5,7 @@ import { AppNav, type AppNavMode } from "./AppNav";
 import { BrandMark } from "./BrandMark";
 import { UserMenu } from "./UserMenu";
 
-export type AppHeaderVariant = "public" | "consumer" | "flow" | "auth";
+export type AppHeaderVariant = "public" | "consumer" | "flow";
 
 type AppHeaderProps = {
   variant?: AppHeaderVariant;
@@ -24,15 +24,9 @@ const flowDefaults = {
     exitHref: "/",
     exitLabel: "ออกจากขั้นตอน",
   },
-  auth: {
-    title: "เข้าสู่ระบบ",
-    description: "บันทึก Passport ของน้องไว้ดูต่อได้ทุกเมื่อ",
-    exitHref: "/",
-    exitLabel: "กลับหน้าแรก",
-  },
 } as const;
 
-function MobileNav({ mode, flow = false, showLogin }: { mode: AppNavMode; flow?: boolean; showLogin?: boolean }) {
+function MobileNav({ mode, flow = false }: { mode: AppNavMode; flow?: boolean }) {
   return (
     <details className={flow ? "flow-header__menu" : "mobile-nav"}>
       <summary aria-label="เปิดเมนูเว็บไซต์">
@@ -43,7 +37,7 @@ function MobileNav({ mode, flow = false, showLogin }: { mode: AppNavMode; flow?:
           {flow ? <IdentificationCard size={16} weight="bold" /> : <PawPrint size={16} weight="fill" />}
           {flow ? "ไปที่" : "เมนู"}
         </span>
-        <AppNav mode={mode} mobile showLogin={showLogin ?? mode === "public"} showBusinessEntry={mode === "public" && !flow} />
+        <AppNav mode={mode} mobile showBusinessEntry={mode === "public" && !flow} />
       </div>
     </details>
   );
@@ -58,10 +52,10 @@ export function AppHeader({
   displayName,
   onLogout,
 }: AppHeaderProps) {
-  if (variant === "flow" || variant === "auth") {
-    const defaults = flowDefaults[variant];
+  if (variant === "flow") {
+    const defaults = flowDefaults.flow;
     return (
-      <header className={`site-header site-header--flow${variant === "auth" ? " site-header--auth" : ""}`}>
+      <header className="site-header site-header--flow">
         <div className="flow-header shell">
           <BrandMark />
           <span className="flow-header__context">
@@ -75,7 +69,7 @@ export function AppHeader({
             <ArrowLeft size={18} weight="bold" />
             {flowExitLabel ?? defaults.exitLabel}
           </a>
-          <MobileNav mode="public" flow showLogin={variant !== "auth"} />
+          <MobileNav mode="public" flow />
         </div>
       </header>
     );

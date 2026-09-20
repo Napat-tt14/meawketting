@@ -36,10 +36,10 @@ export function BusinessRegisterScreen() {
     } catch { setMessage("การเชื่อมต่อขัดข้อง คุณลองส่งข้อมูลเดิมอีกครั้งได้โดยไม่สร้างร้านซ้ำ"); }
     finally { setBusy(false); }
   }
-  return <section className="business-register shell" aria-labelledby="register-title">
+  return <section className="business-register business-auth-layout shell" aria-labelledby="register-title">
     <div className="business-register__intro">
-      <span className="business-register__eyebrow">MEAWKETTING FOR BUSINESS</span>
-      <h1 id="register-title">เริ่มต้นพื้นที่ทำงาน<br />สำหรับร้านของคุณ</h1>
+      <span className="business-register__eyebrow"><PawPrint size={15} /> MEAWKETTING FOR BUSINESS</span>
+      <h1 id="register-title">เริ่มต้นร้านในฝัน<br />พร้อมการดูแล<span className="business-auth-accent">ที่ดีกว่า</span></h1>
       <p>จัดการร้านให้เบาลง แล้วมีเวลาใส่ใจแขกตัวน้อย<br />ตั้งแต่วันแรกที่เปิดประตูต้อนรับ</p>
       <div className="business-register__visual">
         <div className="business-register__visual-orbit" aria-hidden="true" />
@@ -63,6 +63,7 @@ export function BusinessRegisterScreen() {
       <div className="business-register__trust"><span><ShieldCheck size={20} /> ข้อมูลร้านเข้าถึงได้เฉพาะผู้ที่มีสิทธิ์</span><span><CheckCircle size={20} /> เริ่มต้นด้วยข้อมูลที่คุณควบคุม</span></div>
     </div>
     <div className="business-register__card">
+      <span className="business-auth-card-label"><Storefront size={17} /> พื้นที่ใหม่สำหรับร้านของคุณ</span>
       <ol className="business-register__steps" aria-label="ขั้นตอนสมัคร">
         {["ยืนยันตัวตน", "ข้อมูลร้าน", "พร้อมเริ่มต้น"].map((label, index) => <li key={label} aria-current={(state === "done" ? 2 : state === "details" ? 1 : 0) === index ? "step" : undefined}><span>{index + 1}</span>{label}</li>)}
       </ol>

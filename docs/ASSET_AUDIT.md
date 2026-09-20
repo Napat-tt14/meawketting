@@ -18,6 +18,7 @@ Audit date: 2026-09-20. Scope: the active `public/` tree before the first Cloudf
 - `pet-hotel-room.png`, `pet-grooming-transparent.png` and `pet-daycare-transparent.png` are selected by `BusinessServicesSection` through a dynamic image-name map.
 - `pet-hotel-transparent.png`, `pet-care-phone.png`, `pet-passport-transparent.png` and `pet-owner-clay.png` are used by the public landing sections.
 - `business-banner-care-lounge.png`, `business-banner-grooming.png` and `business-banner-hotel.png` are used by Business Home and the pet avatar fallback.
+- `business-auth-welcome.png` is used by `/business/login` as the dedicated auth illustration.
 - `hero-care-v1.png` is used by the frozen Consumer prototype, Passport Studio and Business pet-avatar fallback.
 - `business-register-welcome.png` is used by `/business/register`.
 - `logo.svg`, `favicon.svg`, `catpaw-pattern.svg`, and the Regular/Bold LINE Seed Sans TH fonts are referenced by the active UI.

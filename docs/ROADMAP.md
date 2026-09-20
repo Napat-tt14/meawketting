@@ -21,7 +21,7 @@ This roadmap sequences outcomes, not Page IDs or route counts. A planned stage i
 | **BE7: Billing / Payments** | **VALIDATED BACKEND FINANCIAL MODEL** | PostgreSQL Charge, items/adjustments, Payment allocations, refunds, attempts, provider references, idempotency and reconciliation state. Manual and mock-provider paths are covered; gateway selection remains external. |
 | **BE8: Reports / History / CRM** | **VALIDATED LOCALLY** | Read-only PostgreSQL snapshots derive revenue from Payments, completed services, bookings, customers, module/Branch/date metrics and CRM timeline/balance projections. No writable Reports/CRM store exists. |
 
-Consumer remains PAUSED. Supabase Auth and private Storage code are implemented; real Supabase/Cloudflare staging, LINE credentials and a payment gateway remain external.
+Consumer remains PAUSED. Supabase Auth and private Storage code are implemented; the selected real Supabase/Cloudflare configuration, LINE credentials and a payment gateway remain external.
 
 ## Consumer / Guardian direction status
 

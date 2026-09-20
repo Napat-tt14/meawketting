@@ -3,7 +3,7 @@ import { PassportPreviewStep } from "./PassportPreviewStep";
 
 export const metadata: Metadata = {
   title: "เลือก Passport ให้น้อง",
-  description: "เลือกดีไซน์ Passport ของน้อง แล้วบันทึกภาพหรือไปต่อด้วย Google",
+  description: "เลือกดีไซน์ Passport ของน้อง แล้วบันทึกภาพไว้ได้เลย",
 };
 
 export default function PassportPreviewPage() {

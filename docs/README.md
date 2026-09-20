@@ -2,7 +2,7 @@
 
 Status: **CANONICAL / BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY / BF1–BF12 UI FROZEN**
 
-Latest checkpoint: [Supabase migration report](./SUPABASE_MIGRATION_REPORT.md), [setup runbook](./PRODUCTION_RUNBOOK.md), [staging QA](./PILOT_QA.md). **NOT PRODUCTION READY**.
+Latest checkpoint: [Supabase migration report](./SUPABASE_MIGRATION_REPORT.md), [setup runbook](./PRODUCTION_RUNBOOK.md), [target QA](./PILOT_QA.md). **NOT PRODUCTION READY**.
 
 2026-09-20 addition: [Business signup with Google/LINE](./BUSINESS_REGISTRATION.md), including the approved first-store creation policy and provider setup.
 
@@ -49,6 +49,6 @@ The derived [HTML manual](./.htmlmanual/manual.html) is a compact reading aid, n
 
 Cloudflare Worker/API → Application/Domain → Repository → Supabase PostgreSQL is the only active Business database architecture. Supabase Auth authenticates; Meawketting authorizes Person/Membership/Business/Branch/target/action. Supabase Storage is private media.
 
-BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY. External Supabase/Cloudflare staging configuration is EXTERNAL CONFIG REQUIRED and NOT YET DEPLOYED. See [validation](./VALIDATION.md) for exact counts and limitations, including the prior BE1/BE2 stale-form/retry follow-up.
+BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY. External configuration for the selected real Supabase/Cloudflare environment is EXTERNAL CONFIG REQUIRED and NOT YET DEPLOYED. See [validation](./VALIDATION.md) for exact counts and limitations, including the prior BE1/BE2 stale-form/retry follow-up.
 
 Business UI and LINE Seed Sans TH stay frozen. Consumer is PAUSED. /workfiledesign is untouched. No commit/push/deploy.

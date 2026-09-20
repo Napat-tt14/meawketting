@@ -55,7 +55,6 @@ BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch confi
 | `/business/inbox` | Business-wide Customer conversations with readable split/mobile layouts, compact search/filters, Pet/Booking context, durable unread/read state, send/quick replies, structured add-service approval and optional staff-triggered billing text | LIVE FROZEN UI / BE6 PostgreSQL; `?conversation=`, `?customerId=`, `?petId=`, and `?bookingId=` provide recovery/context; provider delivery and real LINE transport remain external |
 | `/business/scan` | Temporary Business QR scan/manual validation; optional explicit `hotelStayId` or `daycareAttendanceId` target | LIVE FROZEN UI / BE5 PostgreSQL; dev/test identity only; a target never bypasses Business/Branch/Customer/Pet consent validation |
 | `/business/intake/[intakeId]` | Allowed data, Intake, consent review, guarded execution handoff/check-in | LIVE FROZEN UI / BE5 PostgreSQL; same shared engine for all eligible service targets; real Supabase Auth configuration remains external |
-| `/login` | Consumer web-prototype mock login | LIVE MOCK — CURRENT WEB PROTOTYPE; not LINE Login |
 | `/my-pets` | Consumer web-prototype Pet library | LIVE LOCAL MOCK — CURRENT WEB PROTOTYPE / FROZEN |
 | `/activity` | Honest Consumer web-prototype activity categories | LIVE LOCAL MOCK — CURRENT WEB PROTOTYPE / FROZEN |
 | `/create-passport` | Consumer web-prototype photo/crop/minimum-info task | LIVE LOCAL — CURRENT WEB PROTOTYPE / FROZEN |
@@ -112,6 +111,6 @@ The public Business header uses only anchors that exist on `/`:
 | `#services` | Multi-service business types |
 | `#guardian` | Secondary owner / Guardian ecosystem entry |
 
-Header account links use current live web routes: `/login` and `/business/login`. `/login` is the retained Consumer web-prototype mock, not LINE Login. No planned capability receives a fake public route, and no LINE route is implied.
+The old Consumer web login route was removed while the Guardian entry is redesigned around LINE. The public header keeps Business login at `/business/login`; no LINE route is implied until that channel is implemented.
 
 BF-4 intentionally adds no `/business/inbox/[conversationId]` route. Desktop uses a split view, mobile uses a full conversation task, and the stable local selection is recoverable through `?conversation=<id>`; Customer/Booking launch parameters normalize to that query after reusing or creating the Business-level conversation.

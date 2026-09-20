@@ -22,7 +22,7 @@ Documentation and prototype behavior never close an OPEN question by convenience
 
 Product Owner explicitly replaced the former database and custom session architecture. Cloudflare remains the frontend/API/Worker host. Supabase PostgreSQL is the sole Business database, Supabase Auth supplies authentication, and Supabase Storage supplies private media. Meawketting retains server authorization; the browser never receives privileged credentials or directly accesses tables. Historical database selections below are SUPERSEDED on persistence/auth/storage only; their Product and domain rules remain locked.
 
-Three clean PostgreSQL migrations and native repository SQL replace the old migration/runtime stack. There is no production data transfer. Business UX/UI and LINE Seed Sans TH remain frozen, Consumer PAUSED, /workfiledesign untouched. Staging configuration and verification are external; no production readiness claim.
+Four clean PostgreSQL migrations and native repository SQL replace the old migration/runtime stack. There is no production data transfer. Business UX/UI and LINE Seed Sans TH remain frozen, Consumer PAUSED, /workfiledesign untouched. The selected real Supabase configuration and verification are external; no production readiness claim.
 
 
 
@@ -332,7 +332,7 @@ The standalone module and handover workflow below are retained only as historica
 | D-52 | Branch is operational scope, not cosmetic context; transfer rechecks resource, consent, execution and attribution |
 | D-53 | Business UI direction is **WARM OPERATIONAL CLARITY**, with natural Thai and restrained operational motion |
 | D-54 | The Business Foundation stage precedes further feature development; generic Phase F is not the automatic next step |
-| D-55 | Current local Business App Home route is `/business/home`; public Business Landing is `/`; mock Login remains `/business/login` |
+| D-55 | Current local Business App Home route is `/business/home`; public Business Landing is `/`; Business Login remains `/business/login` |
 | D-56 | **HISTORICAL NAVIGATION CHECKPOINT; later live destinations supersede its planned labels.** It introduced live Home, Calendar, Customers and BF-4 Messages plus Scanner in the Header, with Grooming/Hotel gated by active-Branch capability and no fake routes for planned controls. Finance became live under D-126; Reports/Team under BF8/BF9; Daycare/Settings under D-146. The capability and no-fake-route rules remain active. |
 | D-57 | The browser-local active Business/Branch context drives Home summaries and visible Branch-enabled service rows together; capability-gated Grooming and Hotel routes are live only for capable Branches, while a service module not enabled for the active Branch remains absent and its route does not expose operations. |
 | D-58 | Business User Menu is account/context-focused: current Business, Branch, role and Sign out; product destinations stay in main navigation |
@@ -342,7 +342,7 @@ The standalone module and handover workflow below are retained only as historica
 | ID | Decision |
 |---|---|
 | D-01 | Product name is **Meawketting**; initial species are Cat and Dog with Cat first/default and Pet-ready language |
-| D-02 | Create first, claim later remains current web-prototype behavior. The target Consumer entry/auth direction is LINE-first with future LINE Login; current `/login` is only a mock web prototype, and production identity linking remains open. Business Google Login is a separate Business prototype concern. |
+| D-02 | Create first, claim later remains current web-prototype behavior. The target Consumer entry/auth direction is LINE-first with future LINE Login; the old web `/login` mock is removed, and production identity linking remains open. Business Google Login is a separate Business prototype concern. |
 | D-03 | One Person identity may hold several contexts; Consumer, Business and Platform Admin authorize and navigate separately |
 | D-04 | Business never owns Pet Passport data through sharing, intake, service or payment |
 | D-05 | Quick Passport, Public Safety and Temporary Business QR are three separate privacy contracts |

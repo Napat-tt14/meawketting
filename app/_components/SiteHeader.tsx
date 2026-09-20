@@ -11,7 +11,6 @@ export function SiteHeader() {
     return <AppHeader variant="flow" />;
   }
 
-  if (pathname === "/login") return <AppHeader variant="auth" />;
   if (pathname === "/" || pathname === "/business") return <BusinessHeader variant="landing" />;
   if (pathname === "/business/login" || pathname === "/business/register") return <BusinessHeader variant="auth" />;
   if (pathname.startsWith("/business/")) return <BusinessHeader variant="app" />;

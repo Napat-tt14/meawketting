@@ -21,7 +21,7 @@ Product Owner decision, 2026-09-20: verified new users may create a store after 
    - Scopes: `openid profile`; enable PKCE and `email_optional`. Userinfo subject/name/picture are `sub`, `name`, `picture`.
    - Copy the callback URL displayed by Supabase into the LINE channel callback settings. Enable appropriate test users while the channel is developing. Do not put the LINE secret in frontend code or Cloudflare browser bindings.
 4. Set Supabase Site URL to the staging origin and allow exactly `https://STAGING_HOST/api/auth/google/callback`. The callback name is retained for compatibility and serves both providers. Configure the Cloudflare values listed in [the runbook](./PRODUCTION_RUNBOOK.md); no source edits are required.
-5. Test both real provider redirects, cancellation, expired sessions, logout, fresh signup, repeated submission, revoked membership and Branch isolation with synthetic staging accounts. LINE web ID tokens can use HS256, so this integration uses custom OAuth2 with userinfo, not an assumed JWKS-only custom OIDC configuration.
+5. Test both real provider redirects, cancellation, expired sessions, logout, fresh signup, repeated submission, revoked membership and Branch isolation with synthetic target accounts. LINE web ID tokens can use HS256, so this integration uses custom OAuth2 with userinfo, not an assumed JWKS-only custom OIDC configuration.
 
 Sources: [Supabase custom providers](https://supabase.com/docs/guides/auth/custom-oauth-providers), [LINE Login API](https://developers.line.biz/en/reference/line-login/), [LINE ID-token verification](https://developers.line.biz/en/docs/line-login/verify-id-token/).
 
@@ -29,6 +29,6 @@ Use the same login provider for returning access. This feature does not implemen
 
 ## Validation
 
-Local synthetic PostgreSQL tests cover concurrent duplicate registration, changed retries, rollback, no-email LINE users, existing identity denial, input validation, CSRF, missing authentication and provider PKCE. Real Supabase/LINE/Google and Cloudflare staging remain unconfigured and untested; this is not a production-readiness claim.
+Local synthetic PostgreSQL tests cover concurrent duplicate registration, changed retries, rollback, no-email LINE users, existing identity denial, input validation, CSRF, missing authentication and provider PKCE. Real Supabase/LINE/Google and Cloudflare target configuration remain unconfigured and untested; this is not a production-readiness claim.
 
 Local validation on 2026-09-20: frontend 94, backend 84 (including 5 registration tests), security/production 7, API smoke 1 suite with 41 requests across 10 routes: **186 passing tests**. Empty-database migrations and replay passed with all 4 migrations. Root typecheck, lint, build and diff whitespace checks passed. Browser QA used synthetic API responses: identity and details layouts at 375/768/1024/1440 pixels, no horizontal overflow, required inputs, failed-submit preservation, successful retry and existing-account state. Screenshots and run logs are local ignored files in `work/`.

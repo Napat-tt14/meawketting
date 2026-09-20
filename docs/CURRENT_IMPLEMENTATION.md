@@ -74,6 +74,6 @@ CRM's current reversible heuristics count unique completed-service Booking IDs r
 
 ## Current limitations
 
-Real Supabase/Cloudflare staging, Google consent/redirect/recovery/refresh, live Storage policies, runtime privileges, backup/restore and load acceptance remain unverified. LINE transport and payment gateway credentials remain unconfigured; no provider was selected. Consumer stays PAUSED. Only pre-existing TypeScript annotations in Consumer files were corrected to permit whole-repository typechecking; runtime behavior and styling were unchanged.
+Real Supabase/Cloudflare target configuration, Google consent/redirect/recovery/refresh, live Storage policies, runtime privileges, backup/restore and load acceptance remain unverified. LINE transport and payment gateway credentials remain unconfigured; no provider was selected. Consumer stays PAUSED. Only pre-existing TypeScript annotations in Consumer files were corrected to permit whole-repository typechecking; runtime behavior and styling were unchanged.
 
 No real customer data, source-code secret, commit, push or deployment was introduced.

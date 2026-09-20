@@ -9,7 +9,6 @@ export type AppNavMode = "public" | "consumer";
 type AppNavProps = {
   mode?: AppNavMode;
   mobile?: boolean;
-  showLogin?: boolean;
   showBusinessEntry?: boolean;
 };
 
@@ -33,7 +32,7 @@ const consumerNavItems: AppNavItem[] = [
   { label: "ข้อความ", icon: MessageCircle, disabled: true },
 ];
 
-export function AppNav({ mode = "public", mobile = false, showLogin = false, showBusinessEntry = false }: AppNavProps) {
+export function AppNav({ mode = "public", mobile = false, showBusinessEntry = false }: AppNavProps) {
   const pathname = usePathname();
   const ariaLabel = mode === "consumer"
     ? "เมนูผู้ดูแลสัตว์เลี้ยง"
@@ -72,11 +71,6 @@ export function AppNav({ mode = "public", mobile = false, showLogin = false, sho
           </a>
         );
       })}
-      {showLogin ? (
-        <a className="app-nav__link app-nav__link--login" href="/login">
-          <span>เข้าสู่ระบบ</span>
-        </a>
-      ) : null}
       {showBusinessEntry && mode === "public" ? (
         <a className="app-nav__link app-nav__link--business-entry" href="/business">
           <Storefront size={17} />

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BusinessLoginScreen } from "./BusinessLoginScreen";
+import "../auth.css";
 
 export const metadata: Metadata = {
   title: "เข้าสู่ระบบสำหรับธุรกิจ",

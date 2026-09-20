@@ -55,7 +55,7 @@ export class PostgresDatabase implements Database {
 export function connectPostgres(url: string, schema = "public") {
   const parsed = new URL(url);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
-  return new PostgresDatabase(postgres(url, { prepare: false, max: 4, idle_timeout: 5, connect_timeout: 10,
+  return new PostgresDatabase(postgres(url, { prepare: false, max: 1, idle_timeout: 5, connect_timeout: 10,
     ssl: local ? false : "verify-full", onnotice: () => {},
     types: { bigint: { to: 20, from: [20, 1700], serialize: String, parse: (value: string) => {
       const number = Number(value);

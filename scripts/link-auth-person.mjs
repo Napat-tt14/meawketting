@@ -1,6 +1,6 @@
 import postgres from "postgres";
-const { DATABASE_URL: url, SUPABASE_AUTH_USER_ID: user, MEAWKETTING_PERSON_ID: person } = process.env;
-if (!url || !user || !person || !/^[0-9a-f-]{36}$/.test(user)) throw Error("DATABASE_URL, SUPABASE_AUTH_USER_ID and MEAWKETTING_PERSON_ID are required.");
+const { DATABASE_MIGRATION_URL: url, SUPABASE_AUTH_USER_ID: user, MEAWKETTING_PERSON_ID: person } = process.env;
+if (!url || !user || !person || !/^[0-9a-f-]{36}$/.test(user)) throw Error("DATABASE_MIGRATION_URL, SUPABASE_AUTH_USER_ID and MEAWKETTING_PERSON_ID are required.");
 const sql = postgres(url, { prepare: false, max: 1, ssl: ["127.0.0.1","localhost"].includes(new URL(url).hostname) ? false : "verify-full" });
 try {
   const rows = await sql`INSERT INTO auth_person_links(auth_user_id,person_id)

@@ -6,11 +6,11 @@ Cloudflare Worker/Vinext + Supabase PostgreSQL is the BE1–BE8 local architectu
 
 ## Local evidence
 
-- PostgreSQL-backed backend suite: 79/79 PASS (66 BE1–BE8, 3 BE2 cache, 2 request-context, 7 Auth/Storage, 1 migration-runner test).
+- PostgreSQL-backed backend suite: 84/84 PASS (66 BE1–BE8, 3 BE2 cache, 2 request-context, 7 Auth/Storage, 1 migration-runner, 5 registration tests).
 - Production/security suite: 7/7 PASS.
 - API smoke: 41 requests across 10 routes PASS, real isolated PostgreSQL and actual API handlers; external providers are simulated.
-- Empty-schema migrations: all 3 PASS; repeat execution and checksum rejection PASS.
-- Frontend 93/93 PASS in the complete final npm test run; lint, build, whole-repository TypeScript and all BE1–BE8/production typechecks PASS. git diff --check PASS.
+- Empty-schema migrations: all 4 PASS; repeat execution and checksum rejection PASS.
+- Frontend 94/94 PASS; lint, build, whole-repository TypeScript and all BE1–BE8/production typechecks PASS. git diff --check PASS.
 - Existing duplicate/retry, stale-revision, tenant/Branch isolation, capacity, payment and webhook assertions were retained. BE1 identity / Business / Branch validation remains part of the combined suite.
 - Existing BE1/BE2 contracts still lack client revision/replay fields for some writes; the previously documented stale-form/retry audit remains a separate production blocker. No new claim of universal BE1/BE2 replay safety is made.
 
@@ -22,4 +22,4 @@ The existing 34 `page.tsx` route entries and frozen Business design remain the b
 
 ## External verification still required
 
-Real Supabase + Cloudflare staging: Google consent/callback, refresh/recovery/logout, live Storage policies and signed expiry, TLS/pooler behavior, runtime role privileges, rate limits, operational backup/restore, load and production acceptance. None has been deployed or verified. See [runbook](./PRODUCTION_RUNBOOK.md).
+Selected real Supabase + Cloudflare environment: Google consent/callback, refresh/recovery/logout, live Storage policies and signed expiry, TLS/pooler behavior, runtime role privileges, rate limits, operational backup/restore, load and production acceptance. None has been deployed or verified. See [runbook](./PRODUCTION_RUNBOOK.md).

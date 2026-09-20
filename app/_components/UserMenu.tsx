@@ -95,14 +95,13 @@ export function UserMenu({
       onLogout();
       return;
     }
-    window.location.assign("/login");
+    window.location.assign("/");
   }
 
   if (!authenticated) {
     return (
       <div className={`user-menu user-menu--signed-out${className ? ` ${className}` : ""}`}>
         <a className="user-menu__business-entry" href="/business">สำหรับธุรกิจ</a>
-        <a className="user-menu__login" href="/login">Login</a>
         <a className="button button--primary user-menu__create-cta" href="/create-passport">Create Passport</a>
       </div>
     );

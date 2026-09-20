@@ -13771,8 +13771,7 @@ body:has(.page--public-safety) .site-footer {
 .page--inner,
 .page--create-passport,
 .page--consumer,
-.page--public-safety,
-.page--login {
+.page--public-safety {
   background: transparent !important;
 }
 
@@ -14613,88 +14612,6 @@ body:has(.page--public-safety) .site-footer {
   font-weight: 900;
 }
 
-/* Mock login */
-.page--login {
-  padding-block: clamp(42px, 8vw, 92px);
-}
-
-.login-layout {
-  min-height: 560px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.7fr);
-  align-items: center;
-  gap: clamp(28px, 7vw, 90px);
-}
-
-.login-story h1 {
-  max-width: 720px;
-  margin: 14px 0 16px;
-  font-size: clamp(2.2rem, 5.4vw, 4.5rem);
-}
-
-.login-story>p {
-  max-width: 620px;
-  color: var(--ink-soft);
-  font-size: 18px;
-}
-
-.login-trust-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 24px;
-}
-
-.login-trust-list span {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.login-card {
-  display: grid;
-  gap: 14px;
-  padding: clamp(24px, 4vw, 38px);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
-}
-
-.login-card__icon {
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  color: var(--rose-700);
-  background: var(--rose-100);
-}
-
-.login-card h2 {
-  margin: 0;
-  font-size: clamp(1.4rem, 3vw, 2rem);
-}
-
-.login-card>p:not(.consumer-kicker) {
-  margin: 0;
-  color: var(--ink-soft);
-}
-
-.login-card>small {
-  color: var(--ink-muted);
-  font-size: 11px;
-  text-align: center;
-}
-
 /* Passport Studio uses the same reusable PassportCard contract as Create and Pet Detail. */
 .passport-studio .passport-flip {
   width: min(520px, 100%);
@@ -14732,10 +14649,6 @@ body:has(.page--public-safety) .site-footer {
     grid-template-columns: minmax(260px, 1fr) repeat(2, minmax(150px, 0.6fr));
   }
 
-  .login-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.78fr);
-    gap: 36px;
-  }
 }
 
 @media (max-width: 767px) {
@@ -14792,15 +14705,6 @@ body:has(.page--public-safety) .site-footer {
 
   .quick-passport-section__heading .button {
     width: 100%;
-  }
-
-  .login-layout {
-    min-height: 0;
-    grid-template-columns: 1fr;
-  }
-
-  .login-story h1 {
-    font-size: clamp(2rem, 11vw, 3.2rem);
   }
 
   .consumer-header__inner {
@@ -15008,13 +14912,13 @@ body:has(.page--public-safety) .site-footer {
    small click response as the semantic .button component. Controls that own
    a purposeful pseudo-element are excluded so their visual state remains
    intact. */
-button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option) {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option) {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 
-button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)::after {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)::after {
   content: "";
   position: absolute;
   z-index: 0;
@@ -15029,11 +14933,11 @@ button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-
   transform: translate(-50%, -50%) scale(0);
 }
 
-button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):active::after {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):active::after {
   animation: meaw-button-ripple 240ms ease-out;
 }
 
-button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)>* {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)>* {
   position: relative;
   z-index: 1;
 }
@@ -15663,7 +15567,7 @@ button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-
   .user-menu__trigger::after,
   .quick-qr-refresh::after,
   .draft-passport-option::after,
-  button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)::after {
+  button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)::after {
     animation: none !important;
     transition: none !important;
   }
@@ -15773,10 +15677,6 @@ button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-
   display: none;
 }
 
-.app-nav__link--login {
-  color: var(--pink-700);
-}
-
 .app-nav--mobile {
   display: grid;
   justify-content: stretch;
@@ -15792,12 +15692,6 @@ button:not(.button):not([class*="backdrop"]):not(.style-dots button):not(.quick-
 .app-nav--mobile .app-nav__link::after {
   right: 10px;
   left: 10px;
-}
-
-.app-nav--mobile .app-nav__link--login {
-  margin-top: 4px;
-  border-top: 1px solid var(--border);
-  border-radius: 0 0 10px 10px;
 }
 
 .mobile-nav__panel .app-nav,
@@ -16404,23 +16298,6 @@ option {
   gap: 10px;
 }
 
-.user-menu__login {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 10px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.user-menu__login:hover,
-.user-menu__login:focus-visible {
-  color: var(--pink-600);
-}
-
 .user-menu__create-cta {
   min-height: 44px;
   white-space: nowrap;
@@ -16656,7 +16533,6 @@ option {
 .button,
 .app-nav__link,
 .user-menu__trigger,
-.user-menu__login,
 .user-menu__group>a,
 .user-menu__group>button,
 .user-menu__panel>a,
@@ -16718,11 +16594,6 @@ main :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) strong {
 .consumer-recovery h1,
 .pet-detail-skeleton h1,
 .create-passport__intro h1,
-.login-story h1 {
-  font-size: var(--text-meaw-h1);
-  line-height: var(--text-meaw-h1--line-height);
-}
-
 .activity-page__card h2,
 .pet-detail-category h2,
 .pet-management-section h2,
@@ -16797,10 +16668,6 @@ main :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) strong {
 .safety-field b,
 .abuse-categories legend span {
   font-size: var(--text-meaw-micro) !important;
-}
-
-.login-trust-list span {
-  font-size: var(--text-meaw-caption);
 }
 
 .timeline-mini>span {
@@ -17062,10 +16929,6 @@ main :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) strong {
   width: 100%;
   min-width: 0;
   min-height: 52px;
-}
-
-.preview-google-action svg:last-child {
-  margin-left: auto;
 }
 
 .share-passport {
@@ -19873,21 +19736,6 @@ a.business-nav-item:focus-visible,
   gap: 12px;
 }
 
-.business-header--landing .business-header__login {
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  padding-inline: 12px;
-  color: var(--ink-soft);
-  font-size: var(--text-meaw-caption);
-  font-weight: 800;
-  transition: color 180ms ease-out;
-}
-
-.business-header--landing .business-header__login:hover {
-  color: var(--color-meaw-ink-950);
-}
-
 .business-header--landing .business-header__cta-short {
   display: none;
 }
@@ -21822,8 +21670,7 @@ a.business-nav-item:focus-visible,
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .business-header--landing .business-header__nav,
-  .business-header--landing .business-header__login {
+  .business-header--landing .business-header__nav {
     display: none;
   }
 
@@ -27050,5 +26897,341 @@ a.business-nav-item:focus-visible,
   .calendar-timeline-appointment {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Business auth refresh: a warmer welcome surface shared by login and signup. */
+.business-login-page {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    radial-gradient(circle at 10% 18%, color-mix(in srgb, var(--color-meaw-business-glow-yellow) 46%, transparent), transparent 30%),
+    radial-gradient(circle at 92% 74%, color-mix(in srgb, var(--color-meaw-business-mint-soft) 44%, transparent), transparent 26%),
+    var(--background);
+}
+
+.business-login-page::before,
+.business-login-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(2px);
+  opacity: .42;
+}
+
+.business-login-page::before {
+  top: 12rem;
+  left: -11rem;
+  background: var(--color-meaw-business-coral-soft);
+}
+
+.business-login-page::after {
+  right: -10rem;
+  bottom: 4rem;
+  background: var(--color-meaw-business-sky-soft);
+}
+
+.business-auth-layout {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, calc(100% - 64px));
+}
+
+.business-login.business-auth-layout {
+  min-height: calc(100svh - 72px);
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, .75fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 5.5rem);
+  padding-block: clamp(2rem, 5vw, 4.75rem);
+}
+
+.business-login__story {
+  min-width: 0;
+  animation: business-calm-enter 260ms ease-out both;
+}
+
+.business-login__kicker,
+.business-login__card-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  color: var(--color-meaw-business-paw);
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+  line-height: 1.4;
+}
+
+.business-login__kicker svg {
+  color: var(--color-meaw-business-primary-hover);
+}
+
+.business-login__story h1 {
+  max-width: 15ch;
+  margin: 1rem 0 .85rem;
+  font-size: clamp(2.3rem, 4.5vw, 4rem);
+  line-height: 1.14;
+  letter-spacing: -.04em;
+}
+
+.business-login__story>p:not(.business-eyebrow) {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.business-login__scene {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  margin: clamp(1.25rem, 3vw, 2rem) -1.2rem .85rem;
+  padding: .25rem 0 0;
+  border-radius: 2.25rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-meaw-business-accent) 86%, white), color-mix(in srgb, var(--color-meaw-business-mint-soft) 42%, white));
+  border: 1px solid color-mix(in srgb, var(--color-meaw-business-primary-border) 58%, var(--border));
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--color-meaw-business-paw) 10%, transparent);
+}
+
+.business-login__scene::before {
+  content: "";
+  position: absolute;
+  inset: 9% 13% 4%;
+  z-index: -1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-meaw-business-glow-yellow) 52%, transparent);
+}
+
+.business-login__art {
+  display: block;
+  width: 113%;
+  max-width: none;
+  height: auto;
+  margin-inline: -6.5%;
+  filter: drop-shadow(0 1rem 1.4rem color-mix(in srgb, var(--color-meaw-business-paw) 14%, transparent));
+}
+
+.business-login__scene-tag {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  max-width: calc(100% - 1rem);
+  padding: .65rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: var(--shadow-card);
+  font-size: .75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.business-login__scene-tag svg {
+  flex: 0 0 auto;
+  color: var(--color-meaw-business-paw);
+}
+
+.business-login__scene-tag--top {
+  top: 11%;
+  right: -1rem;
+  transform: rotate(4deg);
+}
+
+.business-login__scene-tag--bottom {
+  bottom: 8%;
+  left: -1rem;
+  transform: rotate(-4deg);
+}
+
+.business-login__trust {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+  margin-top: 1.1rem;
+}
+
+.business-login__trust span {
+  min-height: 3.5rem;
+  padding: .75rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--ink-soft);
+  font-size: .78rem;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.business-login__trust svg {
+  flex: 0 0 auto;
+  color: var(--color-meaw-business-success);
+}
+
+.business-login__card {
+  min-width: 0;
+  gap: 0;
+  padding: clamp(1.35rem, 3.4vw, 2.5rem);
+  border: 1px solid color-mix(in srgb, var(--color-meaw-business-primary-border) 54%, var(--border));
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--surface) 90%, var(--color-meaw-business-accent));
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--color-meaw-ink-950) 10%, transparent);
+  animation: business-calm-enter 260ms 60ms ease-out both;
+}
+
+.business-login__card-kicker {
+  margin-bottom: 1rem;
+  color: var(--muted-foreground);
+  letter-spacing: .08em;
+}
+
+.business-login__icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: 1rem;
+  border-radius: 1.15rem;
+  color: var(--color-meaw-business-accent-foreground);
+  background: var(--color-meaw-business-glow-yellow);
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--color-meaw-business-primary-hover) 28%, transparent);
+}
+
+.business-login__card h2 {
+  margin: 0 0 .45rem;
+  font-size: clamp(1.45rem, 2.4vw, 1.8rem);
+  letter-spacing: -.025em;
+}
+
+.business-login__card>p:not(.business-eyebrow) {
+  margin: 0 0 .85rem;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+.business-login__card .button {
+  min-height: 3.25rem;
+  margin-top: .7rem;
+  border-radius: 1rem;
+}
+
+.business-login__card>small {
+  display: block;
+  margin-top: .9rem;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+
+.business-login__card>p:last-child {
+  padding-top: 1.15rem;
+  margin-top: 1.15rem;
+  border-top: 1px solid var(--border);
+  font-size: .9rem;
+}
+
+.business-login__card a:not(.button) {
+  color: var(--color-meaw-business-accent-foreground);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+.business-login__card [role="alert"] {
+  padding: .75rem .9rem;
+  border-radius: .9rem;
+  color: var(--status-critical);
+  background: var(--status-critical-soft);
+  font-size: .9rem;
+}
+
+.business-login-page a:focus-visible,
+.business-login-page button:focus-visible,
+.business-login-page input:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1023px) {
+  .business-login.business-auth-layout {
+    gap: 2.25rem;
+  }
+
+  .business-login__story h1 {
+    font-size: clamp(2.25rem, 5vw, 3.35rem);
+  }
+
+  .business-login__scene-tag--top {
+    right: 0;
+  }
+
+  .business-login__scene-tag--bottom {
+    left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .business-auth-layout,
+  .business-login.business-auth-layout {
+    width: min(100% - 36px, 38rem);
+  }
+
+  .business-login.business-auth-layout {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding-block: 2rem 3rem;
+  }
+
+  .business-login__story h1 {
+    max-width: 18ch;
+    margin-top: .8rem;
+    font-size: clamp(2.1rem, 9vw, 3rem);
+  }
+
+  .business-login__story>p:not(.business-eyebrow) {
+    font-size: .98rem;
+  }
+
+  .business-login__scene {
+    margin-inline: -.45rem;
+    border-radius: 1.75rem;
+  }
+
+  .business-login__scene-tag {
+    font-size: .7rem;
+  }
+
+  .business-login__trust {
+    grid-template-columns: 1fr;
+  }
+
+  .business-login__card {
+    border-radius: 1.5rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .business-auth-layout,
+  .business-login.business-auth-layout {
+    width: min(100% - 28px, 100%);
+  }
+
+  .business-login__scene-tag--top {
+    right: -.25rem;
+  }
+
+  .business-login__scene-tag--bottom {
+    left: -.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .business-login__story,
+  .business-login__card {
+    animation: none;
   }
 }

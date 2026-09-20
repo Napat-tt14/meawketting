@@ -1,18 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PassportCard, passportStyles, savePassportAsImage } from "../../_components/PassportCard";
 import { Save } from "../../_components/icons";
-import { GoogleAuthButton } from "../../_components/GoogleAuthButton";
 import { useDraftPassport } from "../DraftPassportContext";
 import { DraftRecovery } from "../_components/DraftRecovery";
 import { FlowLoading } from "../_components/FlowLoading";
 
 export function PassportPreviewStep() {
-  const router = useRouter();
   const { draft, hydrated, updateDetails } = useDraftPassport();
-  const [isNavigating, setIsNavigating] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "error">("idle");
 
   if (!hydrated) {
@@ -29,12 +25,6 @@ export function PassportPreviewStep() {
   }
 
   const speciesLabel = draft.species === "cat" ? "แมว / Cat" : "สุนัข / Dog";
-
-  function continueToClaim() {
-    if (isNavigating) return;
-    setIsNavigating(true);
-    router.push("/login?returnTo=%2Fmy-pets%2Fclaimed-local&intent=save-passport");
-  }
 
   async function saveImage() {
     setSaveState("idle");
@@ -95,8 +85,8 @@ export function PassportPreviewStep() {
           >
             <Save size={20} weight="bold" /> บันทึกภาพ
           </button>
-          <GoogleAuthButton busy={isNavigating} onClick={continueToClaim} className="preview-google-action" />
         </div>
+        <p className="passport-save-planned">เก็บไว้ในบัญชีผ่าน LINE ได้เร็ว ๆ นี้</p>
         <p className="passport-save-status" role="status" aria-live="polite">
           {saveState === "error" ? "บันทึกภาพไม่สำเร็จ ลองอีกครั้ง" : ""}
         </p>

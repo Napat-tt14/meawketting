@@ -947,21 +947,9 @@ body:has(.business-loading) :is(.business-header, .business-loading) {
   font-weight: 500;
 }
 
-.business-header--landing .business-header__login {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  padding-inline: 0.75rem;
-  border-radius: var(--radius-button);
-  color: var(--foreground);
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
 @media (hover: hover) and (pointer: fine) {
 
-  .business-header--landing .business-header__nav a:hover,
-  .business-header--landing .business-header__login:hover {
+  .business-header--landing .business-header__nav a:hover {
     color: var(--foreground);
     background: var(--accent);
   }
@@ -1815,7 +1803,6 @@ body:has(.business-loading) :is(.business-header, .business-loading) {
   }
 
   .business-header--landing .business-header__nav,
-  .business-header--landing .business-header__login,
   .business-header--landing .business-brand>span {
     display: none;
   }

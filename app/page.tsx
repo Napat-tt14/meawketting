@@ -4,6 +4,7 @@ import { HomeParallax } from "./_components/business-landing/HomeParallax";
 import { BusinessCoreSection, BusinessClosingSection, BusinessTrustSection, BusinessWorkflowSection } from "./_components/business-landing/HomeVisualSections";
 import { BusinessLandingHero } from "./_components/business-landing/BusinessLandingHero";
 import { BusinessServicesSection } from "./_components/business-landing/BusinessServicesSection";
+import { ScrollToTopButton } from "./_components/ScrollToTopButton";
 
 export const metadata: Metadata = {
   title: { absolute: "ระบบจัดการโรงแรมสัตว์เลี้ยง อาบน้ำตัดขน | Meawketting" },
@@ -28,6 +29,7 @@ export default function BusinessLandingPage() {
       <BusinessTrustSection />
       <BusinessWorkflowSection />
       <BusinessClosingSection />
+      <ScrollToTopButton />
     </main>
   );
 }

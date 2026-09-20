@@ -1,0 +1,94 @@
+/* Public authentication pages share the homepage's warm palette and editorial rhythm. */
+.business-login-page .business-auth-layout {
+  width: min(1180px, calc(100% - 64px));
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr);
+  align-items: center;
+  gap: clamp(32px, 5vw, 76px);
+  padding-block: 52px 64px;
+  min-height: calc(100svh - 80px);
+}
+.business-login-page :is(.business-login__story, .business-register__intro) h1 {
+  max-width: none;
+  font-size: clamp(2.25rem, 3.6vw, 3.4rem);
+  line-height: 1.5;
+  letter-spacing: -.035em;
+  margin: 20px 0 16px;
+}
+.business-auth-accent { position: relative; isolation: isolate; white-space: nowrap; }
+.business-login-page .business-login__story h1 br { display: block; }
+.business-auth-accent::after {
+  content: "";
+  position: absolute;
+  inset: 68% -3px 3px;
+  z-index: -1;
+  border-radius: 40% 30% 35% 20%;
+  transform: rotate(-3deg);
+  background: var(--color-meaw-business-primary);
+}
+.business-login-page :is(.business-login__kicker, .business-register__eyebrow) {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 13px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  background: var(--color-meaw-business-accent);
+  color: var(--color-meaw-business-accent-foreground);
+  font-size: 11px;
+  letter-spacing: .09em;
+}
+.business-login-page :is(.business-login__story, .business-register__intro) > p {
+  font-size: 16px;
+  line-height: 1.9;
+  color: var(--muted-foreground);
+}
+.business-login-page :is(.business-login__scene, .business-register__visual) {
+  min-height: 0;
+  margin: 28px 0 24px;
+  padding: 0;
+  border-radius: 28px;
+  border: 0;
+  background: var(--color-meaw-business-accent);
+  box-shadow: none;
+}
+.business-login-page :is(.business-login__art, .business-register__illustration) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  border-radius: 28px;
+  filter: none;
+}
+.business-login-page .business-register__visual-orbit { display: none; }
+.business-login-page :is(.business-login__scene-tag--top, .business-register__visual-tag--top) { top: -12px; right: 12px; }
+.business-login-page :is(.business-login__scene-tag--bottom, .business-register__visual-tag--bottom) { bottom: -12px; left: 12px; }
+.business-login-page :is(.business-login__card, .business-register__card) {
+  position: relative;
+  border-radius: 28px;
+  border: 1px solid var(--border);
+  border-top: 5px solid var(--color-meaw-business-primary);
+  background: var(--surface);
+  padding: clamp(24px, 3vw, 40px);
+  box-shadow: 0 18px 50px color-mix(in srgb, var(--color-meaw-business-paw) 8%, transparent);
+}
+.business-auth-card-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted-foreground); margin-bottom: 16px; }
+.business-login-page .business-register__steps { margin-bottom: 12px; padding-bottom: 22px; }
+.business-login-page .business-register__proof { margin-top: 30px; box-shadow: none; background: transparent; border: 0; padding: 0; }
+.business-login-page :is(.business-login__trust, .business-register__trust) { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.business-login-page :is(.business-login__trust, .business-register__trust) > span { min-height: 0; padding: 0; background: transparent; border: 0; font-size: 12px; font-weight: 400; }
+.business-login-page .business-register__identity > p:last-child { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 12px; margin-bottom: 0; }
+.business-login-page .business-register__identity small { margin-top: 8px; }
+@media (max-width: 900px) {
+  .business-login-page .business-auth-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, .9fr); gap: 28px; width: calc(100% - 40px); }
+  .business-login-page :is(.business-login__story, .business-register__intro) h1 { font-size: 2.15rem; }
+}
+@media (max-width: 700px) {
+  .business-login-page .business-auth-layout { width: min(100% - 36px, 520px); grid-template-columns: 1fr; gap: 28px; padding-block: 28px 40px; min-height: 0; }
+  .business-login-page :is(.business-login__story, .business-register__intro) h1 { font-size: clamp(1.9rem, 7.5vw, 2.6rem); margin-top: 16px; }
+  .business-login-page :is(.business-login__story, .business-register__intro) > p { font-size: 14px; }
+  .business-login-page :is(.business-login__scene, .business-register__visual) { max-width: 380px; margin: 24px auto; }
+  .business-login-page :is(.business-login__card, .business-register__card) { padding: 24px; border-radius: 24px; }
+  .business-login-page .business-register__fields { grid-template-columns: 1fr; }
+}

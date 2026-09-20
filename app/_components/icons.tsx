@@ -2,6 +2,7 @@ import { type IconBaseProps, type IconType } from "react-icons";
 import {
   LuArrowLeft,
   LuArrowRight,
+  LuArrowUp,
   LuArrowUpRight,
   LuArchive,
   LuBellRing,
@@ -34,7 +35,6 @@ import {
   LuImagePlus,
   LuInfo,
   LuLockKeyhole,
-  LuLogIn,
   LuLogOut,
   LuMapPin,
   LuMegaphone,
@@ -104,6 +104,7 @@ function meawIcon(Icon: IconType) {
 export const ArrowClockwise = meawIcon(LuRotateCcw);
 export const ArrowLeft = meawIcon(LuArrowLeft);
 export const ArrowRight = meawIcon(LuArrowRight);
+export const ArrowUp = meawIcon(LuArrowUp);
 export const ArrowUpRight = meawIcon(LuArrowUpRight);
 export const Archive = meawIcon(LuArchive);
 export const BadgeCheck = meawIcon(LuBadgeCheck);
@@ -138,7 +139,6 @@ export const ImagePlus = meawIcon(LuImagePlus);
 export const Info = meawIcon(LuInfo);
 export const List = meawIcon(LuMenu);
 export const LockKey = meawIcon(LuLockKeyhole);
-export const LogIn = meawIcon(LuLogIn);
 export const LogOut = meawIcon(LuLogOut);
 export const MapPin = meawIcon(LuMapPin);
 export const Maximize2 = meawIcon(LuMaximize2);

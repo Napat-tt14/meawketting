@@ -286,3 +286,62 @@
   .hotel-landing .home-reveal-ready { opacity: 1; translate: none; }
   .hotel-landing .clay-float { translate: none; rotate: none; }
 }
+
+.home-scroll-top {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 65;
+  display: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--color-meaw-business-primary-border);
+  border-radius: 50%;
+  color: var(--color-meaw-business-primary-foreground);
+  background: var(--color-meaw-business-primary);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-meaw-business-paw) 18%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 180ms ease-out, transform 180ms ease-out, background 180ms ease-out;
+  cursor: pointer;
+}
+
+.home-scroll-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.home-scroll-top:hover,
+.home-scroll-top:focus-visible {
+  background: var(--color-meaw-business-primary-hover);
+}
+
+.home-scroll-top:focus-visible {
+  outline: 3px solid var(--color-meaw-business-ring);
+  outline-offset: 3px;
+}
+
+.business-homepage > .home-scroll-top {
+  position: fixed;
+  z-index: 65;
+}
+
+@media (max-width: 767px) {
+  .home-scroll-top {
+    display: grid;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(18px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 430px) {
+  .home-scroll-top { width: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-scroll-top { transition: none; }
+}

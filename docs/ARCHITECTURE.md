@@ -316,7 +316,7 @@ PRODUCTION: NOT DEPLOYED / NOT VERIFIED
 
 Cloudflare replaces Vercel as the target production platform direction. Browser → Cloudflare Worker/API → Application/Domain → PostgreSQL Repository → Supabase PostgreSQL. Supabase Auth verifies identity; explicit auth UUID → Person → active Membership → Business → Branch → target/action remains Meawketting authorization. Supabase Storage holds private media outside relational rows. The frontend never accesses Supabase tables directly.
 
-PostgreSQL batches run at SERIALIZABLE isolation and retry serialization/deadlock conflicts. Native constraints/triggers, explicit event sequences, optimistic revisions and existing idempotency receipts protect domain writes. Three clean migrations apply to an empty database; no real data migration is needed. Legacy database/custom-session implementations and bindings have been removed.
+PostgreSQL batches run at SERIALIZABLE isolation and retry serialization/deadlock conflicts. Native constraints/triggers, explicit event sequences, optimistic revisions and existing idempotency receipts protect domain writes. Four clean migrations apply to an empty database; no real data migration is needed. Legacy database/custom-session implementations and bindings have been removed.
 
 ## Implemented versus externally configured
 

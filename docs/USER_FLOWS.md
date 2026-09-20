@@ -213,7 +213,7 @@ Every protected transition resolves Person → active Membership → Business �
 
 | Flow | Happy path | Critical recovery / boundary |
 |---|---|---|
-| Create and claim | Landing bridge → photo/crop/name/species → Passport Preview → mock Login → Pet Detail | Preserve draft/source image through errors; no public sharing before choice |
+| Create and claim | Landing bridge → photo/crop/name/species → Passport Preview → LINE account connection (planned) → Pet Detail | Preserve draft/source image through errors; no public sharing before choice |
 | My Pets / Pet Detail | Pet library → Passport-first detail → compact info/care/history → management actions | Relationship loss and missing data reveal no private content |
 | Quick Passport QR | Flip Passport → five-minute QR/barcode/countdown → renew or flip back | Passport-safe scope only; no Business/Safety permission |
 | Public Safety / Lost | Configure public-safe fields → activate Lost → Finder lead → Guardian review → mark found | Same public identity changes state; restricted contact/location; abuse path |

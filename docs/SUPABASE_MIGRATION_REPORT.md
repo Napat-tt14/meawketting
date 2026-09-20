@@ -10,7 +10,7 @@ Cloudflare remains the frontend/API/Worker host. Business API handlers use Postg
 
 ## 3. Schema and migrations
 
-Three clean PostgreSQL migrations apply from an empty database. The domain baseline contains 65 tables, 118 explicit indexes, 161 foreign keys, 76 triggers and one view. Auth/media add two tables; the migration runner maintains a separate checksum ledger. IDs and domain history remain stable. Explicit identity sequences preserve event order. Native SQL replaces SQLite functions and connection-local row-count assumptions. Transactions use SERIALIZABLE isolation with bounded whole-transaction retry; existing revision and idempotency contracts remain intact.
+Four clean PostgreSQL migrations apply from an empty database. The domain baseline contains 65 tables, 118 explicit indexes, 161 foreign keys, 76 trigger functions/triggers and one view; Auth/media add two tables and business registration adds one. The migration runner maintains a separate checksum ledger. IDs and domain history remain stable. Explicit identity sequences preserve event order. Native SQL replaces SQLite functions and connection-local row-count assumptions. Transactions use SERIALIZABLE isolation with bounded whole-transaction retry; existing revision and idempotency contracts remain intact.
 
 Empty migration, repeat application, applied-checksum rejection and RLS denial to a non-bypass read role pass. Only synthetic records were used. No production data transfer is required.
 
@@ -36,23 +36,23 @@ Removed seven D1 repositories, custom Google/session implementation, D1 bindings
 
 | Check | Result |
 |---|---|
-| PostgreSQL backend suite | 79/79 PASS: 66 domain + 3 cache + 2 runtime + 7 Auth/Storage + 1 migration |
+| PostgreSQL backend suite | 84/84 PASS: 66 domain + 3 cache + 2 runtime + 7 Auth/Storage + 1 migration + 5 registration |
 | Production/security | 7/7 PASS |
 | API smoke | 41 requests across 10 routes PASS; one test file |
-| Three empty-database migrations | PASS; repeat/checksum/RLS assertions PASS |
-| Frontend | 93/93 PASS in the complete final npm test run; assertions and timeouts unchanged |
+| Four empty-database migrations | PASS; repeat/checksum/RLS assertions PASS |
+| Frontend | 94/94 PASS in this validation run |
 | Whole-repo TypeScript + BE1–BE8/production scopes | PASS |
 | Lint / build / git diff --check | PASS |
 
-Tests use native PostgreSQL 18.4 in an isolated database/schema. Supabase HTTP responses are mocked locally; real provider/Cloudflare staging behavior is not asserted. Native test-server cleanup required permission outside the desktop sandbox; completed test servers were identified by their task-owned work/pg-* paths. No unrelated database was stopped.
+Tests use native PostgreSQL 18.4 in an isolated database/schema. Supabase HTTP responses are mocked locally; real provider/Cloudflare target behavior is not asserted. Native test-server cleanup required permission outside the desktop sandbox; completed test servers were identified by their task-owned work/pg-* paths. No unrelated database was stopped.
 
-The final npm test command passed build and all four suites (180 tests total). A Vite module-load timeout was resolved by disabling unnecessary immutable-fixture watchers that crawled generated PostgreSQL directories; local development ignores work/tmp. No assertions were removed, relaxed or skipped. Relative Markdown links were checked: zero broken links.
+The validation-equivalent build and four test suites passed (186 tests total). The isolated build needed filesystem access because Vite's temporary config file was locked in the desktop sandbox; no source assertions were removed, relaxed or skipped. Relative Markdown links were checked: zero broken links.
 
 ## 9. External setup
 
-Create a separate Supabase staging project, configure Google in Supabase Auth, exact callback/site URLs, private bucket, Cloudflare staging origin/rate binding and server Secrets: DATABASE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY. Google secret stays in Supabase provider settings. Use the operator auth:link command only for a verified user and explicitly provisioned active Person/membership; never turn synthetic Owners into production onboarding.
+Use the already selected real Supabase project; do not create another staging/test project. Configure Google in Supabase Auth, exact callback/site URLs, the private bucket and Cloudflare runtime secrets DATABASE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY and SUPABASE_SERVICE_ROLE_KEY. Keep DATABASE_MIGRATION_URL operator-only and use a direct connection or session pooler, never port 6543. Google secret stays in Supabase provider settings. Use the operator auth:link command only for a verified user and explicitly provisioned active Person/membership; never turn synthetic Owners into production onboarding.
 
-Runtime DB privileges require staging review. An optional script proposing broad role grants was rejected by automatic approval review and was not created or executed. No database grants were expanded remotely. Follow the [runbook](./PRODUCTION_RUNBOOK.md); Product Owner does not need to edit source code.
+Runtime DB privileges require review against the selected real project. No database grants were expanded remotely. Follow the [runbook](./PRODUCTION_RUNBOOK.md); Product Owner does not need to paste secrets into chat.
 
 ## 10. Files changed
 
@@ -60,4 +60,4 @@ See [complete changed-file inventory](./SUPABASE_MIGRATION_FILES.md). Changes co
 
 ## 11. Exact next action
 
-Configure separate Supabase + Cloudflare staging using the runbook and test real Google/session/Storage/pooler behavior and operational privileges. Close the documented BE1/BE2 stale-form/retry follow-up before production acceptance. No production deploy, commit or push was performed or authorized.
+Configure the selected Supabase + Cloudflare environment using the runbook and verify the runtime role, migration connection, Google/session/Storage/pooler behavior and operational privileges. Close the documented BE1/BE2 stale-form/retry follow-up before production acceptance. No remote migration, seed, deployment, commit or push was performed or authorized.

@@ -45,7 +45,6 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
         <div className="business-header__actions">
           {variant === "landing" ? (
             <>
-              <Link className="business-header__login" href="/login">เข้าสู่ระบบ</Link>
               <Link className="button button--business business-signature-sweep" href="/business/login" aria-label="เข้าสู่ระบบสำหรับธุรกิจ">
                 <span className="business-header__cta-full">เข้าสู่ระบบสำหรับธุรกิจ</span>
                 <span className="business-header__cta-short">เข้าสู่ระบบธุรกิจ</span>

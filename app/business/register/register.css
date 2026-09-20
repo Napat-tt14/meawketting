@@ -53,3 +53,336 @@
   .business-register__intro h1 { font-size: 2rem; }
 }
 @media (max-width: 480px) { .business-register__fields { grid-template-columns: 1fr; } }
+
+/* Signup is an onboarding story first, then a form. Keep the existing PNG art
+   and give it the same warm, tactile treatment as the public homepage. */
+.business-register.business-auth-layout {
+  width: min(1180px, calc(100% - 64px));
+  grid-template-columns: minmax(0, 1.02fr) minmax(360px, .78fr);
+  gap: clamp(2rem, 5vw, 5.5rem);
+  padding-block: clamp(2rem, 5vw, 4.75rem);
+}
+
+.business-register::before {
+  height: 38rem;
+  opacity: .58;
+  background:
+    radial-gradient(circle at 24% 24%, color-mix(in srgb, var(--color-meaw-business-glow-yellow) 76%, transparent), transparent 48%),
+    radial-gradient(circle at 82% 78%, color-mix(in srgb, var(--color-meaw-business-coral-soft) 52%, transparent), transparent 42%);
+}
+
+.business-register__intro {
+  padding-top: .25rem;
+}
+
+.business-register__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-meaw-business-paw);
+  letter-spacing: .13em;
+}
+
+.business-register__intro h1 {
+  max-width: 15ch;
+  margin: 1rem 0 .85rem;
+  font-size: clamp(2.3rem, 4.5vw, 4rem);
+  line-height: 1.14;
+  letter-spacing: -.04em;
+}
+
+.business-register__intro>p {
+  max-width: 45ch;
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.business-register__visual {
+  min-height: 22rem;
+  margin: 1.5rem -1.5rem .85rem;
+  padding: 1rem .5rem 0;
+  border: 1px solid color-mix(in srgb, var(--color-meaw-business-primary-border) 58%, var(--border));
+  border-radius: 2.25rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-meaw-business-accent) 90%, white), color-mix(in srgb, var(--color-meaw-business-mint-soft) 42%, white));
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--color-meaw-business-paw) 10%, transparent);
+}
+
+.business-register__visual-orbit {
+  inset: 8% 6% 6%;
+  border-color: color-mix(in srgb, var(--color-meaw-business-primary-border) 80%, transparent);
+}
+
+.business-register__illustration {
+  width: 111%;
+  margin-inline: -5.5%;
+  filter: drop-shadow(0 1rem 1.4rem color-mix(in srgb, var(--color-meaw-business-paw) 14%, transparent));
+}
+
+.business-register__visual-tag {
+  padding: .65rem .8rem;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  font-size: .75rem;
+}
+
+.business-register__visual-tag svg {
+  color: var(--color-meaw-business-paw);
+}
+
+.business-register__visual-tag--top {
+  top: 9%;
+  right: -.75rem;
+}
+
+.business-register__visual-tag--bottom {
+  bottom: 7%;
+  left: -.75rem;
+}
+
+.business-register__proof {
+  margin: .25rem 0 1.25rem;
+  padding: .85rem 1rem .85rem .8rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.business-register__proof .business-login__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: 0;
+  border-radius: .9rem;
+  box-shadow: none;
+}
+
+.business-register__trust {
+  gap: .7rem;
+}
+
+.business-register__trust span {
+  min-height: 2.75rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: .9rem;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  line-height: 1.5;
+}
+
+.business-register__card {
+  display: grid;
+  align-content: start;
+  gap: .75rem;
+  padding: clamp(1.35rem, 3.4vw, 2.5rem);
+  border-color: color-mix(in srgb, var(--color-meaw-business-primary-border) 54%, var(--border));
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--surface) 92%, var(--color-meaw-business-accent));
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--color-meaw-ink-950) 10%, transparent);
+}
+
+.business-register__steps {
+  gap: .75rem;
+  padding-bottom: 1.35rem;
+  margin-bottom: 1.5rem;
+}
+
+.business-register__steps li {
+  flex: 1 1 0;
+  color: var(--muted-foreground);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.business-register__steps span {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.business-register__steps [aria-current] span {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--primary-hover) 42%, transparent);
+}
+
+.business-register__identity,
+.business-register__form {
+  animation: business-calm-enter 260ms ease-out both;
+}
+
+.business-register__identity {
+  gap: .8rem;
+}
+
+.business-register__identity h2,
+.business-register__form h2 {
+  margin-bottom: .35rem;
+  font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+  letter-spacing: -.025em;
+}
+
+.business-register__identity .button {
+  min-height: 3.25rem;
+  border-radius: 1rem;
+}
+
+.business-register__form fieldset {
+  gap: .95rem;
+}
+
+.business-register__form label {
+  gap: .45rem;
+  color: var(--foreground);
+}
+
+.business-register__form input:not([type=checkbox]) {
+  height: 3.1rem;
+  border-radius: .95rem;
+  background: color-mix(in srgb, var(--surface) 88%, var(--color-meaw-business-accent));
+  transition: border-color 180ms ease-out, box-shadow 180ms ease-out, background 180ms ease-out;
+}
+
+.business-register__form input:not([type=checkbox]):hover {
+  border-color: var(--color-meaw-business-primary-hover);
+}
+
+.business-register__form input:not([type=checkbox]):focus {
+  border-color: var(--color-meaw-business-primary-hover);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
+  outline: none;
+}
+
+.business-register__fields {
+  gap: .75rem;
+}
+
+.business-register__services {
+  gap: .6rem !important;
+  margin-top: .15rem !important;
+}
+
+.business-register__services legend {
+  margin-bottom: .15rem;
+}
+
+.business-register__form .business-register__services label {
+  min-height: 3.25rem;
+  align-items: center;
+  padding: .65rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: .95rem;
+  background: var(--surface);
+  transition: border-color 180ms ease-out, background 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.business-register__form .business-register__services label:has(input:checked) {
+  border-color: var(--color-meaw-business-primary-hover);
+  background: var(--color-meaw-business-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--color-meaw-business-primary-hover);
+}
+
+.business-register__note {
+  border: 1px solid var(--color-meaw-business-sky-soft);
+  border-radius: .95rem;
+  background: color-mix(in srgb, var(--color-meaw-business-sky-soft) 70%, var(--surface));
+}
+
+.business-register__confirmation {
+  padding: .75rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: .95rem;
+  background: color-mix(in srgb, var(--surface) 76%, var(--color-meaw-business-accent));
+}
+
+.business-register__form .button {
+  min-height: 3.25rem;
+  margin-top: .25rem;
+  border-radius: 1rem;
+}
+
+.business-register__card [role=alert] {
+  padding: .75rem .9rem;
+  border-radius: .9rem;
+  background: var(--status-critical-soft);
+}
+
+.business-register__card>button,
+.business-register__card>a:not(.button) {
+  width: 100%;
+}
+
+.business-register__card>a:not(.button) {
+  display: inline-flex;
+  justify-content: center;
+  min-height: 2.75rem;
+  align-items: center;
+}
+
+@media (max-width: 1023px) {
+  .business-register.business-auth-layout {
+    gap: 2.25rem;
+  }
+
+  .business-register__intro h1 {
+    font-size: clamp(2.25rem, 5vw, 3.35rem);
+  }
+}
+
+@media (max-width: 767px) {
+  .business-register.business-auth-layout {
+    width: min(100% - 36px, 38rem);
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding-block: 2rem 3rem;
+  }
+
+  .business-register__intro h1 {
+    max-width: 18ch;
+    margin-top: .8rem;
+    font-size: clamp(2.1rem, 9vw, 3rem);
+  }
+
+  .business-register__visual {
+    min-height: 16rem;
+    margin-inline: -.45rem;
+    border-radius: 1.75rem;
+  }
+
+  .business-register__visual-tag {
+    font-size: .7rem;
+  }
+
+  .business-register__card {
+    border-radius: 1.5rem;
+  }
+
+  .business-register__services {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .business-register.business-auth-layout {
+    width: min(100% - 28px, 100%);
+  }
+
+  .business-register__visual-tag--top {
+    right: -.25rem;
+  }
+
+  .business-register__visual-tag--bottom {
+    left: -.25rem;
+  }
+
+  .business-register__services {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .business-register__identity,
+  .business-register__form {
+    animation: none;
+  }
+}

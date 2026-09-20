@@ -270,7 +270,7 @@ test("renders the committed Business landing with explicit illustrative content"
 });
 
 test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Yellow-primary", async () => {
-  const [html, css, businessCss, pageSource, headerSource, heroSource, coreSource, workflowSource, closingSource] = await Promise.all([
+  const [html, css, businessCss, pageSource, headerSource, heroSource, coreSource, workflowSource, closingSource, scrollSource, homepageStyles] = await Promise.all([
     htmlFor("/"),
     readFile(new URL("globals.css", appRoot), "utf8"),
     readFile(businessCssUrl, "utf8"),
@@ -280,11 +280,14 @@ test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Y
     readFile(new URL("_components/business-landing/BusinessCoreSection.tsx", appRoot), "utf8"),
     readFile(new URL("_components/business-landing/BusinessWorkflowSection.tsx", appRoot), "utf8"),
     readFile(new URL("_components/business-landing/BusinessClosingSection.tsx", appRoot), "utf8"),
+    readFile(new URL("_components/ScrollToTopButton.tsx", appRoot), "utf8"),
+    readFile(new URL("homepage.css", appRoot), "utf8"),
   ]);
   const landingSource = pageSource + heroSource + coreSource + workflowSource + closingSource;
-  const homepageCss = css.slice(css.indexOf("Business-first root homepage — 2026-08-20"));
+  const homepageCss = css.slice(css.indexOf("Business-first root homepage — 2026-08-20")) + homepageStyles;
 
   assert.match(pageSource, /<BusinessLandingHero \/>[\s\S]*<BusinessCoreSection \/>[\s\S]*<BusinessClosingSection \/>/);
+  assert.match(pageSource, /<ScrollToTopButton \/>/);
   assert.doesNotMatch(pageSource, /const serviceModules|const businessCoreCapabilities|style=\{/);
   assert.match(heroSource, /href="\/business\/login"/);
   assert.match(closingSource, /href="\/my-pets"/);
@@ -298,7 +301,7 @@ test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Y
   assert.match(headerSource, /href="#business-core"/);
   assert.match(headerSource, /href="#services"/);
   assert.match(headerSource, /href="#guardian"/);
-  assert.match(headerSource, /href="\/login"/);
+  assert.doesNotMatch(headerSource, /href="\/login"/);
   assert.match(headerSource, /href="\/business\/login"/);
   for (const id of ["business-core", "services", "guardian"]) assert.match(html, new RegExp(`id="${id}"`));
 
@@ -317,7 +320,10 @@ test("keeps the Business-first homepage honest, linked, responsive, and Pastel-Y
   assert.match(homepageCss, /\.business-homepage-hero \.business-product-preview__photo\s*\{[\s\S]*?min-height: 0;[\s\S]*?max-height: none;/);
   assert.match(homepageCss, /@media \(max-width: 430px\)/);
   assert.match(homepageCss, /@media \(max-width: 359px\)/);
+  assert.match(homepageCss, /\.home-scroll-top\s*\{/);
   assert.match(homepageCss, /prefers-reduced-motion:\s*reduce/);
+  assert.match(scrollSource, /window\.scrollTo\(\{ top: 0, behavior \}/);
+  assert.match(scrollSource, /prefers-reduced-motion/);
 });
 
 test("keeps committed clay landing assets explicit and independent from legacy photos", async () => {
@@ -333,6 +339,7 @@ test("keeps committed clay landing assets explicit and independent from legacy p
   const landingSources = heroSource + servicesSource + hybridSource + workflowSource + closingSource;
 
   assert.deepEqual(assets, [
+    "business-auth-welcome.png",
     "business-banner-care-lounge.png",
     "business-banner-grooming.png",
     "business-banner-hotel.png",
@@ -392,7 +399,7 @@ test("keeps one semantic app canvas while separating Consumer and Business chrom
   assert.match(siteHeaderSource, /variant="consumer" displayName="มิว"/);
   assert.match(appHeaderSource, /<AppNav mode=\{mode\} \/>/);
   assert.match(appHeaderSource, /<UserMenu[\s\S]*authenticated=\{consumer\}/);
-  assert.match(appHeaderSource, /showLogin=\{variant !== "auth"\}/);
+  assert.doesNotMatch(appHeaderSource + appNavSource + siteHeaderSource + menuSource, /showLogin|<AppHeader variant="auth"|if \(variant === "auth"\)|href="\/login"/);
   assert.match(appNavSource, /appNavItems/);
   assert.match(appNavSource, /consumerNavItems[\s\S]*หน้าหลัก[\s\S]*สัตว์เลี้ยง[\s\S]*กิจกรรม[\s\S]*ข้อความ/);
   assert.match(appNavSource, /aria-disabled="true"/);
@@ -510,16 +517,13 @@ test("keeps crop editable and preserves a reusable Passport status contract", as
   assert.doesNotMatch(css, /\.crop-viewport img\s*\{[^}]*object-fit:\s*fill/);
 });
 
-test("renders PUB-004 through Login as one bounded prototype flow", async () => {
-  const [previewHtml, loginHtml, successResponse, claimResponse, authResponse, previewSource, loginSource, googleSource, contextSource, passportSource] = await Promise.all([
+test("keeps PUB-004 exportable while Consumer account connection moves to LINE", async () => {
+  const [previewHtml, successResponse, claimResponse, authResponse, previewSource, contextSource, passportSource] = await Promise.all([
     htmlFor("/create-passport/preview"),
-    htmlFor("/login"),
     render("/create-passport/success"),
     render("/create-passport/claim"),
     render("/create-passport/auth/google"),
     readFile(new URL("create-passport/preview/PassportPreviewStep.tsx", appRoot), "utf8"),
-    readFile(new URL("login/LoginScreen.tsx", appRoot), "utf8"),
-    readFile(new URL("_components/GoogleAuthButton.tsx", appRoot), "utf8"),
     readFile(new URL("create-passport/DraftPassportContext.tsx", appRoot), "utf8"),
     readFile(new URL("_components/PassportCard.tsx", appRoot), "utf8"),
   ]);
@@ -527,7 +531,6 @@ test("renders PUB-004 through Login as one bounded prototype flow", async () => 
   assert.match(previewHtml, /เลือก Passport ให้น้อง/);
   assert.doesNotMatch(previewHtml, /create-progress|Photo\s*Info\s*Preview/);
   assert.doesNotMatch(previewHtml, />DRAFT<|แก้ไขรูป|แก้ไขชื่อหรือชนิดสัตว์|บันทึกเป็นภาพ 4:5/);
-  assert.match(loginHtml, /เข้าสู่ระบบ Meawketting/);
   assert.equal(successResponse.status, 307);
   assert.equal(successResponse.headers.get("location"), "/my-pets/claimed-local");
   assert.equal(claimResponse.status, 404);
@@ -536,14 +539,10 @@ test("renders PUB-004 through Login as one bounded prototype flow", async () => 
   assert.match(previewSource, /passportStyles\.map/);
   assert.equal((previewSource.match(/<PassportCard\b/g) ?? []).length, 1);
   assert.match(previewSource, /passport-style-selector__grid/);
-  assert.match(previewSource, /<GoogleAuthButton/);
-  assert.match(previewSource, /className="preview-google-action"/);
   assert.match(previewSource, /บันทึกภาพ/);
-  assert.match(previewSource, /router\.push\("\/login\?returnTo=/);
-  assert.match(previewSource, /returnTo=%2Fmy-pets%2Fclaimed-local/);
-  assert.match(loginSource, /<GoogleAuthButton/);
-  assert.match(googleSource, /ดำเนินการต่อด้วย Google/);
-  assert.match(loginSource, /prototypeClaimed: true/);
+  assert.match(previewSource, /passport-save-planned/);
+  assert.match(previewSource, /LINE/);
+  assert.doesNotMatch(previewSource, /GoogleAuthButton|preview-google-action|router\.push\("\/login/);
   assert.match(passportSource, /canvas\.width = 1080/);
   assert.match(passportSource, /canvas\.height = 1350/);
 
@@ -1008,23 +1007,21 @@ test("redirects /business to / as the canonical Business Landing page", async ()
   assert.doesNotMatch(hero, /Today|Sessions|Customers|Documents|Team|Settings/);
 });
 
-test("keeps Business Login visually separate while reusing the Google behavior primitive", async () => {
-  const [html, businessLogin, consumerLogin, googleButton] = await Promise.all([
+test("keeps Business Login separate after Consumer login is deferred", async () => {
+  const [html, removedLoginResponse, businessLogin] = await Promise.all([
     htmlFor("/business/login"),
+    render("/login"),
     readFile(new URL("business/login/BusinessLoginScreen.tsx", appRoot), "utf8"),
-    readFile(new URL("login/LoginScreen.tsx", appRoot), "utf8"),
-    readFile(new URL("_components/GoogleAuthButton.tsx", appRoot), "utf8"),
   ]);
 
-  assert.match(html, /พื้นที่ทำงานสำหรับร้านและทีมดูแลสัตว์/);
+  assert.match(html, /กลับมาดูแลร้าน/);
   assert.match(html, /เข้าสู่ระบบ/);
   assert.equal(countRenderedElements(html, "h1"), 1);
+  assert.equal(removedLoginResponse.status, 404);
   assert.doesNotMatch(businessLogin, /router\.push|setTimeout|continueWithGoogle/);
   assert.match(businessLogin, /api\/auth\/google\/start/);
   assert.doesNotMatch(businessLogin, /eyebrow|ดำเนินการต่อด้วยบัญชีของคุณ|บัญชีบุคคลเดียวสามารถเป็นทั้งผู้ดูแลสัตว์และสมาชิกของร้านได้/);
   assert.doesNotMatch(businessLogin, /disabled aria-disabled="true"/);
-  assert.match(consumerLogin, /<GoogleAuthButton/);
-  assert.match(googleButton, /ดำเนินการต่อด้วย Google/);
   assert.doesNotMatch(businessLogin, /DRAFT_PASSPORT_STORAGE_KEY|prototypeClaimed/);
 });
 

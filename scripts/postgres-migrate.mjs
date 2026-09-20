@@ -19,9 +19,12 @@ export async function migrate(sql, directory = resolve("supabase/migrations")) {
   });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  if (!process.env.DATABASE_URL) throw Error("DATABASE_URL is required; use the migration administrator connection.");
-  const local = ["localhost", "127.0.0.1", "[::1]"].includes(new URL(process.env.DATABASE_URL).hostname);
-  const sql = postgres(process.env.DATABASE_URL, { max: 1, prepare: false, ssl: local ? false : "verify-full", onnotice: () => {} });
+  const migrationUrl = process.env.DATABASE_MIGRATION_URL;
+  if (!migrationUrl) throw Error("DATABASE_MIGRATION_URL is required; use a direct or session-pooler migration connection.");
+  const parsed = new URL(migrationUrl);
+  if (parsed.port === "6543") throw Error("DATABASE_MIGRATION_URL must not use the Supabase transaction pooler on port 6543.");
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+  const sql = postgres(migrationUrl, { max: 1, prepare: false, ssl: local ? false : "verify-full", onnotice: () => {} });
   try { await migrate(sql); console.log("PostgreSQL migrations complete"); }
   finally { await sql.end(); }
 }

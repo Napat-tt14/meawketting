@@ -135,7 +135,7 @@ export function PetSafetyQuickPanel({ pet }: { pet: ConsumerPet }) {
               return (
                 <div className={`pet-safety-quick__field${selected ? " is-selected" : ""}`} key={option.key}>
                   <label><input type="checkbox" checked={selected} disabled={isLost} onChange={() => toggleField(option.key)} /><span><strong>{option.label}</strong><small>{option.help}</small></span><span className="pet-safety-quick__field-state">{selected ? <><Check size={15} weight="bold" /> เปิด</> : <><EyeSlash size={15} weight="bold" /> ซ่อน</>}</span></label>
-                  {selected && option.key !== "photo" ? <textarea rows={2} value={copy} disabled={isLost} aria-label={option.label} placeholder="เพิ่มข้อมูลสั้น ๆ" onChange={(event) => updateCopy(option.key, event.currentTarget.value)} /> : null}
+                  {selected && option.key !== "photo" ? <textarea rows={2} value={copy} disabled={isLost} aria-label={option.label} placeholder="เพิ่มข้อมูลสั้น ๆ" onChange={(event) => updateCopy(option.key as Exclude<PublicFieldKey, "photo">, event.currentTarget.value)} /> : null}
                 </div>
               );
             })}

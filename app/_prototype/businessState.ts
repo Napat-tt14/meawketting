@@ -2392,7 +2392,7 @@ function readStore(): BusinessStore {
       // the first Team mutation and therefore remains compatible.
       teamMembers: BUSINESS_FIXTURE_TEST_MODE && parsed.teamMembers && typeof parsed.teamMembers === "object" && !Array.isArray(parsed.teamMembers) ? parsed.teamMembers : {},
       // BE3 has no browser backfill. A pre-BE3 session Booking is deliberately
-      // ignored instead of being merged into the durable D1 directory.
+      // ignored instead of being merged into the durable PostgreSQL directory.
       bookings: {},
       // BF-5 extends the same local Business envelope. Existing BF-1–BF-4
       // tabs keep their state when no Service Job slice exists yet.

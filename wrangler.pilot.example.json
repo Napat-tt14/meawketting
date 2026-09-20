@@ -9,13 +9,10 @@
   "assets": { "directory": "dist/client", "binding": "ASSETS", "run_worker_first": ["/api/*", "/business/*", "/"] },
   "vars": {
     "MEAWKETTING_ENV": "staging",
-    "MEAWKETTING_AUTH_MODE": "google",
+    "MEAWKETTING_AUTH_MODE": "supabase",
     "MEAWKETTING_FIXTURE_MODE": "off",
-    "MEAWKETTING_PUBLIC_ORIGIN": "https://meawketting.com",
-    "MEAWKETTING_GOOGLE_OWNER_EMAIL": "ane049116049@gmail.com",
-    "MEAWKETTING_GOOGLE_OWNER_PERSON_ID": "prs_01k47meawketting000000001"
+    "MEAWKETTING_PUBLIC_ORIGIN": "https://REPLACE_STAGING_HOST"
   },
-  "d1_databases": [{ "binding": "DB", "database_name": "REPLACE_SEPARATE_STAGING_DB", "database_id": "REPLACE_DATABASE_ID", "migrations_dir": "drizzle" }],
   "ratelimits": [{ "name": "API_RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 300, "period": 60 } }],
   "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 } }
 }

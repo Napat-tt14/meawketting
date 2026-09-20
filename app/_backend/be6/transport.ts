@@ -1,10 +1,10 @@
-import type { D1DatabaseLike, D1PreparedStatementLike } from "../be1/repository";
+import type { Database, PreparedStatement } from "../be1/repository";
 import { be1Error } from "../be1/errors";
 import { batch, deleteGuard } from "../shared/database";
 import { BackendConflict, conflict } from "../shared/errors";
 import { hash, opaqueId } from "../shared/validation";
 import type { Channel, ChannelAdapter, IncomingMessage, SendOutcome } from "./contracts";
-import { D1Be6Repository } from "./d1Repository";
+import { PostgresBe6Repository } from "./postgresRepository";
 
 export type ChannelResolver = (channel: Channel) => Promise<ChannelAdapter | null>;
 type ChannelRow = { id: string; business_id: string; branch_id: string; provider: "line" | "mock"; state: "active" | "disconnected"; external_account_id: string; secret_ref: string };
@@ -12,8 +12,8 @@ type OutboxRow = { id: string; business_id: string; branch_id: string; message_i
 
 /** Internal worker boundary. There is no unauthenticated HTTP "drain" command. */
 export class InboxTransport {
-  private readonly repo: D1Be6Repository;
-  constructor(private readonly db: D1DatabaseLike, private readonly resolveAdapter: ChannelResolver, private readonly mode: "dev-test" | "verified-provider" = "verified-provider", private readonly clock = () => new Date().toISOString()) { this.repo = new D1Be6Repository(db, mode); }
+  private readonly repo: PostgresBe6Repository;
+  constructor(private readonly db: Database, private readonly resolveAdapter: ChannelResolver, private readonly mode: "dev-test" | "verified-provider" = "verified-provider", private readonly clock = () => new Date().toISOString()) { this.repo = new PostgresBe6Repository(db, mode); }
   async channel(id: string): Promise<Channel | null> {
     const c = await this.db.prepare(`SELECT ch.* FROM business_channels ch JOIN businesses b ON b.id=ch.business_id JOIN branches br ON br.business_id=ch.business_id AND br.id=ch.branch_id WHERE ch.id=? AND ch.state='active' AND b.status='active' AND br.status='active' AND (ch.provider='line' OR ?='dev-test')`).bind(id, this.mode).first<ChannelRow>();
     return c ? { id: c.id, businessId: c.business_id, branchId: c.branch_id, provider: c.provider, state: c.state, externalAccountId: c.external_account_id, secretRef: c.secret_ref } : null;
@@ -36,11 +36,11 @@ export class InboxTransport {
     };
     if (await replay()) return;
     const link = await db.prepare(`SELECT l.id,l.customer_id,l.revision FROM customer_channel_links l JOIN customers c ON c.business_id=l.business_id AND c.id=l.customer_id WHERE l.business_id=? AND l.channel_id=? AND l.external_subject=? AND l.status='active' AND c.status='active' AND (l.verification_source='verified-provider' OR ?='dev-test')`).bind(channel.businessId, channel.id, event.externalSubject, this.mode).first<{ id: string; customer_id: string; revision: number }>();
-    const token = opaqueId("incoming"), statements: D1PreparedStatementLike[] = [this.channelGuard(channel, token)];
+    const token = opaqueId("incoming"), statements: PreparedStatement[] = [this.channelGuard(channel, token)];
     let messageId: string | null = null;
     if (link) {
       const conversation = await this.repo.forCustomer(channel.businessId, link.customer_id), id = conversation?.id ?? opaqueId("conversation");
-      statements.push(db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,EXISTS(SELECT 1 FROM customer_channel_links WHERE business_id=? AND channel_id=? AND id=? AND revision=? AND status='active')").bind(`${token}-link`, channel.businessId, channel.id, link.id, link.revision));
+      statements.push(db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(EXISTS(SELECT 1 FROM customer_channel_links WHERE business_id=? AND channel_id=? AND id=? AND revision=? AND status='active'))::integer").bind(`${token}-link`, channel.businessId, channel.id, link.id, link.revision));
       if (!conversation) statements.push(db.prepare("INSERT INTO conversations(id,business_id,customer_id,created_at) VALUES(?,?,?,?)").bind(id, channel.businessId, link.customer_id, now));
       // Incoming text cannot assert a Pet, Booking, Person or Guardian relationship.
       statements.push(db.prepare("INSERT INTO conversation_contexts(business_id,branch_id,conversation_id,updated_at) VALUES(?,?,?,?) ON CONFLICT(business_id,branch_id,conversation_id) DO NOTHING").bind(channel.businessId, channel.branchId, id, now));
@@ -59,8 +59,8 @@ export class InboxTransport {
     }
   }
   private channelGuard(channel: Channel, token: string) {
-    return this.db.prepare(`INSERT INTO backend_guards(id,allowed) SELECT ?,EXISTS(SELECT 1 FROM business_channels ch JOIN businesses b ON b.id=ch.business_id JOIN branches br ON br.business_id=ch.business_id AND br.id=ch.branch_id
-      WHERE ch.id=? AND ch.business_id=? AND ch.branch_id=? AND ch.provider=? AND ch.external_account_id=? AND ch.state='active' AND b.status='active' AND br.status='active')`).bind(token, channel.id, channel.businessId, channel.branchId, channel.provider, channel.externalAccountId);
+    return this.db.prepare(`INSERT INTO backend_guards(id,allowed) SELECT ?,(EXISTS(SELECT 1 FROM business_channels ch JOIN businesses b ON b.id=ch.business_id JOIN branches br ON br.business_id=ch.business_id AND br.id=ch.branch_id
+      WHERE ch.id=? AND ch.business_id=? AND ch.branch_id=? AND ch.provider=? AND ch.external_account_id=? AND ch.state='active' AND b.status='active' AND br.status='active'))::integer`).bind(token, channel.id, channel.businessId, channel.branchId, channel.provider, channel.externalAccountId);
   }
   async drain(limit = 20) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw be1Error("INVALID_INPUT");

@@ -1,5 +1,7 @@
 # FINAL BUSINESS UX/UI + DEMO LEAKAGE AUDIT
 
+Historical audit. Its database/auth/storage architecture and commands are superseded by the [Supabase migration](./SUPABASE_MIGRATION_REPORT.md). The documented BE1/BE2 stale-form/retry follow-up remains open; this report is not the current deployment runbook.
+
 Audit completed locally: 2026-09-14. Scope: frozen BF1–BF12, current BE1–BE8 and existing uncommitted PROD0–PROD6 work. Repository status and existing diff were inspected before edits; canonical Product, UX, design, implementation, validation, decisions and production-track documentation informed the audit. Current implementation takes precedence over historical prototype descriptions.
 
 ## 1. Final Verdict

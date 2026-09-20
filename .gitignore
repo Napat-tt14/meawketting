@@ -27,6 +27,7 @@
 /outputs/
 /work/
 /tmp/
+/.be3-test-*/
 
 # Logs and local editor files
 *.log

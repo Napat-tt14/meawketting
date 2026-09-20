@@ -19,7 +19,7 @@ import { BusinessNavigation } from "./BusinessNavigation";
 
 export function BusinessPortalFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const publicBusinessRoute = pathname === "/business" || pathname === "/business/login";
+  const publicBusinessRoute = pathname === "/business" || pathname === "/business/login" || pathname === "/business/register";
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "auth">("loading");
   const [attempt, setAttempt] = useState(0);
 

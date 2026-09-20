@@ -1,6 +1,4 @@
-import { env } from "cloudflare:workers";
-import { beginGoogleLogin } from "../../../../_backend/googleAuth";
-import type { GoogleAuthEnvironment } from "../../../../_backend/googleAuth";
+import { beginGoogleLogin } from "../../../../_backend/supabaseAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +10,7 @@ function failureRedirect(request: Request, code: "not-configured" | "try-again")
 
 export async function GET(request: Request) {
   try {
-    return await beginGoogleLogin(request, env as unknown as GoogleAuthEnvironment);
+    return await beginGoogleLogin();
   } catch {
     return failureRedirect(request, "not-configured");
   }

@@ -1,13 +1,13 @@
 import { env } from "cloudflare:workers";
-import { D1Be1Repository } from "../../_backend/be1/d1Repository";
+import { PostgresBe1Repository } from "../../_backend/be1/postgresRepository";
 import { asBe1Error } from "../../_backend/be1/errors";
 import { resolveIdentity } from "../../_backend/be1/identity";
 import { createRequestMetadata } from "../../_backend/be1/metadata";
-import type { D1DatabaseLike } from "../../_backend/be1/repository";
+import { database as getDatabase } from "../../_backend/runtime";
 import type { Be1ApiFailure, Be1ApiSuccess } from "../../_backend/be1/contracts";
-import { D1Be2Repository } from "../../_backend/be2/d1Repository";
+import { PostgresBe2Repository } from "../../_backend/be2/postgresRepository";
 import { Be3Application } from "../../_backend/be3/application";
-import { D1Be3Repository } from "../../_backend/be3/d1Repository";
+import { PostgresBe3Repository } from "../../_backend/be3/postgresRepository";
 import { parseBe3Operation } from "../../_backend/be3/validation";
 
 import { readJson } from "../../_backend/shared/http";
@@ -29,12 +29,12 @@ export async function POST(request: Request) {
   const metadata = createRequestMetadata(request.headers);
   try {
     requireSameOrigin(request);
-    const database = env.DB as unknown as D1DatabaseLike;
+    const database = getDatabase();
     const identity = await resolveIdentity(request, env.MEAWKETTING_AUTH_MODE, database);
     const application = new Be3Application(
-      new D1Be1Repository(database),
-      new D1Be2Repository(database),
-      new D1Be3Repository(database),
+      new PostgresBe1Repository(database),
+      new PostgresBe2Repository(database),
+      new PostgresBe3Repository(database),
     );
     const actor = await application.resolvePerson(identity.personId);
     const requestBody = await readJson(request);

@@ -115,7 +115,7 @@ export function SafetyOwnerScreen({ petId }: { petId: string }) {
   function toggleDisabled() {
     if (!safety) return;
     const status = safety.status === "disabled" ? "active" : "disabled";
-    const next = { ...safety, status, lastChanged: new Date().toISOString() };
+    const next: SafetyPrototypeState = { ...safety, status, lastChanged: new Date().toISOString() };
     updateState(next, status === "disabled" ? "ปิด Public Safety Profile แล้ว ข้อมูลเดิมจะไม่แสดงบนหน้าสาธารณะ" : "เปิด Public Safety Profile อีกครั้งแล้ว");
   }
 
@@ -161,7 +161,7 @@ export function SafetyOwnerScreen({ petId }: { petId: string }) {
                         rows={3}
                         value={safety[option.key]}
                         placeholder={option.placeholder}
-                        onChange={(event) => updateCopy(option.key, event.target.value)}
+                        onChange={(event) => updateCopy(option.key as Exclude<PublicFieldKey, "photo">, event.target.value)}
                       />
                     ) : null}
                   </div>

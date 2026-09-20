@@ -1,4 +1,4 @@
-import type { D1DatabaseLike } from "../be1/repository";
+import type { Database } from "../be1/repository";
 import type { BusinessServiceModule, ReportOptions, ReportRecentServiceItem } from "./contracts";
 import { emptyReport } from "./projections";
 import { ProjectionSnapshot, type ProjectionScope } from "./snapshot";
@@ -12,17 +12,17 @@ const modules: BusinessServiceModule[] = ["grooming", "hotel", "daycare"];
 const sum = <T>(rows: T[], value: (r: T) => number) => rows.reduce((n, r) => n + value(r), 0);
 const count = (rows: CountRow[], module?: BusinessServiceModule, status?: string[]) => sum(rows.filter((r) => (!module || r.module === module) && (!status || status.includes(r.status))), (r) => r.n);
 
-export async function projectReport(db: D1DatabaseLike, scope: ProjectionScope, options: ReportOptions) {
+export async function projectReport(db: Database, scope: ProjectionScope, options: ReportOptions) {
   const snapshot = new ProjectionSnapshot(db, scope);
   const result = await snapshot.read([
-    { sql: "SELECT id,name,business_name,status,(SELECT json_group_array(module) FROM branch_enabled_modules m WHERE m.business_id=a.business_id AND m.branch_id=a.id) modules FROM allowed a ORDER BY name,id" },
+    { sql: "SELECT id,name,business_name,status,(SELECT coalesce(jsonb_agg(module), '[]'::jsonb)::text FROM branch_enabled_modules m WHERE m.business_id=a.business_id AND m.branch_id=a.id) modules FROM allowed a ORDER BY name,id" },
     { sql: `SELECT a.id branch_id,coalesce((SELECT sum(amount_minor) FROM period_payments p WHERE p.branch_id=a.id),0) received,
       coalesce((SELECT sum(amount_minor) FROM period_refunds r WHERE r.branch_id=a.id),0) refunded,
       coalesce((SELECT sum(p.amount_minor-coalesce((SELECT sum(l.amount_minor) FROM payment_allocations l WHERE l.business_id=p.business_id AND l.branch_id=p.branch_id AND l.payment_id=p.id),0)) FROM period_payments p WHERE p.branch_id=a.id),0) unallocated,
       (SELECT count(*) FROM period_payments p WHERE p.branch_id=a.id) n FROM allowed a` },
     { sql: `SELECT sum(CASE WHEN cancelled_at IS NULL THEN total_minor-paid_minor+refunded_minor ELSE 0 END) remaining,
-      sum(cancelled_at IS NULL AND total_minor>paid_minor-refunded_minor AND paid_minor-refunded_minor=0) unpaid,
-      sum(cancelled_at IS NULL AND total_minor>paid_minor-refunded_minor AND paid_minor-refunded_minor>0) partial FROM balances` },
+      sum((cancelled_at IS NULL AND total_minor>paid_minor-refunded_minor AND paid_minor-refunded_minor=0)::integer) unpaid,
+      sum((cancelled_at IS NULL AND total_minor>paid_minor-refunded_minor AND paid_minor-refunded_minor>0)::integer) partial FROM balances` },
     { sql: "SELECT branch_id,service_module module,status,count(*) n FROM period_bookings GROUP BY branch_id,service_module,status" },
     { sql: "SELECT branch_id,module,status,count(*) n FROM period_executions GROUP BY branch_id,module,status" },
     { sql: "SELECT branch_id,module,'completed' status,count(*) n FROM period_records GROUP BY branch_id,module" },
@@ -30,7 +30,7 @@ export async function projectReport(db: D1DatabaseLike, scope: ProjectionScope, 
       SELECT c.module,l.amount_minor amount,p.id payment_id FROM period_payments p JOIN payment_allocations l ON l.business_id=p.business_id AND l.branch_id=p.branch_id AND l.payment_id=p.id JOIN balances c ON c.id=l.charge_id
       UNION ALL SELECT c.module,-l.amount_minor,NULL FROM period_refunds r JOIN refund_allocations l ON l.business_id=r.business_id AND l.branch_id=r.branch_id AND l.refund_id=r.id JOIN balances c ON c.id=l.charge_id) GROUP BY module` },
     { sql: `SELECT module,label,sum(n) n,sum(amount) amount FROM (
-      SELECT r.module,json_extract(r.snapshot_json,'$.serviceLabel') label,count(*) n,0 amount FROM period_records r GROUP BY r.module,label
+      SELECT r.module,((r.snapshot_json)::jsonb->>'serviceLabel') label,count(*) n,0 amount FROM period_records r GROUP BY r.module,label
       UNION ALL SELECT c.module,c.service_label,0,sum(l.amount_minor) FROM period_payments p JOIN payment_allocations l ON l.business_id=p.business_id AND l.branch_id=p.branch_id AND l.payment_id=p.id JOIN balances c ON c.id=l.charge_id GROUP BY c.module,c.service_label
       UNION ALL SELECT c.module,c.service_label,0,-sum(l.amount_minor) FROM period_refunds r JOIN refund_allocations l ON l.business_id=r.business_id AND l.branch_id=r.branch_id AND l.refund_id=r.id JOIN balances c ON c.id=l.charge_id GROUP BY c.module,c.service_label) GROUP BY module,label ORDER BY n DESC,amount DESC,label LIMIT 20` },
     { sql: `SELECT a.id branch_id,
@@ -39,7 +39,7 @@ export async function projectReport(db: D1DatabaseLike, scope: ProjectionScope, 
        WHERE e.branch_id=a.id AND e.module='hotel' AND e.status IN ('checked-in','in-stay','ready-for-checkout') AND x.start_local<=a.today AND x.end_local>a.today AND h.status='active' AND a.status='active') hotel_occupied,
       coalesce((SELECT sum(capacity) FROM booking_resources r WHERE r.business_id=a.business_id AND r.branch_id=a.id AND r.kind='daycare-zone' AND r.status='active' AND a.status='active'),0) daycare_capacity,
       (SELECT count(*) FROM scoped_executions e WHERE e.branch_id=a.id AND e.module='daycare' AND e.scheduled_start=a.today AND e.status IN ('checked-in','active','ready-for-pickup') AND a.status='active') daycare_occupied FROM allowed a` },
-    { sql: `SELECT strftime('%w',substr(start_local,1,10)) day,count(*) n FROM period_bookings WHERE status<>'cancelled' GROUP BY day ORDER BY n DESC,day LIMIT 1` },
+    { sql: `SELECT extract(dow from substr(start_local,1,10)::date)::integer::text AS day,count(*) n FROM period_bookings WHERE status<>'cancelled' GROUP BY day ORDER BY n DESC,day LIMIT 1` },
     { sql: `SELECT substr(start_local,12,2)||':00' slot,count(*) n FROM period_bookings WHERE status<>'cancelled' AND time_model='appointment' GROUP BY slot ORDER BY n DESC,slot LIMIT 1` },
     { sql: `SELECT count(DISTINCT e.id) n FROM period_executions e JOIN allowed a ON a.id=e.branch_id WHERE e.status NOT IN ('completed','checked-out','cancelled','no-show') AND (substr(coalesce(e.scheduled_end,e.scheduled_start),1,10)<a.today OR EXISTS(SELECT 1 FROM execution_care_tasks t WHERE t.business_id=e.business_id AND t.branch_id=e.branch_id AND t.execution_id=e.id AND t.completed_at IS NULL AND t.scheduled_date<a.today))` },
     { sql: `SELECT c.id,c.display_name,
@@ -47,13 +47,13 @@ export async function projectReport(db: D1DatabaseLike, scope: ProjectionScope, 
       coalesce((SELECT sum(amount_minor) FROM period_payments p WHERE p.customer_id=c.id),0)-coalesce((SELECT sum(amount_minor) FROM period_refunds r WHERE r.customer_id=c.id),0) spent,
       EXISTS(SELECT 1 FROM allowed a WHERE c.created_at>=a.since AND c.created_at<a.until AND (EXISTS(SELECT 1 FROM period_bookings b WHERE b.customer_id=c.id AND b.branch_id=a.id AND b.status<>'cancelled') OR EXISTS(SELECT 1 FROM period_records r WHERE r.customer_id=c.id AND r.branch_id=a.id) OR EXISTS(SELECT 1 FROM period_payments p WHERE p.customer_id=c.id AND p.branch_id=a.id))) is_new,
       EXISTS(SELECT 1 FROM scoped_records r JOIN allowed a ON a.id=r.branch_id WHERE r.customer_id=c.id AND r.completed_at<a.since) returned,
-      (SELECT json_group_array(name) FROM (SELECT DISTINCT p.name FROM business_pet_profiles p JOIN period_records r ON r.business_id=p.business_id AND r.pet_id=p.pet_id WHERE r.customer_id=c.id)) pets
+      (SELECT coalesce(jsonb_agg(name), '[]'::jsonb)::text FROM (SELECT DISTINCT p.name FROM business_pet_profiles p JOIN period_records r ON r.business_id=p.business_id AND r.pet_id=p.pet_id WHERE r.customer_id=c.id)) pets
       FROM customers c WHERE c.business_id IN (SELECT business_id FROM allowed) AND c.id IN (SELECT customer_id FROM period_bookings WHERE status<>'cancelled' UNION SELECT customer_id FROM period_records UNION SELECT customer_id FROM period_payments)` },
     { sql: `SELECT r.id,r.branch_id,r.module,r.completed_at,r.snapshot_json,c.display_name,p.name pet_name,a.name branch_name,e.status,
       coalesce(ch.total_minor,0) amount,CASE WHEN ch.id IS NULL THEN 'no-charge' WHEN ch.cancelled_at IS NOT NULL THEN 'cancelled' WHEN ch.total_minor=ch.paid_minor-ch.refunded_minor THEN 'paid' WHEN ch.paid_minor>ch.refunded_minor THEN 'partial' ELSE 'unpaid' END payment_status
       FROM period_records r JOIN allowed a ON a.id=r.branch_id JOIN customers c ON c.business_id=r.business_id AND c.id=r.customer_id JOIN business_pet_profiles p ON p.business_id=r.business_id AND p.pet_id=r.pet_id JOIN scoped_executions e ON e.id=r.execution_id LEFT JOIN balances ch ON ch.branch_id=r.branch_id AND ch.booking_id=r.booking_id ORDER BY r.completed_at DESC,r.id DESC LIMIT 20` },
-    { sql: `SELECT e.module,sum(CASE WHEN json_extract(e.details_json,'$.actualCheckInAt')>=a.since AND json_extract(e.details_json,'$.actualCheckInAt')<a.until THEN 1 ELSE 0 END) checkins,
-      sum(CASE WHEN json_extract(e.details_json,'$.actualCheckOutAt')>=a.since AND json_extract(e.details_json,'$.actualCheckOutAt')<a.until THEN 1 ELSE 0 END) checkouts FROM scoped_executions e JOIN allowed a ON a.id=e.branch_id WHERE e.module='hotel' GROUP BY e.module` },
+    { sql: `SELECT e.module,sum(CASE WHEN ((e.details_json)::jsonb->>'actualCheckInAt')>=a.since AND ((e.details_json)::jsonb->>'actualCheckInAt')<a.until THEN 1 ELSE 0 END) checkins,
+      sum(CASE WHEN ((e.details_json)::jsonb->>'actualCheckOutAt')>=a.since AND ((e.details_json)::jsonb->>'actualCheckOutAt')<a.until THEN 1 ELSE 0 END) checkouts FROM scoped_executions e JOIN allowed a ON a.id=e.branch_id WHERE e.module='hotel' GROUP BY e.module` },
   ]);
   const branches = result[0] as { id: string; name: string; business_name: string; modules: string; status: string }[], money = result[1] as MoneyRow[];
   const balance = result[2][0] as { remaining: number | null; unpaid: number | null; partial: number | null };

@@ -1,10 +1,10 @@
-import type { D1DatabaseLike, D1PreparedStatementLike } from "../be1/repository";
+import type { Database, PreparedStatement } from "../be1/repository";
 import { be1Error } from "../be1/errors";
 import { validateId } from "../be1/validation";
 import { batch, deleteGuard } from "../shared/database";
 import { BackendConflict, conflict } from "../shared/errors";
 import { choice, hash, integer, object, opaqueId, string } from "../shared/validation";
-import { AMOUNTS, D1Be7Repository } from "./d1Repository";
+import { AMOUNTS, PostgresBe7Repository } from "./postgresRepository";
 import type { AttemptState, PaymentIntent, PaymentProviderEvent, PaymentProviderResolver, ProviderAccount, ProviderOutcome } from "./contracts";
 
 type AttemptRow = { id: string; business_id: string; branch_id: string; charge_id: string; account_id: string; amount_minor: number; currency: "THB"; idempotency_key: string; state: AttemptState; provider_reference: string | null; revision: number; attempts: number; lease_token: string | null; created_by: string };
@@ -24,8 +24,8 @@ function safeFailureCode(value: unknown) { return typeof value === "string" && /
 
 /** Provider-neutral server boundary. No gateway is selected and no public mock route exists. */
 export class PaymentProviderService {
-  private readonly repo: D1Be7Repository;
-  constructor(private readonly db: D1DatabaseLike, private readonly resolve: PaymentProviderResolver, mode: "dev-test" | "verified-provider" = "verified-provider", private readonly clock = () => new Date().toISOString()) { this.repo = new D1Be7Repository(db, mode); }
+  private readonly repo: PostgresBe7Repository;
+  constructor(private readonly db: Database, private readonly resolve: PaymentProviderResolver, mode: "dev-test" | "verified-provider" = "verified-provider", private readonly clock = () => new Date().toISOString()) { this.repo = new PostgresBe7Repository(db, mode); }
   private intent(a: AttemptRow): PaymentIntent { return { attemptId: a.id, idempotencyKey: a.idempotency_key, accountId: a.account_id, amountMinor: a.amount_minor, currency: a.currency }; }
   private async account(id: string) {
     const r = await this.db.prepare("SELECT business_id FROM payment_provider_accounts WHERE id=?").bind(id).first<{ business_id: string }>();
@@ -47,9 +47,9 @@ export class PaymentProviderService {
     const db = this.db, now = this.clock(), oldEvent = await db.prepare("SELECT event_hash FROM payment_webhook_events WHERE account_id=? AND event_id=?").bind(account.id, event.eventId).first<{ event_hash: string }>();
     if (oldEvent) { if (oldEvent.event_hash !== digest) conflict("idempotency"); return; }
     const a = await db.prepare("SELECT * FROM payment_attempts WHERE business_id=? AND account_id=? AND id=?").bind(account.businessId, account.id, event.attemptId).first<AttemptRow>();
-    const statements: D1PreparedStatementLike[] = [], token = opaqueId("settlement");
+    const statements: PreparedStatement[] = [], token = opaqueId("settlement");
     // Bind settlement to the merchant configuration whose signature was verified.
-    statements.push(db.prepare("INSERT INTO backend_guards(id,allowed) SELECT ?,EXISTS(SELECT 1 FROM payment_provider_accounts WHERE id=? AND business_id=? AND status='active' AND provider=? AND external_account_id=? AND secret_ref=? AND source=? AND revision=?)")
+    statements.push(db.prepare("INSERT INTO backend_guards(id,allowed) SELECT ?,(EXISTS(SELECT 1 FROM payment_provider_accounts WHERE id=? AND business_id=? AND status='active' AND provider=? AND external_account_id=? AND secret_ref=? AND source=? AND revision=?))::integer")
       .bind(token, account.id, account.businessId, account.provider, account.externalAccountId, account.secretRef, account.source, account.revision), deleteGuard(db, token));
     let ledger: "applied" | "ignored" | "reconciliation" = "applied", code: string | null = null;
     if (!a) { ledger = "reconciliation"; code = "unknown-attempt"; }
@@ -72,7 +72,7 @@ export class PaymentProviderService {
       if (outcome.state === "failed") code = outcome.code;
       statements.push(db.prepare("UPDATE payment_attempts SET state=?,provider_reference=coalesce(provider_reference,?),failure_code=?,revision=revision+1,lease_token=NULL,lease_until=NULL,next_attempt_at=?,updated_at=? WHERE business_id=? AND branch_id=? AND id=? AND revision=?")
         .bind(state, a.provider_reference ?? reference, code, new Date(Date.parse(now) + 60000).toISOString(), now, a.business_id, a.branch_id, a.id, a.revision),
-        db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,changes()=1").bind(token), deleteGuard(db, token));
+        db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(:previous_row_count::integer=1)::integer").bind(token), deleteGuard(db, token));
       if (state === "succeeded" && outcome.state === "succeeded") {
         const c = await db.prepare(`${AMOUNTS} WHERE c.business_id=? AND c.branch_id=? AND c.id=?`).bind(a.business_id, a.branch_id, a.charge_id).first<{ customer_id: string; cancelled_at: string | null; total_minor: number; paid_minor: number; refunded_minor: number; reserved_minor: number; revision: number }>();
         if (!c) throw be1Error("NOT_FOUND");
@@ -84,7 +84,7 @@ export class PaymentProviderService {
         else { ledger = "reconciliation"; code = "unallocated-payment"; }
         // A late valid success is still received money. An unallocatable receipt is held for review.
         statements.push(db.prepare("UPDATE charges SET revision=revision+1,updated_at=? WHERE business_id=? AND branch_id=? AND id=? AND revision=?").bind(now, a.business_id, a.branch_id, a.charge_id, c.revision),
-          db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,changes()=1").bind(token), deleteGuard(db, token));
+          db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(:previous_row_count::integer=1)::integer").bind(token), deleteGuard(db, token));
       } else if (state !== a.state) statements.push(db.prepare("UPDATE charges SET revision=revision+1,updated_at=? WHERE business_id=? AND branch_id=? AND id=?").bind(now, a.business_id, a.branch_id, a.charge_id));
       statements.push(db.prepare("INSERT INTO payment_attempt_events(id,business_id,branch_id,attempt_id,kind,failure_code,occurred_at) VALUES(?,?,?,?,?,?,?)").bind(opaqueId("pae"), a.business_id, a.branch_id, a.id, state, code, now));
     }
@@ -125,6 +125,6 @@ export class PaymentProviderService {
     const code = safeFailureCode(outcome.state === "unknown" ? outcome.code : "provider-unavailable"), state = a.attempts >= 8 ? "reconciliation" : "retry";
     await batch(db, [db.prepare("UPDATE payment_attempts SET state=?,failure_code=?,lease_token=NULL,lease_until=NULL,next_attempt_at=?,revision=revision+1,updated_at=? WHERE id=? AND lease_token=? AND revision=? AND state='retry'")
       .bind(state, code, new Date(Date.parse(now) + Math.min(3600000, 15000 * 2 ** a.attempts)).toISOString(), now, a.id, lease, a.revision),
-      db.prepare("INSERT INTO payment_attempt_events(id,business_id,branch_id,attempt_id,kind,failure_code,occurred_at) SELECT ?,?,?,?,?,?,? WHERE changes()=1").bind(opaqueId("pae"), a.business_id, a.branch_id, a.id, state, code, now)]);
+      db.prepare("INSERT INTO payment_attempt_events(id,business_id,branch_id,attempt_id,kind,failure_code,occurred_at) SELECT ?,?,?,?,?,?,? WHERE :previous_row_count::integer=1").bind(opaqueId("pae"), a.business_id, a.branch_id, a.id, state, code, now)]);
   }
 }

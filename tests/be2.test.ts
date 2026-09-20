@@ -1,20 +1,18 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { TestSql, TestPostgres, migrate } from "./postgresTestKit";
 import test from "node:test";
 import { Be2Application } from "../app/_backend/be2/application.ts";
-import { D1Be2Repository } from "../app/_backend/be2/d1Repository.ts";
-import { D1Be1Repository } from "../app/_backend/be1/d1Repository.ts";
+import { PostgresBe2Repository } from "../app/_backend/be2/postgresRepository.ts";
+import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository.ts";
 import { Be1Error } from "../app/_backend/be1/errors.ts";
 import type { RequestMetadata } from "../app/_backend/be1/metadata.ts";
-import type { D1DatabaseLike, D1PreparedStatementLike, D1ResultLike } from "../app/_backend/be1/repository.ts";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const migrations = readdirSync(resolve(projectRoot, "drizzle")).filter((name) => name.endsWith(".sql")).sort();
-const be1Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be1-dev.sql"), "utf8");
-const be2Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be2-dev.sql"), "utf8");
+const be1Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be1-dev.sql"), "utf8");
+const be2Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be2-dev.sql"), "utf8");
 
 const OWNER = "prs_01k47meawketting000000001";
 const MANAGER = "prs_01k47meawketting000000002";
@@ -24,85 +22,21 @@ const OUTSIDER = "prs_01k47meawketting000000005";
 const WHISKER = "business-whisker-rest";
 const PAW = "business-paw-partner";
 
-class NodeD1Statement implements D1PreparedStatementLike {
-  private values: SQLInputValue[] = [];
-  readonly database: DatabaseSync;
-  readonly query: string;
-
-  constructor(database: DatabaseSync, query: string) {
-    this.database = database;
-    this.query = query;
-  }
-
-  bind(...values: unknown[]) {
-    const next = new NodeD1Statement(this.database, this.query);
-    next.values = values as SQLInputValue[];
-    return next;
-  }
-
-  async first<T = Record<string, unknown>>(columnName?: string): Promise<T | null> {
-    const row = this.database.prepare(this.query).get(...this.values) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return (columnName ? row[columnName] : row) as T;
-  }
-
-  async all<T = Record<string, unknown>>(): Promise<D1ResultLike<T>> {
-    return { success: true, results: this.database.prepare(this.query).all(...this.values) as T[] };
-  }
-
-  async run<T = Record<string, unknown>>(): Promise<D1ResultLike<T>> {
-    const result = this.database.prepare(this.query).run(...this.values);
-    return { success: true, results: [], meta: { changes: Number(result.changes) } };
-  }
-}
-
-class NodeD1Database implements D1DatabaseLike {
-  readonly sqlite: DatabaseSync;
-
-  constructor(sqlite: DatabaseSync) {
-    this.sqlite = sqlite;
-  }
-
-  prepare(query: string) {
-    return new NodeD1Statement(this.sqlite, query);
-  }
-
-  async batch(statements: D1PreparedStatementLike[]) {
-    this.sqlite.exec("BEGIN IMMEDIATE");
-    try {
-      const results: D1ResultLike[] = [];
-      for (const statement of statements) results.push(await statement.run());
-      this.sqlite.exec("COMMIT");
-      return results;
-    } catch (error) {
-      this.sqlite.exec("ROLLBACK");
-      throw error;
-    }
-  }
-}
-
-function migrate(database: DatabaseSync) {
-  database.exec("PRAGMA foreign_keys = ON");
-  for (const migration of migrations) {
-    database.exec(readFileSync(resolve(projectRoot, "drizzle", migration), "utf8").replaceAll("--> statement-breakpoint", ""));
-  }
-}
-
 function fixture(file?: string) {
-  const sqlite = new DatabaseSync(file ?? ":memory:");
-  migrate(sqlite);
-  sqlite.exec(be1Seed);
-  sqlite.exec(be2Seed);
-  const database = new NodeD1Database(sqlite);
-  const authorizationRepository = new D1Be1Repository(database);
-  const repository = new D1Be2Repository(database);
+  const inspect = new TestSql(file ?? ":memory:");
+  migrate(inspect);
+  inspect.exec(be1Seed);
+  inspect.exec(be2Seed);
+  const database = new TestPostgres(inspect);
+  const authorizationRepository = new PostgresBe1Repository(database);
+  const repository = new PostgresBe2Repository(database);
   let timeSequence = 0;
   let idSequence = 0;
   const application = new Be2Application(authorizationRepository, repository, {
     now: () => `2026-09-07T01:${String(timeSequence++).padStart(2, "0")}:00.000Z`,
     id: (prefix) => `${prefix}_01k47be2test${String(idSequence++).padStart(12, "0")}`,
   });
-  return { sqlite, database, authorizationRepository, repository, application };
+  return { inspect, database, authorizationRepository, repository, application };
 }
 
 function metadata(correlationId = "corr-be2-test-0001"): RequestMetadata {
@@ -122,7 +56,7 @@ function hasCode(code: Be1Error["code"]) {
 }
 
 test("seeded Customer/Pet directory is Business-wide, searchable, and paginated", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const all = await application.listCustomers(owner, { businessId: WHISKER, limit: 100 });
@@ -144,14 +78,14 @@ test("seeded Customer/Pet directory is Business-wide, searchable, and paginated"
 
     // Branch is deliberately absent from the identity query. Both Whisker
     // Branch contexts reference this exact Business-level directory.
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM customers WHERE business_id = ?").get(WHISKER)?.count, 2);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM customers WHERE business_id = ?").get(WHISKER)?.count, 2);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("Customer create/read/update notes/tags/lifecycle is durable and duplicate warnings never merge", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const createdResult = await application.createCustomer(owner, {
@@ -178,7 +112,7 @@ test("Customer create/read/update notes/tags/lifecycle is durable and duplicate 
       businessNotes: "",
     }, metadata("corr-customer-duplicate"));
     assert.equal(warned.outcome, "duplicate-warning");
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM customers WHERE business_id = ? AND phone_key = ?").get(WHISKER, "0812223344")?.count, 1);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM customers WHERE business_id = ? AND phone_key = ?").get(WHISKER, "0812223344")?.count, 1);
 
     const allowed = await application.createCustomer(owner, {
       businessId: WHISKER,
@@ -191,7 +125,7 @@ test("Customer create/read/update notes/tags/lifecycle is durable and duplicate 
     assert.equal(allowed.outcome, "created");
     if (allowed.outcome !== "created") return;
     assert.notEqual(allowed.customer.id, created.id);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM customers WHERE business_id = ? AND phone_key = ?").get(WHISKER, "0812223344")?.count, 2);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM customers WHERE business_id = ? AND phone_key = ?").get(WHISKER, "0812223344")?.count, 2);
 
     const updated = await application.updateCustomer(owner, {
       businessId: WHISKER,
@@ -229,12 +163,12 @@ test("Customer create/read/update notes/tags/lifecycle is durable and duplicate 
     assert.equal((await application.listCustomers(owner, { businessId: WHISKER, includeInactive: true, limit: 100 })).items.some((item) => item.id === created.id), true);
     assert.equal((await application.setCustomerActive(owner, WHISKER, created.id, true, metadata("corr-customer-on"))).status, "active");
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("Pet profiles, multiple Pets, duplicate warnings, and neutral contact relationships persist independently", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const created = await application.createPet(owner, {
@@ -258,7 +192,7 @@ test("Pet profiles, multiple Pets, duplicate warnings, and neutral contact relat
       businessNotes: "",
     }, metadata("corr-pet-duplicate"));
     assert.equal(warning.outcome, "duplicate-warning");
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM business_pet_profiles WHERE business_id = ? AND name_key = 'kiwi'").get(WHISKER)?.count, 1);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM business_pet_profiles WHERE business_id = ? AND name_key = 'kiwi'").get(WHISKER)?.count, 1);
 
     const second = await application.createPet(owner, {
       businessId: WHISKER,
@@ -310,12 +244,12 @@ test("Pet profiles, multiple Pets, duplicate warnings, and neutral contact relat
     assert.equal(inactivePetWarning.outcome, "duplicate-warning", "inactive Pet profiles remain duplicate candidates");
     assert.equal((await application.setPetActive(owner, WHISKER, second.pet.id, true, metadata("corr-pet-on"))).status, "active");
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("server authorization denies wrong Business, spoofed IDs, inactive membership, and cross-tenant links", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     await assert.rejects(application.getCustomer(owner, PAW, "booking-contact-nalin"), hasCode("NOT_FOUND"));
@@ -332,12 +266,12 @@ test("server authorization denies wrong Business, spoofed IDs, inactive membersh
     const outsider = await actor(application, OUTSIDER);
     await assert.rejects(application.listCustomers(outsider, { businessId: WHISKER }), hasCode("FORBIDDEN"));
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("active OWNER, MANAGER, and STAFF reuse the BE1 membership policy without Branch-fragmenting identities", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const manager = await actor(application, MANAGER);
     const staff = await actor(application, STAFF);
@@ -360,21 +294,21 @@ test("active OWNER, MANAGER, and STAFF reuse the BE1 membership policy without B
     }, metadata("corr-staff-update"));
     assert.deepEqual(staffUpdate.tags, ["Front desk"]);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("relational constraints enforce lifecycle, profile vocabulary, and cross-Business relationship scope", () => {
-  const { sqlite } = fixture();
+  const { inspect } = fixture();
   try {
-    assert.throws(() => sqlite.prepare(`
+    assert.throws(() => inspect.prepare(`
       INSERT INTO business_pet_profiles (
         business_id, pet_id, name, name_key, species, profile_source, business_notes, status,
         created_at, updated_at
       ) VALUES (?, ?, 'Bad', 'bad', 'bird', 'business-local', '', 'active', ?, ?)
-    `).run(WHISKER, "booking-pet-mochi", "2026-09-07T01:00:00.000Z", "2026-09-07T01:00:00.000Z"), /CHECK constraint/i);
-    assert.throws(() => sqlite.prepare("UPDATE customers SET status = 'deleted' WHERE id = ?").run("booking-contact-nalin"), /CHECK constraint/i);
-    assert.throws(() => sqlite.prepare(`
+    `).run(WHISKER, "booking-pet-mochi", "2026-09-07T01:00:00.000Z", "2026-09-07T01:00:00.000Z"), /check constraint/i);
+    assert.throws(() => inspect.prepare("UPDATE customers SET status = 'deleted' WHERE id = ?").run("booking-contact-nalin"), /check constraint/i);
+    assert.throws(() => inspect.prepare(`
       INSERT INTO customer_pet_relationships (
         id, business_id, customer_id, pet_id, status, created_at, updated_at
       ) VALUES (?, ?, ?, ?, 'active', ?, ?)
@@ -386,7 +320,7 @@ test("relational constraints enforce lifecycle, profile vocabulary, and cross-Bu
       "2026-09-07T01:00:00.000Z",
       "2026-09-07T01:00:00.000Z",
     ), /FOREIGN KEY constraint/i);
-    assert.throws(() => sqlite.prepare(`
+    assert.throws(() => inspect.prepare(`
       INSERT INTO customer_pet_relationships (
         id, business_id, customer_id, pet_id, status, created_at, updated_at
       ) VALUES (?, ?, ?, ?, 'active', ?, ?)
@@ -397,20 +331,20 @@ test("relational constraints enforce lifecycle, profile vocabulary, and cross-Bu
       "booking-pet-mochi",
       "2026-09-07T01:00:00.000Z",
       "2026-09-07T01:00:00.000Z",
-    ), /UNIQUE constraint/i);
-    assert.deepEqual(sqlite.prepare("PRAGMA foreign_key_check").all(), []);
-    assert.equal(sqlite.prepare("PRAGMA integrity_check").get()?.integrity_check, "ok");
+    ), /unique constraint/i);
+    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+    assert.equal(inspect.prepare("SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND NOT convalidated) THEN 'ok' ELSE 'invalid' END integrity_check").get()?.integrity_check, "ok");
 
-    const petColumns = new Set(sqlite.prepare("PRAGMA table_info(pets)").all().map((row) => row.name));
+    const petColumns = new Set(inspect.prepare("SELECT column_name AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pets'").all().map((row) => row.name));
     assert.deepEqual([...petColumns].sort(), ["created_at", "created_by_person_id", "id"]);
     for (const forbidden of ["business_id", "owner_id", "guardian_id", "passport_id", "consent_id"]) assert.equal(petColumns.has(forbidden), false);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("BE2 audit events retain actor/correlation/target metadata without copying contact or notes", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const result = await application.createCustomer(owner, {
@@ -422,7 +356,7 @@ test("BE2 audit events retain actor/correlation/target metadata without copying 
       tags: ["PRIVATE TAG"],
     }, metadata("corr-audit-minimized"));
     assert.equal(result.outcome, "created");
-    const rows = sqlite.prepare(`
+    const rows = inspect.prepare(`
       SELECT actor_person_id, actor_membership_id, business_id, branch_id, request_id,
              correlation_id, action, target_type, target_id, before_json, after_json
       FROM audit_events
@@ -439,13 +373,13 @@ test("BE2 audit events retain actor/correlation/target metadata without copying 
     }
     assert.match(String(rows[0]?.after_json), /"hasPhone":true/);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("migration-backed Customer/Pet writes survive database reopen", async () => {
   const directory = mkdtempSync(join(tmpdir(), "meawketting-be2-"));
-  const databasePath = join(directory, "be2.sqlite");
+  const databasePath = join(directory, "be2.inspect");
   try {
     const first = fixture(databasePath);
     const owner = await actor(first.application);
@@ -467,12 +401,12 @@ test("migration-backed Customer/Pet writes survive database reopen", async () =>
     }, metadata("corr-durable-pet"));
     assert.equal(petResult.outcome, "created");
     if (petResult.outcome !== "created") return;
-    first.sqlite.close();
+    first.inspect.close();
 
-    const reopened = new DatabaseSync(databasePath);
-    reopened.exec("PRAGMA foreign_keys = ON");
-    const database = new NodeD1Database(reopened);
-    const application = new Be2Application(new D1Be1Repository(database), new D1Be2Repository(database));
+    const reopened = new TestSql(databasePath);
+    reopened.close();
+    const database = new TestPostgres(reopened);
+    const application = new Be2Application(new PostgresBe1Repository(database), new PostgresBe2Repository(database));
     const reopenedOwner = await actor(application);
     const durable = await application.getCustomer(reopenedOwner, WHISKER, customerResult.customer.id);
     assert.equal(durable.displayName, "ลูกค้าคงทน");

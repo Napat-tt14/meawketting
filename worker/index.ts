@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import type { D1DatabaseLike } from "../app/_backend/be1/repository";
+import { withBackend, database } from "../app/_backend/runtime";
 import { InboxTransport } from "../app/_backend/be6/transport";
 import { lineSecretResolver } from "../app/_backend/be6/lineSecrets";
 import { secureFetch } from "./security";
@@ -21,10 +21,13 @@ const worker = {
   // Provisioning the schedule and Business-owned OA secrets is separate launch work.
   async scheduled(_controller: ScheduledController, env: Cloudflare.Env): Promise<void> {
     if (!env.MEAWKETTING_LINE_CREDENTIALS) return;
-    await new InboxTransport(env.DB as unknown as D1DatabaseLike, lineSecretResolver(env.MEAWKETTING_LINE_CREDENTIALS)).drain(20);
+    await withBackend(new Request("https://scheduled.internal/"), env, async () => {
+      await new InboxTransport(database(), lineSecretResolver(env.MEAWKETTING_LINE_CREDENTIALS)).drain(20);
+      return new Response(null, { status: 204 });
+    });
   },
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext): Promise<Response> {
-    return secureFetch(request, env, async () => {
+    return secureFetch(request, env, () => withBackend(request, env, async () => {
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {
@@ -39,7 +42,7 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
-    });
+    }));
   },
 };
 

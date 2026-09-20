@@ -7,6 +7,8 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
 
 ## Product priority and portal entry
 
+- **New Business owner**: `/business/register` → Google or LINE via Supabase Auth → store/contact/first-Branch/service details → declaration of authority → atomic store/Owner creation → `/business/settings?section=branches` to configure opening hours. Identity alone has no Business access; failed or repeated submissions do not create partial/duplicate stores. This is self-declared store information, not legal-business verification. Returning users use their existing provider; blocked memberships cannot regain authority by signing up again.
+
 - **Primary Commercial Experience**: Business Landing (`/`) → Business Login (`/business/login`) → Business Home (`/business/home`) → Shared Calendar & Bookings (`/business/calendar`) → Grooming Operations (`/business/grooming`, when enabled) or Hotel/Daycare Operations (`/business/hotel`, `/business/daycare`, when enabled) → Billing / Payments / Revenue (`/business/billing`) → Reports (`/business/reports`) → Team & Staff Operations (`/business/team`) → Business/Branch Settings (`/business/settings`) → Customers & Pets/derived CRM (`/business/customers`) → Inbox (`/business/inbox`) → Shared Scanner & Intake (`/business/scan`).
 - **Compatibility Redirect**: `/business` immediately redirects to `/`.
 - **Consumer web prototype (CURRENT / FROZEN)**: Pet owners can access `/my-pets`, `/create-passport`, `/activity`, `/passports`, and `/qr-preview`. These routes remain retained and regression-tested, but the standalone web experience is no longer the target final Guardian channel.
@@ -57,7 +59,7 @@ Every protected transition resolves Person → active Membership → Business �
   3. Choose the primary CTA **เข้าสู่ระบบสำหรับธุรกิจ** → `/business/login`, or scroll to `#business-core`.
   4. Review supported multi-service businesses, the connected Hotel + Grooming scenario, product-direction workflow, and Guardian-controlled trust layer.
   5. Pet owners use the visually secondary `#guardian` bridge → `/my-pets`, with `/create-passport` as a supporting action.
-- **Login (`/business/login`)**: Google prototype authentication. Redirects to `/business/home`.
+- **Login (`/business/login`)**: Google login through Supabase Auth. Verified, explicitly mapped active members redirect to `/business/home`; unmapped accounts are denied.
 - **Context Switcher**: Frontdesk staff selects an authorized active Branch from the BE1 configuration registry. Initial dev/test Branches are Whisker Rest Ari, Whisker Rest Thonglor and Paw Partner Onnut; BF10 additions and active-state changes update the same selector. BE3 queries switch Branch context over the same durable Business-wide Customer/Pet identities—never cloned per Branch—while active modules, planning Resources and Bookings update coherently without transferring consent.
 
 ### 2. Business Home & Today's priorities (BF-1)
@@ -103,7 +105,7 @@ Every protected transition resolves Person → active Membership → Business �
   5. Start the existing Booking Editor with Customer and optional Pet preselected; no new Booking engine is created.
   6. Treat `ผู้ติดต่อหลัก` as a Business contact relationship only. Switching Branch keeps the same Customer/Pet identity. Passport connection, Guardian authority and active consent are separate/not implemented in BE2; Business notes never write into Pet Passport.
 
-### 6. Inbox & Customer Communication (BF-4 / BE6 D1, provider-neutral)
+### 6. Inbox & Customer Communication (BF-4 / BE6 PostgreSQL, provider-neutral)
 - **Route**: `/business/inbox`.
 - **Flow**:
   1. Search by Customer name, Pet name, service, or current message text in the single-boundary search field; optionally use the compact all/unread/active-service filters.
@@ -115,7 +117,7 @@ Every protected transition resolves Person → active Membership → Business �
    7. The minimum Guardian-response simulator is visibly labeled as a local test boundary. Business has no normal approve action and duplicate decisions are idempotent. When the request is linked to a Grooming Service Job, a Guardian approval updates only that Job's BE4 add-ons and estimated duration; it never mutates Booking or creates Charge/Payment.
   8. Switching Branch within the same Business keeps the Customer conversation. Context from another Branch is named and its Booking action is withheld; protected Passport values remain governed by the original active consent.
 
-### 7. Grooming Operations Foundation (BF-5 / BE4 D1)
+### 7. Grooming Operations Foundation (BF-5 / BE4 PostgreSQL)
 - **Route**: `/business/grooming` for a Grooming-enabled active Branch only.
 - **Goal**: answer the execution questions for today—who is waiting, in service, ready for pickup, assigned to a groomer/resource, or needs attention—without turning Calendar into a second board.
 - **Flow**:
@@ -124,13 +126,13 @@ Every protected transition resolves Person → active Membership → Business �
   3. On desktop/tablet, drag a Job to the desired active status. The pointer-following preview, reversible movement, valid/invalid destination state, and settle/rollback feedback make the outcome explicit. On mobile, use the grouped status list or open the Job and select a status instead; no work depends on drag.
   4. Open the focused detail drawer/sheet to see shared Pet/Customer contact context, service/timing, resource assignments, internal Business notes, Inbox action, add-on request state and short Job history. Protected Passport data is not pulled into this surface.
   5. Assign or change `ช่าง`, `จุดบริการ`, or `เครื่องเป่า` through the shared Resource foundation. A linked groomer also rechecks the shared Team Member’s active state, Grooming capability and lightweight availability; the local evaluator blocks a conflict and keeps the prior assignment intact.
-   6. Receive a valid Grooming booking through BE5 Shared Intake. The matching D1 Job changes through the check-in transition; the board then permits movement among `รอรับเข้า`, `รับเข้าแล้ว`, `รอเริ่ม`, `กำลังทำ`, `พร้อมรับกลับ`, and `เสร็จแล้ว` while cancellation remains terminal.
+   6. Receive a valid Grooming booking through BE5 Shared Intake. The matching PostgreSQL Job changes through the check-in transition; the board then permits movement among `รอรับเข้า`, `รับเข้าแล้ว`, `รอเริ่ม`, `กำลังทำ`, `พร้อมรับกลับ`, and `เสร็จแล้ว` while cancellation remains terminal.
   7. If an add-on needs consent, send the existing structured Inbox request. The Job shows `รอลูกค้าตอบ`; Business cannot approve. A local Guardian-simulator approval appends the add-on and time only to the linked Job.
    8. On completion, the existing shared selector creates or updates one Business-side Service Record from the permitted Job facts. The Grooming detail confirms that the record was saved; the record is read from Customer/Pet `ประวัติบริการ`, not a new page. It does not create a receipt, certificate, Passport, photo store, or Guardian-facing document.
    9. When staff chooses explicit checkout, open `/business/billing` with the linked Grooming context to review/reconcile the Charge and record Cash, bank-transfer or Other payment if received. Completion remains an operational status: it does not make the Charge paid or prevent a partial/unpaid balance.
    10. Customer/Pet history may show a short read-only BF7 payment reference. Paid never means the service was completed, and service completion never means Paid. If work is reopened and completed again, the original source snapshot remains auditable and the same Service Record is refreshed rather than duplicated.
 
-### 8. Hotel / Boarding Operations Foundation (BF-6 / BE4 D1)
+### 8. Hotel / Boarding Operations Foundation (BF-6 / BE4 PostgreSQL)
 - **Route**: `/business/hotel` for a Hotel-enabled active Branch only.
 - **Goal**: answer who arrives/leaves today, who is staying, where each Pet is assigned, remaining capacity, care due, attention notes, and who is ready for pickup without turning Calendar into an execution board.
 - **Flow**:
@@ -146,18 +148,18 @@ Every protected transition resolves Person → active Membership → Business �
    10. After actual checkout, the shared selector creates or updates one Stay Service Record with permitted dates, room/zone and ordinary daily-care summary. Customer/Pet `ประวัติบริการ` shows it inline; no separate summary or handover page is opened. Medication, Guardian instructions, Intake details and incidents do not enter the record.
 - **Boundary**: Calendar remains date-range planning; Hotel Operations owns Stay execution and occupancy. BF-7 owns the separate local Charge/Payment record, while BF8 owns shared Service Record data after genuine checkout. Pricing authority, full inventory, full Incident Management and medical records are not part of BF6.
 
-### 9. Billing, Payments & Revenue Foundation (BF-7 / BE7 D1 financial model)
+### 9. Billing, Payments & Revenue Foundation (BF-7 / BE7 PostgreSQL financial model)
 - **Route**: `/business/billing`.
 - **Goal**: review what is owed separately from how and when money is received, without turning local prototype records into a payment gateway or accounting system.
 - **Flow**:
   1. Open Finance directly, or choose explicit checkout from a linked Grooming Job, Hotel Stay or Daycare Attendance. The active Branch remains the financial attribution context.
-  2. Review the D1 Charge: one booking-level base-service amount, reconciled approved Grooming add-ons where applicable, and any manual adjustment or discount with its required reason. Whole Thai Baht integers are a prototype assumption.
+  2. Review the PostgreSQL Charge: one booking-level base-service amount, reconciled approved Grooming add-ons where applicable, and any manual adjustment or discount with its required reason. Whole Thai Baht integers are a prototype assumption.
   3. Read the Charge total, paid amount and remaining amount. Status is derived from Charge cancellation and Payment allocations: `ยังไม่ชำระ`, `ชำระบางส่วน`, `ชำระแล้ว`, or `ยกเลิก`; service completion never supplies a payment state.
   4. Record Cash, bank-transfer or Other payment with a local note. A duplicate-safe request prevents repeated local submission from creating a second payment effect; partial payment leaves the remaining balance visible.
   5. Cancel only an unpaid Charge and provide a reason. This does not process a refund, reverse a recorded payment, decide tax/invoice policy, or settle work across Branches.
   6. Return to Customer Detail or Business Home to see the same shared financial history or payment-derived current-Branch revenue. An optional local Inbox text is staff-triggered only and does not change the financial record.
 
-### 10. Shared Service Record behavior (BF-8/BF-11 / BE4 D1 source, BE8 read-only projection)
+### 10. Shared Service Record behavior (BF-8/BF-11 / BE4 PostgreSQL source, BE8 read-only projection)
 - **Where it appears**: No standalone route, menu, dashboard, management page, summary page or post-completion workflow. The former CareProof standalone experience is **SUPERSEDED**.
 - **Flow**:
   1. Complete a Grooming Job or check out/complete a Hotel Stay or Daycare Attendance in its existing execution surface. The shared selector creates or updates one source-keyed, Pet-specific Service Record in the existing Business envelope.
@@ -165,9 +167,9 @@ Every protected transition resolves Person → active Membership → Business �
   3. Open Customer or Pet detail and read one `ประวัติบริการ` timeline/list. Pet photo/avatar anchors each item; inline expansion shows summary, service details, activities, staff/resources, local note, permitted photo metadata and completion time.
   4. A short BF7 Charge/Payment reference may appear in the item (`ไม่มี Charge`, unpaid, partial, paid or cancelled). It is read-only: service completion and payment remain separate states.
   5. If a record needs correction, update only the supported summary or Business note with reason/staff/time/request key. The prior value remains auditable; no silent deletion is allowed.
-- **Boundary**: Service Record is a Business service record only. Guardian LINE visibility is planned. Real photo storage, social/public sharing, full medical charts and full document/certificate/print systems remain out of scope; the current source is BE4 D1 and the BE8 view is read-only.
+- **Boundary**: Service Record is a Business service record only. Guardian LINE visibility is planned. Real photo storage, social/public sharing, full medical charts and full document/certificate/print systems remain out of scope; the current source is BE4 PostgreSQL and the BE8 view is read-only.
 
-### 11. Team & Staff Operations Foundation (BF-9 / BE4 D1)
+### 11. Team & Staff Operations Foundation (BF-9 / BE4 PostgreSQL)
 - **Route**: `/business/team`.
 - **Goal**: answer who works today, which Branch they serve, what work they can accept, current/next work, and whether a local assignment conflicts—without creating an HR system.
 - **Flow**:
@@ -176,17 +178,17 @@ Every protected transition resolves Person → active Membership → Business �
   3. Add or edit the small local profile: name/avatar seed, one or more Branches, capabilities, displayed Owner/Manager/Staff role, active flag, and basic working/unavailable/break/time-off windows. This is not a certification, attendance, leave, payroll or HR workflow.
   4. Review today’s linked Booking, Grooming, Hotel care and Daycare workload, including current/next work and surfaced conflict/overload context. Team does not create module-specific staff fixtures.
   5. Return to Calendar/Booking, Grooming, Hotel or Daycare; their assignment controls reuse the same Team Member and show a concrete inactive, capability, availability or time-conflict recovery instead of silently accepting an invalid assignee.
-- **Boundary**: BF9 Owner, Manager and Staff labels are display data only. BE1 active memberships and Branch grants authorize BE1–BE7 server operations; BE8 is read-only. Production authentication and a granular operational permission matrix are not implemented. Consumer remains paused; payroll and HRIS remain excluded.
+- **Boundary**: BF9 Owner, Manager and Staff labels are display data only. BE1 active memberships and Branch grants authorize BE1–BE7 server operations; BE8 is read-only. Supabase Auth authenticates identity; a granular workforce permission matrix remains unimplemented. Consumer remains paused; payroll and HRIS remain excluded.
 
 ### 12. Business & Branch Settings (BF-10 frozen UI / BE1 durable)
 
-1. Open `/business/settings`; edit durable Business text/contact through BE1 without changing Customer or Pet identity. Logo bytes remain a local preview because R2/media is not implemented.
+1. Open `/business/settings`; edit durable Business text/contact through BE1 without changing Customer or Pet identity. Logo bytes remain a local preview in the frozen UI; authorized private Supabase Storage APIs are implemented separately.
 2. Open the Branch section (`?section=branches`) to add/edit durable Branch contact and location, enabled services and weekly hours. Save updates the same BE1 Branch registry used by navigation, Team display and BE3 Booking validation.
 3. Enable/disable a Branch explicitly. Historical work remains; the last active Branch cannot be disabled. A disabled current Branch selects an active fallback rather than leaving an invalid context.
 4. Read active Team count, names and capabilities from the shared Team source; use `ดูทีม` on an active Branch to switch to that Branch and open the existing Team directory. Expand service/resources to inspect the existing Grooming default duration and Hotel/Daycare capacity; no second staff editor or pricing catalogue is created.
 5. Return to Calendar or a service board. New work respects Branch activation, enabled module, operating hours and existing capacity/staff guards. Disabling a service does not erase its history or grant another Branch's consent.
 
-### 13. Daycare Operations (BF-11 / BE4 D1)
+### 13. Daycare Operations (BF-11 / BE4 PostgreSQL)
 
 1. Select a Daycare-enabled Branch and open `/business/daycare`; use the operational date and status view to see shared day-Booking attendance per Pet.
 2. Choose a valid zone and an eligible shared Team Member. A full zone, wrong Branch/capability, inactive or unavailable assignee returns a concrete recovery instead of silently accepting the change.

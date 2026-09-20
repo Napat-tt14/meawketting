@@ -3,26 +3,12 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { businessRequest, readJson } from "../app/_backend/shared/http";
 import { requireSameOrigin } from "../app/_backend/shared/requestSecurity";
-import { ServerSessionIdentityAdapter, newSessionToken, sessionTokenHash, sessionCookie, SESSION_COOKIE, type SessionRecord } from "../app/_backend/be1/session";
+import { resolveIdentityAdapter } from "../app/_backend/be1/identity";
 import { secureFetch } from "../worker/security";
 import { LineChannelAdapter } from "../app/_backend/be6/adapters";
 
-test("session resolves only server hash records; forged, duplicate, expired and revoked cookies fail closed", async () => {
-  const token = newSessionToken(), digest = await sessionTokenHash(token);
-  assert.equal(token.length, 43); assert.equal(digest.length, 64); assert.notEqual(newSessionToken(), token);
-  let record: SessionRecord | null = { personId: "prs_01k47meawketting000000001", issuedAt: 1, expiresAt: 100, revokedAt: null };
-  const adapter = new ServerSessionIdentityAdapter({ findByTokenHash: async hash => hash === digest ? record : null, revokeByTokenHash: async hash => { assert.equal(hash, digest); record = null; } }, () => 50);
-  const request = (cookie = `${SESSION_COOKIE}=${token}`) => new Request("https://shop.test/api/be1", { headers: { cookie, "x-meawketting-dev-person-id": "spoofed-person" } });
-  assert.equal((await adapter.resolve(request())).personId, record.personId);
-  for (const cookie of ["", `${SESSION_COOKIE}=forged`, `${SESSION_COOKIE}=${newSessionToken()}`, `${SESSION_COOKIE}=${token}; ${SESSION_COOKIE}=${token}`]) await assert.rejects(adapter.resolve(request(cookie)));
-  for (const patch of [{ expiresAt: 50 }, { revokedAt: 20 }, { issuedAt: 60 }, { expiresAt: NaN }]) {
-    record = { personId: "prs_01k47meawketting000000001", issuedAt: 1, expiresAt: 100, revokedAt: null, ...patch };
-    await assert.rejects(adapter.resolve(request()));
-  }
-  record = { personId: "prs_01k47meawketting000000001", issuedAt: 1, expiresAt: 100, revokedAt: null };
-  assert.match(sessionCookie(token, 60), /Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=60$/);
-  assert.match(await adapter.invalidate(request()), /Max-Age=0$/);
-  await assert.rejects(adapter.resolve(request()));
+test("identity selection rejects obsolete and unconfigured providers", () => {
+  for (const mode of [undefined, "google", "session", "supabase"]) assert.throws(() => resolveIdentityAdapter(mode));
 });
 
 test("origin protection rejects cross-site, null origin and cookie requests with no origin", () => {

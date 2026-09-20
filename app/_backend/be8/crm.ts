@@ -1,4 +1,4 @@
-import type { D1DatabaseLike } from "../be1/repository";
+import type { Database } from "../be1/repository";
 import { be1Error } from "../be1/errors";
 import { dateInZone } from "../shared/time";
 import { ProjectionSnapshot, type ProjectionScope } from "./snapshot";
@@ -27,11 +27,11 @@ function profile(f: Facts, upcoming: CrmBooking[], scope: ProjectionScope): Cust
   return p;
 }
 
-export async function projectCrm(db: D1DatabaseLike, scope: ProjectionScope, options: { afterId?: string; limit?: number; customerId?: string; before?: { at: string; id: string } }): Promise<CrmPage> {
+export async function projectCrm(db: Database, scope: ProjectionScope, options: { afterId?: string; limit?: number; customerId?: string; before?: { at: string; id: string } }): Promise<CrmPage> {
   const limit = options.customerId ? 1 : options.limit ?? 50;
   const selected = `, selected_customers AS (SELECT c.* FROM customers c WHERE c.business_id IN (SELECT business_id FROM allowed) AND ${options.customerId ? "c.id=?" : "c.status='active' AND c.id>?"} ORDER BY c.id LIMIT ${limit + 1})`;
   const values = [options.customerId ?? options.afterId ?? ""];
-  // Group financial events so each compound SELECT stays within D1's limit.
+  // Group related financial events into one read-only projection.
   // The same scoped events still form one ordered, paginated timeline.
   const timeline = `, timeline AS (
     SELECT 'booking-'||b.id id,'booking' kind,b.customer_id,b.created_at at,CASE WHEN b.status='cancelled' THEN 'นัดหมายถูกยกเลิก' ELSE 'นัดหมาย' END title,s.label||' · '||b.start_local detail,'/business/calendar?bookingId='||b.id href,b.service_module module
@@ -39,8 +39,8 @@ export async function projectCrm(db: D1DatabaseLike, scope: ProjectionScope, opt
     UNION ALL SELECT 'service-'||r.id,'service',r.customer_id,r.completed_at,'บริการเสร็จแล้ว',r.summary,'#customer-service-history-title',r.module FROM scoped_records r
     UNION ALL SELECT * FROM (
     SELECT 'charge-'||h.id,'payment',c.customer_id,h.occurred_at,CASE h.kind WHEN 'cancelled' THEN 'ยอดเรียกเก็บถูกยกเลิก' WHEN 'adjusted' THEN 'ปรับยอดเรียกเก็บ' ELSE 'เปิดยอดเรียกเก็บ' END,c.service_label,'/business/billing?chargeId='||c.id,c.module FROM charge_events h JOIN balances c ON c.business_id=h.business_id AND c.branch_id=h.branch_id AND c.id=h.charge_id
-    UNION ALL SELECT 'payment-'||p.id,'payment',p.customer_id,p.occurred_at,'บันทึกการชำระแล้ว','รับเงิน '||printf('%.0f',p.amount_minor/100.0)||' บาท','/business/billing',NULL FROM scoped_payments p
-    UNION ALL SELECT 'refund-'||r.id,'payment',r.customer_id,r.recorded_at,'บันทึกคืนเงินแล้ว','คืนเงิน '||printf('%.0f',r.amount_minor/100.0)||' บาท','/business/billing',NULL FROM scoped_refunds r
+    UNION ALL SELECT 'payment-'||p.id,'payment',p.customer_id,p.occurred_at,'บันทึกการชำระแล้ว','รับเงิน '||(p.amount_minor/100)::text||' บาท','/business/billing',NULL FROM scoped_payments p
+    UNION ALL SELECT 'refund-'||r.id,'payment',r.customer_id,r.recorded_at,'บันทึกคืนเงินแล้ว','คืนเงิน '||(r.amount_minor/100)::text||' บาท','/business/billing',NULL FROM scoped_refunds r
     )
     UNION ALL SELECT 'message-'||m.id,'message',c.customer_id,m.occurred_at,CASE WHEN m.kind='add-service-request' THEN 'ร้านส่งคำขอบริการเพิ่มเติม' WHEN m.direction='customer' THEN 'ลูกค้าส่งข้อความ' ELSE 'ร้านส่งข้อความ' END,m.body,'/business/inbox?conversation='||c.id,NULL
       FROM messages m JOIN allowed a ON a.business_id=m.business_id AND a.id=m.branch_id JOIN conversations c ON c.business_id=m.business_id AND c.id=m.conversation_id
@@ -50,19 +50,19 @@ export async function projectCrm(db: D1DatabaseLike, scope: ProjectionScope, opt
       (SELECT count(DISTINCT booking_id) FROM scoped_records r WHERE r.customer_id=c.id) visits,
       (SELECT completed_at FROM scoped_records r WHERE r.customer_id=c.id ORDER BY completed_at DESC,id DESC LIMIT 1) last_visit,
       (SELECT branch_id FROM scoped_records r WHERE r.customer_id=c.id ORDER BY completed_at DESC,id DESC LIMIT 1) last_branch,
-      (SELECT json_extract(snapshot_json,'$.serviceLabel') FROM scoped_records r WHERE r.customer_id=c.id ORDER BY completed_at DESC,id DESC LIMIT 1) last_label,
+      (SELECT ((snapshot_json)::jsonb->>'serviceLabel') FROM scoped_records r WHERE r.customer_id=c.id ORDER BY completed_at DESC,id DESC LIMIT 1) last_label,
       coalesce((SELECT sum(total_minor-paid_minor+refunded_minor) FROM balances b WHERE b.customer_id=c.id AND b.cancelled_at IS NULL),0) balance,
       (SELECT count(DISTINCT cc.conversation_id) FROM conversation_contexts cc JOIN allowed a ON a.business_id=cc.business_id AND a.id=cc.branch_id JOIN conversations cv ON cv.business_id=cc.business_id AND cv.id=cc.conversation_id WHERE cv.customer_id=c.id) conversation_count,
       (SELECT max(m.occurred_at) FROM messages m JOIN allowed a ON a.business_id=m.business_id AND a.id=m.branch_id JOIN conversations cv ON cv.business_id=m.business_id AND cv.id=m.conversation_id WHERE cv.customer_id=c.id) latest_conversation,
-      (SELECT json_group_array(module) FROM (SELECT module FROM scoped_records r WHERE r.customer_id=c.id UNION SELECT b.service_module FROM scoped_bookings b JOIN allowed a ON a.id=b.branch_id WHERE b.customer_id=c.id AND b.status<>'cancelled' AND substr(b.start_local,1,10)<=a.today)) modules
+      (SELECT coalesce(jsonb_agg(module), '[]'::jsonb)::text FROM (SELECT module FROM scoped_records r WHERE r.customer_id=c.id UNION SELECT b.service_module FROM scoped_bookings b JOIN allowed a ON a.id=b.branch_id WHERE b.customer_id=c.id AND b.status<>'cancelled' AND substr(b.start_local,1,10)<=a.today)) modules
       FROM selected_customers c ORDER BY c.id` },
     { values, sql: `${selected}, upcoming AS (
       SELECT b.*,row_number() OVER (PARTITION BY b.customer_id ORDER BY b.start_local,b.id) position FROM scoped_bookings b JOIN allowed a ON a.id=b.branch_id WHERE b.customer_id IN (SELECT id FROM selected_customers) AND b.status<>'cancelled' AND substr(b.start_local,1,10)>=a.today
       AND EXISTS(SELECT 1 FROM booking_pets bp WHERE bp.business_id=b.business_id AND bp.branch_id=b.branch_id AND bp.booking_id=b.id AND NOT EXISTS(SELECT 1 FROM scoped_records r WHERE r.branch_id=b.branch_id AND r.booking_id=b.id AND r.pet_id=bp.pet_id)))
       SELECT b.*,c.display_name customer_name,s.label service_label,
-        (SELECT json_group_array(json_object('id',p.pet_id,'name',p.name,'species',p.species)) FROM booking_pets bp JOIN business_pet_profiles p ON p.business_id=bp.business_id AND p.pet_id=bp.pet_id WHERE bp.business_id=b.business_id AND bp.branch_id=b.branch_id AND bp.booking_id=b.id AND NOT EXISTS(SELECT 1 FROM scoped_records r WHERE r.branch_id=b.branch_id AND r.booking_id=b.id AND r.pet_id=bp.pet_id)) pets,
-        (SELECT json_group_array(resource_kind) FROM booking_service_resource_requirements r WHERE r.business_id=b.business_id AND r.branch_id=b.branch_id AND r.service_id=b.service_id) requirements,
-        (SELECT json_group_array(resource_id) FROM booking_resource_assignments r WHERE r.business_id=b.business_id AND r.branch_id=b.branch_id AND r.booking_id=b.id) resources
+        (SELECT coalesce(jsonb_agg(jsonb_build_object('id',p.pet_id,'name',p.name,'species',p.species)), '[]'::jsonb)::text FROM booking_pets bp JOIN business_pet_profiles p ON p.business_id=bp.business_id AND p.pet_id=bp.pet_id WHERE bp.business_id=b.business_id AND bp.branch_id=b.branch_id AND bp.booking_id=b.id AND NOT EXISTS(SELECT 1 FROM scoped_records r WHERE r.branch_id=b.branch_id AND r.booking_id=b.id AND r.pet_id=bp.pet_id)) pets,
+        (SELECT coalesce(jsonb_agg(resource_kind), '[]'::jsonb)::text FROM booking_service_resource_requirements r WHERE r.business_id=b.business_id AND r.branch_id=b.branch_id AND r.service_id=b.service_id) requirements,
+        (SELECT coalesce(jsonb_agg(resource_id), '[]'::jsonb)::text FROM booking_resource_assignments r WHERE r.business_id=b.business_id AND r.branch_id=b.branch_id AND r.booking_id=b.id) resources
       FROM upcoming b JOIN customers c ON c.business_id=b.business_id AND c.id=b.customer_id JOIN booking_services s ON s.business_id=b.business_id AND s.branch_id=b.branch_id AND s.id=b.service_id WHERE b.position<=${options.customerId ? 100 : 1} ORDER BY b.start_local,b.id` },
     ...(options.customerId ? [{ values: [...values, options.before?.at ?? "9999", options.before?.at ?? "9999", options.before?.id ?? "~"], sql: `${selected}${timeline} SELECT t.* FROM timeline t WHERE t.customer_id IN (SELECT id FROM selected_customers) AND (t.at<? OR (t.at=? AND t.id<?)) ORDER BY t.at DESC,t.id DESC LIMIT 101` }] : []),
   ]);

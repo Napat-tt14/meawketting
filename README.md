@@ -1,94 +1,30 @@
 # Meawketting
 
-Meawketting is a Business-first Pet Business Operating Platform prototype. BF1–BF12 UI is frozen; BE1–BE8 backend foundations are implemented locally with Vinext/Cloudflare Worker and D1. BE6 remains provider-neutral, BE7 remains gateway-neutral, and BE8 is read-only/derived.
+Business-first Pet Business Operating Platform. BF1–BF12 Business UI is frozen. Consumer is PAUSED.
 
-## Run locally
+Browser → Cloudflare Worker/API → Application/Domain → PostgreSQL Repository → Supabase PostgreSQL.
+Supabase Auth authenticates Google users; Meawketting authorizes Person/Membership/Business/Branch/target/action.
+Supabase Storage holds private media. No browser table access or privileged browser credentials.
 
-```powershell
-npm.cmd install
-npm.cmd run db:local:migrate
-npm.cmd run db:local:seed
-npm.cmd run dev
-```
-
-- App: `http://localhost:3000/`
-- Canonical documentation router: `docs/README.md`
-- Derived static manual: `docs/.htmlmanual/manual.html`
-
-Read `docs/README.md` first and follow its task-specific reading route. The repository intentionally keeps only the canonical owner documents; the HTML manual is not a source of truth.
-
-The local server enables an explicit development/test identity adapter. It is not production authentication. The dev seed supplies Owner/Manager/Staff and denial scenarios; never use it as production data.
-
-Useful backend checks:
+## Run and validate locally
 
 ```powershell
-npm.cmd run typecheck:be1
-npm.cmd run typecheck:be2
-npm.cmd run typecheck:be3
-npm.cmd run typecheck:be4
-npm.cmd run typecheck:be5
-npm.cmd run typecheck:be6
-npm.cmd run typecheck:be7
-npm.cmd run typecheck:be8
-npm.cmd run db:check
-npm.cmd run test:be1
-npm.cmd run test:be2
-npm.cmd run test:be3
-npm.cmd run test:be4
-npm.cmd run test:be5
-npm.cmd run test:be6
-npm.cmd run test:be7
-npm.cmd run test:be8
+npm.cmd ci
+npm.cmd run test:backend
+npm.cmd run test:production
+npm.cmd run test:api:smoke
+npm.cmd run lint
+npm.cmd run typecheck:production
+npm.cmd run build
+npm.cmd run test:frontend
 ```
 
-## Current prototype
+Backend tests automatically start isolated native PostgreSQL and use synthetic records. For persistent local development, set DATABASE_URL to a dedicated PostgreSQL 16+ test database, run npm.cmd run db:migrate, then set MEAWKETTING_ENV=test and run npm.cmd run db:seed:test. Supply local Worker bindings in ignored .dev.vars and run npm.cmd run dev. Local dev-test identity is explicit and rejected by the production build. Real Google testing requires HTTPS and configured Supabase Auth.
 
-The repository contains 34 `page.tsx` route entries: 30 active local routes, 3 compatibility redirects and 1 legacy QR demo. See `docs/ROUTES.md` for the mechanical classification; final validation evidence is tracked separately.
+Read [canonical docs](./docs/README.md), [architecture](./docs/ARCHITECTURE.md), [validation](./docs/VALIDATION.md) and [setup runbook](./docs/PRODUCTION_RUNBOOK.md). Migration SQL lives in supabase/migrations; Drizzle schema describes domain tables, while reviewed migrations also own native triggers, RLS and grants.
 
-Implemented Business scope is limited to:
+## Preserved boundaries
 
-```text
-Business Landing → mock Business Login → Business Home
-→ Shared Calendar & Booking Editor → Customers & Pets
-→ Business Inbox & Customer Communication
-→ Scanner → Temporary Business QR validation → allowed Pet data
-→ Intake / consent states → receive/check-in complete
-→ Grooming Operations (BF-5; Branch capability-aware)
-→ Hotel / Boarding Operations (BF-6; Branch capability-aware)
-→ Billing, Payments & Revenue Foundation (BF-7; Branch-attributed)
-→ Customer/Pet `ประวัติบริการ` (shared Service Record data from BF-8)
-→ Team & Staff Operations (BF-9; shared Branch-aware local team data)
-→ Business & Branch Settings (BF-10; shared profiles, capabilities and hours)
-→ Daycare Operations (BF-11; Pet-specific attendance linked to shared Bookings)
-→ Customer CRM & Retention (BF-12; derived within Customers, not another store)
-```
+Customer ≠ Guardian; LINE identity ≠ Pet authority; Business never owns Pet Passport; Booking ≠ execution; Charge ≠ Payment; completed ≠ paid. Reports/CRM remain derived/read-only. Branch authorization stays server-side. Business UX/UI and LINE Seed Sans TH remain unchanged; /workfiledesign is untouched.
 
-BE1 moves Business text profile and Branch registry—including contact details, active state, enabled services and weekly hours—from browser truth to a typed server application boundary and durable D1 records. BE2 makes Business-wide Customer, Business-local Pet profile/contact relationship, notes/tags/lifecycle and Customer/Pet search durable. BE3 makes Booking planning, Pet links, Branch service/resource catalogues, assignments, availability reservations and Calendar range queries durable while continuing to reference BE2 identities. BE4 adds durable Grooming Jobs, Hotel Stays, Daycare Attendance, assignments, care logs and canonical Service Records. BE5 adds scoped temporary access grants, Consent and Intake; BE6 adds durable Inbox, outbox and provider-neutral Business-owned LINE OA boundaries; BE7 adds Charge/Payment records, allocations, refunds, attempts and webhook/reconciliation ledgers; BE8 derives read-only Reports/CRM from those records. Logo and other media remain outside the implementation because R2 is not provisioned. Consult `docs/VALIDATION.md` for recorded evidence.
-
-Business Home and Shared Calendar keep their frozen presentation while Booking summaries and planning mutations use BE3 truth after hydration. Customers & Pets keeps the same frozen UI with BE2 truth, including BE3-backed upcoming Booking projections; the explicit seeded Passport/access compatibility read model remains non-authoritative. Inbox, Intake, Grooming, Hotel, Daycare, Billing, Service Records, Reports and CRM now hydrate through their typed BE4–BE8 clients; persistent compatibility is explicit fixture mode only, and any pre-hydration snapshot is presentation-only. Charge remains distinct from Payment, execution remains distinct from Booking, and Service Record remains Business-side history. Production Guardian/Passport authority, real messaging/LINE delivery, payment processing, media, production auth and deployment are not implemented. BF10 text profile/Branch configuration uses BE1; BF12 CRM remains a derived projection rather than a new store.
-
-Consumer navigation is currently four slots: live `สัตว์เลี้ยง` (`/my-pets`) and `กิจกรรม` (`/activity`), plus disabled planned `หน้าหลัก` and `ข้อความ` placeholders. `สร้าง Pet Passport` remains a contextual action in My Pets at `/create-passport`; no Consumer Home or Inbox/Chat route has been created.
-
-The implemented BE1 access model is:
-
-```text
-Person → BusinessMembership → Business → authorized Branch → Enabled Service Modules
-                                  └→ Business-wide Customer ↔ Pet contact relationship (BE2)
-authorized Branch + Customer/Pet → Booking + planning Resources (BE3)
-```
-
-A Business or Branch may enable several services; there is no fixed Business Type or user-facing Workspace layer.
-
-## Boundaries
-
-BE1 Person, Business, Branch, BusinessMembership, Branch access, configuration, server authorization and audit/correlation are implemented locally. BE2 Customer, Pet identity/Business-local profile, neutral contact relationship, notes/tags/lifecycle/search/duplicate warnings and audit are implemented locally. BE3 Booking planning, three time models, multi-Pet links, minimal planning Resources, server availability/conflict enforcement, create idempotency and optimistic revision checks are implemented locally. BE4 execution/staff assignments, care/activity logs and Service Records; BE5 Consent/temporary access and Intake; BE6 Inbox/message/outbox and the Business-owned LINE adapter boundary; BE7 Charge/Payment/allocations/refunds/attempts and webhook/reconciliation ledgers; and BE8 read-only Reports/CRM projections are implemented locally with Branch and Business authorization. OWNER has Business-wide Branch/configuration access; active OWNER/MANAGER/STAFF reuse the current operational membership foundation with Branch scope enforced server-side. Production authentication is **not implemented**; the development/test adapter fails closed unless explicitly configured.
-
-Temporary QR tokens, Consent and Intake are server-validated and do not infer Guardian authority from Customer or LINE identity. Real LINE delivery, payment gateway processing, media/R2, payroll, HRIS, full accounting, production verification and deployment remain out of scope. Consumer development is **PAUSED**; `/workfiledesign` remains untouched.
-
-```text
-TARGET PLATFORM: Cloudflare
-PRODUCTION: NOT DEPLOYED / NOT VERIFIED
-PRODUCTION READY: NO
-```
-
-Cloudflare Worker/Vinext with D1 is the implemented local BE1–BE8 architecture; the latest safe migration is `0014_be7_settlement_guards.sql`. No production resource or deployment has been created or verified. Browser/session records are explicit DEV/TEST compatibility fixtures only and are not backfilled into D1. BF1–BF12 are frozen; standalone CareProof/Handover is superseded. Production auth, external providers, R2/media and deployment remain launch dependencies. See `docs/ROADMAP.md`.
+IMPLEMENTED and TESTED LOCALLY does not mean Production Ready. Supabase/Cloudflare staging configuration, real provider tests, recovery, privileges and operational acceptance are EXTERNAL CONFIG REQUIRED and NOT YET DEPLOYED. The existing BE1/BE2 stale-form/retry contract follow-up remains documented. No production deploy, payment-provider selection, Consumer revival, commit or push was performed.

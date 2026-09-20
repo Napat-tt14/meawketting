@@ -3,7 +3,10 @@
 declare namespace Cloudflare {
   interface Env {
     ASSETS: Fetcher;
-    DB: D1Database;
+    DATABASE_URL?: string;
+    SUPABASE_URL?: string;
+    SUPABASE_PUBLISHABLE_KEY?: string;
+    SUPABASE_SERVICE_ROLE_KEY?: string;
     IMAGES: {
       input(stream: ReadableStream): {
         transform(options: Record<string, unknown>): {
@@ -16,10 +19,6 @@ declare namespace Cloudflare {
     MEAWKETTING_ENV?: "local" | "test" | "staging" | "production";
     MEAWKETTING_FIXTURE_MODE?: string;
     MEAWKETTING_PUBLIC_ORIGIN?: string;
-    MEAWKETTING_GOOGLE_OWNER_EMAIL?: string;
-    MEAWKETTING_GOOGLE_OWNER_PERSON_ID?: string;
-    GOOGLE_CLIENT_ID?: string;
-    GOOGLE_CLIENT_SECRET?: string;
     API_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
     /** Secret binding keyed by opaque channel secret reference; never exposed to clients. */
     MEAWKETTING_LINE_CREDENTIALS?: string;

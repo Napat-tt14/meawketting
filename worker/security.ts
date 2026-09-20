@@ -14,6 +14,8 @@ export async function secureFetch(request: Request, env: SecurityEnvironment, ne
     const remote = env.MEAWKETTING_ENV === "staging" || env.MEAWKETTING_ENV === "production";
     if (api && remote && (env.MEAWKETTING_AUTH_MODE === "dev-test" || env.MEAWKETTING_FIXTURE_MODE === "test" || !env.API_RATE_LIMITER)) {
       response = Response.json({ ok: false, error: { code: "ENVIRONMENT_NOT_CONFIGURED" } }, { status: 503 });
+    } else if (api && process.env.NODE_ENV === "production" && env.MEAWKETTING_AUTH_MODE === "dev-test") {
+      response = Response.json({ ok:false, error:{code:"AUTHENTICATION_NOT_CONFIGURED"} }, { status:url.pathname === "/api/dev/guardian" ? 404 : 501 });
     } else if (api && env.API_RATE_LIMITER && !(await env.API_RATE_LIMITER.limit({ key: `${routeGroup(url.pathname)}:${request.headers.get("cf-connecting-ip") ?? "unknown"}` })).success) {
       response = Response.json({ ok: false, error: { code: "RATE_LIMITED" } }, { status: 429, headers: { "retry-after": "60" } });
     } else {

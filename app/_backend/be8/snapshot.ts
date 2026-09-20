@@ -1,25 +1,25 @@
 import type { BranchView } from "../be1/contracts";
-import type { AuthorizedMutation, D1DatabaseLike } from "../be1/repository";
+import type { AuthorizedMutation, Database } from "../be1/repository";
 import { be1Error } from "../be1/errors";
 import { batch } from "../shared/database";
 import { addDays, dateInZone, utcDayStart } from "../shared/time";
-import { AMOUNTS } from "../be7/d1Repository";
+import { AMOUNTS } from "../be7/postgresRepository";
 
 export type ProjectionScope = { context: AuthorizedMutation; branches: BranchView[]; now: string; startDate: string; endDate: string };
-/** Every SELECT repeats authorization inside one transactional D1 batch. No writable projections. */
+/** Every SELECT repeats authorization inside one serializable transaction. No writable projections. */
 export class ProjectionSnapshot {
   readonly input: string;
-  constructor(private readonly db: D1DatabaseLike, private readonly scope: ProjectionScope) {
+  constructor(private readonly db: Database, private readonly scope: ProjectionScope) {
     this.input = JSON.stringify({ personId: scope.context.actor.id, membershipId: scope.context.membership.id, businessId: scope.context.membership.businessId, startDate: scope.startDate, endDate: scope.endDate, untilDate: addDays(scope.endDate, 1), branches: scope.branches.map((b) => ({ id: b.id, timezone: b.timezone, updatedAt: b.updatedAt, since: utcDayStart(scope.startDate, b.timezone), until: utcDayStart(addDays(scope.endDate, 1), b.timezone), today: dateInZone(scope.now, b.timezone) })) });
   }
   readonly cte = `WITH q AS (SELECT ? input), allowed AS (
-    SELECT br.*,b.name business_name,json_extract(x.value,'$.since') since,json_extract(x.value,'$.until') until,json_extract(x.value,'$.today') today,
-      json_extract(q.input,'$.startDate') start_day,json_extract(q.input,'$.endDate') end_day,json_extract(q.input,'$.untilDate') until_day
-    FROM q JOIN json_each(q.input,'$.branches') x JOIN branches br ON br.id=json_extract(x.value,'$.id')
+    SELECT br.*,b.name business_name,((x.value)::jsonb->>'since') since,((x.value)::jsonb->>'until') until,((x.value)::jsonb->>'today') today,
+      ((q.input)::jsonb->>'startDate') start_day,((q.input)::jsonb->>'endDate') end_day,((q.input)::jsonb->>'untilDate') until_day
+    FROM q CROSS JOIN LATERAL jsonb_array_elements_text((q.input)::jsonb->'branches') x(value) JOIN branches br ON br.id=((x.value)::jsonb->>'id')
       JOIN businesses b ON b.id=br.business_id JOIN business_memberships m ON m.business_id=b.id JOIN persons p ON p.id=m.person_id
-    WHERE b.id=json_extract(q.input,'$.businessId') AND b.status='active' AND p.id=json_extract(q.input,'$.personId') AND p.status='active'
-      AND m.id=json_extract(q.input,'$.membershipId') AND m.status='active'
-      AND br.timezone=json_extract(x.value,'$.timezone') AND br.updated_at=json_extract(x.value,'$.updatedAt')
+    WHERE b.id=((q.input)::jsonb->>'businessId') AND b.status='active' AND p.id=((q.input)::jsonb->>'personId') AND p.status='active'
+      AND m.id=((q.input)::jsonb->>'membershipId') AND m.status='active'
+      AND br.timezone=((x.value)::jsonb->>'timezone') AND br.updated_at=((x.value)::jsonb->>'updatedAt')
       AND (m.role='OWNER' OR (br.status='active' AND EXISTS(SELECT 1 FROM membership_branch_access g WHERE g.business_id=m.business_id AND g.membership_id=m.id AND g.branch_id=br.id AND g.status='active')))
   ), scoped_bookings AS (SELECT b.* FROM bookings b JOIN allowed a ON a.business_id=b.business_id AND a.id=b.branch_id),
   period_bookings AS (SELECT b.* FROM scoped_bookings b JOIN allowed a ON a.id=b.branch_id WHERE b.start_local<a.until_day AND (CASE WHEN b.time_model='date-range' THEN b.end_local>a.start_day ELSE substr(coalesce(b.end_local,b.start_local),1,10)>=a.start_day END)),

@@ -48,7 +48,7 @@ export type BusinessView = {
   email: string;
   description: string;
   address: string;
-  /** Metadata reference only. BE1 does not implement media upload or R2. */
+  /** Metadata reference only. Authorized uploads use the separate private media API. */
   logoUrl: string | null;
   status: Be1LifecycleStatus;
   createdAt: string;

@@ -1,7 +1,7 @@
 import { asBe1Error, be1Error } from "../be1/errors";
 import { resolveIdentity } from "../be1/identity";
 import { createRequestMetadata, type RequestMetadata } from "../be1/metadata";
-import type { D1DatabaseLike } from "../be1/repository";
+import type { Database } from "../be1/repository";
 import { BackendConflict } from "./errors";
 import { requireSameOrigin } from "./requestSecurity";
 
@@ -31,7 +31,7 @@ export async function readJson(request: Request, limit = 65536): Promise<unknown
 
 export async function businessRequest(request: Request, authMode: string | undefined,
   execute: (personId: string, body: unknown, metadata: RequestMetadata) => Promise<unknown>,
-  database?: D1DatabaseLike) {
+  database?: Database) {
   const metadata = createRequestMetadata(request.headers);
   const headers = { "cache-control": "no-store", "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff",
     "x-request-id": metadata.requestId, "x-correlation-id": metadata.correlationId };

@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.be8.json",
-  "include": ["next-env.d.ts", "worker-configuration.d.ts", "app/_backend/**/*.ts", "app/api/**/*.ts", "db/**/*.ts", "worker/**/*.ts", "vite.config.ts", "drizzle.config.ts", "tests/production.test.ts", "scripts/production-restore-drill.ts", "app/business/**/*.tsx", "app/business/**/*.ts"]
+  "include": ["next-env.d.ts", "worker-configuration.d.ts", "app/_backend/**/*.ts", "app/api/**/*.ts", "db/**/*.ts", "worker/**/*.ts", "vite.config.ts", "drizzle.config.ts", "tests/production.test.ts", "tests/runtime.test.ts", "tests/supabase.test.ts", "tests/migrations.test.ts", "app/business/**/*.tsx", "app/business/**/*.ts"]
 }

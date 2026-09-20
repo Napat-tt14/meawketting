@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 export async function businessFixtureHtml(pathname, { empty = false } = {}) {
   const url = new URL(pathname, "http://localhost");
   const cache = await mkdtemp(join(tmpdir(), "meawketting-ui-fixture-"));
-  const server = await createServer({ configFile: false, cacheDir: cache, server: { middlewareMode: true }, appType: "custom", logLevel: "silent",
+  const server = await createServer({ configFile: false, cacheDir: cache, server: { middlewareMode: true, watch: null }, appType: "custom", logLevel: "silent",
     define: { "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify(empty ? "off" : "test") },
     resolve: { alias: { "next/image": resolve("node_modules/vinext/dist/shims/image.js") } },
     plugins: [{ name: "business-fixture-navigation", resolveId(id) { if (id === "next/navigation") return "\0fixture-navigation"; },

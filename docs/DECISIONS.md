@@ -5,6 +5,8 @@ Owner: Product
 
 ## Status model
 
+**DECIDED — 2026-09-20 Business signup:** Product Owner authorizes self-service first-store creation after Google/LINE authentication, completed store details and explicit confirmation. `/business/register` is the approved new UI surface. OAuth alone grants no Owner; existing memberships and Branch authorization remain mandatory. This supersedes invitation-only onboarding for new store owners. See [implementation and setup](./BUSINESS_REGISTRATION.md).
+
 | Status | Meaning |
 |---|---|
 | DECIDED | Active Product direction |
@@ -15,6 +17,16 @@ Owner: Product
 Documentation and prototype behavior never close an OPEN question by convenience.
 
 ## Active decisions
+
+### Supabase replacement — 2026-09-19
+
+Product Owner explicitly replaced the former database and custom session architecture. Cloudflare remains the frontend/API/Worker host. Supabase PostgreSQL is the sole Business database, Supabase Auth supplies authentication, and Supabase Storage supplies private media. Meawketting retains server authorization; the browser never receives privileged credentials or directly accesses tables. Historical database selections below are SUPERSEDED on persistence/auth/storage only; their Product and domain rules remain locked.
+
+Three clean PostgreSQL migrations and native repository SQL replace the old migration/runtime stack. There is no production data transfer. Business UX/UI and LINE Seed Sans TH remain frozen, Consumer PAUSED, /workfiledesign untouched. Staging configuration and verification are external; no production readiness claim.
+
+
+
+## Historical phase decisions — persistence/auth/storage superseded above
 
 ### BE4–BE8 backend completion decisions — 2026-09-08 / 2026-09-09
 

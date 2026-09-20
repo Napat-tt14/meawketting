@@ -1,24 +1,23 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import type { AuthorizedMutation } from "../app/_backend/be1/repository";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { TestSql, TestPostgres, migrate } from "./postgresTestKit";
 import test from "node:test";
-import { D1Be1Repository } from "../app/_backend/be1/d1Repository.ts";
+import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository.ts";
 import { Be1Error } from "../app/_backend/be1/errors.ts";
 import type { RequestMetadata } from "../app/_backend/be1/metadata.ts";
-import type { AuthorizedMutation, D1DatabaseLike, D1PreparedStatementLike, D1ResultLike } from "../app/_backend/be1/repository.ts";
-import { D1Be2Repository } from "../app/_backend/be2/d1Repository.ts";
+import { PostgresBe2Repository } from "../app/_backend/be2/postgresRepository.ts";
 import { Be3Application } from "../app/_backend/be3/application.ts";
 import type { BookingAvailabilityInput, BookingConflictCode, BookingMutationResult, CreateBookingInput } from "../app/_backend/be3/contracts.ts";
-import { D1Be3Repository } from "../app/_backend/be3/d1Repository.ts";
+import { PostgresBe3Repository } from "../app/_backend/be3/postgresRepository.ts";
 import type { Be3Repository, BookingPersistenceWrite } from "../app/_backend/be3/repository.ts";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const migrations = readdirSync(resolve(projectRoot, "drizzle")).filter((name) => name.endsWith(".sql")).sort();
-const be1Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be1-dev.sql"), "utf8");
-const be2Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be2-dev.sql"), "utf8");
-const be3Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be3-dev.sql"), "utf8");
-const be4Seed = readFileSync(resolve(projectRoot, "scripts", "seed-be4-dev.sql"), "utf8");
+const be1Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be1-dev.sql"), "utf8");
+const be2Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be2-dev.sql"), "utf8");
+const be3Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be3-dev.sql"), "utf8");
+const be4Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be4-dev.sql"), "utf8");
 
 const OWNER = "prs_01k47meawketting000000001";
 const MANAGER = "prs_01k47meawketting000000002";
@@ -31,64 +30,10 @@ const ARI = "whisker-ari";
 const THONGLOR = "whisker-thonglor";
 const ONNUT = "partner-onnut";
 
-class NodeD1Statement implements D1PreparedStatementLike {
-  private values: SQLInputValue[] = [];
-  constructor(readonly database: DatabaseSync, readonly query: string) {}
-
-  bind(...values: unknown[]) {
-    const next = new NodeD1Statement(this.database, this.query);
-    next.values = values as SQLInputValue[];
-    return next;
-  }
-
-  async first<T = Record<string, unknown>>(columnName?: string): Promise<T | null> {
-    const row = this.database.prepare(this.query).get(...this.values) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return (columnName ? row[columnName] : row) as T;
-  }
-
-  async all<T = Record<string, unknown>>(): Promise<D1ResultLike<T>> {
-    return { success: true, results: this.database.prepare(this.query).all(...this.values) as T[] };
-  }
-
-  async run<T = Record<string, unknown>>(): Promise<D1ResultLike<T>> {
-    const result = this.database.prepare(this.query).run(...this.values);
-    return { success: true, results: [], meta: { changes: Number(result.changes) } };
-  }
-}
-
-class NodeD1Database implements D1DatabaseLike {
-  constructor(readonly sqlite: DatabaseSync) {}
-
-  prepare(query: string) {
-    return new NodeD1Statement(this.sqlite, query);
-  }
-
-  async batch(statements: D1PreparedStatementLike[]) {
-    this.sqlite.exec("BEGIN IMMEDIATE");
-    try {
-      const results: D1ResultLike[] = [];
-      for (const statement of statements) results.push(await statement.run());
-      this.sqlite.exec("COMMIT");
-      return results;
-    } catch (error) {
-      this.sqlite.exec("ROLLBACK");
-      throw error;
-    }
-  }
-}
-
-function migrate(database: DatabaseSync) {
-  database.exec("PRAGMA foreign_keys = ON");
-  for (const migration of migrations) {
-    database.exec(readFileSync(resolve(projectRoot, "drizzle", migration), "utf8").replaceAll("--> statement-breakpoint", ""));
-  }
-}
-
-function applicationFor(database: NodeD1Database, idNamespace = "main", bookingRepository?: Be3Repository) {
-  const authorizationRepository = new D1Be1Repository(database);
-  const customerPetRepository = new D1Be2Repository(database);
-  const durableBookingRepository = bookingRepository ?? new D1Be3Repository(database);
+function applicationFor(database: TestPostgres, idNamespace = "main", bookingRepository?: Be3Repository) {
+  const authorizationRepository = new PostgresBe1Repository(database);
+  const customerPetRepository = new PostgresBe2Repository(database);
+  const durableBookingRepository = bookingRepository ?? new PostgresBe3Repository(database);
   let timeSequence = 0;
   let idSequence = 0;
   const application = new Be3Application(authorizationRepository, customerPetRepository, durableBookingRepository, {
@@ -99,14 +44,14 @@ function applicationFor(database: NodeD1Database, idNamespace = "main", bookingR
 }
 
 function fixture(file?: string) {
-  const sqlite = new DatabaseSync(file ?? ":memory:");
-  migrate(sqlite);
-  sqlite.exec(be1Seed);
-  sqlite.exec(be2Seed);
-  sqlite.exec(be3Seed);
-  sqlite.exec(be4Seed);
-  const database = new NodeD1Database(sqlite);
-  return { sqlite, database, ...applicationFor(database) };
+  const inspect = new TestSql(file ?? ":memory:");
+  migrate(inspect);
+  inspect.exec(be1Seed);
+  inspect.exec(be2Seed);
+  inspect.exec(be3Seed);
+  inspect.exec(be4Seed);
+  const database = new TestPostgres(inspect);
+  return { inspect, database, ...applicationFor(database) };
 }
 
 function metadata(correlationId = "corr-be3-test-0001"): RequestMetadata {
@@ -184,7 +129,7 @@ function daycareInput(overrides: Partial<CreateBookingInput> = {}): CreateBookin
 }
 
 test("seeded catalog and Calendar queries preserve all time models, one Hotel range, and Branch grants", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const catalog = await application.getCatalog(owner, WHISKER, ARI);
@@ -195,7 +140,7 @@ test("seeded catalog and Calendar queries preserve all time models, one Hotel ra
     assert.equal(hotel.timeModel, "date-range");
     assert.equal(hotel.end, "2026-08-26", "Hotel checkout is the exclusive range end");
     assert.deepEqual(hotel.pets.map((pet) => pet.id), ["booking-pet-mochi", "booking-pet-biscuit"]);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM bookings WHERE id = ?").get(hotel.id)?.count, 1);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM bookings WHERE id = ?").get(hotel.id)?.count, 1);
 
     const day = await application.getBooking(owner, PAW, ONNUT, "booking-fixture-onnut-daycare-full");
     assert.equal(day.timeModel, "day");
@@ -239,18 +184,18 @@ test("seeded catalog and Calendar queries preserve all time models, one Hotel ra
     const staffPage = await application.listBookings(await actor(application, STAFF), { businessId: WHISKER, limit: 100 });
     assert.deepEqual(new Set(staffPage.items.map((booking) => booking.branchId)), new Set([THONGLOR]));
 
-    sqlite.prepare("UPDATE customers SET display_name = 'ชื่อใหม่จาก BE2' WHERE business_id = ? AND id = ?").run(WHISKER, "booking-contact-nalin");
-    sqlite.prepare("UPDATE business_pet_profiles SET name = 'Mochi Canonical' WHERE business_id = ? AND pet_id = ?").run(WHISKER, "booking-pet-mochi");
+    inspect.prepare("UPDATE customers SET display_name = 'ชื่อใหม่จาก BE2' WHERE business_id = ? AND id = ?").run(WHISKER, "booking-contact-nalin");
+    inspect.prepare("UPDATE business_pet_profiles SET name = 'Mochi Canonical' WHERE business_id = ? AND pet_id = ?").run(WHISKER, "booking-pet-mochi");
     const recomposed = await application.getBooking(owner, WHISKER, ARI, hotel.id);
     assert.equal(recomposed.customerName, "ชื่อใหม่จาก BE2");
     assert.equal(recomposed.pets[0]?.name, "Mochi Canonical");
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("appointment, date-range, and day aggregates persist with durable Pet and Resource links", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const appointment = await application.createBooking(owner, groomingInput(), metadata("corr-create-appointment"));
@@ -267,24 +212,24 @@ test("appointment, date-range, and day aggregates persist with durable Pet and R
     assert.equal(daycare.booking.end, null);
     assert.deepEqual(hotel.booking.pets.map((pet) => pet.id), ["booking-pet-mochi", "booking-pet-biscuit"]);
 
-    const hotelPets = sqlite.prepare("SELECT pet_id, position FROM booking_pets WHERE booking_id = ? ORDER BY position").all(hotel.booking.id);
+    const hotelPets = inspect.prepare("SELECT pet_id, position FROM booking_pets WHERE booking_id = ? ORDER BY position").all(hotel.booking.id);
     assert.deepEqual(hotelPets.map((row) => row.pet_id), ["booking-pet-mochi", "booking-pet-biscuit"]);
-    const reservations = sqlite.prepare("SELECT reservation_date, units FROM booking_resource_reservations WHERE booking_id = ? ORDER BY reservation_date").all(hotel.booking.id)
+    const reservations = inspect.prepare("SELECT reservation_date, units FROM booking_resource_reservations WHERE booking_id = ? ORDER BY reservation_date").all(hotel.booking.id)
       .map((row) => ({ reservation_date: row.reservation_date, units: row.units }));
     assert.deepEqual(reservations, [
       { reservation_date: "2026-08-27", units: 2 },
       { reservation_date: "2026-08-28", units: 2 },
     ]);
-    assert.equal(sqlite.prepare("SELECT end_minute - start_minute AS duration FROM bookings WHERE id = ?").get(daycare.booking.id)?.duration, 1440);
-    assert.equal(sqlite.prepare("SELECT reservation_key FROM booking_resource_reservations WHERE booking_id = ? AND resource_id = ?").get(appointment.booking.id, "ari-groomer-pim")?.reservation_key, "interval");
-    assert.deepEqual(sqlite.prepare("PRAGMA foreign_key_check").all(), []);
+    assert.equal(inspect.prepare("SELECT end_minute - start_minute AS duration FROM bookings WHERE id = ?").get(daycare.booking.id)?.duration, 1440);
+    assert.equal(inspect.prepare("SELECT reservation_key FROM booking_resource_reservations WHERE booking_id = ? AND resource_id = ?").get(appointment.booking.id, "ari-groomer-pim")?.reservation_key, "interval");
+    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("edit, resource change, drag, both resize directions, revision conflict, and cancel are authoritative", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const created = await application.createBooking(owner, groomingInput({
@@ -389,7 +334,7 @@ test("edit, resource change, drag, both resize directions, revision conflict, an
     }, metadata("corr-edit-cancel-retry"));
     assert.equal(replay.outcome, "replayed");
 
-    const actions = sqlite.prepare("SELECT action FROM audit_events WHERE target_type = 'booking' AND target_id = ? ORDER BY occurred_at").all(created.booking.id).map((row) => row.action);
+    const actions = inspect.prepare("SELECT action FROM audit_events WHERE target_type = 'booking' AND target_id = ? ORDER BY occurred_at").all(created.booking.id).map((row) => row.action);
     assert.deepEqual(actions, [
       "booking.created",
       "booking.updated",
@@ -399,16 +344,16 @@ test("edit, resource change, drag, both resize directions, revision conflict, an
       "booking.rescheduled",
       "booking.cancelled",
     ]);
-    const audit = JSON.stringify(sqlite.prepare("SELECT before_json, after_json FROM audit_events WHERE target_type = 'booking' AND target_id = ?").all(created.booking.id));
+    const audit = JSON.stringify(inspect.prepare("SELECT before_json, after_json FROM audit_events WHERE target_type = 'booking' AND target_id = ?").all(created.booking.id));
     assert.equal(audit.includes("SENSITIVE BOOKING NOTE"), false);
     assert.equal(audit.includes("SENSITIVE UPDATED NOTE"), false);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("availability returns typed hours, resource, staff, duplicate, and capacity conflicts", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const exact: BookingAvailabilityInput = {
@@ -449,32 +394,32 @@ test("availability returns typed hours, resource, staff, duplicate, and capacity
     assert.deepEqual(availabilityCodes(capacity), ["CAPACITY_CONFLICT"]);
     assert.deepEqual(capacity.conflicts[0]?.dates, ["2026-08-19"]);
 
-    sqlite.prepare("UPDATE booking_resources SET status = 'inactive' WHERE id = 'ari-dryer-1'").run();
+    inspect.prepare("UPDATE booking_resources SET status = 'inactive' WHERE id = 'ari-dryer-1'").run();
     const inactiveResource = await application.checkAvailability(owner, { ...exact, start: "2026-08-20T10:00", end: "2026-08-20T11:30" });
     assert.ok(availabilityCodes(inactiveResource).includes("RESOURCE_UNAVAILABLE"));
-    sqlite.prepare("UPDATE booking_resources SET status = 'active' WHERE id = 'ari-dryer-1'").run();
+    inspect.prepare("UPDATE booking_resources SET status = 'active' WHERE id = 'ari-dryer-1'").run();
 
-    sqlite.prepare("DELETE FROM branch_enabled_modules WHERE business_id = ? AND branch_id = ? AND module = 'hotel'").run(WHISKER, ARI);
+    inspect.prepare("DELETE FROM branch_enabled_modules WHERE business_id = ? AND branch_id = ? AND module = 'hotel'").run(WHISKER, ARI);
     const disabledInput: BookingAvailabilityInput = { ...hotelInput() };
     const disabled = await application.checkAvailability(owner, disabledInput);
     assert.ok(availabilityCodes(disabled).includes("MODULE_DISABLED"));
-    sqlite.prepare("INSERT INTO branch_enabled_modules (business_id, branch_id, module, created_at, created_by_person_id) VALUES (?, ?, 'hotel', ?, ?)").run(WHISKER, ARI, "2026-09-07T00:00:00.000Z", OWNER);
+    inspect.prepare("INSERT INTO branch_enabled_modules (business_id, branch_id, module, created_at, created_by_person_id) VALUES (?, ?, 'hotel', ?, ?)").run(WHISKER, ARI, "2026-09-07T00:00:00.000Z", OWNER);
 
-    sqlite.prepare("UPDATE branch_operating_hours SET closed = 1 WHERE business_id = ? AND branch_id = ? AND weekday = 'thursday'").run(WHISKER, ARI);
+    inspect.prepare("UPDATE branch_operating_hours SET closed = 1 WHERE business_id = ? AND branch_id = ? AND weekday = 'thursday'").run(WHISKER, ARI);
     const closed = await application.checkAvailability(owner, { ...exact, start: "2026-08-20T10:00", end: "2026-08-20T11:30" });
     assert.ok(availabilityCodes(closed).includes("BRANCH_CLOSED"));
-    sqlite.prepare("UPDATE branch_operating_hours SET closed = 0, opens_at = '09:00', closes_at = '20:00' WHERE business_id = ? AND branch_id = ? AND weekday = 'thursday'").run(WHISKER, ARI);
+    inspect.prepare("UPDATE branch_operating_hours SET closed = 0, opens_at = '09:00', closes_at = '20:00' WHERE business_id = ? AND branch_id = ? AND weekday = 'thursday'").run(WHISKER, ARI);
 
-    sqlite.prepare("UPDATE branches SET status = 'inactive' WHERE business_id = ? AND id = ?").run(WHISKER, ARI);
+    inspect.prepare("UPDATE branches SET status = 'inactive' WHERE business_id = ? AND id = ?").run(WHISKER, ARI);
     const inactiveBranch = await application.checkAvailability(owner, { ...exact, start: "2026-08-20T10:00", end: "2026-08-20T11:30" });
     assert.ok(availabilityCodes(inactiveBranch).includes("BRANCH_INACTIVE"));
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("authorization rejects wrong Business, Branch, Customer, Pet, Resource, Booking, and inactive access", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const manager = await actor(application, MANAGER);
@@ -511,12 +456,12 @@ test("authorization rejects wrong Business, Branch, Customer, Pet, Resource, Boo
     }, metadata("corr-staff-booking"));
     assert.equal(staffCreated.outcome, "created");
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("idempotency replays equal creates and rejects reuse with a different payload", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const input = groomingInput({
@@ -530,13 +475,13 @@ test("idempotency replays equal creates and rejects reuse with a different paylo
     assert.equal(replay.outcome, "replayed");
     if (created.outcome !== "created" || replay.outcome !== "replayed") return;
     assert.equal(replay.booking.id, created.booking.id);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM bookings WHERE business_id = ? AND idempotency_key = ?").get(WHISKER, input.idempotencyKey)?.count, 1);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM bookings WHERE business_id = ? AND idempotency_key = ?").get(WHISKER, input.idempotencyKey)?.count, 1);
 
     const reused = await application.createBooking(owner, { ...input, notes: "different request" }, metadata("corr-idempotency-reuse"));
     assert.deepEqual(conflictCodes(reused), ["IDEMPOTENCY_KEY_REUSED"]);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE target_type = 'booking' AND target_id = ? AND action = 'booking.created'").get(created.booking.id)?.count, 1);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE target_type = 'booking' AND target_id = ? AND action = 'booking.created'").get(created.booking.id)?.count, 1);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
@@ -565,7 +510,7 @@ function gatedCreateRepository(delegate: Be3Repository, parties: number): Be3Rep
 }
 
 test("two stale-available competing creates commit one winner and return a deterministic conflict", async () => {
-  const { sqlite, database, bookingRepository } = fixture();
+  const { inspect, database, bookingRepository } = fixture();
   try {
     const gated = gatedCreateRepository(bookingRepository, 2);
     const firstApplication = applicationFor(database, "racea", gated).application;
@@ -590,23 +535,23 @@ test("two stale-available competing creates commit one winner and return a deter
     assert.deepEqual([first.outcome, second.outcome].sort(), ["conflict", "created"]);
     const loser = first.outcome === "conflict" ? first : second;
     assert.ok(conflictCodes(loser).includes("TIME_CONFLICT"));
-    assert.equal(sqlite.prepare(`
+    assert.equal(inspect.prepare(`
       SELECT COUNT(*) AS count FROM bookings
       WHERE business_id = ? AND branch_id = ? AND start_local = ? AND idempotency_key IN (?, ?)
     `).get(WHISKER, ARI, "2026-08-24T10:00", firstInput.idempotencyKey, secondInput.idempotencyKey)?.count, 1);
-    assert.equal(sqlite.prepare(`
+    assert.equal(inspect.prepare(`
       SELECT COUNT(*) AS count FROM booking_write_commits commit_row
       INNER JOIN bookings booking ON booking.business_id = commit_row.business_id AND booking.branch_id = commit_row.branch_id AND booking.id = commit_row.booking_id
       WHERE booking.idempotency_key IN (?, ?)
     `).get(firstInput.idempotencyKey, secondInput.idempotencyKey)?.count, 1);
-    assert.deepEqual(sqlite.prepare("PRAGMA foreign_key_check").all(), []);
+    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
 test("cancellation releases exclusive Resources without deleting planning history", async () => {
-  const { sqlite, application } = fixture();
+  const { inspect, application } = fixture();
   try {
     const owner = await actor(application);
     const first = await application.createBooking(owner, groomingInput({
@@ -632,22 +577,19 @@ test("cancellation releases exclusive Resources without deleting planning histor
       idempotencyKey: "be3-cancel-release-002",
     }), metadata("corr-release-replacement"));
     assert.equal(replacement.outcome, "created");
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM bookings WHERE id = ? AND status = 'cancelled'").get(first.booking.id)?.count, 1);
-    const retained = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM booking_resource_reservations WHERE booking_id = ?").get(first.booking.id)?.count ?? 0);
+    assert.equal(inspect.prepare("SELECT COUNT(*) AS count FROM bookings WHERE id = ? AND status = 'cancelled'").get(first.booking.id)?.count, 1);
+    const retained = Number(inspect.prepare("SELECT COUNT(*) AS count FROM booking_resource_reservations WHERE booking_id = ?").get(first.booking.id)?.count ?? 0);
     assert.ok(retained > 0);
   } finally {
-    sqlite.close();
+    inspect.close();
   }
 });
 
-test("Booking audit metadata is bounded and durable rows survive a database reopen", async () => {
-  // Keep the file-backed durability probe inside the workspace. On Windows,
-  // deleting a freshly closed SQLite file from the system temp directory can
-  // intermittently fail with EPERM while the temp-volume scanner still has a
-  // transient handle. The workspace-local directory remains isolated and is
-  // removed by the parent runner after this SQLite process exits.
+test("Booking audit metadata is bounded and durable rows survive a database reopen", async (t) => {
+  // A stable schema key reopens the same committed PostgreSQL data.
   const directory = mkdtempSync(join(projectRoot, ".be3-test-"));
-  const databasePath = join(directory, "be3.sqlite");
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const databasePath = join(directory, "be3.inspect");
   const first = fixture(databasePath);
   const owner = await actor(first.application);
   const result = await first.application.createBooking(owner, groomingInput({
@@ -659,7 +601,7 @@ test("Booking audit metadata is bounded and durable rows survive a database reop
   assert.equal(result.outcome, "created");
   if (result.outcome !== "created") return;
   const bookingId = result.booking.id;
-  const audit = first.sqlite.prepare(`
+  const audit = first.inspect.prepare(`
     SELECT actor_person_id, actor_membership_id, business_id, branch_id, request_id,
            correlation_id, target_type, target_id, after_json
     FROM audit_events WHERE correlation_id = ?
@@ -671,11 +613,11 @@ test("Booking audit metadata is bounded and durable rows survive a database reop
   assert.equal(audit?.target_id, bookingId);
   assert.ok(String(audit?.after_json).length < 32_000);
   assert.equal(String(audit?.after_json).includes("PRIVATE NOTE"), false);
-  first.sqlite.close();
+  first.inspect.close();
 
-  const reopened = new DatabaseSync(databasePath);
-  reopened.exec("PRAGMA foreign_keys = ON");
-  const database = new NodeD1Database(reopened);
+  const reopened = new TestSql(databasePath);
+  reopened.close();
+  const database = new TestPostgres(reopened);
   const reopenedApplication = applicationFor(database, "reopen").application;
   const durable = await reopenedApplication.getBooking(await actor(reopenedApplication), WHISKER, ARI, bookingId);
   assert.equal(durable.notes, "PRIVATE NOTE THAT MUST NOT BE COPIED TO AUDIT");

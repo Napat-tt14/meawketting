@@ -30,7 +30,7 @@ export interface Be1Repository {
   setBranchActive(before: BranchView, active: boolean, context: AuthorizedMutation): Promise<BranchActivationResult>;
 }
 
-export type D1ResultLike<T = Record<string, unknown>> = {
+export type QueryResult<T = Record<string, unknown>> = {
   success?: boolean;
   results?: T[];
   meta?: {
@@ -38,14 +38,14 @@ export type D1ResultLike<T = Record<string, unknown>> = {
   };
 };
 
-export interface D1PreparedStatementLike {
-  bind(...values: unknown[]): D1PreparedStatementLike;
+export interface PreparedStatement {
+  bind(...values: unknown[]): PreparedStatement;
   first<T = Record<string, unknown>>(columnName?: string): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<D1ResultLike<T>>;
-  run<T = Record<string, unknown>>(): Promise<D1ResultLike<T>>;
+  all<T = Record<string, unknown>>(): Promise<QueryResult<T>>;
+  run<T = Record<string, unknown>>(): Promise<QueryResult<T>>;
 }
 
-export interface D1DatabaseLike {
-  prepare(query: string): D1PreparedStatementLike;
-  batch(statements: D1PreparedStatementLike[]): Promise<D1ResultLike[]>;
+export interface Database {
+  prepare(query: string): PreparedStatement;
+  batch(statements: PreparedStatement[]): Promise<QueryResult[]>;
 }

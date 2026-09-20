@@ -10,7 +10,7 @@ export type NonAuthoritativePassportCompatibility = {
  * DEV PROTOTYPE / NON-AUTHORITATIVE READ MODEL ONLY.
  *
  * These values preserve frozen BF3 Passport/access presentation for seeded
- * Pet IDs. They are not returned by BE2, persisted in D1, or usable as
+ * Pet IDs. They are not returned by BE2, persisted in PostgreSQL, or usable as
  * Guardian, ownership, consent, QR, or access-grant authority.
  */
 const PASSPORT_COMPATIBILITY_BY_PET_ID: Readonly<Record<string, NonAuthoritativePassportCompatibility>> = {

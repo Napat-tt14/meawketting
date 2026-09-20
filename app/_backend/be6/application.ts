@@ -1,17 +1,17 @@
 import type { PersonView } from "../be1/contracts";
 import type { RequestMetadata } from "../be1/metadata";
-import type { Be1Repository, D1PreparedStatementLike } from "../be1/repository";
+import type { Be1Repository, PreparedStatement } from "../be1/repository";
 import { be1Error } from "../be1/errors";
 import { BusinessApplication } from "../shared/application";
 import { deleteGuard, findReceipt } from "../shared/database";
 import { BackendConflict, conflict } from "../shared/errors";
 import { hash, opaqueId } from "../shared/validation";
 import type { Be6Operation, ConversationView, InboxDirectory } from "./contracts";
-import { D1Be6Repository } from "./d1Repository";
+import { PostgresBe6Repository } from "./postgresRepository";
 import { parseBe6Operation } from "./validation";
 
 export class Be6Application extends BusinessApplication {
-  constructor(auth: Be1Repository, private readonly inbox: D1Be6Repository, private readonly clock = () => new Date().toISOString()) { super(auth); }
+  constructor(auth: Be1Repository, private readonly inbox: PostgresBe6Repository, private readonly clock = () => new Date().toISOString()) { super(auth); }
   async executeBe6(actor: PersonView, raw: Be6Operation, metadata: RequestMetadata): Promise<ConversationView | InboxDirectory> {
     return this.executeAttempt(actor, raw, metadata, 0);
   }
@@ -28,7 +28,7 @@ export class Be6Application extends BusinessApplication {
     };
     const previous = await replay(); if (previous) return previous;
     let id: string;
-    const statements: D1PreparedStatementLike[] = [];
+    const statements: PreparedStatement[] = [];
     try {
       if (op.type === "conversation.ensure") {
         const value = await repo.requireContext(op.businessId, op.branchId, op.context), existing = await repo.forCustomer(op.businessId, value.customerId);
@@ -42,8 +42,8 @@ export class Be6Application extends BusinessApplication {
         if (op.type === "conversation.read") {
           // Cursor advances only to messages actually present in each currently readable Branch.
           statements.push(db.prepare(`INSERT INTO conversation_reads(business_id,branch_id,conversation_id,person_id,through_sequence,read_at)
-            SELECT m.business_id,m.branch_id,m.conversation_id,?,max(m.sequence),? FROM messages m WHERE m.business_id=? AND m.conversation_id=? AND m.sequence<=? AND ${repo.visibility("m")} GROUP BY m.branch_id
-            ON CONFLICT(business_id,branch_id,conversation_id,person_id) DO UPDATE SET through_sequence=max(conversation_reads.through_sequence,excluded.through_sequence),read_at=excluded.read_at`)
+            SELECT m.business_id,m.branch_id,m.conversation_id,?,max(m.sequence),? FROM messages m WHERE m.business_id=? AND m.conversation_id=? AND m.sequence<=? AND ${repo.visibility("m")} GROUP BY m.business_id,m.branch_id,m.conversation_id
+            ON CONFLICT(business_id,branch_id,conversation_id,person_id) DO UPDATE SET through_sequence=greatest(conversation_reads.through_sequence,excluded.through_sequence),read_at=excluded.read_at`)
             .bind(actor.id, now, op.businessId, id, op.throughSequence, ...repo.bindings(context)));
         } else if (op.type === "approval.cancel") {
           const m = await repo.message(context, op.branchId, id, op.messageId); if (!m || m.kind !== "add-service-request") throw be1Error("NOT_FOUND");
@@ -51,7 +51,7 @@ export class Be6Application extends BusinessApplication {
           if (m.status !== "waiting") conflict("invalid-transition");
           const guard = opaqueId("approval");
           statements.push(db.prepare("UPDATE message_approvals SET status='cancelled',responded_at=?,revision=revision+1 WHERE business_id=? AND branch_id=? AND message_id=? AND revision=? AND status='waiting'").bind(now, op.businessId, op.branchId, m.id, op.expectedRevision),
-            db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,changes()=1").bind(guard), deleteGuard(db, guard));
+            db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(:previous_row_count::integer=1)::integer").bind(guard), deleteGuard(db, guard));
           statements.push(db.prepare("UPDATE message_outbox SET state='failed',failure_code='request-cancelled',updated_at=? WHERE business_id=? AND branch_id=? AND message_id=? AND state IN ('blocked','queued') AND attempts=0").bind(now, op.businessId, op.branchId, m.id));
         } else {
           if (op.context.customerId !== conversation.customer_id) throw be1Error("NOT_FOUND");

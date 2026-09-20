@@ -1,6 +1,6 @@
 import type { PersonView } from "../be1/contracts";
 import type { RequestMetadata } from "../be1/metadata";
-import type { Be1Repository, D1DatabaseLike } from "../be1/repository";
+import type { Be1Repository, Database } from "../be1/repository";
 import { BusinessApplication } from "../shared/application";
 import { dateInZone } from "../shared/time";
 import type { Be8Operation } from "./contracts";
@@ -10,7 +10,7 @@ import { projectReport } from "./reports";
 import { projectCrm } from "./crm";
 
 export class Be8Application extends BusinessApplication {
-  constructor(repository: Be1Repository, private readonly db: D1DatabaseLike, private readonly clock = () => new Date().toISOString()) { super(repository); }
+  constructor(repository: Be1Repository, private readonly db: Database, private readonly clock = () => new Date().toISOString()) { super(repository); }
   async executeBe8(actor: PersonView, raw: Be8Operation, metadata: RequestMetadata) {
     const op = parseBe8Operation(raw), now = this.clock(), context = await this.scope(actor, op.businessId, op.branchId, metadata, now);
     const all = op.type !== "reports.get" || op.options.branchScope === "all";

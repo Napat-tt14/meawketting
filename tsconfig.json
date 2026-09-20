@@ -26,5 +26,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "workfiledesign"]
+  "exclude": ["node_modules", "workfiledesign", "work", "tmp", "dist"]
 }

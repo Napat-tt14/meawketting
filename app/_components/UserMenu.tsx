@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { IconType } from "react-icons";
 import { ChevronDown, LogOut, UserRound, X } from "./icons";
 
 type UserMenuProps = {
@@ -13,7 +12,7 @@ type UserMenuProps = {
 
 type UserMenuItem = {
   label: string;
-  icon: IconType;
+  icon: typeof UserRound;
   href?: string;
   action?: "logout";
 };

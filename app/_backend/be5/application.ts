@@ -2,21 +2,21 @@ import type { PersonView } from "../be1/contracts";
 import type { RequestMetadata } from "../be1/metadata";
 import type { Be1Repository } from "../be1/repository";
 import { be1Error } from "../be1/errors";
-import { D1Be2Repository } from "../be2/d1Repository";
-import { D1Be3Repository } from "../be3/d1Repository";
+import { PostgresBe2Repository } from "../be2/postgresRepository";
+import { PostgresBe3Repository } from "../be3/postgresRepository";
 import { Be4Application } from "../be4/application";
-import { D1Be4Repository } from "../be4/d1Repository";
+import { PostgresBe4Repository } from "../be4/postgresRepository";
 import { changeExecution } from "../be4/domain";
 import { BusinessApplication } from "../shared/application";
 import { authorizationGuard, batch, deleteGuard, findReceipt } from "../shared/database";
 import { BackendConflict, conflict } from "../shared/errors";
 import { hash, opaqueId } from "../shared/validation";
 import type { Be5Operation, IntakeResult, AccessView } from "./contracts";
-import { D1Be5Repository, type GrantRow } from "./d1Repository";
+import { PostgresBe5Repository, type GrantRow } from "./postgresRepository";
 import { parseBe5Operation } from "./validation";
 
 export class Be5Application extends BusinessApplication {
-  constructor(private readonly auth: Be1Repository, private readonly intakes: D1Be5Repository, private readonly clock = () => new Date().toISOString()) { super(auth); }
+  constructor(private readonly auth: Be1Repository, private readonly intakes: PostgresBe5Repository, private readonly clock = () => new Date().toISOString()) { super(auth); }
   async executeBe5(actor: PersonView, raw: Be5Operation, metadata: RequestMetadata): Promise<IntakeResult | AccessView> {
     const op = parseBe5Operation(raw), now = this.clock(), repo = this.intakes, db = repo.database;
     const context = await this.scope(actor, op.businessId, op.branchId, metadata, now, !["intake.get", "access.scan"].includes(op.type));
@@ -60,7 +60,7 @@ export class Be5Application extends BusinessApplication {
           await repo.write(grant, context, receipt(existing.id), [], false, "intake.resumed");
           return repo.result(existing, grant, now);
         }
-        const operations = new D1Be4Repository(db);
+        const operations = new PostgresBe4Repository(db);
         const execution = op.executionId ? await operations.get(op.businessId, op.branchId, op.executionId) : null;
         if (op.executionId && (!execution || execution.record.petId !== grant.pet_id || ["cancelled", "no-show", "completed", "checked-out"].includes(execution.record.status))) throw be1Error("NOT_FOUND");
         // Only explicit neutral relationships match known Business records. Ambiguous contacts stay unlinked.
@@ -78,7 +78,7 @@ export class Be5Application extends BusinessApplication {
         if (row.checked_in_at) return repo.result(row, grant, now);
         const statements = [], token = opaqueId("intakerevision"); targetId = row.id;
         let executionIdValue = row.execution_id;
-        const operations = new D1Be4Repository(db);
+        const operations = new PostgresBe4Repository(db);
         let executionWrite;
         if (op.type === "intake.receive") {
           if (!executionIdValue && row.customer_id && row.pet_id && context.branch.enabledModules.includes("grooming")) {
@@ -93,9 +93,9 @@ export class Be5Application extends BusinessApplication {
             if (after.record.revision === before.record.revision) { after.record.revision++; after.record.updatedAt = now; }
             after.record.intakeId = row.id;
             after.record.history.push({ id: opaqueId("event"), at: now, type: "intake", summary: "เชื่อมการรับเข้าที่ได้รับอนุญาตแล้ว" } as never);
-            const planning = new D1Be3Repository(db), booking = await planning.getBooking(op.businessId, op.branchId, before.record.bookingId);
+            const planning = new PostgresBe3Repository(db), booking = await planning.getBooking(op.businessId, op.branchId, before.record.bookingId);
             if (!booking || booking.status === "cancelled") conflict("invalid-transition");
-            const application = new Be4Application(this.auth, new D1Be2Repository(db), planning, operations, this.clock);
+            const application = new Be4Application(this.auth, new PostgresBe2Repository(db), planning, operations, this.clock);
             const checkedStaff = await application.validateAssignments(after, booking);
             executionWrite = { before, after, context, receipt: null, checkedStaff, requireActiveSource: true };
           }
@@ -103,7 +103,7 @@ export class Be5Application extends BusinessApplication {
         const fields = op.type === "intake.update" ? [JSON.stringify(op.belongings), op.businessNote, op.taskState, null]
           : [row.belongings_json, row.business_note, op.type === "intake.receive" ? "complete" : row.task_state, op.type === "intake.receive" ? now : null];
         statements.push(db.prepare(`UPDATE business_intakes SET belongings_json=?,business_note=?,task_state=?,checked_in_at=?,execution_id=?,revision=revision+1,updated_at=? WHERE business_id=? AND branch_id=? AND id=? AND revision=?`)
-          .bind(...fields, executionIdValue, now, op.businessId, op.branchId, row.id, row.revision), db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,changes()=1").bind(token));
+          .bind(...fields, executionIdValue, now, op.businessId, op.branchId, row.id, row.revision), db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(:previous_row_count::integer=1)::integer").bind(token));
         if (op.type === "intake.correct") {
           const passport = await repo.passport(grant, now); if (!passport) conflict("intake-required");
           if (op.topic === "passport-reference" && !grant.scope.includes("passportReference")) throw be1Error("FORBIDDEN");

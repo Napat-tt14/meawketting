@@ -10,7 +10,8 @@ import { createServer as createViteServer } from "vite";
 // Local domain fixtures are opt-in for the isolated compatibility test server.
 // The production Worker built by `build` keeps this flag disabled.
 function createServer(config) {
-  return createViteServer({ ...config, define: { ...config.define, "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("test") } });
+  // Immutable SSR fixtures need no watcher; do not crawl native test clusters.
+  return createViteServer({ ...config, server: { ...config.server, watch: null }, define: { ...config.define, "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("test") } });
 }
 
 const appRoot = new URL("../app/", import.meta.url);
@@ -60,16 +61,27 @@ test("production Business routes never render fixture identity, records or fake 
   }
   const login = await htmlFor("/business/login");
   assert.match(login, /href="\/api\/auth\/google\/start\?returnTo=%2Fbusiness%2Fhome"/);
-  assert.match(login, /ใช้บัญชี Google ที่ได้รับอนุญาตสำหรับร้านเท่านั้น/);
+  assert.match(login, /ใช้บัญชีที่เชื่อมกับร้านของคุณ/);
+  assert.match(login, /href="\/api\/auth\/line\/start"/);
+  assert.match(login, /href="\/business\/register"/);
   assert.equal((await render("/__debug")).status, 404);
   // The separate built-Worker API test supplies the Workers binding and checks
   // /api/dev/guardian; importing that API without its binding is not an HTTP test.
 });
 
+test("Business signup is a public branded route with one heading and no fixture authority", async () => {
+  const html = await htmlFor("/business/register");
+  assert.match(html, /เริ่มต้นพื้นที่ทำงาน/);
+  assert.match(html, /business-header--auth/);
+  assert.match(html, /กำลังตรวจสอบการเข้าสู่ระบบ/);
+  assert.doesNotMatch(html, /กำลังโหลดข้อมูลร้าน|Whisker|Paw Partner/);
+  assert.equal(countRenderedElements(html, "h1"), 1);
+});
+
 test("fixture-off selectors ignore poisoned browser records and never invent Business, catalog or customer truth", async () => {
   const previousWindow = globalThis.window;
   const cacheDirectory = await mkdtemp(join(tmpdir(), "meawketting-no-fixtures-"));
-  const server = await createViteServer({ configFile: false, cacheDir: cacheDirectory, server: { middlewareMode: true }, appType: "custom", logLevel: "silent", define: { "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("off") } });
+  const server = await createViteServer({ configFile: false, cacheDir: cacheDirectory, server: { middlewareMode: true, watch: null }, appType: "custom", logLevel: "silent", define: { "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("off") } });
   globalThis.window = { sessionStorage: { getItem: () => JSON.stringify({ activeContextKey: "whisker-ari-frontdesk", customers: { bad: { name: "Injected Customer" } }, bookings: { bad: {} }, charges: { bad: {} }, payments: { bad: {} }, intakes: { bad: {} }, serviceJobs: { bad: {} }, teamMembers: { bad: {} } }) } };
   try {
     const state = await server.ssrLoadModule("/app/_prototype/businessState.ts");
@@ -90,13 +102,13 @@ test("fixture-off selectors ignore poisoned browser records and never invent Bus
 test("production build fails closed for development identity and Guardian test adapters", async () => {
   // Node does not implement the Workers binding module. Supply only that binding;
   // execute the actual production bundle, and fail if it tries to use the database.
-  const binding = `export const env = { MEAWKETTING_AUTH_MODE: "dev-test", DB: { prepare() { throw new Error("Production queried D1 using development identity"); } } };`;
+  const binding = `export const env = { MEAWKETTING_AUTH_MODE: "dev-test", get DATABASE_URL() { throw new Error("Production queried PostgreSQL using development identity"); } };`;
   const bindingUrl = `data:text/javascript,${encodeURIComponent(binding)}`;
   register(`data:text/javascript,${encodeURIComponent(`export async function resolve(specifier, context, next) { return specifier === "cloudflare:workers" ? { url: ${JSON.stringify(bindingUrl)}, shortCircuit: true } : next(specifier, context); }`)}`, import.meta.url);
   const { default: worker } = await import(new URL("../dist/server/index.js?production-auth-check", import.meta.url).href);
   for (const path of ["/api/be1", "/api/be2", "/api/be3", "/api/be4", "/api/be5", "/api/be6", "/api/be7", "/api/be8", "/api/dev/guardian"]) {
     const response = await worker.fetch(new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json", "x-meawketting-dev-person-id": "prs_01k47meawketting000000001" }, body: "{}" }),
-      { MEAWKETTING_AUTH_MODE: "dev-test", DB: { prepare() { throw new Error("Production must reject dev identity before querying D1"); } } }, { waitUntil() {}, passThroughOnException() {} });
+      { MEAWKETTING_AUTH_MODE: "dev-test", get DATABASE_URL() { throw new Error("Production must reject dev identity before querying PostgreSQL"); } }, { waitUntil() {}, passThroughOnException() {} });
     assert.equal(response.status, path === "/api/dev/guardian" ? 404 : 501, path);
   }
 });
@@ -324,8 +336,8 @@ test("keeps committed clay landing assets explicit and independent from legacy p
     "business-banner-care-lounge.png",
     "business-banner-grooming.png",
     "business-banner-hotel.png",
+    "business-register-welcome.png",
     "pet-business-hero-photo.png",
-    "pet-business-hero-wide.png",
     "pet-business-services-photo.png",
     "pet-business-workflow-photo.png",
   ]);
@@ -2455,7 +2467,7 @@ test("keeps durable Customer/Pet truth and non-authoritative Passport compatibil
   assert.match(durableClient, /BE2_API_PATH/);
   assert.match(durableCache, /readBe2CustomerByStableId/);
   assert.match(passportCompatibility, /DEV PROTOTYPE \/ NON-AUTHORITATIVE READ MODEL ONLY/);
-  assert.match(passportCompatibility, /not returned by BE2, persisted in D1/);
+  assert.match(passportCompatibility, /not returned by BE2, persisted in PostgreSQL/);
   assert.match(state, /findKnownBusinessCustomerPetByPassportSlug/);
   assert.match(state, /unknown QR never creates a permanent Customer relationship/);
   assert.match(editor, /อาจมีลูกค้ารายนี้อยู่แล้ว/);
@@ -3348,7 +3360,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(validation, /34 `page\.tsx` route entries/);
   assert.match(html, /Production Ready:.*NO/);
   assert.doesNotMatch(html, /Daycare operations ยังไม่เริ่ม|Daycare has no operations route|Stop after BF-9|32 route entries/);
-  assert.match(validation, /Cloudflare Worker\/Vinext \+ D1 is the BE1–BE8 local architecture/);
+  assert.match(validation, /Cloudflare Worker\/Vinext \+ Supabase PostgreSQL is the BE1–BE8 local architecture/);
   assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
   assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
   assert.match(decisions, /Cloudflare replaces Vercel as the target production platform direction/);
@@ -3904,7 +3916,7 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("_components/icons.tsx", appRoot), "utf8"),
     readFile(new URL("_components/BrandMark.tsx", appRoot), "utf8"),
-    readFile(new URL("../public/catpaw.svg", import.meta.url), "utf8"),
+    readFile(new URL("../docs/assets/archived/catpaw.svg", import.meta.url), "utf8"),
     readFile(new URL("../public/catpaw-pattern.svg", import.meta.url), "utf8"),
     readFile(new URL("_components/business-landing/GuardianEntrySection.tsx", appRoot), "utf8"),
     readFile(new URL("_components/HomePetPreview.tsx", appRoot), "utf8"),

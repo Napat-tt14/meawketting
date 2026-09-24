@@ -1,5 +1,11 @@
 # Module Map
 
+## Guardian foundation checkpoint — 2026-09-22
+
+Guardian is a separate minimal product surface, not a Business module or reuse of the Business dashboard. Reuse BE1 Person, BE2 shared Pet anchor, BE5 authority/Passport/consent/access and external identity schema; BE4 Service Records require a safe Guardian projection before disclosure. No CareProof module. See [MVP and domain map](./GUARDIAN_LINE_MINIAPP.md).
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Status: **CANONICAL CAPABILITY OWNERSHIP (BUSINESS-FIRST REBASE)**  
 Owner: Product Architecture
 
@@ -11,8 +17,8 @@ A Module is a capability and outcome, not a route family, Page ID or separate da
 |---|---|
 | **CURRENT** | Standalone Consumer web prototype remains implemented and retained/frozen. |
 | **TARGET** | Guardian layer planned for a minimal, mobile-first LINE Mini App. |
-| **PAUSED** | Consumer development and independent Guardian expansion. |
-| **NOT IMPLEMENTED** | LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking. |
+| **PAUSED** | Standalone Consumer expansion. Guardian Mini App is PLANNED with a documented foundation. |
+| **NOT IMPLEMENTED** | Guardian LINE login, Mini App runtime, notifications and production Guardian identity linking. Business LINE OAuth entry code exists; real configuration remains external. |
 
 ## Product priority
 
@@ -38,10 +44,10 @@ Normal Business runtime hydrates these domains through typed server clients. `ME
 
 | Area | Outcome | Current state |
 |---|---|---|
-| LINE-first Guardian channel | Lightweight entry through Meawketting LINE, LINE Login, and a LINE Mini App | FUTURE / PAUSED / NOT IMPLEMENTED |
+| LINE-first Guardian channel | Lightweight entry through Meawketting LINE, LINE Login, and a LINE Mini App | PLANNED / NOT IMPLEMENTED |
 | Consumer web prototype | Existing standalone Create Passport, My Pets, Activity, Pet Detail, Safety/Lost, and Sharing surfaces | CURRENT WEB PROTOTYPE / FROZEN |
 | Business Landing (`/`) | Commercial product showcase, multi-service overview, trust advantage, login CTA | LIVE LOCAL PROTOTYPE |
-| Business Login (`/business/login`) | Google prototype auth for business staff and managers | LIVE LOCAL PROTOTYPE |
+| Business Login (`/business/login`) | Supabase Google/LINE auth entry for Business users | IMPLEMENTED code; real provider configuration external; not Guardian login |
 | Business Redirect (`/business`) | Compatibility redirect to `/` | LIVE LOCAL PROTOTYPE |
 | Passport / My Pets | Create, preview/export, list Pets and open Passport-first detail | CURRENT WEB PROTOTYPE / FROZEN |
 | Quick Passport QR | Five-minute Passport-safe sharing from Pet Detail | CURRENT WEB PROTOTYPE / FROZEN |

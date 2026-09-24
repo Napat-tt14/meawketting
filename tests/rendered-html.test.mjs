@@ -343,6 +343,7 @@ test("keeps committed clay landing assets explicit and independent from legacy p
     "business-banner-care-lounge.png",
     "business-banner-grooming.png",
     "business-banner-hotel.png",
+    "business-login-welcome.png",
     "business-register-welcome.png",
     "pet-business-hero-photo.png",
     "pet-business-services-photo.png",

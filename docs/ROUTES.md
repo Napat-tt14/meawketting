@@ -1,12 +1,18 @@
 # Routes
 
+## Guardian foundation checkpoint — 2026-09-22
+
+No Guardian route is registered. Proposed `/guardian`, `/guardian/pets`, `/guardian/pets/[petId]`, its `/passport` and `/share` children, `/guardian/access`, `/guardian/account` and conditional `/history` are **PLANNED** only. See [route/API map](./GUARDIAN_LINE_MINIAPP.md#12-initial-route-map). `/api/auth/line/start` is implemented Business login entry code with external provider setup; `/api/dev/guardian` stays development/test-only.
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Status: **CURRENT REPOSITORY AUDIT (BE1–BE8 / BUSINESS-FIRST REBASE)**
 Audit date: 2026-09-09
 Owner: Product Architecture / Front-end
 
 This file owns URLs and navigation destinations only. Wizard steps, tabs, task states, boards, modals and reusable errors are not routes by default.
 
-2026-09-20 addition: `/business/register` is the public Google/LINE Business signup page. `/api/business/register` handles server-verified onboarding; `/api/auth/line/start` starts Supabase LINE OAuth. Both providers share `/api/auth/google/callback`. See [registration](./BUSINESS_REGISTRATION.md). Guardian LINE access remains paused.
+2026-09-20 addition: `/business/register` is the public Google/LINE Business signup page. `/api/business/register` handles server-verified onboarding; `/api/auth/line/start` starts Supabase LINE OAuth. Both providers share `/api/auth/google/callback`. See [registration](./BUSINESS_REGISTRATION.md). Guardian LINE access is PLANNED, not implemented.
 
 ## Consumer / Guardian route status
 
@@ -15,7 +21,7 @@ This file owns URLs and navigation destinations only. Wizard steps, tabs, task s
 | **CURRENT** | Consumer routes below are standalone web prototype routes retained in the repository. |
 | **TARGET** | Guardian access is intended to move to a LINE Mini App. |
 | **PAUSED** | Consumer development; the current web prototype is frozen. |
-| **NOT IMPLEMENTED** | LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking. |
+| **NOT IMPLEMENTED** | Guardian LINE login, Mini App runtime, notifications and production Guardian identity linking. Business LINE OAuth entry code exists; real configuration remains external. |
 
 No LINE Mini App route is created in this audit. The future LINE channel is an entry/authentication decision, not a reason to invent web paths.
 
@@ -31,7 +37,7 @@ Service Record is shared domain data created by Grooming completion or Hotel/Day
 
 Team & Staff Operations is a local shared operational route. Its Owner/Manager/Staff labels do not create authentication, authorization or a permission matrix.
 
-BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch configuration. BE2 exposes typed same-origin `POST /api/be2` for Customer/Pet queries and commands. BE3 exposes typed same-origin `POST /api/be3` for Booking/Calendar/planning Resource queries and commands. BE4 exposes `POST /api/be4` for Grooming/Hotel/Daycare execution and Service Records; BE5 exposes `POST /api/be5` for Passport authority, Consent, access grants and Intake; BE6 exposes `POST /api/be6` for Conversations, Messages and outbox operations; BE7 exposes `POST /api/be7` for Charges, Payments, allocations, refunds and reconciliation; BE8 exposes `POST /api/be8` for read-only Reports/CRM snapshots. These server endpoints are not counted as `page.tsx` UI routes and expose no PostgreSQL binding to the browser. `POST /api/channels/line/[channelId]` is a provider-neutral, signature-checked webhook boundary for a Business-owned LINE OA; no production credentials are configured.
+BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch configuration. BE2 exposes typed same-origin `POST /api/be2` for Customer/Pet queries and commands. BE3 exposes typed same-origin `POST /api/be3` for Booking/Calendar/planning Resource queries and commands. BE4 exposes `POST /api/be4` for Grooming/Hotel/Daycare execution and Service Records; BE5 exposes `POST /api/be5` for Business-authorized scan and Intake; Guardian grant issue/decide are separate BE5 service methods, currently reached only by the development/test Guardian adapter; BE6 exposes `POST /api/be6` for Conversations, Messages and outbox operations; BE7 exposes `POST /api/be7` for Charges, Payments, allocations, refunds and reconciliation; BE8 exposes `POST /api/be8` for read-only Reports/CRM snapshots. These server endpoints are not counted as `page.tsx` UI routes and expose no PostgreSQL binding to the browser. `POST /api/channels/line/[channelId]` is a provider-neutral, signature-checked webhook boundary for a Business-owned LINE OA; no production credentials are configured.
 
 ## Active live local routes — current repository count
 
@@ -40,7 +46,8 @@ BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch confi
 | `/` | **Business-first Landing (Canonical Commercial Homepage)** | LIVE LOCAL; primary CTA `/business/login`; owner entry secondary |
 | `/privacy` | Thai privacy notice with summary and section navigation | LOCAL DRAFT added 2026-09-17; noindex until operator/contact, retention and provider details are confirmed |
 | `/terms` | Thai platform terms with summary and section navigation | LOCAL DRAFT added 2026-09-17; no effective date or implied acceptance; linked from the landing footer |
-| `/business/login` | Business Login with Supabase Google Auth | IMPLEMENTED; real provider configuration required |
+| `/business/login` | Business Login with Supabase Google/LINE entry | IMPLEMENTED code; real provider configuration required |
+| `/business/register` | Explicit first-store registration after verified Google/LINE identity | IMPLEMENTED code; no Guardian authority created; external provider configuration required |
 | `/business/home` | Branch-aware Business Home with square three-image carousel, arrow/click navigation, touch swipe and operational overview | LIVE FROZEN HYBRID; next-work/Booking summaries use BE3 truth and execution/attention/finance hydrate from BE4/BE7/BE8 PostgreSQL projections |
 | `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, server-backed move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE FROZEN UI / BE3 PostgreSQL TRUTH; range/create/edit/reschedule/Resource/cancel use typed backend operations and server conflict recovery |
 | `/business/grooming` | Capability-aware Grooming Today execution board for linked Pet-specific Service Jobs; aligned status cards, pointer-following reversible drag or swipe, no date/job filter rail, and mobile grouped status-list/detail alternative | LIVE FROZEN UI / BE4 PostgreSQL only when the active Branch enables Grooming; Calendar remains Booking planning, not execution |
@@ -51,7 +58,7 @@ BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch confi
 | `/business/reports` | Single-page read-only Reports & Business Insights over shared records; date range presets (วันนี้, 7 วัน, 30 วัน, กำหนดเอง), current vs all-Branches scope, payment-derived revenue, all three service modules, Hotel occupancy, Daycare attendance/capacity and operational/customer metrics | LIVE FROZEN UI / BE8 READ-ONLY PostgreSQL; no separate report/CRM store, accounting, tax, forecasting or AI analytics |
 | `/business/team` | Branch-aware Team directory with shared display identity, multi-Branch assignment, Grooming/Hotel care/Daycare/Front desk capabilities, active/inactive and lightweight availability/workload context | LIVE FROZEN UI / BE4 PostgreSQL; BE3 keeps only its minimal durable planning Resource projection with an opaque display link. Authentication uses Supabase; no payroll/HR, certification or full workforce scheduling |
 | `/business/customers` | Search durable Business-level Customers/Pets through BE2 and derive CRM lifecycle, service and follow-up segments from existing shared operational records | LIVE FROZEN UI / BE2 PostgreSQL TRUTH; no separate CRM route or persisted score; Passport/access badges are non-authoritative compatibility only |
-| `/business/customers/[customerId]` | Durable Customer/Pet detail and notes/tags, BE3 upcoming Booking projection, BE4/BE7 service and financial history, BE8 last-visit/repeat-use CRM projection and unified Booking/service/payment/message timeline | LIVE FROZEN UI / BE2 + BE3 + BE4/BE7/BE8 PostgreSQL; next actions are staff-triggered, not campaigns or automation; Guardian/Passport authority not implemented |
+| `/business/customers/[customerId]` | Durable Customer/Pet detail and notes/tags, BE3 upcoming Booking projection, BE4/BE7 service and financial history, BE8 last-visit/repeat-use CRM projection and unified Booking/service/payment/message timeline | LIVE FROZEN UI / BE2 + BE3 + BE4/BE7/BE8 PostgreSQL; next actions are staff-triggered, not campaigns or automation; no Guardian authority inferred here; BE5 authority is separate |
 | `/business/inbox` | Business-wide Customer conversations with readable split/mobile layouts, compact search/filters, Pet/Booking context, durable unread/read state, send/quick replies, structured add-service approval and optional staff-triggered billing text | LIVE FROZEN UI / BE6 PostgreSQL; `?conversation=`, `?customerId=`, `?petId=`, and `?bookingId=` provide recovery/context; provider delivery and real LINE transport remain external |
 | `/business/scan` | Temporary Business QR scan/manual validation; optional explicit `hotelStayId` or `daycareAttendanceId` target | LIVE FROZEN UI / BE5 PostgreSQL; dev/test identity only; a target never bypasses Business/Branch/Customer/Pet consent validation |
 | `/business/intake/[intakeId]` | Allowed data, Intake, consent review, guarded execution handoff/check-in | LIVE FROZEN UI / BE5 PostgreSQL; same shared engine for all eligible service targets; real Supabase Auth configuration remains external |
@@ -91,7 +98,7 @@ The target is a LINE-first Guardian experience. Service Records are currently Bu
 Add Meawketting LINE → LINE Login → open LINE Mini App → My Pets → Add Pet → Pet Passport
 ```
 
-This is conceptual and **NOT IMPLEMENTED**. Do not add `/line/*`, Mini App paths, or replacement Consumer routes until a future Consumer phase defines the production channel and identity-linking architecture.
+The Guardian handoff defines PLANNED route/API boundaries. No Mini App route or replacement Consumer route is registered; implementation and provider integration remain future work.
 
 ## Planned route concepts (Next milestones)
 

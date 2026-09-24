@@ -1,5 +1,11 @@
 # Roadmap
 
+## Guardian foundation checkpoint — 2026-09-22
+
+Current order is **Business → production readiness/pilot → Guardian LINE Mini App → broader standalone Consumer expansion (PAUSED)**. Guardian Product/architecture foundation is complete; feature implementation does not start automatically. Its next single phase is identity/session boundaries with explicit Person mapping and failure tests, without Pet authority provisioning. See [Guardian handoff](./GUARDIAN_LINE_MINIAPP.md); Add Pet/history remain policy-gated.
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Current backend checkpoint: [Supabase migration](./SUPABASE_MIGRATION_REPORT.md). Earlier infrastructure/auth sequencing is superseded; frozen Product scope is unchanged.
 
 Status: **CANONICAL OUTCOME ROADMAP (BUSINESS-FIRST REBASE)**  
@@ -29,8 +35,8 @@ Consumer remains PAUSED. Supabase Auth and private Storage code are implemented;
 |---|---|---|
 | **CURRENT** | Consumer web prototype | Existing standalone Consumer routes remain in the repository and are retained/frozen. |
 | **TARGET** | LINE Mini App | LINE-first Guardian channel: LINE → Login → My Pets → Add Pet → Pet Passport. |
-| **PAUSED** | Consumer development | No independent Guardian expansion is authorized in the current Business-first stage. |
-| **NOT IMPLEMENTED** | LINE Login / LINE Mini App / LINE notifications / production Guardian identity linking | Future architecture and integration work only. |
+| **PAUSED** | Standalone Consumer expansion | Existing standalone prototype stays frozen; Guardian foundation is separately PLANNED. |
+| **NOT IMPLEMENTED** | Guardian LINE login / Mini App / notifications / production Guardian linking | Business LINE OAuth entry code exists; real provider configuration is external. |
 
 ## Completed local prototype foundations
 
@@ -56,9 +62,9 @@ Consumer remains PAUSED. Supabase Auth and private Storage code are implemented;
 
 - **Meawketting Business is the main product and primary commercial experience.** Feature development prioritizes business operational capabilities that drive commercial revenue and business customer value.
 - **Consumer development is PAUSED.** The current Consumer web prototype remains retained, frozen, and regression-tested; independent Guardian expansion is frozen.
-- **LINE-first Guardian experience is the future target.** The LINE Mini App is a future / paused Guardian touchpoint, not the next implementation phase and not a reason to change current Business priority.
+- **LINE-first Guardian experience is the future target.** The LINE Mini App is PLANNED with a documentation/type foundation; Business production readiness/pilot stays ahead of implementation.
 
-### Future Guardian touchpoint direction (P2 / P3 — Paused)
+### Guardian touchpoint direction (PLANNED; standalone expansion PAUSED)
 
 The conceptual future flow is:
 
@@ -94,7 +100,7 @@ The completed local foundations and future candidate milestones are:
 14. **BE2 Customer / Pet backend** — **IMPLEMENTED LOCALLY**: Business-wide Customer and Business-local Pet profile/contact relationship truth, notes/tags/lifecycle, server name/phone/Pet search, warning-only duplicates, stable-ID compatibility for local domains, tenant enforcement and privacy-bounded audit. Guardian/Passport/Consent are not included.
 15. **BE3 Booking / Calendar / resources backend** — **IMPLEMENTED LOCALLY**: durable planning aggregates and minimal schedulable Resources use BE1 authorization and BE2 identities; Calendar/Home/Customer projections use BE3 truth, and PostgreSQL write-time guards protect capacity/exclusive conflicts. BE4 consumes these records for execution.
 16. **BE4–BE8 backend completion** — **VALIDATED LOCALLY / PROVIDER-NEUTRAL WHERE REQUIRED**: Service Operations, Consent/Intake, Inbox/outbox, financial model and read-only Reports/CRM are implemented with PostgreSQL migrations through `202609180003_event_order.sql`. Populated end-to-end coverage and security/concurrency/idempotency tests are recorded in VALIDATION. Production provider credentials remain external dependencies.
-17. **Guardian touchpoints required by Business workflows (P2)** — **FUTURE / PAUSED**: Introduce only when an approved Business workflow requires a Guardian-side action. Target channel is the LINE Mini App; scope and sequencing require a separate Consumer phase decision.
+17. **Guardian touchpoints required by Business workflows (P2)** — **PLANNED / FOUNDATION READY**: minimal scope and boundaries are documented. Implementation follows Business production readiness/pilot; authority/visibility decisions remain gates.
 18. **Independent Guardian expansion (P3)** — **PAUSED**: No standalone Consumer expansion or LINE feature build starts automatically.
 
 ## Strict Boundary

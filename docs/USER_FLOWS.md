@@ -1,5 +1,11 @@
 # User Flows
 
+## Guardian foundation checkpoint — 2026-09-22
+
+Canonical planned Guardian flows A–F (first entry, Add Pet, QR/consent/revoke, conditional history, unlinked identity, revoked authority) and failure recovery are in the [Guardian handoff](./GUARDIAN_LINE_MINIAPP.md#17-mvp-user-flows). They supersede the earlier broad future-Consumer flow below. Business chat continues through each Business's own OA; central Guardian login does not authorize Pet access.
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Status: **CANONICAL GOAL-ORIENTED FLOWS (BE1–BE8 / BUSINESS-FIRST REBASE)**
 Owner: UX Architecture
 
@@ -12,7 +18,7 @@ A flow defines goal, decision, privacy boundary and recovery. It does not prescr
 - **Primary Commercial Experience**: Business Landing (`/`) → Business Login (`/business/login`) → Business Home (`/business/home`) → Shared Calendar & Bookings (`/business/calendar`) → Grooming Operations (`/business/grooming`, when enabled) or Hotel/Daycare Operations (`/business/hotel`, `/business/daycare`, when enabled) → Billing / Payments / Revenue (`/business/billing`) → Reports (`/business/reports`) → Team & Staff Operations (`/business/team`) → Business/Branch Settings (`/business/settings`) → Customers & Pets/derived CRM (`/business/customers`) → Inbox (`/business/inbox`) → Shared Scanner & Intake (`/business/scan`).
 - **Compatibility Redirect**: `/business` immediately redirects to `/`.
 - **Consumer web prototype (CURRENT / FROZEN)**: Pet owners can access `/my-pets`, `/create-passport`, `/activity`, `/passports`, and `/qr-preview`. These routes remain retained and regression-tested, but the standalone web experience is no longer the target final Guardian channel.
-- **Guardian target (FUTURE / PAUSED)**: LINE-first experience through a LINE Mini App. LINE Login, the Mini App, LINE notifications, and production identity linking are not implemented.
+- **Guardian target (PLANNED / NOT IMPLEMENTED)**: LINE-first experience through a LINE Mini App. LINE Login, the Mini App, LINE notifications, and production identity linking are not implemented.
 - **Priority order**: P0 Business Product → P1 Business workflows → P2 Guardian touchpoints required by Business workflows → P3 independent Guardian expansion.
 
 ### Backend flow boundaries (BE1–BE8)
@@ -220,7 +226,7 @@ Every protected transition resolves Person → active Membership → Business �
 | Temporary Business Sharing | Select Business/Branch → scope → duration → consent → QR → gateway/decision → revoke/history | No Pet value before valid context and active consent |
 | Returned Service History | History list → stable record → evidence/document/correction request | **PLANNED**; internal Business data and unshared evidence excluded |
 
-## Future LINE-first Guardian flow (Conceptual / Paused / Not implemented)
+## Future LINE-first Guardian flow (PLANNED / NOT IMPLEMENTED)
 
 ```text
 Add Meawketting LINE
@@ -242,5 +248,5 @@ The previous four-item standalone Consumer shell is **CURRENT WEB PROTOTYPE / SU
 ```
 - Keep this composition truthful for the retained web prototype only. Do not treat it as final LINE Mini App navigation.
 - `สร้าง Passport` is a contextual action inside My Pets (`/create-passport`) in the current prototype, not a primary navigation bar item.
-- Do not design detailed LINE Mini App navigation in this documentation correction; decide it in the future Consumer LINE Mini App phase.
+- Use the Guardian handoff's provisional minimal IA; exact navigation remains for implementation.
 - Signed-in consumer user menu handles session and account identity only; it never exposes internal business operations.

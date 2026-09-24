@@ -15,8 +15,8 @@ export function BusinessLoginScreen() {
         <div className="business-login__scene">
           <Image
             className="business-login__art"
-            src="/images/business/business-auth-welcome.png"
-            alt="ภาพประกอบเจ้าของร้านยิ้มต้อนรับพร้อมแมวและสุนัขที่เคาน์เตอร์ร้านดูแลสัตว์เลี้ยง"
+            src="/images/business/business-login-welcome.png"
+            alt="ภาพประกอบเจ้าของร้านดูแลสัตว์เลี้ยงถือแท็บเล็ตและเช็กลิสต์ พร้อมแมวในกระเป๋าเดินทางและสุนัขนั่งข้างกัน"
             width={1536}
             height={1024}
             sizes="(max-width: 767px) 92vw, 55vw"

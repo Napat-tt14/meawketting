@@ -1,5 +1,11 @@
 # Backend Readiness — Supabase migration
 
+## Guardian foundation — 2026-09-22
+
+**IMPLEMENTED:** BE1–BE8 PostgreSQL/Supabase and BE5 authority/Passport/consent/grants/Intake. **PLANNED:** Guardian Mini App with type-only `app/_backend/guardian/contracts.ts`. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** Guardian identity/onboarding/session/APIs/deployment. **PRODUCT DECISION REQUIRED:** authority establishment and disclosure. **EXTERNAL DEPENDENCY:** real LINE/Supabase/Cloudflare setup. See [Guardian handoff](./GUARDIAN_LINE_MINIAPP.md).
+
+Reuse BE5 `GuardianGrantService.issue/decide`: production mode requires active primary authority and active Person, Branch scope, three Passport categories and 120/480/1440-minute durations. External identity tables exist; Guardian provisioning and safe Pet/Intake/history/media projections do not. No persistence, repository or schema is added by the scaffold.
+
 Status: IMPLEMENTED / TESTED LOCALLY / EXTERNAL CONFIG REQUIRED / NOT YET DEPLOYED.
 
 Cloudflare Worker/Vinext → API → Application/Domain → Repository → Supabase PostgreSQL is the only active Business persistence architecture. Supabase Auth supplies identity; Meawketting supplies authorization. Supabase Storage supplies private media. See [setup runbook](./PRODUCTION_RUNBOOK.md) and [validation](./VALIDATION.md).

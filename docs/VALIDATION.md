@@ -1,5 +1,24 @@
 # Validation
 
+## Guardian foundation checkpoint — 2026-09-22
+
+Documentation and one type-only Guardian contract file changed. Business/Consumer runtime, schema, tests and workfiledesign were not changed. Initial working tree was clean. Status vocabulary and implementation gaps are in [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
+| Check | Current result |
+|---|---|
+| npm run lint | PASS |
+| npx tsc --noEmit --pretty false --incremental false | PASS |
+| npm run typecheck:be5 / typecheck:production | PASS / PASS; includes Guardian contracts |
+| npm run build | PASS after permission retry for Vite temporary-file writes; existing runtime deprecation/classification notices remain |
+| npm run test:frontend | **93/94 PASS, 1 FAIL**: existing Business signup headline expectation at tests/rendered-html.test.mjs:74 |
+| npm run test:backend | **84/84 PASS**, exit 0; Windows isolated-cluster teardown required permission to complete its normal process termination |
+| npm run test:production | **7/7 PASS** |
+| git diff --check | PASS |
+
+The frontend test expects `เริ่มต้นพื้นที่ทำงาน`; committed BusinessRegisterScreen.tsx renders `เริ่มต้นร้านในฝัน`. Both mismatch sides were verified in HEAD and neither was edited. No test was weakened and Business UI was not changed to satisfy it. Therefore this checkpoint does **not** claim a fully green suite; earlier passing counts below are dated historical evidence.
+
+No real LINE/Supabase integration, browser/device Mini App QA, deployment or API smoke rerun in this foundation task. There are 36 current page.tsx entries and no new Guardian route. The only code addition is erased TypeScript interfaces/types, so no runtime feature is presented as working.
+
 Supabase migration checkpoint — verified 2026-09-20. NOT PRODUCTION READY.
 
 Cloudflare Worker/Vinext + Supabase PostgreSQL is the BE1–BE8 local architecture. Authentication is Supabase Auth; authorization is the Meawketting backend. Supabase Storage is private media.

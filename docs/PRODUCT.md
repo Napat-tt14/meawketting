@@ -1,5 +1,11 @@
 # Product
 
+## Guardian foundation checkpoint — 2026-09-22
+
+Priority: **Business → production readiness/pilot → Guardian LINE Mini App → standalone Consumer expansion (PAUSED)**. The Guardian MVP is LINE entry/Person linking, My Pets, Add Dog/Cat subject to authority policy, profile/Passport, Temporary Business QR, consent/revoke and safe Intake status. Service History is conditional on an approved safe projection. No social/marketplace/loyalty/chat super-app. See the [canonical Guardian definition](./GUARDIAN_LINE_MINIAPP.md).
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Status: **CANONICAL PRODUCT DIRECTION (BUSINESS-FIRST REBASE)**  
 Owner: Product
 
@@ -18,8 +24,8 @@ Meawketting is a **Pet Business Operating Platform with Pet Passport & Guardian 
 |---|---|
 | **CURRENT** | Standalone Consumer web prototype remains in the repository and is retained/frozen. |
 | **TARGET** | LINE-first Guardian experience through a LINE Mini App: LINE → Login → My Pets → Add Pet → Pet Profile / Pet Passport. |
-| **PAUSED** | Consumer development and independent Guardian expansion. |
-| **NOT IMPLEMENTED** | LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking. |
+| **PAUSED** | Standalone Consumer expansion. Guardian Mini App is PLANNED with a documented foundation. |
+| **NOT IMPLEMENTED** | Guardian LINE login, Mini App runtime, notifications and production Guardian identity linking. Business LINE OAuth entry code exists; real configuration remains external. |
 
 The LINE flow is a future product direction, not an implemented integration. A standalone Consumer website is retained for current prototype continuity but is not the primary future Guardian journey.
 
@@ -48,7 +54,7 @@ One Person may hold several roles and Business memberships. Consumer and Busines
 - **Product honesty**: Business Home, Calendar, Customers & Pets, Inbox, Scan / Intake, Branch-aware shell, Billing / Payments / Revenue, Reports, the shared Service Record foundation, and the lightweight Team & Staff Operations foundation retain their frozen UI. BE1–BE8 now provide local server authorization and durable Business/Branch, Customer/Pet, Booking/planning Resource, execution, Consent/Intake, Inbox and financial truth, with Reports/CRM as read-only queries. There is no standalone CareProof module/menu/page or handover workflow. Real Supabase Auth configuration, granular operational permissions, real messaging/delivery, payment processing, full accounting, full workforce scheduling, payroll/HR, production Guardian/Passport authority, Guardian LINE visibility, live Supabase Storage configuration, and production service-record delivery remain future work.
 - **`/business` Route**: Compatibility redirect to root homepage (`/`).
 - **Business App Frame**: Dedicated workspace frame with Warm White / Pastel Yellow operational visual system, branch switcher, and capability-aware navigation.
-- **Consumer Navigation**: **CURRENT WEB PROTOTYPE / SUPERSEDED AS FINAL CONSUMER DIRECTION**. The preserved web prototype uses `/my-pets`, `/activity`, `/create-passport`, `/passports`, and `/qr-preview`; it remains isolated from internal Business operations. The final LINE Mini App navigation is intentionally undecided until the future Consumer phase.
+- **Consumer Navigation**: **CURRENT WEB PROTOTYPE / SUPERSEDED AS FINAL CONSUMER DIRECTION**. The preserved web prototype uses `/my-pets`, `/activity`, `/create-passport`, `/passports`, and `/qr-preview`; it remains isolated from internal Business operations. The Guardian handoff defines provisional minimal navigation; exact composition remains for implementation.
 
 ## Hybrid Business model
 
@@ -115,7 +121,7 @@ Create Passport → preview value → claim → manage Pet
 → retain the current Passport/consent boundary; no Guardian-facing Service Record delivery is implemented in this web prototype
 ```
 
-### Guardian loop (Target / Future / Paused)
+### Guardian loop (PLANNED / NOT IMPLEMENTED)
 
 ```text
 Add Meawketting LINE
@@ -156,7 +162,7 @@ The three contracts never inherit each other's permissions.
 
 **BE3 Booking/Calendar checkpoint (2026-09-07; historical planning boundary):** Appointment, one logical checkout-exclusive Hotel date range and day-based Booking planning are durable through the same BE1/BE2 membership-scoped PostgreSQL architecture. Bookings reference canonical Customer/Pet identities, preserve multi-Pet links and use a minimal Branch planning Resource catalogue. Server writes revalidate Branch/module/hours/availability, return typed conflicts, protect interval/capacity races, replay equivalent create retries and reject stale revisions. Calendar, Home and Customer upcoming Booking projections use this truth. BE4 now owns separate PostgreSQL Grooming Job, Hotel Stay and Daycare Attendance execution; BE5–BE8 add Consent/Intake, Inbox, financial and read-only Reports/CRM records.
 
-**BE2 Customer/Pet checkpoint (2026-09-07, retained boundary):** Business Customer, identity-only Pet anchor, Business-local Pet profile/contact relationship, notes/tags/lifecycle and name/phone/Pet search are durable through the BE1 membership-scoped PostgreSQL architecture. Duplicate handling warns and never merges automatically. Customer is not Guardian; the relationship is not ownership; seeded Passport/access presentation is non-authoritative compatibility only. Its original Booking exclusion is superseded by BE3; Guardian/Passport/Consent and later domains remain unimplemented.
+**BE2 Customer/Pet checkpoint (2026-09-07, retained boundary):** Business Customer, identity-only Pet anchor, Business-local Pet profile/contact relationship, notes/tags/lifecycle and name/phone/Pet search are durable through the BE1 membership-scoped PostgreSQL architecture. Duplicate handling warns and never merges automatically. Customer is not Guardian; the relationship is not ownership; seeded Passport/access presentation is non-authoritative compatibility only. Its original Booking exclusion is superseded by BE3; BE5 implements durable authority/Passport/Consent foundations. Production Guardian identity and authority provisioning remain unimplemented.
 
 **Current BF10–BF12 checkpoint (2026-09-04):** Business/Branch Settings, Daycare Operations and derived Customer CRM/retention are implemented locally. This is an implementation checkpoint, not a claim of final integrated validation or production readiness.
 

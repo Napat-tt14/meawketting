@@ -1,5 +1,11 @@
 # Decisions and Open Questions
 
+## Guardian foundation checkpoint — 2026-09-22
+
+**DECIDED:** authorize documentation and type-only Guardian boundaries; retain Business-first sequencing, separate Business OA chat from central Mini App, require verified identity → Person → durable Pet authority. No new routes, schema, real integration or ownership policy. [Guardian section 19](./GUARDIAN_LINE_MINIAPP.md#19-product-decisions-required) owns unresolved authority establishment, multi-Guardian/dispute rules, editable fields/photo, history disclosure, pilot dependency and production QR duration policy. Recommendations do not close decisions.
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Status: **ACTIVE CANONICAL DECISION LOG (BUSINESS-FIRST REBASE)**  
 Owner: Product
 
@@ -67,7 +73,7 @@ The dated BF-4–BF-12 decision blocks below preserve historical UX choices. Any
 | D-BE2-06 | **Search and duplicate handling are server-side and non-destructive.** Business-scoped name/phone/Pet-name search supports bounded limit/offset. Exact normalized phone and Pet name/species candidates return a warning, including inactive records; only an explicit continue creates a separate record. No merge engine or automatic deduplication is implemented. |
 | D-BE2-07 | **BE2 reuses the active BE1 membership foundation.** OWNER, MANAGER and STAFF may use current Customer/Pet operational capabilities after actor → membership → active Business resolution. Branch grants neither hide another Branch's copy—there is none—nor expose another Business. A granular operational permission matrix remains open. |
 | D-BE2-08 | **D1 is the only Customer/Pet source of truth after hydration.** The frozen synchronous selectors read an in-memory compatibility cache; the former browser Customer slice is ignored, emptied on later writes and never backfilled/dual-written. This checkpoint's Booking-local clause is superseded by D-BE3-01–D-BE3-10; its dated Inbox, Billing and service-execution wording is historical and superseded by the active BE4–BE8 decisions. |
-| D-BE2-09 | **Passport presentation is compatibility data, never authority.** Seeded connection/access badges live in an explicit non-authoritative dev read model and are absent from BE2 tables/API. The checkpoint's statement that Consent, QR, access grants and protected Passport fields were not implemented is historical; BE5 now owns those scoped records while Guardian/Passport authority and production identity linking remain external. |
+| D-BE2-09 | **Passport presentation is compatibility data, never authority.** Seeded connection/access badges live in an explicit non-authoritative dev read model and are absent from BE2 tables/API. The checkpoint's statement that Consent, QR, access grants and protected Passport fields were not implemented is historical; BE5 now owns those scoped records while production Guardian identity linking and authority provisioning remain external. |
 | D-BE2-10 | **Mutations are durable and privacy-bounded.** Actor, membership, Business, target, request/correlation ID, time and bounded state shape are audited with the D1 write; names, contact values, notes and tag labels are not copied to audit JSON. Deterministic SQL fixtures are dev/test only. At its own checkpoint BE2 stopped before Booking; D-BE3-01–D-BE3-10 now supersede only that exclusion. |
 
 ### BE1 identity / Business / Branch foundation — 2026-09-06
@@ -137,10 +143,10 @@ See [BACKEND_READINESS](./BACKEND_READINESS.md) for the persistence map, applica
 |---|---|
 | D-98 | **Meawketting Business remains the main product and primary commercial experience.** Priority order is P0 Business Product, P1 Business workflows, P2 Guardian touchpoints required by Business workflows, and P3 independent Guardian expansion. |
 | D-99 | **The standalone Consumer experience is no longer the target final product.** The existing Consumer web prototype remains in the repository as **CURRENT / RETAINED / FROZEN** for continuity and regression coverage; existing Consumer routes are not deleted. |
-| D-100 | **LINE Mini App becomes the target Guardian channel.** The future experience is LINE-first: Add Meawketting LINE → open Mini App → LINE Login → My Pets → Add Pet → Cat/Dog → Pet Profile / Pet Passport. This direction is **FUTURE / PAUSED**, not an implementation phase. |
+| D-100 | **LINE Mini App becomes the target Guardian channel.** The future experience is LINE-first: Add Meawketting LINE → open Mini App → LINE Login → My Pets → Add Pet → Cat/Dog → Pet Profile / Pet Passport. This direction is **PLANNED** with a foundation handoff; implementation has not started. |
 | D-101 | **The future Guardian UI direction is a minimal LINE Mini App.** It should be minimal, fast, lightweight, mobile-first, familiar inside LINE, low-text, low-friction, action-clear, and simpler than Business. Business and Guardian interaction systems remain separate while sharing the Master Brand. No detailed Mini App navigation is decided yet. |
 | D-102 | **LINE identity is not Pet ownership authority.** LINE is an authentication/entry channel only. The authority model remains `Person → Guardian relationship → Pet`; production identity linking, ownership policy, and consent linking remain future architecture decisions. |
-| D-103 | **LINE integration is not implemented.** LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking must be documented as **NOT IMPLEMENTED** until a separately approved Consumer phase begins. |
+| D-103 | **Guardian LINE integration is not implemented.** LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking remain **NOT IMPLEMENTED** for Guardian. Business LINE OAuth entry code exists with external configuration required; Guardian implementation is a separate phase. |
 
 ### Business Design System rebase — 2026-08-23
 
@@ -403,7 +409,7 @@ The standalone module and handover workflow below are retained only as historica
 | ID | Question / reversible treatment |
 |---|---|
 | OQ-01 | Anonymous Passport draft retention/expiry — describe as temporary without a promised duration |
-| OQ-02 | Temporary Business QR presets, maximum and one-time behavior — current 2/8/24-hour values are Demo only |
+| OQ-02 | Temporary Business QR presets, maximum and one-time behavior — BE5 enforces 2/8/24-hour values; production duration/one-time policy remains open |
 | OQ-03 | Digital acknowledgement/signature and legal status — use neutral `Acknowledge` |
 | OQ-04 | Ownership transfer evidence, appeal and interim authority — no instant transfer |
 | OQ-05 | Lost location precision/retention — area-level default, precise location hidden |
@@ -426,7 +432,7 @@ The standalone module and handover workflow below are retained only as historica
 - Business is Light / Warm White only with no dark-mode implementation or toggle; Consumer visual behavior remains unchanged during the pause.
 - Current Business, Branch, role, QR duration and checked-in references are Demo fixtures, not production policy.
 - BF-2 Booking planning, Pet links and the minimal schedulable Resource/capacity projection are durable BE3 data using stable BE2 Customer/Pet IDs. Grooming Job, Hotel Stay/room assignment and Daycare Attendance execution are durable BE4 records and reference the durable Booking identity.
-- BF-3 Customer, Business-local Pet profile/contact relationships, tags, notes, lifecycle, search and duplicate warnings are durable BE2 data. Seeded Passport connection/access presentation remains an explicit non-authoritative dev fixture. Guardian authority, Passport/Consent and Customer merge are not implemented.
+- BF-3 Customer, Business-local Pet profile/contact relationships, tags, notes, lifecycle, search and duplicate warnings are durable BE2 data. Seeded Passport connection/access presentation remains an explicit non-authoritative dev fixture. BE5 separately implements durable authority, Passport and Consent; production Guardian provisioning and Customer merge are not implemented.
 - BF-4 Conversation/message/unread/request data is durable BE6 state. Its minimum Guardian-response simulator is only a test boundary; real participant identity, delivery, authorization policy, retention, notifications, Booking add-on effects and disputes remain unimplemented/open.
 - BF-5 Grooming Service Jobs, timing, resource assignment, internal notes, activity history and Job-linked structured-request effects are durable BE4 data. The fixture date/time and attention wording are demonstration aids, not an operating-hours, SLA, pickup or staff-scheduling policy.
 - BF-6 Hotel Stays, room/zone assignments, move history, care tasks, lightweight incidents and operational timing are durable BE4 data. Shared Calendar date-range Bookings remain the planning source; the Stay is a linked execution record rather than a second Booking.

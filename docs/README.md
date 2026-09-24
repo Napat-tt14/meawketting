@@ -1,5 +1,7 @@
 # Meawketting Documentation
 
+Guardian foundation — 2026-09-22: [GUARDIAN_LINE_MINIAPP](./GUARDIAN_LINE_MINIAPP.md) is the main Guardian Product/architecture handoff, owning MVP, audited domain reuse, proposed routes/APIs and decisions. Read it first for Guardian work. **IMPLEMENTED:** Business PostgreSQL/Supabase foundations. **PLANNED:** Guardian Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** authority/disclosure policies. **EXTERNAL DEPENDENCY:** provider/environment configuration. Only type contracts were added; no Guardian runtime.
+
 Status: **CANONICAL / BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY / BF1–BF12 UI FROZEN**
 
 Latest checkpoint: [Supabase migration report](./SUPABASE_MIGRATION_REPORT.md), [setup runbook](./PRODUCTION_RUNBOOK.md), [target QA](./PILOT_QA.md). **NOT PRODUCTION READY**.

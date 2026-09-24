@@ -1,5 +1,11 @@
 # Product and Domain Architecture
 
+## Guardian foundation checkpoint — 2026-09-22
+
+Guardian UI → Cloudflare Application/API → verified identity/Person mapping → explicit per-Pet authority → existing BE5/domain services → repositories → Supabase PostgreSQL. LINE identity never confers authority. Business OA/Messaging API/Inbox remains separate from central Guardian entry. No duplicate domain store or new schema. Root layout injects shared chrome; any later Guardian shell must account for that without changing Business UI. See the [Guardian architecture](./GUARDIAN_LINE_MINIAPP.md).
+
+**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+
 Status: **CANONICAL ARCHITECTURE DIRECTION (BUSINESS-FIRST / BF1–BF12 FROZEN / BE1–BE8 IMPLEMENTED LOCALLY)**
 Owner: Product Architecture
 
@@ -11,8 +17,8 @@ This document owns shared objects, authority and boundaries. Capability detail i
 |---|---|
 | **CURRENT** | Standalone Consumer web prototype is retained/frozen in the repository. |
 | **TARGET** | LINE-first Guardian experience through a LINE Mini App. |
-| **PAUSED** | Consumer development and independent Guardian expansion. |
-| **NOT IMPLEMENTED** | LINE Login, LINE Mini App, LINE notifications, and production Guardian identity linking. |
+| **PAUSED** | Standalone Consumer expansion. Guardian Mini App is PLANNED with a documented foundation. |
+| **NOT IMPLEMENTED** | Guardian LINE login, Mini App runtime, notifications and production Guardian identity linking. Business LINE OAuth entry code exists; real configuration remains external. |
 
 ## Product architecture hierarchy
 
@@ -148,7 +154,7 @@ Service Record ── records permitted evidence across module execution records
 
 | Object | Canonical responsibility | Key boundary |
 |---|---|---|
-| **Person** | Durable BE1 human identity that can hold Business memberships and later external identities/Guardian relationships | One identity direction; contexts authorize separately |
+| **Person** | Durable BE1 human identity with Business memberships, BE5 Pet authority and external identity mapping foundations | Contexts authorize separately; production Guardian linking/provisioning absent |
 | **Business** | Durable BE1 organization/tenant profile and policy context | Not one service category; BE2 Customers/Pet profiles and BE3 Booking planning are scoped to the same tenant |
 | **Branch** | Durable BE1 physical/operational location, active state, enabled modules and hours | Local capability and attribution scope; historical records are never deleted by deactivation |
 | **Customer** | Durable BE2 Business relationship/contact arranging services | One Business-level record can use many services and have several Pet contact relationships; a Customer is not automatically a Guardian, owner, or Passport authority |
@@ -193,7 +199,7 @@ Root Homepage (/) [Business Landing] ───> Business Login (/business/login)
 - The current Consumer portal links are retained for the web prototype only; they are not the target final Guardian entry channel.
 - Unauthorized deep links reveal neither protected Pet values nor sensitive entity existence.
 
-## Guardian channel architecture (Target / Future / Paused)
+## Guardian channel architecture (PLANNED / NOT IMPLEMENTED)
 
 ```text
 Add Meawketting LINE
@@ -205,7 +211,7 @@ Add Meawketting LINE
 → Pet Profile / Pet Passport
 ```
 
-This flow is conceptual and has no repository route contract yet. Do not invent LINE Mini App routes, imply that LINE integration exists, or treat LINE identity as proof of Pet ownership or consent. Future production linking must establish the Person ↔ Guardian relationship and consent authority separately.
+This flow is PLANNED. The Guardian handoff defines proposed routes, not registered endpoints. Verified LINE identity maps to Person; durable Pet authority is checked separately. Production linking and authority provisioning are not implemented.
 
 ## BE6 / BF-4 Conversation architecture
 

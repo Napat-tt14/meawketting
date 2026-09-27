@@ -1,5 +1,7 @@
 # Supabase migration report — verified 2026-09-20
 
+Historical local-test checkpoint. For the current Supabase and staging Worker setup, see [the owner guide](./คู่มือ-Supabase-Cloudflare.md) and [runbook](./PRODUCTION_RUNBOOK.md).
+
 ## 1. Final status
 
 Code migration IMPLEMENTED; PostgreSQL-backed checks TESTED LOCALLY; real Supabase/Cloudflare configuration EXTERNAL CONFIG REQUIRED; NOT YET DEPLOYED. NOT PRODUCTION READY.
@@ -56,7 +58,7 @@ Runtime DB privileges require review against the selected real project. No datab
 
 ## 10. Files changed
 
-See [complete changed-file inventory](./SUPABASE_MIGRATION_FILES.md). Changes cover repositories/runtime/routes, PostgreSQL schema/migrations/seeds, Auth/Storage, test/CLI/configuration, canonical docs and annotation-only legacy type fixes.
+Changes cover repositories/runtime/routes, PostgreSQL schema/migrations/seeds, Auth/Storage, test/CLI/configuration, canonical docs and annotation-only legacy type fixes. Git history retains the original changed-file inventory.
 
 ## 11. Exact next action
 

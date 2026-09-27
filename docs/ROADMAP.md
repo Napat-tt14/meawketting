@@ -6,7 +6,7 @@ Current order is **Business → production readiness/pilot → Guardian LINE Min
 
 **IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
 
-Current backend checkpoint: [Supabase migration](./SUPABASE_MIGRATION_REPORT.md). Earlier infrastructure/auth sequencing is superseded; frozen Product scope is unchanged.
+Current backend setup: [owner guide](./คู่มือ-Supabase-Cloudflare.md) and [runbook](./PRODUCTION_RUNBOOK.md). The [Supabase migration report](./SUPABASE_MIGRATION_REPORT.md) records the earlier local-test checkpoint; frozen Product scope is unchanged.
 
 Status: **CANONICAL OUTCOME ROADMAP (BUSINESS-FIRST REBASE)**  
 Owner: Product / Delivery

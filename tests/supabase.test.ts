@@ -54,6 +54,26 @@ test("Google login uses Supabase PKCE and secure HttpOnly cookies; logout revoke
   const logout = await withBackend(req("/api/auth/google/logout"),env,logoutSupabase);
   assert.equal(logout.status,204); assert.equal(revoked,true); assert.match(logout.headers.get("set-cookie")!,/Max-Age=0/i);
 });
+
+test("local Google login uses an HTTP localhost callback and host-only development cookies", async () => {
+  const variables = process.env as Record<string, string | undefined>;
+  const previous = variables.NODE_ENV;
+  variables.NODE_ENV = "development";
+  try {
+    const localEnv = { ...env, MEAWKETTING_PUBLIC_ORIGIN: "http://localhost:5173" };
+    const request = new Request("http://localhost:5173/api/auth/google/start");
+    const response = await withBackend(request, localEnv, beginGoogleLogin);
+    assert.equal(new URL(response.headers.get("location")!).searchParams.get("redirect_to"), "http://localhost:5173/api/auth/google/callback");
+    const verifier = response.headers.get("set-cookie")!;
+    assert.match(verifier, /meawketting-auth-local-code-verifier=/);
+    assert.doesNotMatch(verifier, /; Secure/i);
+    await assert.rejects(withBackend(new Request("http://example.test/api/auth/google/start"),
+      { ...env, MEAWKETTING_PUBLIC_ORIGIN: "http://example.test" }, beginGoogleLogin));
+  } finally {
+    if (previous === undefined) delete variables.NODE_ENV;
+    else variables.NODE_ENV = previous;
+  }
+});
 test("private media validates types, denies cross-Branch reads, and only signs authorized opaque paths", async t => {
   const db=seededDatabase(), id=crypto.randomUUID();
   db.inspect.prepare("INSERT INTO auth_person_links(auth_user_id,person_id) VALUES(?::uuid,?)").run(userId,OWNER);

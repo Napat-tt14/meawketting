@@ -3,6 +3,11 @@ import { backendContext, database } from "./runtime";
 import { be1Error } from "./be1/errors";
 import type { IdentityAdapter, AuthenticatedIdentity } from "./be1/identity";
 
+function localHttp(request: Request) {
+  const url = new URL(request.url);
+  return process.env.NODE_ENV === "development" && url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+}
+
 export function authClient() {
   const current = backendContext();
   if (current.auth) return current.auth;
@@ -15,11 +20,13 @@ export function authClient() {
   const names = header.split(";").filter(part => part.includes("=")).map(part => part.slice(0,part.indexOf("=")).trim());
   if (new Set(names).size !== names.length) throw be1Error("UNAUTHENTICATED");
   const input = parseCookieHeader(header);
+  const local = localHttp(request);
+  const cookieOptions = { name: local ? "meawketting-auth-local" : "__Host-meawketting-auth", path: "/", secure: !local, httpOnly: true, sameSite: "lax" as const };
   return current.auth = createServerClient(env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY, {
-    cookieOptions: { name: "__Host-meawketting-auth", path: "/", secure: true, httpOnly: true, sameSite: "lax" },
+    cookieOptions,
     cookies: {
       getAll: () => input.map(c => ({ name: c.name, value: c.value ?? "" })),
-      setAll: values => { for (const c of values) cookies.push(serializeCookieHeader(c.name, c.value, { ...c.options, path: "/", secure: true, httpOnly: true, sameSite: "lax" })); },
+      setAll: values => { for (const c of values) cookies.push(serializeCookieHeader(c.name, c.value, { ...c.options, path: "/", secure: !local, httpOnly: true, sameSite: "lax" })); },
     },
   });
 }
@@ -40,7 +47,7 @@ function origin() {
   const { env, request } = backendContext();
   if (!env.MEAWKETTING_PUBLIC_ORIGIN) throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
   const url = new URL(env.MEAWKETTING_PUBLIC_ORIGIN);
-  if (url.protocol !== "https:" || url.origin !== new URL(request.url).origin) throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
+  if ((url.protocol !== "https:" && !localHttp(request)) || url.origin !== new URL(request.url).origin) throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
   return url.origin;
 }
 export async function beginGoogleLogin() {
@@ -54,24 +61,32 @@ export async function beginBusinessLogin(provider: "google" | "custom:line") {
   return Response.redirect(data.url, 302);
 }
 export async function finishGoogleLogin(request: Request) {
+  let stage = "callback";
   try {
     const target = origin();
     const code = new URL(request.url).searchParams.get("code");
     if (!code) throw be1Error("UNAUTHENTICATED");
     const client = authClient();
+    stage = "token-exchange";
     const { data, error } = await client.auth.exchangeCodeForSession(code);
     if (error || !data.user) throw be1Error("UNAUTHENTICATED");
+    stage = "person-link-query";
     const linked = await database().prepare("SELECT person_id FROM auth_person_links WHERE auth_user_id=?::uuid")
       .bind(data.user.id).first();
     // Verified identity can complete registration, but has no Business authority yet.
     if (!linked) return Response.redirect(`${target}/business/register`, 302);
+    stage = "membership-query";
     const person = await database().prepare(`SELECT p.id FROM auth_person_links l JOIN persons p ON p.id=l.person_id
       WHERE l.auth_user_id=?::uuid AND p.status='active' AND EXISTS(SELECT 1 FROM business_memberships m
       JOIN businesses b ON b.id=m.business_id WHERE m.person_id=p.id AND m.status='active' AND b.status='active')`)
       .bind(data.user.id).first();
     if (!person) { await client.auth.signOut(); throw be1Error("FORBIDDEN"); }
     return Response.redirect(`${target}/business/home`, 302);
-  } catch { return Response.redirect(new URL("/business/login?error=try-again", request.url), 302); }
+  } catch (error) {
+    const code = typeof (error as { code?: unknown })?.code === "string" ? (error as { code: string }).code : "unknown";
+    console.warn(JSON.stringify({ event: "google-callback-failure", stage, code }));
+    return Response.redirect(new URL("/business/login?error=try-again", request.url), 302);
+  }
 }
 export async function logoutSupabase() {
   const { error } = await authClient().auth.signOut({ scope: "local" });

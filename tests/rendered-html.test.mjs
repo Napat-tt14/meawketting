@@ -71,7 +71,7 @@ test("production Business routes never render fixture identity, records or fake 
 
 test("Business signup is a public branded route with one heading and no fixture authority", async () => {
   const html = await htmlFor("/business/register");
-  assert.match(html, /เริ่มต้นพื้นที่ทำงาน/);
+  assert.match(html, /เริ่มต้นร้านในฝัน/);
   assert.match(html, /business-header--auth/);
   assert.match(html, /กำลังตรวจสอบการเข้าสู่ระบบ/);
   assert.doesNotMatch(html, /กำลังโหลดข้อมูลร้าน|Whisker|Paw Partner/);
@@ -339,7 +339,6 @@ test("keeps committed clay landing assets explicit and independent from legacy p
   const landingSources = heroSource + servicesSource + hybridSource + workflowSource + closingSource;
 
   assert.deepEqual(assets, [
-    "business-auth-welcome.png",
     "business-banner-care-lounge.png",
     "business-banner-grooming.png",
     "business-banner-hotel.png",
@@ -3907,14 +3906,13 @@ test("BF12 uses one date-level upcoming rule across CRM, customer list, detail, 
 });
 
 test("keeps typography, Business tokens, reduced motion, logo, and icon rules visible in source", async () => {
-  const [layout, css, businessCss, packageJson, icons, brandMark, catPaw, catPawPattern, guardianSource, previewSource] = await Promise.all([
+  const [layout, css, businessCss, packageJson, icons, brandMark, catPawPattern, guardianSource, previewSource] = await Promise.all([
     readFile(new URL("layout.tsx", appRoot), "utf8"),
     readFile(new URL("globals.css", appRoot), "utf8"),
     readFile(businessCssUrl, "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("_components/icons.tsx", appRoot), "utf8"),
     readFile(new URL("_components/BrandMark.tsx", appRoot), "utf8"),
-    readFile(new URL("../docs/assets/archived/catpaw.svg", import.meta.url), "utf8"),
     readFile(new URL("../public/catpaw-pattern.svg", import.meta.url), "utf8"),
     readFile(new URL("_components/business-landing/GuardianEntrySection.tsx", appRoot), "utf8"),
     readFile(new URL("_components/HomePetPreview.tsx", appRoot), "utf8"),
@@ -3962,10 +3960,6 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   assert.match(css, /background-image: url\("\/catpaw-pattern\.svg"\)/);
   assert.match(css, /\.passport-showcase::before\s*\{[\s\S]*?background-image: url\("\/catpaw-pattern\.svg"\)/);
   assert.match(css, /\.taped-note::after\s*\{/);
-  assert.equal((catPaw.match(/<path\s/g) ?? []).length, 5);
-  assert.match(catPaw, /viewBox="0 0 100 100"/);
-  assert.match(catPaw, /fill="#ffb5c6"/);
-  assert.match(catPaw, /<\/svg>/);
   assert.match(catPawPattern, /viewBox="0 0 64 64"/);
   assert.match(catPawPattern, /<path/);
   assert.match(guardianSource, /<PawPrint/);

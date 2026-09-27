@@ -1,6 +1,6 @@
 # Supabase and Cloudflare setup
 
-Status: IMPLEMENTED in code; TESTED LOCALLY with synthetic data; EXTERNAL CONFIG REQUIRED; NOT YET DEPLOYED. This is not Production Ready.
+Status: migrations and private Storage configured in the selected Supabase project; `meawketting-pilot` deployed on workers.dev with server secrets. Real Google OAuth completed on localhost:3000 and reached the new-business registration form. The staging Worker callback still requires retesting after the local code is pushed and deployed; production release is not verified. This is not Production Ready. See [the owner guide](./คู่มือ-Supabase-Cloudflare.md).
 
 ## Architecture and authority
 
@@ -23,7 +23,7 @@ Keep DATABASE_MIGRATION_URL operator-only in the local migration process. It mus
 
 Set non-secret environment values: MEAWKETTING_AUTH_MODE=supabase, MEAWKETTING_ENV=staging, MEAWKETTING_FIXTURE_MODE=off, MEAWKETTING_PUBLIC_ORIGIN=the exact HTTPS staging origin. Configure API_RATE_LIMITER and distinct staging hostname/Worker name using wrangler.pilot.example.json. The example is not a deployment authorization. The generated build has no database binding or fallback.
 
-In Supabase Auth, enable Google. Put Google client ID/secret in the Supabase provider settings, not Cloudflare or the browser. Google Authorized redirect URI is the Supabase Auth callback URL shown in that dashboard. Set the Supabase Site URL to staging and allow exactly https://STAGING_HOST/api/auth/google/callback. Do not use wildcard production callback URLs. Configure Google consent/test users and recovery/support policy.
+In Supabase Auth, enable Google. Put Google client ID/secret in the Supabase provider settings, not Cloudflare or the browser. Google Authorized redirect URI is the Supabase Auth callback URL shown in that dashboard. Keep the Supabase Site URL at the production origin and allow exactly https://STAGING_HOST/api/auth/google/callback as an additional Redirect URL. Do not use wildcard production callback URLs. Configure Google consent/test users and recovery/support policy.
 
 ## Migrations and private bucket
 
@@ -59,4 +59,4 @@ Before release approval, verify real Google PKCE callback, refresh, logout, revo
 
 Use Supabase backup/PITR appropriate to the chosen plan and rehearse restore without resetting the selected project. Restore Storage separately and reconcile metadata/object references; database backup is not an object backup. A code rollback cannot restore the removed database architecture. Back up before later migrations and prefer reviewed forward fixes; never drop an unknown schema/database. Real target backup/restore, load, security and provider integration remain unverified.
 
-Consumer stays PAUSED. No LINE Mini App, payment-provider choice, production deploy, commit or push is part of this migration.
+Consumer stays PAUSED. This staging setup does not release the LINE Mini App, select a payment provider or deploy the production Worker.

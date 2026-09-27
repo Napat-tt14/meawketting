@@ -34,7 +34,7 @@ export default defineConfig(async ({ command }) => {
           ...localBindingConfig,
           // This caller-controlled identity mode exists for local development
           // only. Production uses Supabase identity and server authorization.
-          vars: { MEAWKETTING_AUTH_MODE: command === "serve" ? "dev-test" : "supabase" },
+          vars: { MEAWKETTING_AUTH_MODE: command === "serve" ? process.env.MEAWKETTING_AUTH_MODE ?? "dev-test" : "supabase" },
         },
       }),
     ],

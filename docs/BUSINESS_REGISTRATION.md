@@ -14,7 +14,7 @@ Product Owner decision, 2026-09-20: verified new users may create a store after 
 
 1. Apply migrations with `npm run db:migrate` using the staging administrator connection. Keep Worker database credentials server-side and authorize its runtime role for the new receipt table as part of the existing privilege review.
 2. Enable Google in Supabase Auth and configure Google client ID/secret there. Copy the Supabase callback shown in the dashboard into Google's authorized redirect URIs.
-3. Create a **LINE Login** channel (web app), separate from any messaging channel. In Supabase Authentication → Sign In / Providers → Custom Providers, add identifier `line`, type **OAuth2**, with the LINE channel ID and channel secret. Configure:
+3. Create a **LINE Login** channel (web app), separate from any messaging channel. In Supabase Authentication → Sign In / Providers → Custom Providers, add identifier `custom:line`, type **OAuth2**, with the LINE channel ID and channel secret. Configure:
    - Authorization URL: `https://access.line.me/oauth2/v2.1/authorize`
    - Token URL: `https://api.line.me/oauth2/v2.1/token`
    - Userinfo URL: `https://api.line.me/oauth2/v2.1/userinfo`

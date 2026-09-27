@@ -12,7 +12,7 @@ The active backend uses Cloudflare Worker/API, Supabase PostgreSQL, Supabase Aut
 
 BE1–BE8 keep their domain repositories and application authorization. The frontend calls the Worker APIs and never queries Supabase tables. PostgreSQL migrations preserve IDs, constraints, indexes, histories, revisions and idempotency contracts. Supabase Google/LINE PKCE and verified server identity replace custom sessions. OAuth alone never grants Owner. The 2026-09-20 [Business registration](./BUSINESS_REGISTRATION.md) addition creates a new user's first store only after explicit details and confirmation, with atomic duplicate-safe persistence. Existing identity links cannot self-promote. Media foundation supports Business logo, Pet photo, Grooming before/after and Hotel/Daycare.
 
-Existing BE1/BE2 request contracts still lack universal client revisions/replay keys. The [earlier cleanliness audit](./FINAL_BUSINESS_UX_UI_DEMO_LEAKAGE_AUDIT.md) remains relevant to those correctness follow-ups; its database/auth architecture is superseded. This migration does not claim Production Ready.
+Existing BE1/BE2 request contracts still lack universal client revisions/replay keys. Those stale-form and retry follow-ups remain open. This migration does not claim Production Ready.
 
 ## Route implementation
 
@@ -80,6 +80,6 @@ CRM's current reversible heuristics count unique completed-service Booking IDs r
 
 ## Current limitations
 
-Real Supabase/Cloudflare target configuration, Google consent/redirect/recovery/refresh, live Storage policies, runtime privileges, backup/restore and load acceptance remain unverified. LINE transport and payment gateway credentials remain unconfigured; no provider was selected. Consumer stays PAUSED. Only pre-existing TypeScript annotations in Consumer files were corrected to permit whole-repository typechecking; runtime behavior and styling were unchanged.
+The selected Supabase project has the migrations, private Storage bucket, runtime role and Google provider configured. Real Google sign-in reached registration on localhost:3000; the staging Worker callback, session recovery/refresh, backup/restore and load acceptance remain unverified. LINE transport and payment gateway credentials remain unconfigured; no provider was selected. Consumer stays PAUSED. Only pre-existing TypeScript annotations in Consumer files were corrected to permit whole-repository typechecking; runtime behavior and styling were unchanged.
 
 No real customer data, source-code secret, commit, push or deployment was introduced.

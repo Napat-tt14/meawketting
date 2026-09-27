@@ -4,7 +4,7 @@ Guardian foundation — 2026-09-22: [GUARDIAN_LINE_MINIAPP](./GUARDIAN_LINE_MINI
 
 Status: **CANONICAL / BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY / BF1–BF12 UI FROZEN**
 
-Latest checkpoint: [Supabase migration report](./SUPABASE_MIGRATION_REPORT.md), [setup runbook](./PRODUCTION_RUNBOOK.md), [target QA](./PILOT_QA.md). **NOT PRODUCTION READY**.
+Latest checkpoint: [owner setup and rotation guide](./คู่มือ-Supabase-Cloudflare.md), [technical runbook](./PRODUCTION_RUNBOOK.md), [target QA](./PILOT_QA.md). **NOT PRODUCTION READY**.
 
 2026-09-20 addition: [Business signup with Google/LINE](./BUSINESS_REGISTRATION.md), including the approved first-store creation policy and provider setup.
 
@@ -51,6 +51,6 @@ The derived [HTML manual](./.htmlmanual/manual.html) is a compact reading aid, n
 
 Cloudflare Worker/API → Application/Domain → Repository → Supabase PostgreSQL is the only active Business database architecture. Supabase Auth authenticates; Meawketting authorizes Person/Membership/Business/Branch/target/action. Supabase Storage is private media.
 
-BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY. External configuration for the selected real Supabase/Cloudflare environment is EXTERNAL CONFIG REQUIRED and NOT YET DEPLOYED. See [validation](./VALIDATION.md) for exact counts and limitations, including the prior BE1/BE2 stale-form/retry follow-up.
+BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY. The selected Supabase project has the four migrations, private media bucket and restricted Worker role. Real Google sign-in completed on localhost:3000 and reached new-business registration. A separate staging Worker is deployed, but its callback and production integration still need acceptance testing. See [the owner guide](./คู่มือ-Supabase-Cloudflare.md) and [validation](./VALIDATION.md) for limits.
 
-Business UI and LINE Seed Sans TH stay frozen. Consumer is PAUSED. /workfiledesign is untouched. No commit/push/deploy.
+Business UI and LINE Seed Sans TH stay frozen. Consumer is PAUSED. /workfiledesign is untouched. Staging uses a separate Worker from the production domain.

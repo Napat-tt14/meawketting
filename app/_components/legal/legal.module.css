@@ -38,3 +38,17 @@
   .article h2 { font-size: 19px; }
 }
 @media (max-width: 420px) { .contents ol { columns: 1; } .tabs a { padding-inline: 10px; font-size: 14px; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .header, .tabs, .draft, .summary, .contents, .article > section { animation: legal-enter 620ms cubic-bezier(.22, 1, .36, 1) backwards; }
+  .tabs { animation-delay: 50ms; }
+  .draft { animation-delay: 100ms; }
+  .summary { animation-delay: 150ms; }
+  .contents, .article > section { animation-delay: 200ms; }
+  .page a { transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease; }
+  .page :focus-within { animation-duration: 0s; animation-delay: 0s; }
+  @keyframes legal-enter { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page *, .page *::before, .page *::after { animation: none !important; transition: none !important; }
+}

@@ -92,3 +92,38 @@
   .business-login-page :is(.business-login__card, .business-register__card) { padding: 24px; border-radius: 24px; }
   .business-login-page .business-register__fields { grid-template-columns: 1fr; }
 }
+
+/* Public login and signup use the same gentle rhythm as the landing page. */
+@media (prefers-reduced-motion: no-preference) {
+  .business-login-page :is(.business-login__story, .business-register__intro, .business-login__card) { animation: none; }
+  .business-login-page .business-auth-layout > div > * {
+    animation: business-auth-enter 620ms cubic-bezier(.22, 1, .36, 1) var(--auth-entry-delay, 0ms) backwards;
+  }
+  .business-login-page .business-auth-layout > div > :nth-child(2) { --auth-entry-delay: 50ms; }
+  .business-login-page .business-auth-layout > div > :nth-child(3) { --auth-entry-delay: 100ms; }
+  .business-login-page .business-auth-layout > div > :nth-child(4) { --auth-entry-delay: 150ms; }
+  .business-login-page .business-auth-layout > div > :nth-child(5) { --auth-entry-delay: 200ms; }
+  .business-login-page .business-auth-layout > div > :nth-child(n + 6) { --auth-entry-delay: 250ms; }
+  .business-login-page .business-register__card > :is(.business-register__identity, .business-register__form) { animation: business-auth-enter 360ms cubic-bezier(.22, 1, .36, 1) backwards; }
+  .business-login-page .business-auth-layout > div > :focus-within { animation-duration: 0s; animation-delay: 0s; }
+  .business-login-page .business-auth-layout > div > :is([role="alert"], [role="status"]) { animation: none; }
+  :is(.business-login-page, .business-header--auth) .button {
+    transition: transform 220ms cubic-bezier(.22, 1, .36, 1), background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, color 220ms ease;
+  }
+  :is(.business-login-page, .business-header--auth) .button > svg { transition: translate 220ms cubic-bezier(.22, 1, .36, 1); }
+  .business-login-page .business-register__steps :is(li, span) { transition: color 220ms ease, background-color 220ms ease, box-shadow 220ms ease; }
+  .business-login-page .business-register__form input[type="checkbox"] { transition: accent-color 180ms ease; }
+  @keyframes business-auth-enter { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :is(.business-login-page, .business-header--auth) .button:not(:disabled):not([aria-disabled="true"]):hover { transform: translateY(-2px); }
+  .business-register__form .business-register__services label:not(:has(input:disabled)):hover { border-color: var(--color-meaw-business-primary-hover); }
+  .business-header--auth .button:hover > svg { translate: -3px 0; }
+  .business-register__form .button:not(:disabled):hover > svg { translate: 3px 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.business-login-page, .business-header--auth) .button:not(:disabled):not([aria-disabled="true"]):active { transform: translateY(0) scale(.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .business-login-page *, .business-login-page *::before, .business-login-page *::after { animation: none !important; transition: none !important; }
+}

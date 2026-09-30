@@ -147,7 +147,8 @@
 .visual-closing__business { display: flex; justify-content: space-between; gap: 24px; align-items: center; border-radius: 24px; background: var(--color-meaw-business-accent); border: 1px solid var(--color-meaw-business-primary-border); padding: 28px 32px; }
 .visual-closing__business .button { margin-top: 8px; }
 @media (prefers-reduced-motion: no-preference) {
-  .hotel-landing .visual-float, .hotel-landing .visual-orb { animation: care-bob 6s ease-in-out infinite; animation-iteration-count: infinite !important; }
+  .hotel-landing .visual-float, .hotel-landing .visual-orb { animation: care-bob 6s ease-in-out infinite; animation-iteration-count: infinite !important; animation-play-state: paused; }
+  .hotel-landing .motion-active :is(.visual-float, .visual-orb) { animation-play-state: running; }
   .hotel-landing .visual-float--bottom { animation-delay: -3s; }
   .hotel-landing .visual-orb { animation-delay: -1.5s; }
   @keyframes care-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
@@ -250,14 +251,25 @@
 .care-cloud--one { top: 12%; left: 6%; }
 .care-cloud--two { top: 5%; right: 3%; }
 .hotel-landing .visual-art > img { border-radius: 0; }
-.hotel-landing .hotel-service { transition: box-shadow 280ms ease, border-color 280ms ease; }
+.hotel-landing .hotel-service { transition: transform 280ms cubic-bezier(.22, 1, .36, 1), box-shadow 280ms ease, border-color 280ms ease; }
 .hotel-landing .clay-float { transform-origin: 50% 80%; }
 @media (prefers-reduced-motion: no-preference) {
-  .hotel-landing .home-reveal-ready { opacity: 0; translate: 0 18px; transition: opacity 700ms ease, translate 700ms cubic-bezier(.22, 1, .36, 1); }
+  .hotel-landing .hotel-hero__copy > * { animation: home-copy-enter 620ms cubic-bezier(.22, 1, .36, 1) backwards; }
+  .hotel-landing .hotel-hero__copy > :nth-child(2) { animation-delay: 50ms; }
+  .hotel-landing .hotel-hero__copy > :nth-child(3) { animation-delay: 100ms; }
+  .hotel-landing .hotel-hero__copy > :nth-child(4) { animation-delay: 150ms; }
+  .hotel-landing .hotel-hero__copy > :nth-child(5) { animation-delay: 200ms; }
+  .hotel-landing .hotel-hero__copy > :nth-child(6) { animation-delay: 250ms; }
+  .hotel-landing .hotel-hero__copy > :focus-within { animation-duration: 0s; animation-delay: 0s; }
+  .hotel-landing .hotel-hero__scene { animation: home-scene-enter 800ms 100ms ease-out backwards; }
+  .hotel-landing .home-reveal-ready { opacity: 0; translate: 0 18px; transition: opacity 620ms ease var(--home-reveal-delay, 0ms), translate 620ms cubic-bezier(.22, 1, .36, 1) var(--home-reveal-delay, 0ms), transform 280ms cubic-bezier(.22, 1, .36, 1), box-shadow 280ms ease, border-color 280ms ease; }
   .hotel-landing .home-reveal-ready.is-revealed { opacity: 1; translate: 0 0; }
-  .hotel-landing .hotel-service:nth-child(2), .hotel-landing .visual-capabilities article:nth-child(2) { transition-delay: 70ms; }
-  .hotel-landing .hotel-service:nth-child(3), .hotel-landing .visual-capabilities article:nth-child(3) { transition-delay: 140ms; }
-  .hotel-landing .visual-capabilities article:nth-child(4) { transition-delay: 210ms; }
+  .hotel-landing :is(.hotel-service, .visual-capabilities article, .visual-journey article):nth-child(2) { --home-reveal-delay: 70ms; }
+  .hotel-landing :is(.hotel-service, .visual-capabilities article, .visual-journey article):nth-child(3) { --home-reveal-delay: 140ms; }
+  .hotel-landing .visual-capabilities article:nth-child(4) { --home-reveal-delay: 210ms; }
+  .business-homepage.hotel-landing .button { transition: transform 220ms cubic-bezier(.22, 1, .36, 1), background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, color 220ms ease; }
+  .hotel-landing :is(.button, .hotel-text-link, .hotel-guardian-link, .hotel-service > a, .guardian-feature__secondary) > svg { transition: translate 220ms cubic-bezier(.22, 1, .36, 1); }
+  .business-homepage.hotel-landing .button:active { transform: translateY(0) scale(.98); }
   .hotel-landing .clay-float { animation: clay-drift 7s ease-in-out infinite; animation-iteration-count: infinite !important; animation-play-state: paused; }
   .hotel-landing .motion-active .clay-float { animation-play-state: running; }
   .hotel-service:nth-child(2) .clay-float { animation-delay: -2.3s; }
@@ -267,14 +279,21 @@
   .hotel-landing .care-cloud { animation: cloud-drift 9s ease-in-out infinite; animation-iteration-count: infinite !important; animation-play-state: paused; }
   .hotel-landing .motion-active :is(.guardian-feature__heart, .care-cloud) { animation-play-state: running; }
   .hotel-landing .care-cloud--two { animation-delay: -4.5s; }
+  @keyframes home-copy-enter { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes home-scene-enter { from { opacity: 0; } to { opacity: 1; } }
   @keyframes clay-drift { 0%, 100% { translate: 0 0; rotate: -.35deg; } 50% { translate: 0 -6px; rotate: .35deg; } }
   @keyframes phone-sway { 0%, 100% { translate: 0 2px; rotate: -1deg; } 50% { translate: 0 -7px; rotate: 1deg; } }
   @keyframes cloud-drift { 0%, 100% { translate: 0 0; } 50% { translate: 7px 0; } }
   @keyframes clay-heartbeat { 0%, 65%, 100% { scale: 1; } 75% { scale: 1.07; } 85% { scale: 1; } 92% { scale: 1.04; } }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .hotel-landing .hotel-service:hover { border-color: var(--color-meaw-business-primary-border); box-shadow: 0 16px 35px color-mix(in srgb, var(--color-meaw-business-paw) 12%, transparent); }
+  .hotel-landing .hotel-service:hover { transform: translateY(-4px); border-color: var(--color-meaw-business-primary-border); box-shadow: 0 16px 35px color-mix(in srgb, var(--color-meaw-business-paw) 12%, transparent); }
   .hotel-landing .hotel-service:hover .clay-float { animation-play-state: paused; }
+  .business-homepage.hotel-landing .button:hover { transform: translateY(-2px); }
+  .business-homepage.hotel-landing .button:active { transform: translateY(0) scale(.98); }
+  .hotel-landing :is(.button, .hotel-guardian-link, .hotel-service > a, .guardian-feature__secondary):hover > svg { translate: 3px 0; }
+  .hotel-landing .hotel-text-link:hover > svg { translate: 2px 0; }
+  .hotel-landing .hotel-hero__actions .hotel-text-link:hover > svg { translate: 0 3px; }
 }
 @media (max-width: 600px) {
   .care-phone-scene { padding: 26px 0 22px; }

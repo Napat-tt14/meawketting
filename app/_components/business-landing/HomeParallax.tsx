@@ -7,7 +7,8 @@ export function HomeParallax() {
   useEffect(() => {
     const layers = Array.from(document.querySelectorAll<HTMLElement>(".hotel-landing [data-parallax]"));
     const sections = Array.from(document.querySelectorAll<HTMLElement>(".hotel-landing > section"));
-    const reveals = Array.from(document.querySelectorAll<HTMLElement>(".hotel-landing > section, .hotel-service, .visual-capabilities article, .visual-journey article"));
+    // Reveal independent blocks so parent and child fades do not compound.
+    const reveals = Array.from(document.querySelectorAll<HTMLElement>(".hotel-landing :is(.hotel-benefit-strip, .hotel-section-heading, .hotel-service, .visual-heading, .care-phone-scene, .visual-capabilities article, .visual-trust__copy, .visual-art, .visual-journey article, .visual-closing__business, .guardian-feature)"));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const narrow = window.matchMedia("(max-width: 800px)");
     const visible = new Set<HTMLElement>();

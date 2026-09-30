@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Sriracha&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap");
 
 @font-face {
   font-family: "LINE Seed Sans TH";
@@ -118,13 +118,12 @@
 
   --color-meaw-white: #ffffff;
   --color-meaw-border: #ead9d4;
-  --color-meaw-app-background: var(--color-meaw-cream-100);
-  --color-meaw-primary: var(--color-meaw-rose-500);
-  --color-meaw-primary-hover: var(--color-meaw-rose-400);
-  --color-meaw-primary-active: var(--color-meaw-rose-500);
-  --color-meaw-primary-foreground: var(--color-meaw-ink-900);
-  /* Business/public Business visual foundation. These tokens stay separate
-     from Consumer aliases so the Consumer visual system remains frozen. */
+  --color-meaw-app-background: var(--color-meaw-business-background);
+  --color-meaw-primary: var(--color-meaw-business-primary);
+  --color-meaw-primary-hover: var(--color-meaw-business-primary-hover);
+  --color-meaw-primary-active: var(--color-meaw-business-primary-active);
+  --color-meaw-primary-foreground: var(--color-meaw-business-primary-foreground);
+  /* Shared visual foundation for Business, public pages and Consumer. */
   --color-meaw-business-background: #fffdf9;
   --color-meaw-business-foreground: #2b2b2b;
   --color-meaw-business-surface: #ffffff;
@@ -214,9 +213,9 @@
   --color-meaw-passport-japan-line: #bdb8ae;
   --color-meaw-passport-japan-muted: #79756e;
 
-  --font-meaw: "Noto Sans Thai", sans-serif;
+  --font-meaw: var(--font-meaw-business);
   --font-meaw-business: "LINE Seed Sans TH", "Noto Sans Thai", sans-serif;
-  --font-meaw-hand: "Sriracha", "Noto Sans Thai", cursive;
+  --font-meaw-hand: var(--font-meaw-business);
   --text-meaw-display: clamp(2.5rem, 5vw, 4rem);
   --text-meaw-display--line-height: 1.06;
   --text-meaw-h1: clamp(2rem, 4vw, 2.75rem);

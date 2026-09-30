@@ -57,7 +57,7 @@ test("production Business routes never render fixture identity, records or fake 
     const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
     assert.match(markup, /กำลังโหลดข้อมูลร้าน/);
     assert.doesNotMatch(markup, /Whisker|Paw Partner|คุณพิม|Mochi|Luna|booking-fixture|grooming-job-fixture|hello@whisker|ยอดค้างชำระสะสม|ไม่มีรายการที่ต้องจัดการ/);
-    assert.doesNotMatch(markup, /site-footer|business-marketing-footer/);
+    assert.doesNotMatch(markup, /site-footer|business-marketing-footer|business-public-footer/);
   }
   const login = await htmlFor("/business/login");
   assert.match(login, /href="\/api\/auth\/google\/start\?returnTo=%2Fbusiness%2Fhome"/);
@@ -67,6 +67,21 @@ test("production Business routes never render fixture identity, records or fake 
   assert.equal((await render("/__debug")).status, 404);
   // The separate built-Worker API test supplies the Workers binding and checks
   // /api/dev/guardian; importing that API without its binding is not an HTTP test.
+});
+
+test("public legal pages share Business chrome, omit the review banner and retain contents and working footer links", async () => {
+  for (const path of ["/privacy", "/terms"]) {
+    const html = await htmlFor(path);
+    assert.match(html, /business-header--auth/);
+    assert.match(html, /business-legal-page/);
+    assert.equal(countRenderedElements(html, "footer"), 1);
+    assert.equal(countRenderedElements(html, "h1"), 1);
+    assert.doesNotMatch(html, /ฉบับร่างสำหรับตรวจทาน|เอกสารนี้ยังไม่ใช่ฉบับประกาศใช้ ผู้ดำเนินการต้องยืนยัน/);
+    assert.match(html, /aria-label="สารบัญ"/);
+    for (const target of ["/#business-core", "/#services", "/#guardian", "/privacy", "/terms", "/business/register"]) {
+      assert.ok(html.includes(`href="${target}"`), `${path} links to ${target}`);
+    }
+  }
 });
 
 test("Business signup is a public branded route with one heading and no fixture authority", async () => {
@@ -382,7 +397,7 @@ test("keeps one semantic app canvas while separating Consumer and Business chrom
     readFile(new URL("business/_components/BusinessUserMenu.tsx", appRoot), "utf8"),
   ]);
 
-  assert.match(css, /--color-meaw-app-background:\s*var\(--color-meaw-cream-100\)/);
+  assert.match(css, /--color-meaw-app-background:\s*var\(--color-meaw-business-background\)/);
   assert.match(css, /--app-background:\s*var\(--color-meaw-app-background\)/);
   assert.match(css, /html\s*\{[\s\S]*?background:\s*var\(--app-background\)/);
   assert.match(css, /body\s*\{[\s\S]*?background:\s*var\(--app-background\)/);
@@ -394,7 +409,7 @@ test("keeps one semantic app canvas while separating Consumer and Business chrom
   assert.match(css, /\.draft-passport-option:active::after/);
   assert.match(layoutSource, /<SiteHeader \/>[\s\S]*<RouteFooter \/>/);
   assert.doesNotMatch(layoutSource, /<SiteFooter \/>/);
-  assert.match(routeFooterSource, /new Set\(\["\/"\]\)/);
+  assert.match(routeFooterSource, /new Set\(\["\/", "\/business\/login", "\/business\/register", "\/privacy", "\/terms"\]\)/);
   assert.match(routeFooterSource, /fullFooterRoutes\.has\(pathname\) \? <SiteFooter \/> : null/);
   assert.match(siteHeaderSource, /variant="consumer" displayName="มิว"/);
   assert.match(appHeaderSource, /<AppNav mode=\{mode\} \/>/);
@@ -420,7 +435,7 @@ test("keeps one semantic app canvas while separating Consumer and Business chrom
   assert.doesNotMatch(authenticatedMenuSource, /business|สำหรับธุรกิจ|\/business\//i);
   assert.doesNotMatch(appHeaderSource + appNavSource, /variant === "business"|AppNavMode = [^\n]*business/);
   assert.match(siteHeaderSource, /pathname === "\/business"[\s\S]*BusinessHeader variant="landing"/);
-  assert.match(siteHeaderSource, /pathname === "\/business\/login"[\s\S]*BusinessHeader variant="auth"/);
+  assert.match(siteHeaderSource, /\["\/business\/login", "\/business\/register", "\/privacy", "\/terms"\]\.includes\(pathname\)[\s\S]*BusinessHeader variant="auth"/);
   assert.match(siteHeaderSource, /pathname === "\/activity"[\s\S]*AppHeader variant="consumer"/);
   assert.match(businessHeaderSource, /href="\/business\/scan"[\s\S]*สแกนรับเข้า/);
   assert.match(businessMenuSource, /ร้านและสาขา[\s\S]*หน้าที่ปัจจุบัน/);
@@ -1005,6 +1020,48 @@ test("redirects /business to / as the canonical Business Landing page", async ()
   assert.match(hero, /href="\/business\/login"/);
   assert.match(hero, /ให้ทุกการเข้าพัก/);
   assert.doesNotMatch(hero, /Today|Sessions|Customers|Documents|Team|Settings/);
+});
+
+test("renders homepage SEO, crawl routes and pricing offers for both billing periods", async () => {
+  const html = await htmlFor("/");
+  const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+  assert.equal(countRenderedElements(html, "h1"), 1);
+  assert.match(markup, /<link[^>]*rel="canonical"[^>]*href="https:\/\/meawketting\.com\/?"/);
+  assert.match(markup, /name="description"[^>]*content="[^"]*เดย์แคร์[^"]*490/);
+  assert.match(markup, /property="og:url"[^>]*content="https:\/\/meawketting\.com\/?"/);
+  assert.match(markup, /property="og:image"[^>]*content="https:\/\/meawketting\.com\/images\/landing\/pet-hotel-room\.png"/);
+  assert.match(markup, /name="twitter:card"[^>]*content="summary_large_image"/);
+  assert.match(markup, /aria-pressed="true"[^>]*>รายเดือน/);
+  assert.match(markup, /ฟรี 2 เดือน/);
+  for (const text of ["Paw Start", "Paw Care", "Paw Grow", "Free", "490", "1,490", "4,900", "14,900"]) assert.ok(markup.includes(text), text);
+  assert.match(markup, /href="#pricing"/);
+  const comparison = markup.match(/<table[^>]*>([\s\S]*?)<\/table>/)?.[1];
+  assert.ok(comparison, "plan comparison is server rendered");
+  const branches = comparison.match(/<tr><th[^>]*>จำนวนสาขา<\/th>([\s\S]*?)<\/tr>/)?.[1];
+  const branchCells = [...branches.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1].replace(/<[^>]+>/g, ""));
+  assert.deepEqual(branchCells, ["1 สาขา", "3 สาขา", "10 สาขา"]);
+  const limits = comparison.match(/<tr><th[^>]*>ลูกค้าที่รับได้ต่อวัน<\/th>([\s\S]*?)<\/tr>/)?.[1];
+  assert.match(limits, /3 คน \/ วัน/);
+  assert.equal((limits.match(/ไม่จำกัด/g) ?? []).length, 2);
+  const qr = comparison.match(/<tr><th[^>]*>สแกน QR เพื่อเช็กอิน<\/th>([\s\S]*?)<\/tr>/)?.[1];
+  const qrCells = [...qr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1].replace(/<[^>]+>/g, ""));
+  assert.deepEqual(qrCells, ["ไม่ได้", "ได้", "ได้"]);
+  const json = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(json, "structured data is server rendered");
+  const graph = JSON.parse(json)["@graph"];
+  assert.ok(graph.some((node) => node["@type"] === "WebSite" && node.url === "https://meawketting.com/"));
+  const offers = graph.find((node) => node["@type"] === "SoftwareApplication").offers;
+  assert.deepEqual(offers.map((offer) => offer.price), [0, 490, 4900, 1490, 14900]);
+  assert.ok(offers.every((offer) => offer.priceCurrency === "THB" && offer.url === "https://meawketting.com/#pricing"));
+  assert.equal(offers[2].priceSpecification.billingDuration, "P1Y");
+  const robots = await render("/robots.txt");
+  assert.equal(robots.status, 200);
+  assert.match(await robots.text(), /Sitemap: https:\/\/meawketting\.com\/sitemap\.xml/);
+  const sitemap = await render("/sitemap.xml");
+  assert.equal(sitemap.status, 200);
+  const xml = await sitemap.text();
+  for (const path of ["/", "/privacy", "/terms"]) assert.ok(xml.includes(`<loc>https://meawketting.com${path}</loc>`));
+  assert.doesNotMatch(xml, /business\/home|my-pets|temporary-access/);
 });
 
 test("keeps Business Login separate after Consumer login is deferred", async () => {
@@ -3000,7 +3057,7 @@ test("keeps Phase E responsive, accessible, and free of Marketing Footer", async
   assert.match(intake, /aria-modal="true"/);
   assert.match(intake, /event\.key === "Escape"/);
   assert.match(intake, /event\.key !== "Tab"/);
-  assert.match(footer, /new Set\(\["\/"\]\)/);
+  assert.match(footer, /new Set\(\["\/", "\/business\/login", "\/business\/register", "\/privacy", "\/terms"\]\)/);
   assert.doesNotMatch(scanner + intake, /<SiteFooter|Marketing Footer/);
 });
 
@@ -3919,7 +3976,7 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   ]);
 
   assert.match(css, /Noto Sans Thai/);
-  assert.match(css, /--font-meaw:\s*"Noto Sans Thai"/);
+  assert.match(css, /--font-meaw:\s*var\(--font-meaw-business\)/);
   assert.match(css, /font-family:\s*"LINE Seed Sans TH"/);
   assert.match(css, /font-display:\s*swap/);
   assert.match(css, /--font-meaw-business:\s*"LINE Seed Sans TH"/);
@@ -3950,11 +4007,11 @@ test("keeps typography, Business tokens, reduced motion, logo, and icon rules vi
   assert.match(businessCss, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(businessCss, /\[data-(?:portal-)?theme=['"]dark['"]\]/i);
   assert.doesNotMatch(businessCss, /#[0-9a-fA-F]{3,8}|rgba?\(/);
-  assert.match(css, /Sriracha/);
+  assert.match(css, /--font-meaw-hand:\s*var\(--font-meaw-business\)/);
   assert.match(css, /@theme static/);
   assert.match(css, /--color-meaw-rose-500/);
   assert.match(css, /--color-meaw-rose-950/);
-  assert.match(css, /--color-meaw-primary:\s*var\(--color-meaw-rose-500\)/);
+  assert.match(css, /--color-meaw-primary:\s*var\(--color-meaw-business-primary\)/);
   assert.match(css, /--background-image-meaw-brand/);
   assert.match(css, /\.passport-stage::before\s*\{/);
   assert.match(css, /background-image: url\("\/catpaw-pattern\.svg"\)/);

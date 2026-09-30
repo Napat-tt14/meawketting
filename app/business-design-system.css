@@ -1,15 +1,12 @@
 /*
  * MEAWKETTING BUSINESS DESIGN SYSTEM
  * Primitive colors live in app/globals.css @theme. This runtime layer maps
- * semantic and component tokens only for Business/public Business surfaces.
- * Consumer routes intentionally keep their existing visual system.
+ * semantic tokens across Business, public pages and Consumer. Operational
+ * component rules below remain scoped to the Business workspace.
  */
 
 /* === SEMANTIC TOKENS (LIGHT / WARM WHITE ONLY) === */
-body:has(.business-homepage),
-body:has(.business-login-page),
-body:has(.business-app-frame),
-body:has(.business-loading) {
+:root {
   color-scheme: light;
   --background: var(--color-meaw-business-background);
   --foreground: var(--color-meaw-business-foreground);
@@ -64,7 +61,7 @@ body:has(.business-loading) {
   --weight-strong: 700;
   font-synthesis: none;
 
-  /* Existing Business BEM rules consume these aliases. They remain scoped. */
+  /* Existing BEM rules consume the same shared semantic aliases. */
   --app-background: var(--background);
   --cream-50: var(--background);
   --cream-100: var(--accent);
@@ -112,7 +109,7 @@ body:has(.business-loading) {
   --skeleton-base-bg: var(--muted);
   --skeleton-highlight-bg: color-mix(in srgb, var(--surface) 88%, var(--primary));
 
-  /* Scoped bridges for legacy phase CSS; frozen Consumer values do not move. */
+  /* Bridges keep older Consumer and Business CSS on the shared palette. */
   --color-meaw-app-background: var(--background);
   --color-meaw-border: var(--border);
   --color-meaw-cream-50: var(--background);
@@ -173,10 +170,35 @@ body:has(.business-loading) {
   --color-meaw-rose-700: var(--status-critical);
   --color-meaw-rose-800: var(--status-critical);
 
+  --rose-50: var(--accent);
+  --rose-100: var(--accent);
+  --rose-200: var(--color-meaw-business-primary-border);
+  --rose-300: var(--color-meaw-business-soft-yellow);
+  --rose-400: var(--primary-hover);
+  --rose-500: var(--primary);
+  --rose-600: var(--primary-hover);
+  --rose-700: var(--primary-foreground);
+  --rose-800: var(--accent-foreground);
+  --pink-50: var(--accent);
+  --pink-100: var(--accent);
+  --pink-200: var(--color-meaw-business-primary-border);
+  --pink-300: var(--color-meaw-business-soft-yellow);
+  --pink-500: var(--primary);
+  --pink-600: var(--primary-hover);
+  --pink-700: var(--primary-foreground);
+  --font-hand: var(--font-body);
+
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body);
 }
+
+/* User-facing controls share Business colors without changing their flows. */
+.site-header { background: var(--surface); border-color: var(--border); }
+.button--primary { color: var(--primary-foreground); background: var(--primary); border-color: var(--primary-hover); box-shadow: var(--shadow-primary); }
+.button--primary:hover { background: var(--primary-hover); box-shadow: var(--shadow-lift); }
+.button--primary:active { background: var(--primary-hover); box-shadow: var(--shadow-card); }
+:is(.site-header, .consumer-bottom-nav, .page) :is(a, button, input, select, textarea, summary):focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
 
 /* === COMPONENT TOKENS: TYPOGRAPHY / FOCUS / BUTTONS === */
 body:has(.business-homepage) :is(.business-header, .business-homepage, .business-public-footer),

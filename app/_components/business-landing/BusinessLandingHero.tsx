@@ -7,7 +7,7 @@ export function BusinessLandingHero() {
       <div className="hotel-hero__copy">
         <p className="hotel-kicker"><PawPrint size={17} /> ระบบจัดการโรงแรมสัตว์เลี้ยง</p>
         <h1 id="business-homepage-title">ให้ทุกการเข้าพัก<br />มีแต่เรื่อง<span className="hotel-hero__accent">น่ารัก</span></h1>
-        <p className="hotel-hero__lead">รวมการจอง ห้องพัก และงานดูแลไว้ในที่เดียว<br className="hotel-desktop-break" /> ให้ทีมมีเวลาใส่ใจแขกตัวน้อยได้เต็มที่</p>
+        <p className="hotel-hero__lead">รวมการจอง ห้องพัก อาบน้ำตัดขน และเดย์แคร์ไว้ในที่เดียว<br className="hotel-desktop-break" /> ให้ทีมมีเวลาใส่ใจแขกตัวน้อยได้เต็มที่</p>
         <div className="hotel-hero__actions">
           <a className="button button--business button--large" href="/business/login">เริ่มต้นใช้งานสำหรับธุรกิจ <ArrowRight size={19} /></a>
           <a className="hotel-text-link" href="#business-core">มาดูกันว่าช่วยอะไรได้บ้าง <ChevronDown size={17} /></a>

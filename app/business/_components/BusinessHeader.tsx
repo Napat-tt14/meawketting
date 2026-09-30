@@ -33,6 +33,7 @@ export function BusinessHeader({ variant }: BusinessHeaderProps) {
           <nav className="business-header__nav" aria-label="เมนูหลักสำหรับธุรกิจ">
             <Link href="#business-core">ระบบ</Link>
             <Link href="#services">บริการสำหรับธุรกิจ</Link>
+            <Link href="#pricing">แพ็กเกจ</Link>
             <Link href="#guardian">สำหรับเจ้าของสัตว์เลี้ยง</Link>
           </nav>
         ) : null}

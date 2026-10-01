@@ -14,7 +14,7 @@ class Statement implements PreparedStatement {
 }
 
 export class PostgresDatabase implements Database {
-  constructor(readonly sql: Sql, readonly schema = "public") {
+  constructor(readonly sql: Sql, readonly schema = "public", readonly prepared = false) {
     if (!/^[a-z][a-z0-9_]*$/.test(schema)) throw new Error("Invalid database schema");
   }
   prepare(query: string) { return new Statement(this, query); }
@@ -38,7 +38,7 @@ export class PostgresDatabase implements Database {
               }
               return token;
             });
-            const rows = await tx.unsafe(query, values as never[]);
+            const rows = await tx.unsafe(query, values as never[], { prepare: this.prepared });
             results.push({ success: true, results: [...rows], meta: { changes: rows.count } });
           }
           return results;
@@ -52,15 +52,17 @@ export class PostgresDatabase implements Database {
   async close() { await this.sql.end({ timeout: 5 }); }
 }
 
-export function connectPostgres(url: string, schema = "public") {
+export function connectPostgres(url: string, schema = "public", hyperdrive = false) {
   const parsed = new URL(url);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
-  return new PostgresDatabase(postgres(url, { prepare: false, max: 1, idle_timeout: 5, connect_timeout: 10,
-    ssl: local ? false : "verify-full", onnotice: () => {},
+  return new PostgresDatabase(postgres(url, { prepare: hyperdrive, fetch_types: !hyperdrive, max: 1, idle_timeout: 5, connect_timeout: 10,
+    // Hyperdrive's internal socket terminates TLS at the platform binding; its
+    // origin is configured separately with the Supabase CA and verify-full.
+    ssl: local || hyperdrive ? false : "verify-full", onnotice: () => {},
     types: { bigint: { to: 20, from: [20, 1700], serialize: String, parse: (value: string) => {
       const number = Number(value);
       if (!Number.isSafeInteger(number)) throw new Error("Unsafe database integer");
       return number;
     } } },
-  }), schema);
+  }), schema, hyperdrive);
 }

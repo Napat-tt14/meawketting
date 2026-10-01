@@ -5,6 +5,7 @@ import { be1Error } from "./be1/errors";
 
 export type BackendEnvironment = {
   DATABASE_URL?: string;
+  HYPERDRIVE?: { connectionString: string };
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -22,8 +23,10 @@ export function database() {
   const current = backendContext();
   if (current.env.MEAWKETTING_AUTH_MODE === "dev-test" && process.env.NODE_ENV === "production") throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
   if (current.database) return current.database;
-  if (!current.env.DATABASE_URL) throw be1Error("PERSISTENCE_ERROR");
-  return current.database ??= connectPostgres(current.env.DATABASE_URL);
+  const hyperdrive = current.env.HYPERDRIVE;
+  const url = hyperdrive?.connectionString ?? current.env.DATABASE_URL;
+  if (!url) throw be1Error("PERSISTENCE_ERROR");
+  return current.database ??= connectPostgres(url, "public", Boolean(hyperdrive));
 }
 export async function withBackend(request: Request, env: BackendEnvironment, next: () => Promise<Response>) {
   const current: Context = { env, request, cookies: [] };

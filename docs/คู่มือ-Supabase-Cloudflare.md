@@ -2,6 +2,10 @@
 
 อัปเดต 1 ตุลาคม 2026 — เชื่อม Supabase กับ Worker เว็บจริง `meawketting` บน <https://meawketting.com> เพิ่มเติมจาก Worker ทดลอง การยืนยัน Login ครบทั้งรอบต้องให้ผู้ใช้เข้าสู่ระบบและกลับมาถึงเว็บจริง
 
+**ผลตรวจล่าสุด:** deploy `13d647f` สำเร็จและ Google กลับมาถึง callback ได้แล้ว แต่ยังติดการเชื่อม PostgreSQL ที่ Worker ไม่เชื่อถือ Supabase CA (`person-link-query`) การส่ง `ca` ให้ Node TLS ใน workerd ยังไม่แก้ปัญหานี้ โค้ดรองรับ Hyperdrive เตรียมและทดสอบแล้ว แต่ยังไม่ได้สร้าง/ผูก binding จึงยังไม่ถือว่า Login เว็บจริงสำเร็จ ส่วน LINE ยังรอบันทึก Callback URL ใน LINE Developers
+
+แนวทางแก้: Cloudflare Hyperdrive ใช้บัญชี `meawketting_production`, ใบรับรองสาธารณะ `scripts/certs/supabase-prod-ca-2021.crt`, SSL mode `verify-full`, ปิด query cache และผูก `HYPERDRIVE` กับ Worker โค้ดจะใช้ connectionString จาก binding แทน `DATABASE_URL` การเชื่อมจาก Hyperdrive ไป Supabase ตรวจ TLS ที่ Hyperdrive; socket ภายในจาก Worker ไป binding จัดการโดย Cloudflare ไม่ปิด TLS ของฐานข้อมูลโดยตรง อ้างอิง [Hyperdrive SSL certificates](https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/), [Postgres.js configuration](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-drivers-and-libraries/postgres-js/)
+
 ## Google และ LINE Login บนเว็บจริง
 
 - Cloudflare → **Workers & Pages** → **meawketting** → **Settings** → **Variables and Secrets**: ใช้ Secrets `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` อย่าใส่รหัสจริงใน Git

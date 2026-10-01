@@ -20,3 +20,19 @@ test("missing database configuration fails closed in request context", async () 
     return new Response(null);
   });
 });
+
+test("Hyperdrive binding takes precedence and runs parameterized queries in a transaction", async () => {
+  await withBackend(new Request("https://shop.test/api/auth/google/callback"), {
+    HYPERDRIVE: { connectionString: process.env.MEAWKETTING_TEST_DATABASE_URL! },
+    DATABASE_URL: "postgres://unused:unused@unconfigured.invalid/postgres",
+  }, async () => {
+    const db = database();
+    const results = await db.batch([
+      db.prepare("SELECT ?::integer AS value").bind(42),
+      db.prepare("SELECT ?::text AS value").bind("a 'quoted' value"),
+    ]);
+    assert.equal(results[0].results?.[0]?.value, 42);
+    assert.equal(results[1].results?.[0]?.value, "a 'quoted' value");
+    return new Response(null);
+  });
+});

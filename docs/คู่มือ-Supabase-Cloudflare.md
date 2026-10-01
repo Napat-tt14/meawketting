@@ -2,9 +2,11 @@
 
 อัปเดต 1 ตุลาคม 2026 — เชื่อม Supabase กับ Worker เว็บจริง `meawketting` บน <https://meawketting.com> เพิ่มเติมจาก Worker ทดลอง การยืนยัน Login ครบทั้งรอบต้องให้ผู้ใช้เข้าสู่ระบบและกลับมาถึงเว็บจริง
 
-**ผลตรวจล่าสุด:** deploy `13d647f` สำเร็จและ Google กลับมาถึง callback ได้แล้ว แต่ยังติดการเชื่อม PostgreSQL ที่ Worker ไม่เชื่อถือ Supabase CA (`person-link-query`) การส่ง `ca` ให้ Node TLS ใน workerd ยังไม่แก้ปัญหานี้ โค้ดรองรับ Hyperdrive เตรียมและทดสอบแล้ว แต่ยังไม่ได้สร้าง/ผูก binding จึงยังไม่ถือว่า Login เว็บจริงสำเร็จ ส่วน LINE ยังรอบันทึก Callback URL ใน LINE Developers
+**ผลตรวจล่าสุด:** deploy `13d647f` สำเร็จและ Google กลับมาถึง callback ได้แล้ว แต่ติดการเชื่อม PostgreSQL ที่ Worker ไม่เชื่อถือ Supabase CA (`person-link-query`) จึงสร้าง Hyperdrive `meawketting-production` แล้ว โดยหมุนรหัส `meawketting_production` และอัปเดต Worker Secret สำเร็จ โค้ดรองรับ binding และผ่านการทดสอบแล้ว ยังต้อง deploy binding และทดสอบ Login บนเว็บจริง ส่วน LINE บันทึก Callback URL ใน LINE Developers เรียบร้อยแล้ว
 
 แนวทางแก้: Cloudflare Hyperdrive ใช้บัญชี `meawketting_production`, ใบรับรองสาธารณะ `scripts/certs/supabase-prod-ca-2021.crt`, SSL mode `verify-full`, ปิด query cache และผูก `HYPERDRIVE` กับ Worker โค้ดจะใช้ connectionString จาก binding แทน `DATABASE_URL` การเชื่อมจาก Hyperdrive ไป Supabase ตรวจ TLS ที่ Hyperdrive; socket ภายในจาก Worker ไป binding จัดการโดย Cloudflare ไม่ปิด TLS ของฐานข้อมูลโดยตรง อ้างอิง [Hyperdrive SSL certificates](https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/), [Postgres.js configuration](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-drivers-and-libraries/postgres-js/)
+
+Hyperdrive ID `ce743e399bc94e67a5b525a679f556bf` อยู่ใน `vite.config.ts` เฉพาะ production build; origin คือ `db.mgieoxfeqvcklhzxqnnl.supabase.co:5432`, database `postgres`, user `meawketting_production` และ CA ID `f8416f6b-5bf7-4d02-81ac-3d1ccf817af2` รหัสจริงเก็บใน Cloudflare เท่านั้น หากเปลี่ยนรหัส ให้เข้า **Storage & databases → Hyperdrive → meawketting-production** แล้วแก้ origin credentials พร้อม Secret `DATABASE_URL` ใน Worker ให้ตรงกัน
 
 ## Google และ LINE Login บนเว็บจริง
 
@@ -17,7 +19,7 @@
 - LINE ใช้ scopes `openid profile` และอนุญาตบัญชีไม่มีอีเมลใน Supabase หาก Channel ยังเป็น **Developing** จะล็อกอินได้เฉพาะ Admin/Tester; การเปิดให้ทุกคนใช้ต้อง Publish Channel หลังตรวจ flow เสร็จ
 - เปิด `/business/login` แล้วกดผู้ให้บริการ บัญชีใหม่ไป `/business/register` เพื่อยืนยันข้อมูลร้าน บัญชีที่ผูกกับร้านและมีสิทธิ์แล้วไป `/business/home` การล็อกอินเพียงอย่างเดียวยังไม่สร้างร้าน
 
-หากเปลี่ยนโดเมน ให้แก้ origin ใน `vite.config.ts` และ Redirect URL ใน Supabase แล้ว push `main` หากหมุนรหัสบัญชี `meawketting_production` ให้ผู้ดูแลแก้รหัส role ในฐานข้อมูลและ Secret `DATABASE_URL` ของ Worker `meawketting` ให้ตรงกัน การเปลี่ยนรหัสหลัก `postgres` หรือรหัสเว็บทดลองไม่เปลี่ยนรหัสเว็บจริงโดยอัตโนมัติ
+หากเปลี่ยนโดเมน ให้แก้ origin ใน `vite.config.ts` และ Redirect URL ใน Supabase แล้ว push `main` หากหมุนรหัสบัญชี `meawketting_production` ให้ผู้ดูแลแก้รหัส role ในฐานข้อมูล, Secret `DATABASE_URL` ของ Worker `meawketting` และรหัส origin connection ของ Hyperdrive ให้ตรงกันเมื่อผูก Hyperdrive แล้ว การเปลี่ยนรหัสหลัก `postgres` หรือรหัสเว็บทดลองไม่เปลี่ยนรหัสเว็บจริงโดยอัตโนมัติ
 
 การอัปโหลดสื่อเป็นการตั้งค่าแยกจาก Login และต้องมี `SUPABASE_SERVICE_ROLE_KEY` ใน Worker ด้วย ส่วน LINE Official Account/Messaging API ไม่ใช่ LINE Login
 

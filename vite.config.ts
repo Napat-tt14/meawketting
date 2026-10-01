@@ -45,6 +45,7 @@ export default defineConfig(async ({ command }) => {
               MEAWKETTING_PUBLIC_ORIGIN: "https://meawketting.com",
             },
           ...(command === "build" ? {
+            hyperdrive: [{ binding: "HYPERDRIVE", id: "ce743e399bc94e67a5b525a679f556bf" }],
             ratelimits: [{ name: "API_RATE_LIMITER", namespace_id: "1002", simple: { limit: 300, period: 60 as const } }],
           } : {}),
         },

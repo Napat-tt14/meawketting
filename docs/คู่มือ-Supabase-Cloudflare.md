@@ -1,10 +1,12 @@
 # คู่มือ Supabase และ Cloudflare สำหรับเจ้าของโปรเจกต์
 
-อัปเดต 1 ตุลาคม 2026 — เชื่อม Supabase กับ Worker เว็บจริง `meawketting` บน <https://meawketting.com> เพิ่มเติมจาก Worker ทดลอง การยืนยัน Login ครบทั้งรอบต้องให้ผู้ใช้เข้าสู่ระบบและกลับมาถึงเว็บจริง
+อัปเดต 1 ตุลาคม 2026 — เชื่อม Supabase กับ Worker เว็บจริง `meawketting` บน <https://meawketting.com> และทดสอบ Google/LINE Login จริงแล้ว
 
-**ผลตรวจล่าสุด:** deploy `13d647f` สำเร็จและ Google กลับมาถึง callback ได้แล้ว แต่ติดการเชื่อม PostgreSQL ที่ Worker ไม่เชื่อถือ Supabase CA (`person-link-query`) จึงสร้าง Hyperdrive `meawketting-production` แล้ว โดยหมุนรหัส `meawketting_production` และอัปเดต Worker Secret สำเร็จ โค้ดรองรับ binding และผ่านการทดสอบแล้ว ยังต้อง deploy binding และทดสอบ Login บนเว็บจริง ส่วน LINE บันทึก Callback URL ใน LINE Developers เรียบร้อยแล้ว
+**ผลตรวจล่าสุด:** Cloudflare build `4cebcba2-e820-4fe2-a318-9a804ce7586f` ของ commit `356d67e` build/deploy สำเร็จ พร้อม binding Hyperdrive และทดสอบ Google กับ LINE Login บนเว็บจริงผ่านทั้งสองรายการ: กลับจากผู้ให้บริการผ่าน Supabase และเปิดแบบฟอร์มข้อมูลร้านที่ `/business/register` ได้ ปัญหา PostgreSQL CA ที่ทำให้ callback เด้งกลับ Login แก้แล้ว บัญชีที่ทดสอบยังไม่ผูกกับร้าน จึงยังไม่ได้สร้างร้านหรือทดสอบเข้า dashboard ของร้านจริง LINE Channel ยังเป็น **Developing** ใช้ได้เฉพาะ Admin/Tester
 
 แนวทางแก้: Cloudflare Hyperdrive ใช้บัญชี `meawketting_production`, ใบรับรองสาธารณะ `scripts/certs/supabase-prod-ca-2021.crt`, SSL mode `verify-full`, ปิด query cache และผูก `HYPERDRIVE` กับ Worker โค้ดจะใช้ connectionString จาก binding แทน `DATABASE_URL` การเชื่อมจาก Hyperdrive ไป Supabase ตรวจ TLS ที่ Hyperdrive; socket ภายในจาก Worker ไป binding จัดการโดย Cloudflare ไม่ปิด TLS ของฐานข้อมูลโดยตรง อ้างอิง [Hyperdrive SSL certificates](https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/), [Postgres.js configuration](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-drivers-and-libraries/postgres-js/)
+
+ตรวจ production build, typecheck และ production tests 7/7 ผ่าน โค้ด runtime/Auth/registration ผ่านชุดทดสอบ PostgreSQL แยก 16/16 ก่อน deploy ไฟล์ชั่วคราวที่ใช้ส่งรหัสให้ Cloudflare ถูกลบแล้ว ไม่เก็บรหัสใน Git
 
 Hyperdrive ID `ce743e399bc94e67a5b525a679f556bf` อยู่ใน `vite.config.ts` เฉพาะ production build; origin คือ `db.mgieoxfeqvcklhzxqnnl.supabase.co:5432`, database `postgres`, user `meawketting_production` และ CA ID `f8416f6b-5bf7-4d02-81ac-3d1ccf817af2` รหัสจริงเก็บใน Cloudflare เท่านั้น หากเปลี่ยนรหัส ให้เข้า **Storage & databases → Hyperdrive → meawketting-production** แล้วแก้ origin credentials พร้อม Secret `DATABASE_URL` ใน Worker ให้ตรงกัน
 

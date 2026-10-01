@@ -52,13 +52,13 @@ export function BusinessPricingSection() {
           const amount = annual ? plan.price * 10 : plan.price;
           return (
             <article key={plan.name} className={`business-pricing__card${plan.icon === "care" ? " business-pricing__card--featured" : ""}`} data-paid={plan.price > 0} aria-labelledby={`plan-${plan.icon}`}>
-              <div className="business-pricing__card-top"><span className="business-pricing__icon"><Icon size={21} /></span>{plan.icon === "care" ? <span className="business-pricing__badge">สำหรับร้านที่มีทีม</span> : null}</div>
+              <div className="business-pricing__card-top"><span className="business-pricing__icon"><Icon size={21} /></span>{plan.price > 0 ? <span className="business-pricing__badge">{plan.icon === "care" ? "สำหรับร้าน 1 สาขา" : "สำหรับร้านหลายสาขา"}</span> : null}</div>
               <h3 id={`plan-${plan.icon}`}>{plan.name}</h3>
               <p className="business-pricing__description">{plan.description}</p>
               <p className="business-pricing__original-price">{annual && plan.price > 0 ? <><span className="sr-only">ราคาเต็มรายปี </span><s>฿{(plan.price * 12).toLocaleString("en-US")} / ปี</s><span className="business-pricing__discount">ประหยัด {annualSavingsPercent}%</span></> : null}</p>
               <div className="business-pricing__price" aria-live="polite" aria-atomic="true"><span className="sr-only">{plan.price === 0 ? "ฟรี 0 บาท" : `${amount.toLocaleString("en-US")} บาทต่อ${annual ? "ปี" : "เดือน"}`}</span><span className="business-pricing__price-visual" aria-hidden="true">{plan.price === 0 ? <strong>Free</strong> : <><span>฿</span><AnimatedPrice amount={amount} /><span>/{annual ? "ปี" : "เดือน"}</span></>}</span></div>
               <p key={plan.price === 0 ? "free" : annual ? "annual" : "monthly"} className="business-pricing__saving">{plan.price === 0 ? "ใช้ฟรี สำหรับร้านที่เพิ่งเริ่มต้น" : annual ? "จ่ายครั้งเดียว ใช้ได้ 12 เดือน" : "จ่ายเป็นรายเดือน"}</p>
-              <dl className="business-pricing__limits"><div><dt>สาขา</dt><dd>{plan.branches} <span>สาขา</span></dd></div><div><dt>ลูกค้าต่อวัน</dt><dd>{plan.price === 0 ? <>3 <span>คน</span></> : "ไม่จำกัด"}</dd></div></dl>
+              <dl className="business-pricing__limits"><div><dt>สาขา</dt><dd>{plan.branches} <span>สาขา</span></dd></div><div><dt>เข้าพักต่อเดือน</dt><dd>{plan.monthlyStays === null ? "ไม่จำกัด" : <>{plan.monthlyStays} <span>ครั้ง</span></>}</dd></div></dl>
               <a className={`button ${plan.icon === "care" ? "button--business" : "button--business-ghost"}`} href="/business/register">{plan.action} <ArrowRight size={17} /></a>
               <ul aria-label={`สิ่งที่รวมใน ${plan.name}`}>{plan.features.map((feature) => <li key={feature}><CheckCircle size={17} /><span>{feature}</span></li>)}{plan.price === 0 ? <li className="business-pricing__unavailable"><X size={17} /><span>สแกน QR เช็กอินไม่ได้</span></li> : null}</ul>
             </article>

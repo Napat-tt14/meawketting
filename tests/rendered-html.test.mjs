@@ -1039,13 +1039,24 @@ test("renders homepage SEO, crawl routes and pricing offers for both billing per
   assert.ok(comparison, "plan comparison is server rendered");
   const branches = comparison.match(/<tr><th[^>]*>จำนวนสาขา<\/th>([\s\S]*?)<\/tr>/)?.[1];
   const branchCells = [...branches.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1].replace(/<[^>]+>/g, ""));
-  assert.deepEqual(branchCells, ["1 สาขา", "3 สาขา", "10 สาขา"]);
-  const limits = comparison.match(/<tr><th[^>]*>ลูกค้าที่รับได้ต่อวัน<\/th>([\s\S]*?)<\/tr>/)?.[1];
-  assert.match(limits, /3 คน \/ วัน/);
+  assert.deepEqual(branchCells, ["1 สาขา", "1 สาขา", "10 สาขา"]);
+  const limits = comparison.match(/<tr><th[^>]*>การเข้าพัก<\/th>([\s\S]*?)<\/tr>/)?.[1];
+  assert.match(limits, /10 ครั้ง \/ เดือน/);
   assert.equal((limits.match(/ไม่จำกัด/g) ?? []).length, 2);
+  assert.match(comparison, /3 รายการ \/ การเข้าพัก/);
+  assert.match(comparison, /5 รูป \/ การเข้าพัก/);
   const qr = comparison.match(/<tr><th[^>]*>สแกน QR เพื่อเช็กอิน<\/th>([\s\S]*?)<\/tr>/)?.[1];
   const qrCells = [...qr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1].replace(/<[^>]+>/g, ""));
   assert.deepEqual(qrCells, ["ไม่ได้", "ได้", "ได้"]);
+  const rooms = comparison.match(/<tr><th[^>]*>ห้องพัก<\/th>([\s\S]*?)<\/tr>/)?.[1];
+  assert.equal((rooms.match(/>ได้</g) ?? []).length, 3);
+  for (const feature of ["พนักงานหลายคน", "Branding ร้าน (โลโก้และชื่อร้าน)", "Export (ส่งออกข้อมูล)"]) {
+    const row = [...comparison.matchAll(/<tr><th[^>]*>([^<]+)<\/th>([\s\S]*?)<\/tr>/g)].find((match) => match[1] === feature)?.[2];
+    assert.ok(row, feature);
+    assert.match(row, /ไม่ได้/);
+    assert.equal((row.match(/ไม่ได้/g) ?? []).length, 1);
+  }
+  assert.doesNotMatch(markup, /3 คน \/ วัน|ลูกค้าที่รับได้ต่อวัน|Paw Care รองรับสูงสุด 3 สาขา/);
   const json = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(json, "structured data is server rendered");
   const graph = JSON.parse(json)["@graph"];

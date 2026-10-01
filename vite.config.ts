@@ -32,9 +32,21 @@ export default defineConfig(async ({ command }) => {
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: {
           ...localBindingConfig,
-          // This caller-controlled identity mode exists for local development
-          // only. Production uses Supabase identity and server authorization.
-          vars: { MEAWKETTING_AUTH_MODE: command === "serve" ? process.env.MEAWKETTING_AUTH_MODE ?? "dev-test" : "supabase" },
+          name: "meawketting",
+          compatibility_date: "2026-05-15",
+          // Secrets stay in Cloudflare/.dev.vars. Keep production bindings in
+          // the build so GitHub deployments retain the real login configuration.
+          vars: command === "serve"
+            ? { MEAWKETTING_AUTH_MODE: process.env.MEAWKETTING_AUTH_MODE ?? "supabase" }
+            : {
+              MEAWKETTING_AUTH_MODE: "supabase",
+              MEAWKETTING_ENV: "production",
+              MEAWKETTING_FIXTURE_MODE: "off",
+              MEAWKETTING_PUBLIC_ORIGIN: "https://meawketting.com",
+            },
+          ...(command === "build" ? {
+            ratelimits: [{ name: "API_RATE_LIMITER", namespace_id: "1002", simple: { limit: 300, period: 60 as const } }],
+          } : {}),
         },
       }),
     ],

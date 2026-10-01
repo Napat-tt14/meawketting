@@ -1,8 +1,23 @@
 # คู่มือ Supabase และ Cloudflare สำหรับเจ้าของโปรเจกต์
 
-อัปเดต 27 กันยายน 2026 — โปรเจกต์ Supabase `mgieoxfeqvcklhzxqnnl` และ Worker ทดลอง `meawketting-pilot` ใช้งานอยู่ที่ <https://meawketting-pilot.ane049116049.workers.dev> ส่วน Worker เว็บจริงและโดเมน `meawketting.com` ไม่ได้เปลี่ยนในการตั้งค่าครั้งนี้
+อัปเดต 1 ตุลาคม 2026 — เชื่อม Supabase กับ Worker เว็บจริง `meawketting` บน <https://meawketting.com> เพิ่มเติมจาก Worker ทดลอง การยืนยัน Login ครบทั้งรอบต้องให้ผู้ใช้เข้าสู่ระบบและกลับมาถึงเว็บจริง
 
-## ตอนนี้ตั้งค่าอะไรแล้ว
+## Google และ LINE Login บนเว็บจริง
+
+- Cloudflare → **Workers & Pages** → **meawketting** → **Settings** → **Variables and Secrets**: ใช้ Secrets `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` อย่าใส่รหัสจริงใน Git
+- `DATABASE_URL` เว็บจริงใช้บัญชี `meawketting_production` ผ่าน transaction pooler พอร์ต `6543` บัญชีนี้รับสิทธิ์แอปจาก `meawketting_runtime` แต่มีรหัสแยกจากเว็บทดลอง ไม่มีสิทธิ์ผู้ดูแล/สร้างฐานข้อมูล/สร้าง role/ข้าม RLS และอ่าน migration ledger ไม่ได้
+- ค่าที่ไม่ใช่รหัสลับอยู่ใน `vite.config.ts`: Auth mode `supabase`, environment `production`, fixtures `off`, origin `https://meawketting.com` และ binding `API_RATE_LIMITER` การ push `main` จะ build และ deploy อัตโนมัติผ่าน Cloudflare
+- Supabase → **Authentication** → **Sign In / Providers**: Google ใช้ Google Client ID/Secret ส่วน `custom:line` ใช้ LINE Channel ID/Secret รหัสของผู้ให้บริการอยู่ใน Supabase ไม่ต้องใส่ Google/LINE Client Secret ใน Worker
+- Google Cloud → OAuth Web client → **Authorized redirect URIs** และ LINE Developers → **Meawketting Business** → **LINE Login** → **Callback URL** ใช้ `https://mgieoxfeqvcklhzxqnnl.supabase.co/auth/v1/callback` เหมือนกัน
+- Supabase → **Authentication** → **URL Configuration**: Site URL `https://meawketting.com`, Redirect URL `https://meawketting.com/api/auth/google/callback` ทั้ง Google และ LINE ใช้ callback ของแอปเส้นทางเดียวกัน
+- LINE ใช้ scopes `openid profile` และอนุญาตบัญชีไม่มีอีเมลใน Supabase หาก Channel ยังเป็น **Developing** จะล็อกอินได้เฉพาะ Admin/Tester; การเปิดให้ทุกคนใช้ต้อง Publish Channel หลังตรวจ flow เสร็จ
+- เปิด `/business/login` แล้วกดผู้ให้บริการ บัญชีใหม่ไป `/business/register` เพื่อยืนยันข้อมูลร้าน บัญชีที่ผูกกับร้านและมีสิทธิ์แล้วไป `/business/home` การล็อกอินเพียงอย่างเดียวยังไม่สร้างร้าน
+
+หากเปลี่ยนโดเมน ให้แก้ origin ใน `vite.config.ts` และ Redirect URL ใน Supabase แล้ว push `main` หากหมุนรหัสบัญชี `meawketting_production` ให้ผู้ดูแลแก้รหัส role ในฐานข้อมูลและ Secret `DATABASE_URL` ของ Worker `meawketting` ให้ตรงกัน การเปลี่ยนรหัสหลัก `postgres` หรือรหัสเว็บทดลองไม่เปลี่ยนรหัสเว็บจริงโดยอัตโนมัติ
+
+การอัปโหลดสื่อเป็นการตั้งค่าแยกจาก Login และต้องมี `SUPABASE_SERVICE_ROLE_KEY` ใน Worker ด้วย ส่วน LINE Official Account/Messaging API ไม่ใช่ LINE Login
+
+## บันทึกการตั้งค่าฐานข้อมูลและเว็บทดลอง ณ 27 กันยายน 2026
 
 - รัน migration ฐานข้อมูล 4 ไฟล์แล้ว มีตารางแอป, ระบบเชื่อมผู้ใช้, ข้อมูลสื่อ และการสมัครร้าน
 - สร้างบัญชีฐานข้อมูล `meawketting_runtime` สำหรับ Worker พร้อมสิทธิ์เฉพาะตารางแอปและ RLS policy สำหรับบัญชีนี้ Worker ไม่ใช้รหัส `postgres`

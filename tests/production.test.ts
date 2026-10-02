@@ -54,6 +54,40 @@ test("Worker wraps streaming replies with headers and bounded PII-free failure e
   assert.match(html.headers.get("permissions-policy")!, /camera=\(self\)/);
 });
 
+test("guest signup status is quiet, while real auth failures retain safe route evidence", async () => {
+  const events: unknown[] = [];
+  const run = (path: string, method = "GET", status = 401) => secureFetch(new Request(`https://shop.test${path}`, { method }), {},
+    async () => Response.json({ error: "UNAUTHENTICATED" }, { status }), event => events.push(event));
+  const guest = await run("/api/business/register?email=private");
+  assert.equal(guest.status, 401);
+  assert.deepEqual(events, []);
+  assert.ok(guest.headers.get("x-request-id"));
+  await run("/api/business/register", "POST");
+  await run("/api/auth/email/login?password=private", "POST");
+  await run("/api/business/register", "GET", 403);
+  assert.deepEqual(events.map(event => (event as { route: string }).route), ["/api/business/register", "/api/auth/email/login", "/api/business/register"]);
+  assert.doesNotMatch(JSON.stringify(events), /private|email=|password=/);
+  let limiterKey = "";
+  await secureFetch(new Request("https://shop.test/api/auth/email/login"), { API_RATE_LIMITER: { limit: async ({ key }) => { limiterKey = key; return { success: true }; } } }, async () => new Response("ok"));
+  assert.equal(limiterKey, "/api/other:unknown");
+});
+
+test("development timing uses measured durations without mixing Worker and Node clocks", async () => {
+  const variables = process.env as Record<string, string | undefined>;
+  const previous = variables.NODE_ENV;
+  try {
+    for (const [mode, expected] of [["development", "0,24,94"], ["production", "1790928236600,24,94"]]) {
+      variables.NODE_ENV = mode;
+      const response = await secureFetch(new Request("https://shop.test/business/login"), {},
+        async () => new Response("ok", { headers: { "x-vinext-timing": "1790928236600,24,94" } }));
+      assert.equal(response.headers.get("x-vinext-timing"), expected);
+      assert.equal(await response.text(), "ok");
+    }
+  } finally {
+    if (previous === undefined) delete variables.NODE_ENV; else variables.NODE_ENV = previous;
+  }
+});
+
 test("LINE transient server failures retry with unchanged retry key, credentials never follow redirects", async () => {
   const keys: string[] = [];
   const adapter = new LineChannelAdapter("test-secret", "test-access-token", async (_url, init) => {

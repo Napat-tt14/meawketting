@@ -19,7 +19,7 @@ import { BusinessNavigation } from "./BusinessNavigation";
 
 export function BusinessPortalFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const publicBusinessRoute = pathname === "/business" || pathname === "/business/login" || pathname === "/business/register";
+  const publicBusinessRoute = pathname === "/business" || pathname === "/business/login" || pathname === "/business/register" || pathname === "/business/setup";
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "auth">("loading");
   const [attempt, setAttempt] = useState(0);
 
@@ -39,7 +39,19 @@ export function BusinessPortalFrame({ children }: { children: React.ReactNode })
         }),
       ])))
       .then(() => { if (active) setLoadState("ready"); })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
+        if (!active) return;
+        if (error instanceof Be1ClientError && error.code === "UNAUTHENTICATED") {
+          window.location.replace("/business/login"); return;
+        }
+        if (error instanceof Be1ClientError && error.code === "FORBIDDEN") {
+          try {
+            const response = await fetch("/api/business/register", { credentials: "same-origin", cache: "no-store" });
+            if (response.ok && !(await response.json() as { registered: boolean }).registered) {
+              if (active) window.location.replace("/business/setup"); return;
+            }
+          } catch { /* The retry state below handles unavailable account status. */ }
+        }
         if (active) setLoadState(error instanceof Be1ClientError && ["AUTHENTICATION_NOT_CONFIGURED", "UNAUTHENTICATED"].includes(error.code) ? "auth" : "error");
       });
     return () => { active = false; };

@@ -14911,13 +14911,13 @@ body:has(.page--public-safety) .site-footer {
    small click response as the semantic .button component. Controls that own
    a purposeful pseudo-element are excluded so their visual state remains
    intact. */
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option) {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle) {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)::after {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle)::after {
   content: "";
   position: absolute;
   z-index: 0;
@@ -14932,11 +14932,11 @@ button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-do
   transform: translate(-50%, -50%) scale(0);
 }
 
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):active::after {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle):active::after {
   animation: meaw-button-ripple 240ms ease-out;
 }
 
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)>* {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle)>* {
   position: relative;
   z-index: 1;
 }
@@ -16539,23 +16539,23 @@ option {
   font-size: var(--text-meaw-button);
 }
 
-main :is(button, input, textarea, select, label, legend, a):not(.share-passport *):not(.passport-canvas *) {
+main:not(.business-auth-page):not(.business-setup-page) :is(button, input, textarea, select, label, legend, a):not(.share-passport *):not(.passport-canvas *) {
   font-size: var(--text-meaw-body) !important;
 }
 
-main :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) {
+main:not(.business-auth-page):not(.business-setup-page) :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) {
   font-size: var(--text-meaw-body) !important;
 }
 
-main :is(small, figcaption, dt):not(.share-passport *):not(.passport-canvas *) {
+main:not(.business-auth-page):not(.business-setup-page) :is(small, figcaption, dt):not(.share-passport *):not(.passport-canvas *) {
   font-size: var(--text-meaw-caption) !important;
 }
 
-main :is(button, a, label):not(.share-passport *):not(.passport-canvas *)> :is(span, strong, small) {
+main:not(.business-auth-page):not(.business-setup-page) :is(button, a, label):not(.share-passport *):not(.passport-canvas *)> :is(span, strong, small) {
   font-size: inherit !important;
 }
 
-main :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) strong {
+main:not(.business-auth-page):not(.business-setup-page) :is(p, li, dd):not(.share-passport *):not(.passport-canvas *) strong {
   font-size: inherit !important;
 }
 

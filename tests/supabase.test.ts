@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { withBackend, backendContext } from "../app/_backend/runtime";
 import { connectPostgres } from "../app/_backend/postgres";
-import { SupabaseIdentityAdapter, beginGoogleLogin, finishGoogleLogin, logoutSupabase } from "../app/_backend/supabaseAuth";
+import { SupabaseIdentityAdapter, beginGoogleLogin, finishGoogleLogin, logoutSupabase, emailPasswordRequest } from "../app/_backend/supabaseAuth";
 import { imageType, readMedia, uploadMedia } from "../app/_backend/media";
+import { GET as googleStart } from "../app/api/auth/google/start/route";
+import { GET as lineStart } from "../app/api/auth/line/start/route";
 import { seededDatabase, OWNER, WHISKER, ARI, STAFF } from "./postgresFixtures";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -74,6 +76,26 @@ test("local Google login uses an HTTP localhost callback and host-only developme
     else variables.NODE_ENV = previous;
   }
 });
+
+test("both OAuth entry routes preserve signup intent and diagnose configuration without leaking credentials", async t => {
+  const events: string[] = [];
+  t.mock.method(console, "warn", (event: string) => { events.push(event); });
+  for (const [provider, handler] of [["google", googleStart], ["custom:line", lineStart]] as const) {
+    const request = req(`/api/auth/${provider === "google" ? "google" : "line"}/start?intent=register&secret=private`, "");
+    const success = await withBackend(request, env, () => handler(request));
+    assert.equal(new URL(success.headers.get("location")!).searchParams.get("provider"), provider);
+    const mismatch = await withBackend(request, { ...env, MEAWKETTING_PUBLIC_ORIGIN: "https://other.test" }, () => handler(request));
+    assert.equal(mismatch.headers.get("location"), "https://shop.test/business/register?error=origin-mismatch");
+    assert.equal(mismatch.headers.has("set-cookie"), false);
+    const missing = await withBackend(request, { ...env, SUPABASE_PUBLISHABLE_KEY: undefined }, () => handler(request));
+    assert.equal(missing.headers.get("location"), "https://shop.test/business/register?error=not-configured");
+    const invalid = await withBackend(request, { ...env, SUPABASE_URL: "not-a-url" }, () => handler(request));
+    assert.equal(invalid.headers.get("location"), "https://shop.test/business/register?error=not-configured");
+  }
+  assert.ok(events.some(event => JSON.parse(event).reason === "origin-mismatch"));
+  assert.ok(events.some(event => JSON.parse(event).reason === "supabase-config"));
+  assert.doesNotMatch(events.join("\n"), /private|synthetic-anon-key|secret=|https:/);
+});
 test("private media validates types, denies cross-Branch reads, and only signs authorized opaque paths", async t => {
   const db=seededDatabase(), id=crypto.randomUUID();
   db.inspect.prepare("INSERT INTO auth_person_links(auth_user_id,person_id) VALUES(?::uuid,?)").run(userId,OWNER);
@@ -119,12 +141,100 @@ test("Google callback accepts only an explicitly mapped active membership and ne
       return finishGoogleLogin(request);
     });
   };
-  assert.equal((await run()).headers.get("location"), "https://shop.test/business/register");
+  assert.equal((await run()).headers.get("location"), "https://shop.test/business/setup");
   db.inspect.prepare("INSERT INTO auth_person_links(auth_user_id,person_id) VALUES(?::uuid,?)").run(userId,OWNER);
   assert.equal((await run()).headers.get("location"),"https://shop.test/business/home");
   db.inspect.prepare("UPDATE business_memberships SET status='inactive' WHERE person_id=?").run(OWNER);
-  assert.match((await run()).headers.get("location")!, /login\?error=try-again$/);
+  const rejected = await run();
+  assert.match(rejected.headers.get("location")!, /login\?error=try-again$/);
+  assert.match(rejected.headers.getSetCookie().filter(value => value.startsWith("__Host-meawketting-auth=")).at(-1) ?? "", /Max-Age=0/);
   assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n,6);
+});
+
+test("email signup waits for confirmation, uses PKCE and never creates domain authority", async t => {
+  const db = seededDatabase();
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (url: string, init?: RequestInit) => {
+    const target = new URL(String(url));
+    assert.equal(target.pathname, "/auth/v1/signup");
+    assert.equal(target.searchParams.get("redirect_to"), "https://shop.test/api/auth/google/callback");
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.email, "new@example.test");
+    assert.equal(body.password, "synthetic-password");
+    assert.equal(body.code_challenge_method, "s256");
+    assert.ok(body.code_challenge); calls++;
+    return Response.json({ id: userId, aud: "authenticated", app_metadata: { provider: "email" }, email: body.email });
+  });
+  const request = new Request("https://shop.test/api/auth/email/register", { method: "POST", headers: { origin: "https://shop.test", "content-type": "application/json" }, body: JSON.stringify({ email: " new@example.test ", password: "synthetic-password" }) });
+  const response = await withBackend(request, env, async () => {
+    backendContext().database = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL!, db.schema);
+    return emailPasswordRequest(request, "register");
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { confirmationRequired: true });
+  assert.equal(calls, 1);
+  assert.match(response.headers.get("set-cookie")!, /code-verifier=.*HttpOnly/);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM auth_person_links").get()?.n, 0);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n, 6);
+});
+
+test("email login and session signup route new accounts to setup and active members to Home", async t => {
+  const db = seededDatabase();
+  const user = { id: userId, email: "new@example.test", email_confirmed_at: "2026-10-02T00:00:00Z", aud: "authenticated", role: "authenticated", app_metadata: { provider: "email" }, user_metadata: { role: "OWNER" } };
+  const session = { ...JSON.parse(Buffer.from(cookie().split("base64-")[1], "base64url").toString()), user, expires_in: 3600 };
+  t.mock.method(globalThis, "fetch", async (url: string) => String(url).includes("/user") ? Response.json(user) : Response.json(session));
+  const run = (mode: "register" | "login" = "login") => {
+    const request = new Request(`https://shop.test/api/auth/email/${mode}`, { method: "POST", headers: { origin: "https://shop.test", "content-type": "application/json" }, body: JSON.stringify({ email: user.email, password: "synthetic-password" }) });
+    return withBackend(request, env, async () => {
+      backendContext().database = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL!, db.schema);
+      return emailPasswordRequest(request, mode);
+    });
+  };
+  for (const mode of ["register", "login"] as const) {
+    const response = await run(mode);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { redirectTo: "/business/setup" });
+    assert.match(response.headers.get("set-cookie")!, /__Host-meawketting-auth=.*HttpOnly/);
+    assert.match(response.headers.get("set-cookie")!, /Secure/);
+  }
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 0);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n, 6);
+  db.inspect.prepare("INSERT INTO auth_person_links(auth_user_id,person_id) VALUES(?::uuid,?)").run(userId, OWNER);
+  assert.deepEqual(await (await run()).json(), { redirectTo: "/business/home" });
+  db.inspect.prepare("UPDATE business_memberships SET status='inactive' WHERE person_id=?").run(OWNER);
+  assert.equal((await run()).status, 403);
+});
+
+test("email auth rejects CSRF, malformed credentials and forged setup/authority before provider calls", async t => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => { calls++; throw new Error("Unexpected provider call"); });
+  const input = { email: "new@example.test", password: "synthetic-password" };
+  const run = (body: unknown, origin: string | undefined = "https://shop.test") => {
+    const request = new Request("https://shop.test/api/auth/email/register", { method: "POST", headers: { "content-type": "application/json", ...(origin ? { origin } : {}) }, body: JSON.stringify(body) });
+    return withBackend(request, env, () => emailPasswordRequest(request, "register"));
+  };
+  assert.equal((await run(input, "https://evil.test")).status, 403);
+  assert.equal((await run(input, "")).status, 403);
+  for (const body of [{ ...input, role: "OWNER" }, { ...input, businessName: "Forged shop" }, { ...input, returnTo: "https://evil.test" }, { ...input, email: "bad" }, { ...input, password: "short" }, { ...input, password: "x".repeat(129) }, null]) {
+    assert.equal((await run(body)).status, 400);
+  }
+  assert.equal(calls, 0);
+});
+
+test("email auth reports safe credential, confirmation and rate-limit errors", async t => {
+  let status = 400, code = "invalid_credentials";
+  t.mock.method(globalThis, "fetch", async () => Response.json({ code, msg: "private provider error with email/password" }, { status, headers: { "x-supabase-api-version": "2024-01-01" } }));
+  const run = () => {
+    const request = new Request("https://shop.test/api/auth/email/login", { method: "POST", headers: { origin: "https://shop.test", "content-type": "application/json" }, body: JSON.stringify({ email: "new@example.test", password: "synthetic-password" }) });
+    return withBackend(request, env, () => emailPasswordRequest(request, "login"));
+  };
+  assert.deepEqual(await (await run()).json(), { error: "INVALID_CREDENTIALS" });
+  code = "email_not_confirmed";
+  assert.deepEqual(await (await run()).json(), { error: "EMAIL_NOT_CONFIRMED" });
+  status = 429; code = "over_request_rate_limit";
+  const response = await run();
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "RATE_LIMITED" });
 });
 
 test("authorized media upload persists only metadata and compensates Storage when database commit fails", async t => {

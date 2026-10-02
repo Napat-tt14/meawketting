@@ -11,9 +11,16 @@
 # Secrets and local environment files
 .env
 .env.*
+*.env
+*.env.*
 .dev.vars
 .dev.vars.*
-!.env.example
+.evn
+.evn.*
+*.evn
+*.evn.*
+# Only this empty root template belongs in Git.
+!/.env.example
 # Local provider/API credential exports
 /credentials/
 /secrets/
@@ -21,8 +28,6 @@
 *.secrets
 # Local staging configuration; keep wrangler.pilot.example.json tracked
 /wrangler.pilot.json
-.evn
-.evn.*
 
 # Dependencies and generated output
 /node_modules/
@@ -31,6 +36,14 @@
 /dist/
 /.wrangler/
 /coverage/
+# Browser QA reports and local authenticated session snapshots
+/playwright-report/
+/test-results/
+/.auth/
+*.auth-state.json
+# Supabase CLI local project caches
+/supabase/.temp/
+/supabase/.branches/
 /outputs/
 /work/
 /tmp/

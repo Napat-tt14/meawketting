@@ -60,8 +60,10 @@ test("production Business routes never render fixture identity, records or fake 
     assert.doesNotMatch(markup, /site-footer|business-marketing-footer|business-public-footer/);
   }
   const login = await htmlFor("/business/login");
-  assert.match(login, /href="\/api\/auth\/google\/start\?returnTo=%2Fbusiness%2Fhome"/);
-  assert.match(login, /ใช้บัญชีที่เชื่อมกับร้านของคุณ/);
+  assert.match(login, /href="\/api\/auth\/google\/start"/);
+  assert.match(login, /เข้าใช้ครั้งแรก เราจะพาคุณตั้งค่าร้าน/);
+  assert.match(login, /name="email"/);
+  assert.match(login, /autoComplete="current-password"/i);
   assert.match(login, /href="\/api\/auth\/line\/start"/);
   assert.match(login, /href="\/business\/register"/);
   assert.equal((await render("/__debug")).status, 404);
@@ -86,10 +88,28 @@ test("public legal pages share Business chrome, omit the review banner and retai
 
 test("Business signup is a public branded route with one heading and no fixture authority", async () => {
   const html = await htmlFor("/business/register");
-  assert.match(html, /เริ่มต้นร้านในฝัน/);
+  assert.match(html, /สร้างบัญชีของคุณ/);
   assert.match(html, /business-header--auth/);
-  assert.match(html, /กำลังตรวจสอบการเข้าสู่ระบบ/);
+  const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+  assert.equal((markup.match(/<input\b/g) ?? []).length, 2);
+  assert.match(markup, /name="email"/);
+  assert.match(markup, /autoComplete="new-password"/i);
+  assert.match(markup, /\/api\/auth\/google\/start\?intent=register/);
+  assert.match(markup, /\/api\/auth\/line\/start\?intent=register/);
+  assert.doesNotMatch(markup, /name="businessName"|name="phone"|name="modules"/);
   assert.doesNotMatch(html, /กำลังโหลดข้อมูลร้าน|Whisker|Paw Partner/);
+  assert.equal(countRenderedElements(html, "h1"), 1);
+});
+
+test("Business setup has its own three-step route without operational or marketing navigation", async () => {
+  const html = await htmlFor("/business/setup");
+  const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+  assert.match(markup, /ตั้งค่าร้านของคุณ/);
+  assert.match(markup, /ขั้นตอนตั้งค่าร้าน/);
+  assert.match(markup, /ตรวจสอบและเริ่มใช้/);
+  assert.match(markup, /business-header--auth/);
+  assert.match(markup, /กำลังตรวจสอบบัญชีของคุณ/);
+  assert.doesNotMatch(markup, /business-app-frame|business-mobile-nav|site-footer|Whisker|Paw Partner/);
   assert.equal(countRenderedElements(html, "h1"), 1);
 });
 
@@ -1079,16 +1099,16 @@ test("keeps Business Login separate after Consumer login is deferred", async () 
   const [html, removedLoginResponse, businessLogin] = await Promise.all([
     htmlFor("/business/login"),
     render("/login"),
-    readFile(new URL("business/login/BusinessLoginScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessAuthScreen.tsx", appRoot), "utf8"),
   ]);
 
-  assert.match(html, /กลับมาดูแลร้าน/);
+  assert.match(html, /ทุกการดูแลที่ดี/);
   assert.match(html, /เข้าสู่ระบบ/);
   assert.equal(countRenderedElements(html, "h1"), 1);
   assert.equal(removedLoginResponse.status, 404);
   assert.doesNotMatch(businessLogin, /router\.push|setTimeout|continueWithGoogle/);
   assert.match(businessLogin, /api\/auth\/google\/start/);
-  assert.doesNotMatch(businessLogin, /eyebrow|ดำเนินการต่อด้วยบัญชีของคุณ|บัญชีบุคคลเดียวสามารถเป็นทั้งผู้ดูแลสัตว์และสมาชิกของร้านได้/);
+  assert.doesNotMatch(businessLogin, /ดำเนินการต่อด้วยบัญชีของคุณ|บัญชีบุคคลเดียวสามารถเป็นทั้งผู้ดูแลสัตว์และสมาชิกของร้านได้/);
   assert.doesNotMatch(businessLogin, /disabled aria-disabled="true"/);
   assert.doesNotMatch(businessLogin, /DRAFT_PASSPORT_STORAGE_KEY|prototypeClaimed/);
 });
@@ -2906,7 +2926,7 @@ test("uses everyday Thai task language across the Business flow", async () => {
   const [scanner, intake, login] = await Promise.all([
     readFile(new URL("business/scan/BusinessScanner.tsx", appRoot), "utf8"),
     readFile(new URL("business/intake/[intakeId]/BusinessIntake.tsx", appRoot), "utf8"),
-    readFile(new URL("business/login/BusinessLoginScreen.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessAuthScreen.tsx", appRoot), "utf8"),
   ]);
   const copy = scanner + intake + login;
   assert.match(copy, /สแกนรับเข้า/);

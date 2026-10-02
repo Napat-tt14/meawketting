@@ -1,129 +1,64 @@
-/* Public authentication pages share the homepage's warm palette and editorial rhythm. */
-.business-login-page .business-auth-layout {
-  width: min(1180px, calc(100% - 64px));
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr);
-  align-items: center;
-  gap: clamp(32px, 5vw, 76px);
-  padding-block: 52px 64px;
-  min-height: calc(100svh - 80px);
+.business-auth-page { background: radial-gradient(ellipse at 14% 28%, var(--surface-soft), transparent 60%); }
+.business-auth { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); align-items: center; gap: clamp(32px, 6vw, 88px); width: min(1120px, calc(100% - 64px)); padding-block: 56px 72px; min-height: calc(100svh - 96px); }
+.business-auth__story { min-width: 0; }
+.business-auth__eyebrow { display: flex; gap: 8px; align-items: center; color: var(--muted-foreground); font-size: 12px; letter-spacing: .1em; font-weight: 700; }
+.business-auth__eyebrow svg { color: var(--color-meaw-business-primary-hover); }
+.business-auth__story h2 { font-size: clamp(30px, 3.2vw, 44px); line-height: 1.45; letter-spacing: -.035em; margin: 20px 0 14px; }
+.business-auth__story h2 span { display: block; width: fit-content; background: linear-gradient(transparent 66%, var(--primary) 66%, var(--primary) 91%, transparent 91%); }
+.business-auth__story > p { max-width: 400px; font-size: 16px; line-height: 1.85; color: var(--muted-foreground); }
+.business-auth__art { margin: 24px 0 20px; overflow: hidden; border-radius: 28px; }
+.business-auth__art img { display: block; width: 100%; height: auto; }
+.business-auth__footnote { display: flex; align-items: center; gap: 10px; color: var(--muted-foreground); font-size: 13px; }
+.business-auth__footnote svg { color: var(--status-success); flex: none; }
+.business-auth__card { min-width: 0; padding: 32px 36px; border: 1px solid var(--border); border-radius: 28px; background: var(--surface); box-shadow: 0 12px 48px color-mix(in srgb, var(--foreground) 6%, transparent); }
+.business-auth__mark { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 17px; background: var(--surface-soft); color: var(--primary-foreground); margin-bottom: 20px; }
+.business-auth__welcome { margin-bottom: 6px; color: var(--muted-foreground); font-size: 13px; }
+.business-auth__card h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.4; letter-spacing: -.025em; scroll-margin-top: 100px; }
+.business-auth__subtitle { margin: 0 0 24px; color: var(--muted-foreground); font-size: 14px; line-height: 1.75; }
+.business-auth__providers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.business-auth__provider { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer; transition: border-color 180ms, background-color 180ms; }
+.business-auth__provider--line svg { color: #008a3e; }
+.business-auth__provider:hover { border-color: var(--foreground); background: var(--muted); }
+.business-auth__divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--muted-foreground); font-size: 12px; }
+.business-auth__divider::before, .business-auth__divider::after { content: ""; height: 1px; background: var(--border); flex: 1; }
+.business-auth__form fieldset { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.business-auth__form label { font-size: 14px; font-weight: 700; }
+.business-auth__form label:not(:first-child) { margin-top: 8px; }
+.business-auth__form input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; color: var(--foreground); background: var(--background); font: inherit; font-size: 16px; }
+.business-auth__form input::placeholder { color: var(--muted-foreground); }
+.business-auth__password { position: relative; }
+.business-auth__password input { padding-right: 52px; }
+.business-auth__password button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 8px; color: var(--muted-foreground); background: transparent; cursor: pointer; }
+.business-auth__password button:hover { background: var(--muted); color: var(--foreground); }
+.business-auth__form small { color: var(--muted-foreground); font-size: 12px; }
+.business-auth__form .business-auth__submit { width: 100%; min-height: 48px; border-radius: 12px; margin-top: 14px; gap: 10px; }
+.business-auth__form .business-auth__error { margin: 8px 0 0; padding: 12px; border-radius: 10px; background: var(--status-critical-soft); color: var(--status-critical); font-size: 13px; line-height: 1.75; }
+.business-auth__legal { margin: 16px 0 0; font-size: 12px; line-height: 1.8; color: var(--muted-foreground); }
+.business-auth__card a:not(.business-auth__provider):not(.button) { text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
+.business-auth__switch { margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; font-size: 14px; }
+.business-auth__secure { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 14px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.7; }
+.business-auth__secure svg { flex: none; }
+.business-auth__confirmation { display: grid; gap: 16px; }
+.business-auth__confirmation > svg { color: var(--status-success); }
+.business-auth__confirmation p { margin: 0; line-height: 1.8; color: var(--muted-foreground); font-size: 14px; overflow-wrap: anywhere; }
+.business-auth__confirmation strong { color: var(--foreground); }
+.business-auth__text-button { min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); text-decoration: underline; cursor: pointer; font: inherit; font-size: 14px; }
+.business-auth__text-button:hover { color: var(--foreground); }
+.business-auth :is(a, button, input):focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+.business-auth :is(button, input):disabled { opacity: .65; cursor: not-allowed; }
+@media (max-width: 1000px) {
+  .business-auth { width: calc(100% - 40px); gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); }
+  .business-auth__card { padding: 28px; }
 }
-.business-login-page :is(.business-login__story, .business-register__intro) h1 {
-  max-width: none;
-  font-size: clamp(2.25rem, 3.6vw, 3.4rem);
-  line-height: 1.5;
-  letter-spacing: -.035em;
-  margin: 20px 0 16px;
+@media (max-width: 767px) {
+  .business-auth { width: min(480px, calc(100% - 32px)); grid-template-columns: 1fr; min-height: 0; padding-block: 24px 40px; gap: 24px; }
+  .business-auth__story { display: none; }
+  .business-auth__card { padding: 28px 24px; border-radius: 24px; }
 }
-.business-auth-accent { position: relative; isolation: isolate; white-space: nowrap; }
-.business-login-page .business-login__story h1 br { display: block; }
-.business-auth-accent::after {
-  content: "";
-  position: absolute;
-  inset: 68% -3px 3px;
-  z-index: -1;
-  border-radius: 40% 30% 35% 20%;
-  transform: rotate(-3deg);
-  background: var(--color-meaw-business-primary);
+@media (max-width: 374px) {
+  .business-auth { width: calc(100% - 24px); }
+  .business-auth__card { padding: 24px 18px; }
+  .business-auth__card h1 { font-size: 26px; }
+  .business-auth__secure { align-items: flex-start; }
 }
-.business-login-page :is(.business-login__kicker, .business-register__eyebrow) {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  padding: 9px 13px;
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  background: var(--color-meaw-business-accent);
-  color: var(--color-meaw-business-accent-foreground);
-  font-size: 11px;
-  letter-spacing: .09em;
-}
-.business-login-page :is(.business-login__story, .business-register__intro) > p {
-  font-size: 16px;
-  line-height: 1.9;
-  color: var(--muted-foreground);
-}
-.business-login-page :is(.business-login__scene, .business-register__visual) {
-  min-height: 0;
-  margin: 28px 0 24px;
-  padding: 0;
-  border-radius: 28px;
-  border: 0;
-  background: var(--color-meaw-business-accent);
-  box-shadow: none;
-}
-.business-login-page :is(.business-login__art, .business-register__illustration) {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-  margin: 0;
-  border-radius: 28px;
-  filter: none;
-}
-.business-login-page .business-register__visual-orbit { display: none; }
-.business-login-page :is(.business-login__scene-tag--top, .business-register__visual-tag--top) { top: -12px; right: 12px; }
-.business-login-page :is(.business-login__scene-tag--bottom, .business-register__visual-tag--bottom) { bottom: -12px; left: 12px; }
-.business-login-page :is(.business-login__card, .business-register__card) {
-  position: relative;
-  border-radius: 28px;
-  border: 1px solid var(--border);
-  border-top: 5px solid var(--color-meaw-business-primary);
-  background: var(--surface);
-  padding: clamp(24px, 3vw, 40px);
-  box-shadow: 0 18px 50px color-mix(in srgb, var(--color-meaw-business-paw) 8%, transparent);
-}
-.business-auth-card-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted-foreground); margin-bottom: 16px; }
-.business-login-page .business-register__steps { margin-bottom: 12px; padding-bottom: 22px; }
-.business-login-page .business-register__proof { margin-top: 30px; box-shadow: none; background: transparent; border: 0; padding: 0; }
-.business-login-page :is(.business-login__trust, .business-register__trust) { display: flex; flex-wrap: wrap; gap: 12px 20px; }
-.business-login-page :is(.business-login__trust, .business-register__trust) > span { min-height: 0; padding: 0; background: transparent; border: 0; font-size: 12px; font-weight: 400; }
-.business-login-page .business-register__identity > p:last-child { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 12px; margin-bottom: 0; }
-.business-login-page .business-register__identity small { margin-top: 8px; }
-@media (max-width: 900px) {
-  .business-login-page .business-auth-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, .9fr); gap: 28px; width: calc(100% - 40px); }
-  .business-login-page :is(.business-login__story, .business-register__intro) h1 { font-size: 2.15rem; }
-}
-@media (max-width: 700px) {
-  .business-login-page .business-auth-layout { width: min(100% - 36px, 520px); grid-template-columns: 1fr; gap: 28px; padding-block: 28px 40px; min-height: 0; }
-  .business-login-page :is(.business-login__story, .business-register__intro) h1 { font-size: clamp(1.9rem, 7.5vw, 2.6rem); margin-top: 16px; }
-  .business-login-page :is(.business-login__story, .business-register__intro) > p { font-size: 14px; }
-  .business-login-page :is(.business-login__scene, .business-register__visual) { max-width: 380px; margin: 24px auto; }
-  .business-login-page :is(.business-login__card, .business-register__card) { padding: 24px; border-radius: 24px; }
-  .business-login-page .business-register__fields { grid-template-columns: 1fr; }
-}
-
-/* Public login and signup use the same gentle rhythm as the landing page. */
-@media (prefers-reduced-motion: no-preference) {
-  .business-login-page :is(.business-login__story, .business-register__intro, .business-login__card) { animation: none; }
-  .business-login-page .business-auth-layout > div > * {
-    animation: business-auth-enter 620ms cubic-bezier(.22, 1, .36, 1) var(--auth-entry-delay, 0ms) backwards;
-  }
-  .business-login-page .business-auth-layout > div > :nth-child(2) { --auth-entry-delay: 50ms; }
-  .business-login-page .business-auth-layout > div > :nth-child(3) { --auth-entry-delay: 100ms; }
-  .business-login-page .business-auth-layout > div > :nth-child(4) { --auth-entry-delay: 150ms; }
-  .business-login-page .business-auth-layout > div > :nth-child(5) { --auth-entry-delay: 200ms; }
-  .business-login-page .business-auth-layout > div > :nth-child(n + 6) { --auth-entry-delay: 250ms; }
-  .business-login-page .business-register__card > :is(.business-register__identity, .business-register__form) { animation: business-auth-enter 360ms cubic-bezier(.22, 1, .36, 1) backwards; }
-  .business-login-page .business-auth-layout > div > :focus-within { animation-duration: 0s; animation-delay: 0s; }
-  .business-login-page .business-auth-layout > div > :is([role="alert"], [role="status"]) { animation: none; }
-  :is(.business-login-page, .business-header--auth) .button {
-    transition: transform 220ms cubic-bezier(.22, 1, .36, 1), background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, color 220ms ease;
-  }
-  :is(.business-login-page, .business-header--auth) .button > svg { transition: translate 220ms cubic-bezier(.22, 1, .36, 1); }
-  .business-login-page .business-register__steps :is(li, span) { transition: color 220ms ease, background-color 220ms ease, box-shadow 220ms ease; }
-  .business-login-page .business-register__form input[type="checkbox"] { transition: accent-color 180ms ease; }
-  @keyframes business-auth-enter { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
-}
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  :is(.business-login-page, .business-header--auth) .button:not(:disabled):not([aria-disabled="true"]):hover { transform: translateY(-2px); }
-  .business-register__form .business-register__services label:not(:has(input:disabled)):hover { border-color: var(--color-meaw-business-primary-hover); }
-  .business-header--auth .button:hover > svg { translate: -3px 0; }
-  .business-register__form .button:not(:disabled):hover > svg { translate: 3px 0; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  :is(.business-login-page, .business-header--auth) .button:not(:disabled):not([aria-disabled="true"]):active { transform: translateY(0) scale(.98); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .business-login-page *, .business-login-page *::before, .business-login-page *::after { animation: none !important; transition: none !important; }
-}
+@media (prefers-reduced-motion: reduce) { .business-auth * { transition: none !important; } }

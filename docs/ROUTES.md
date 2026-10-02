@@ -12,7 +12,7 @@ Owner: Product Architecture / Front-end
 
 This file owns URLs and navigation destinations only. Wizard steps, tabs, task states, boards, modals and reusable errors are not routes by default.
 
-2026-09-20 addition: `/business/register` is the public Google/LINE Business signup page. `/api/business/register` handles server-verified onboarding; `/api/auth/line/start` starts Supabase LINE OAuth. Both providers share `/api/auth/google/callback`. See [registration](./BUSINESS_REGISTRATION.md). Guardian LINE access is PLANNED, not implemented.
+2026-10-02 auth flow: `/business/register` creates an account with email/password or Google/LINE; `/business/setup` is the separate three-step first-store setup. `POST /api/auth/email/register` and `/login` handle password auth. `/api/business/register` handles server-verified setup; Google, LINE and email confirmation share `/api/auth/google/callback`. New accounts go to setup, completed accounts go to Home. See [registration](./BUSINESS_REGISTRATION.md). Guardian LINE access is PLANNED, not implemented.
 
 ## Consumer / Guardian route status
 
@@ -46,8 +46,9 @@ BE1 exposes typed same-origin `POST /api/be1` for identity/Business/Branch confi
 | `/` | **Business-first Landing (Canonical Commercial Homepage)** | LIVE LOCAL; primary CTA `/business/login`; owner entry secondary |
 | `/privacy` | Thai privacy notice with summary and section navigation | LOCAL DRAFT added 2026-09-17; noindex until operator/contact, retention and provider details are confirmed |
 | `/terms` | Thai platform terms with summary and section navigation | LOCAL DRAFT added 2026-09-17; no effective date or implied acceptance; linked from the landing footer |
-| `/business/login` | Business Login with Supabase Google/LINE entry | IMPLEMENTED code; real provider configuration required |
-| `/business/register` | Explicit first-store registration after verified Google/LINE identity | IMPLEMENTED code; no Guardian authority created; external provider configuration required |
+| `/business/login` | Email/password and Google/LINE login | IMPLEMENTED code; server checks setup completion before Home |
+| `/business/register` | Two-field email/password or Google/LINE account signup | IMPLEMENTED code; creates no domain authority; real provider configuration required |
+| `/business/setup` | Three-step first-store setup for a verified account | IMPLEMENTED code; explicit confirmation creates one atomic Owner workspace, then Home |
 | `/business/home` | Branch-aware Business Home with square three-image carousel, arrow/click navigation, touch swipe and operational overview | LIVE FROZEN HYBRID; next-work/Booking summaries use BE3 truth and execution/attention/finance hydrate from BE4/BE7/BE8 PostgreSQL projections |
 | `/business/calendar` | Sunday-first branch-aware Day/Week/Month/Custom Calendar with shared view control, remembered view, compact accessible status-color cards, server-backed move/both-edge resize, Today focus, spreadsheet-like keyboard shortcuts including undo, touch handlers, mobile Agenda, and searchable/auto-validating Booking Editor | LIVE FROZEN UI / BE3 PostgreSQL TRUTH; range/create/edit/reschedule/Resource/cancel use typed backend operations and server conflict recovery |
 | `/business/grooming` | Capability-aware Grooming Today execution board for linked Pet-specific Service Jobs; aligned status cards, pointer-following reversible drag or swipe, no date/job filter rail, and mobile grouped status-list/detail alternative | LIVE FROZEN UI / BE4 PostgreSQL only when the active Branch enables Grooming; Calendar remains Booking planning, not execution |

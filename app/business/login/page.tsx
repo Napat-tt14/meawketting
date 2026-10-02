@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BusinessLoginScreen } from "./BusinessLoginScreen";
+import { BusinessAuthScreen } from "../_components/BusinessAuthScreen";
 import "../auth.css";
 
 export const metadata: Metadata = {
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function BusinessLoginPage() {
-  return <main id="main-content" className="business-portal business-login-page"><BusinessLoginScreen /></main>;
+  return <main id="main-content" className="business-portal business-auth-page"><BusinessAuthScreen mode="login" /></main>;
 }

@@ -1,16 +1,9 @@
-import { authClient } from "./supabaseAuth";
+import { verifiedBusinessUser, businessAccountDestination } from "./supabaseAuth";
 import { database } from "./runtime";
 import { asBe1Error, be1Error } from "./be1/errors";
 import { readJson } from "./shared/http";
 import { requireSameOrigin } from "./shared/requestSecurity";
 import { normalizeBranchNameKey } from "./be1/validation";
-
-async function identity() {
-  const { data, error } = await authClient().auth.getUser();
-  if (error || !data.user || data.user.is_anonymous) throw be1Error("UNAUTHENTICATED");
-  if (!["google", "custom:line"].includes(data.user.app_metadata.provider ?? "")) throw be1Error("FORBIDDEN");
-  return data.user;
-}
 
 function validate(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw be1Error("INVALID_INPUT");
@@ -30,7 +23,7 @@ function validate(value: unknown) {
 
 /** Account-scoped transaction lock serializes retries before any authority is created. */
 export async function registerBusiness(value: unknown) {
-  const user = await identity();
+  const user = await verifiedBusinessUser();
   const input = validate(value);
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(input)))), b => b.toString(16).padStart(2,"0")).join("");
   const db = database();
@@ -74,9 +67,9 @@ export async function registrationRequest(request: Request) {
   const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
   try {
     if (request.method === "GET") {
-      const user = await identity();
-      const linked = await database().prepare("SELECT person_id FROM auth_person_links WHERE auth_user_id=?::uuid").bind(user.id).first();
-      return Response.json({ authenticated: true, registered: !!linked }, { headers });
+      const user = await verifiedBusinessUser();
+      const destination = await businessAccountDestination(user.id);
+      return Response.json({ authenticated: true, registered: destination === "/business/home" }, { headers });
     }
     requireSameOrigin(request);
     const result = await registerBusiness(await readJson(request, 4096));

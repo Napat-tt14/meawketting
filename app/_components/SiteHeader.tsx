@@ -12,6 +12,7 @@ export function SiteHeader() {
   }
 
   if (pathname === "/" || pathname === "/business") return <BusinessHeader variant="landing" />;
+  if (pathname === "/business/setup") return <BusinessHeader variant="auth" />;
   if (["/business/login", "/business/register", "/privacy", "/terms"].includes(pathname)) return <BusinessHeader variant="auth" />;
   if (pathname.startsWith("/business/")) return <BusinessHeader variant="app" />;
   if (pathname === "/activity" || pathname.startsWith("/my-pets")) return <AppHeader variant="consumer" displayName="มิว" />;

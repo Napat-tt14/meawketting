@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import "./register.css";
 import "../auth.css";
-import { BusinessRegisterScreen } from "./BusinessRegisterScreen";
-export const metadata: Metadata = { title: "สมัครใช้งานสำหรับธุรกิจ", description: "สร้างร้านด้วย Google หรือ LINE" };
+import { BusinessAuthScreen } from "../_components/BusinessAuthScreen";
+export const metadata: Metadata = { title: "สมัครสมาชิก", description: "สร้างบัญชีด้วยอีเมลและรหัสผ่าน หรือ Google / LINE แล้วตั้งค่าร้านภายหลัง" };
 export default function BusinessRegisterPage() {
-  return <main id="main-content" className="business-portal business-login-page business-register-page"><BusinessRegisterScreen /></main>;
+  return <main id="main-content" className="business-portal business-auth-page"><BusinessAuthScreen mode="register" /></main>;
 }

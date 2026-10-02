@@ -14,14 +14,15 @@ const input = { displayName: "Synthetic owner", businessName: "Synthetic shop", 
 function harness(t: TestContext) {
   const db = seededDatabase();
   let provider = "google";
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: uid, app_metadata: { provider }, user_metadata: { role: "OWNER" }, aud: "authenticated", role: "authenticated" }));
+  let confirmed = true;
+  t.mock.method(globalThis, "fetch", async () => Response.json({ id: uid, app_metadata: { provider }, email_confirmed_at: confirmed ? "2026-10-02T00:00:00Z" : null, user_metadata: { role: "OWNER" }, aud: "authenticated", role: "authenticated" }));
   const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
   const cookie = `__Host-meawketting-auth=base64-${b64({ access_token: `${b64({alg:"HS256"})}.${b64({sub:uid,exp:Math.floor(Date.now()/1000)+3600})}.test`,refresh_token:"test",expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid} })}`;
   const run = (body: unknown = input, method = "POST", origin = "https://shop.test", authenticated = true) => {
     const request = new Request("https://shop.test/api/business/register", { method, headers: { origin, "content-type":"application/json", ...(authenticated ? {cookie} : {}) }, ...(method === "POST" ? {body:JSON.stringify(body)} : {}) });
     return withBackend(request,env,async () => { backendContext().database = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL!,db.schema); return registrationRequest(request); });
   };
-  return { db, run, line: () => { provider="custom:line"; } };
+  return { db, run, line: () => { provider="custom:line"; }, email: (verified = true) => { provider="email"; confirmed=verified; } };
 }
 test("registration creates one atomic Owner workspace and concurrent identical retries reuse it", async t => {
   const { db, run } = harness(t);
@@ -36,6 +37,7 @@ test("registration creates one atomic Owner workspace and concurrent identical r
   assert.equal((await run({...input,businessName:"Changed"})).status,409);
   assert.equal(db.inspect.prepare("SELECT m.role FROM business_memberships m JOIN business_registrations r USING(business_id)").get()?.role,"OWNER");
   const app = new Be1Application(new PostgresBe1Repository(db));
+  assert.deepEqual(await (await run(null,"GET")).json(), { authenticated:true, registered:true });
   const personId = db.inspect.prepare("SELECT person_id FROM auth_person_links WHERE auth_user_id=?::uuid").get(uid)?.person_id as string;
   const actor = await app.resolvePerson(personId);
   const session = await app.resolveSession(actor);
@@ -46,6 +48,7 @@ test("registration creates one atomic Owner workspace and concurrent identical r
   await assert.rejects(app.getBranch(actor,session.workspaces[0].business.id,ARI),{code:"NOT_FOUND"});
   db.inspect.exec("UPDATE businesses SET status='inactive' WHERE id IN (SELECT business_id FROM business_registrations)");
   assert.equal((await run()).status,403);
+  assert.equal((await run(null,"GET")).status,403);
 });
 test("registration rejects missing auth, cross-origin, unconfirmed, forged authority, invalid contact and modules without writes", async t => {
   const { db, run } = harness(t);
@@ -77,4 +80,17 @@ test("LINE uses Supabase custom provider with PKCE and the same server callback"
   assert.equal(url.searchParams.get("provider"),"custom:line");
   assert.equal(url.searchParams.get("code_challenge_method"),"s256");
   assert.equal(url.searchParams.get("redirect_to"),"https://shop.test/api/auth/google/callback");
+});
+
+test("email accounts need verified email before setup and a completed workspace is durable", async t => {
+  const { db, run, email } = harness(t);
+  email(false);
+  assert.equal((await run(null, "GET")).status, 403);
+  assert.equal((await run()).status, 403);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 0);
+  email();
+  assert.deepEqual(await (await run(null, "GET")).json(), { authenticated: true, registered: false });
+  assert.equal((await run()).status, 200);
+  assert.deepEqual(await (await run(null, "GET")).json(), { authenticated: true, registered: true });
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 1);
 });

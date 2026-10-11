@@ -3,36 +3,27 @@
   @view-transition { navigation: auto; }
 
   .business-auth__card { view-transition-name: business-auth-card; }
-  .business-setup__card { view-transition-name: business-setup-card; }
-  .business-setup__steps { view-transition-name: business-setup-steps; }
 
   .business-auth__card,
-  .business-setup__card,
-  .business-setup__header,
   .business-auth__story > :is(.business-auth__eyebrow, h2, p) {
     animation: business-welcome-enter 300ms var(--ease-premium) both;
   }
   .business-auth__story h2 { animation-delay: 40ms; }
   .business-auth__story > p { animation-delay: 80ms; }
-  .business-setup__form,
   .business-auth__confirmation,
-  :is(.business-auth__error, .business-setup__error) {
+  .business-auth__error {
     animation: business-welcome-enter 220ms var(--ease-premium) both;
   }
 
   /* Snapshots already animate these regions; don't animate them twice. */
-  :root:active-view-transition :is(.business-auth, .business-setup, .business-route-stage) * {
+  :root:active-view-transition :is(.business-auth, .business-route-stage) * {
     animation: none !important;
   }
   ::view-transition-group(*) { animation-duration: 260ms; animation-timing-function: var(--ease-premium); }
   ::view-transition-old(root) { animation: business-welcome-exit 160ms ease-in both; }
   ::view-transition-new(root) { animation: business-welcome-enter 260ms var(--ease-premium) both; }
-  ::view-transition-old(business-auth-card),
-  ::view-transition-old(business-setup-card) { animation: business-content-exit 140ms ease-in both; }
-  ::view-transition-new(business-auth-card),
-  ::view-transition-new(business-setup-card) { animation: business-content-enter 240ms var(--ease-premium) both; }
-  ::view-transition-old(business-setup-steps),
-  ::view-transition-new(business-setup-steps) { animation-duration: 180ms; }
+  ::view-transition-old(business-auth-card) { animation: business-content-exit 140ms ease-in both; }
+  ::view-transition-new(business-auth-card) { animation: business-content-enter 240ms var(--ease-premium) both; }
 }
 
 @keyframes business-welcome-enter {

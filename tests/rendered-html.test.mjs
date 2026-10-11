@@ -101,11 +101,13 @@ test("Business signup is a public branded route with one heading and no fixture 
   assert.equal(countRenderedElements(html, "h1"), 1);
 });
 
-test("Business setup has its own three-step route without operational or marketing navigation", async () => {
+test("Business setup has its own four-step route without operational or marketing navigation", async () => {
   const html = await htmlFor("/business/setup");
   const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
   assert.match(markup, /ตั้งค่าร้านของคุณ/);
   assert.match(markup, /ขั้นตอนตั้งค่าร้าน/);
+  assert.match(markup, /4 ช่วงสั้น ๆ/);
+  assert.equal((markup.match(/class="business-setup__step-number"/g) ?? []).length, 4);
   assert.match(markup, /ตรวจสอบและเริ่มใช้/);
   assert.match(markup, /business-header--auth/);
   assert.match(markup, /กำลังตรวจสอบบัญชีของคุณ/);

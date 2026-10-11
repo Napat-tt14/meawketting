@@ -1,5 +1,14 @@
 # Validation
 
+## Centered Business setup — 2026-10-05
+
+- Replaced the sidebar/form layout with four centered steps: shop name, caretaker/contact, illustrated multi-service choices, and review/Owner declaration. Existing assets and brand tokens are reused; no dependency or database migration was added.
+- Native browser QA observed forward/backward heading and field transitions. Scenes, text and actions have separate timing; welcome drift settles within five seconds. Reduced-motion CSS and the immediate helper fallback are retained; browser preference emulation was not available.
+- Synthetic API browser QA verified required name/phone/service/declaration checks, optional Branch/email fields, Back and completed-step value preservation, a failed final submission followed by successful retry, Home navigation and completed-account setup bypass. Both final requests contained the exact seven expected fields and retained all test values. No real account or store was created.
+- Service cards had no horizontal overflow at 320/390/768/1024/1440px. The 390px flow and review were exercised; the short desktop name step shows its main action without scrolling. Returning from a long mobile step places the illustration below the sticky header and focuses the new heading.
+- `npm run build`, whole-project TypeScript and lint: PASS. `npm run test:frontend`: 97/97 PASS. `node scripts/test-postgres.mjs tests/registration.test.ts`: 6/6 PASS with isolated PostgreSQL, including authority validation, concurrent retries and transaction rollback.
+- Screenshots and QA logs remain ignored under `work/`; local environment files remain ignored. The synthetic API proxy was stopped after QA.
+
 ## Business motion and login diagnostics — 2026-10-02
 
 - Added short CSS entrance motion and native page/card transitions for Business login/signup, email confirmation and setup steps. Browser QA observed active native transitions during login → signup, confirmation, and setup step changes. Back navigation preserved shop/contact fields and service selection; new step headings received focus. Reduced-motion and unsupported native APIs use immediate updates.

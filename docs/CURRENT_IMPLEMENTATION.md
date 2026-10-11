@@ -1,5 +1,7 @@
 # Current Implementation
 
+Business setup UI — 2026-10-05: centered four-step onboarding now asks for shop name, caretaker/contact, illustrated service choices, and final review/declaration. Existing clay artwork, bounded welcome motion and native directional transitions make each step distinct. Back/edit retain values, reduced-motion preferences are respected, and the final API payload, access checks and atomic store creation are preserved.
+
 Business entry update — 2026-10-02: signup now collects only email/password or Google/LINE identity. The separate `/business/setup` wizard collects shop details, services and confirmation after authentication, then sends the user to Home. Password auth and shared server account routing preserve existing membership checks and duplicate-safe setup. See [Business registration](./BUSINESS_REGISTRATION.md) for implementation and provider configuration.
 
 Business motion/login diagnostics — 2026-10-02: native page/card transitions and short text entrance motion now cover login, signup, email confirmation and setup steps, with immediate reduced-motion fallbacks. Expected guest setup-status checks retain 401 without generating failure events. OAuth start diagnostics distinguish invalid configuration/origin from other failures, and development timing avoids mixing Worker and Node clocks. Read-only Google/LINE authorization redirects succeeded; no real account was used.

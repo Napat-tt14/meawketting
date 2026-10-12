@@ -4,12 +4,28 @@ import { executionId } from "./domain";
 
 // Authorized response cache only. No storage, fixtures, inferred grants or writes.
 const entries = new Map<string, OperationDirectory>();
-const key = (businessId: string, branchId: string) => `${readBusinessSession()?.person.id ?? ""}\u0000${businessId}\u0000${branchId}`;
+const complete = new Set<string>();
+function key(businessId: string, branchId: string) {
+  const s = readBusinessSession(), w = s?.workspaces.find(w => w.business.id === businessId);
+  return JSON.stringify([s?.person.id ?? "", businessId, branchId, w?.membership.id, w?.membership.role, w?.membership.updatedAt,
+    w?.permittedBranches.map(b => [b.id, b.updatedAt]).sort()]);
+}
+export { key as operationScopeKey };
 function emit() { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("meawketting:business-state")); }
-export function installOperations(businessId: string, branchId: string, data: OperationDirectory) {
+export function installOperations(businessId: string, branchId: string, data: OperationDirectory, full = true) {
   if ([...data.executions.map((e) => e.record), ...data.records, ...data.rooms].some((r) => r.businessId !== businessId || r.branchId !== branchId)
     || data.staff.some((s) => s.businessId !== businessId || !s.branchIds.includes(branchId))) throw new Error("Operations response scope mismatch");
+  if (full) complete.add(key(businessId, branchId));
   entries.set(key(businessId, branchId), structuredClone(data)); emit();
+}
+export function operationsComplete(businessId: string, branchId: string) { return complete.has(key(businessId, branchId)); }
+export function patchOperationPage(businessId: string, branchId: string, data: OperationDirectory) {
+  if (!readOperationDirectory(businessId, branchId)) installOperations(businessId, branchId, data, false);
+  else {
+    const current = readOperationDirectory(businessId, branchId)!;
+    current.staff = structuredClone(data.staff); current.rooms = structuredClone(data.rooms);
+    data.executions.forEach(patchExecution); data.records.forEach(patchServiceRecord); emit();
+  }
 }
 export function readOperationDirectory(businessId: string, branchId: string) { return entries.get(key(businessId, branchId)) ?? null; }
 export function readOperationDirectories() {
@@ -54,4 +70,4 @@ export function patchServiceRecord(value: ServiceRecordView) {
   if (!entry) return;
   entry.records = entry.records.filter((r) => r.serviceRecordId !== value.serviceRecordId).concat(value); emit();
 }
-export function clearOperationsCache() { entries.clear(); emit(); }
+export function clearOperationsCache() { entries.clear(); complete.clear(); emit(); }

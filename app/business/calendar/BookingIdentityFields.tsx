@@ -14,11 +14,13 @@ export function BookingCustomerCombobox({
   selectedId,
   describedBy,
   onChange,
+  onSearch,
 }: {
   contacts: readonly DemoBookingContact[];
   selectedId: string | null;
   describedBy: string;
   onChange: (contactId: string) => void;
+  onSearch?: (query: string) => void;
 }) {
   const inputId = useId();
   const listboxId = `${inputId}-results`;
@@ -91,10 +93,11 @@ export function BookingCustomerCombobox({
             value={query}
             placeholder="พิมพ์ชื่อลูกค้า"
             autoComplete="off"
-            onFocus={() => setOpen(true)}
+            onFocus={() => { setOpen(true); onSearch?.(query); }}
             onChange={(event) => {
               const nextQuery = event.target.value;
               setQuery(nextQuery);
+              onSearch?.(nextQuery);
               setOpen(true);
               setActiveIndex(0);
             }}

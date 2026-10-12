@@ -36,7 +36,8 @@ export function parseBe4Operation(value: unknown): Be4Operation {
   }
   const scope = { businessId: validateId(v.businessId), branchId: validateId(v.branchId) };
   switch (v.type) {
-    case "operations.list": return { type: v.type, ...scope, afterId: v.afterId ? validateId(v.afterId) : "", limit: v.limit === undefined ? 100 : integer(v.limit, 1, 200) };
+    case "operations.list": return { type: v.type, ...scope, afterId: v.afterId ? validateId(v.afterId) : "", limit: v.limit === undefined ? 100 : integer(v.limit, 1, 200), bookingId: v.bookingId === undefined ? undefined : validateId(v.bookingId), executionId: v.executionId === undefined ? undefined : validateId(v.executionId), customerId: v.customerId === undefined ? undefined : validateId(v.customerId), date: v.date === undefined ? undefined : date(v.date), module: v.module === undefined ? undefined : choice(v.module, ["grooming", "hotel", "daycare"] as const) };
+    case "operations.metadata": return { type: v.type, ...scope };
     case "operations.get": return { type: v.type, ...scope, executionId: validateId(v.executionId) };
     case "record.correct": return { type: v.type, ...scope, recordId: validateId(v.recordId), field: choice(v.field, ["summary", "business-note"]), value: string(v.value, 4000, true), reason: string(v.reason, 1000, true), expectedRevision: integer(v.expectedRevision, 1), requestKey: validateId(v.requestKey) };
     case "staff.save": {

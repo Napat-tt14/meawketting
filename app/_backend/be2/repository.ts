@@ -8,6 +8,7 @@ export type CustomerQuery = {
   includeInactive: boolean;
   limit: number;
   offset: number;
+  customerIds?: string[];
 };
 
 export interface Be2Repository {

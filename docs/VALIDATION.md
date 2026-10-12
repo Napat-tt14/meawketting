@@ -1,5 +1,15 @@
 # Validation
 
+## Business startup and guidance — 2026-10-12
+
+- Removed the requested setup helper copy and first-Branch disclosure; the default `สาขาหลัก` and existing seven-field registration contract remain unchanged.
+- Scoped loading tests cover required route projections, permitted branches, reuse on warm navigation, unrelated report/finance failure isolation, rejected private Branches, preserved projections on retry, and the 20-second API deadline.
+- Synthetic browser QA covers client navigation without another session request, guidance Next/Back/Escape/skip/replay/persistence, 320/390/768/1440px layouts, reduced-motion preferences and all four setup steps. Every API is intercepted locally; no real account/store or database is changed.
+- The Calendar fullscreen cleanup now excludes null refs and handles a rejected exit, avoiding an unhandled browser error when navigating away.
+- Final build, full TypeScript, lint and diff whitespace checks pass. Frontend rendering checks pass 97/97, scoped loading/timeout checks 2/2, and cache/production guard checks 12/12. Browser QA also confirms the final seven-field payload with the default Branch and retry recovery after a synthetic billing failure.
+
+Production network/database latency is not measured by the synthetic browser test. Earlier checkpoints below are historical.
+
 ## Centered Business setup — 2026-10-05
 
 - Replaced the sidebar/form layout with four centered steps: shop name, caretaker/contact, illustrated multi-service choices, and review/Owner declaration. Existing assets and brand tokens are reused; no dependency or database migration was added.

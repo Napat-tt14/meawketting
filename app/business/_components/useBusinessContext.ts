@@ -19,7 +19,7 @@ export function useBusinessStateReady() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false);
 }
 
-export function useBusinessContext() {
+export function useBusinessContext(enabled = true) {
   const [context, setContext] = useState(() => getDemoBusinessContext(null));
   const [revision, setRevision] = useState(0);
   const [isContextReady, setIsContextReady] = useState(false);
@@ -30,10 +30,11 @@ export function useBusinessContext() {
   );
 
   useEffect(() => {
+    if (!enabled) return;
     void ensureBusinessSession().catch(() => {
       // The portal frame owns loading/error feedback; no fixture fallback.
     });
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     const sync = () => {

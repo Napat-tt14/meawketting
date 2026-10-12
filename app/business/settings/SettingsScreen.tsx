@@ -1,7 +1,11 @@
 "use client";
 
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+
 import Image from "next/image";
-import { useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { ensureOperationMetadata } from "../../_backend/be4/client";
+import { ensureDurableBookingCatalog } from "../../_backend/be3/client";
 import {
   BUSINESS_SERVICE_MODULES,
   BUSINESS_WEEKDAY_LABELS,
@@ -277,7 +281,7 @@ export function SettingsScreen() {
           <Storefront size={19} /><span className="settings-nav-copy"><strong>สาขา <span>{branches.length}</span></strong><small>บริการและเวลาทำการ</small></span>
         </button>
       </nav>
-      <div className="settings-rail__note"><h2>ตั้งค่าให้ตรงกับหน้าร้าน</h2><p>ข้อมูลร้านใช้ร่วมกันทุกสาขา ส่วนบริการและเวลาทำการกำหนดแยกในแต่ละสาขา</p><a href="/business/team">จัดการทีมงาน <ChevronRight size={16} /></a></div>
+      <div className="settings-rail__note"><h2>ตั้งค่าให้ตรงกับหน้าร้าน</h2><p>ข้อมูลร้านใช้ร่วมกันทุกสาขา ส่วนบริการและเวลาทำการกำหนดแยกในแต่ละสาขา</p><Link href="/business/team">จัดการทีมงาน <ChevronRight size={16} /></Link></div>
       </aside>
       <div className="settings-content">
 
@@ -375,6 +379,19 @@ function ProfileEditor({
 }
 
 function BranchCard({ branch, current, fixtureOnly, team, onOpenTeam, onEdit, onToggleActive }: { branch: PrototypeBusinessBranch; current: boolean; fixtureOnly: boolean; team: PrototypeTeamMember[]; onOpenTeam: () => void; onEdit: () => void; onToggleActive: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  useEffect(() => {
+    if (fixtureOnly) return;
+    void ensureOperationMetadata(branch.businessId, branch.branchId).catch(() => setLoadFailed(true));
+  }, [branch.businessId, branch.branchId, fixtureOnly]);
+  useEffect(() => {
+    if (!expanded || fixtureOnly) return;
+    let active = true;
+    void ensureDurableBookingCatalog(branch.businessId, branch.branchId).catch(() => { if (active) setLoadFailed(true); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [branch.businessId, branch.branchId, expanded, fixtureOnly]);
   const openDays = branch.operatingHours.filter((entry) => !entry.closed);
   const timeRanges = [...new Set(openDays.map((entry) => `${entry.open}–${entry.close}`))];
   const hoursSummary = !openDays.length ? "ปิดทุกวัน" : `${openDays.length} วันต่อสัปดาห์ · ${timeRanges.length === 1 ? timeRanges[0] : "เวลาต่างกันตามวัน"}`;
@@ -399,14 +416,15 @@ function BranchCard({ branch, current, fixtureOnly, team, onOpenTeam, onEdit, on
         <div><dt>ทีมประจำสาขา</dt><dd>{team.length ? `${team.length} คนที่เปิดใช้งาน · ${team.map((member) => member.name).join(", ")}` : "ยังไม่มีทีมที่เปิดใช้งาน"}</dd></div>
         {team.length ? <div><dt>ความสามารถ</dt><dd>{[...new Set(team.flatMap((member) => member.capabilities))].map((capability) => TEAM_MEMBER_CAPABILITY_LABELS[capability]).join(" · ")}</dd></div> : null}
       </dl>
-      {services.length ? <details className="settings-branch-services">
+      {branch.enabledModules.length ? <details className="settings-branch-services" onToggle={event => { const open = event.currentTarget.open; setExpanded(open); if (open && !fixtureOnly) { setLoading(true); setLoadFailed(false); } }}>
         <summary>บริการและทรัพยากร</summary>
+        {loading ? <p role="status">กำลังโหลดบริการ</p> : loadFailed ? <p role="status">โหลดบริการไม่สำเร็จ กรุณาเปิดส่วนนี้อีกครั้ง</p> : null}
         <ul>{services.map((service) => <li key={service.id}><strong>{service.label}</strong><span>{service.defaultDurationMinutes ? `${service.defaultDurationMinutes} นาทีต่อการจอง` : service.module === "hotel" ? `เข้าพักตามช่วงวันที่ · ความจุ ${hotelCapacity} ตัว` : `ดูแลรายวัน · ความจุ ${daycareCapacity} ตัว`}</span></li>)}</ul>
         <p>ใช้เวลาและทรัพยากรชุดเดียวกับปฏิทินและงานบริการ</p>
       </details> : null}
       <footer>
         <button className="button button--business-ghost" type="button" onClick={onEdit}><Pencil size={17} />แก้ไข</button>
-        {branch.active ? <a className="button button--business-ghost" href="/business/team" onClick={onOpenTeam} aria-label={`ดูทีม ${branch.name}`}><UsersRound size={17} />ดูทีม</a> : null}
+        {branch.active ? <Link className="button button--business-ghost" href="/business/team" onClick={onOpenTeam} aria-label={`ดูทีม ${branch.name}`}><UsersRound size={17} />ดูทีม</Link> : null}
         <label className="settings-switch">
           <input type="checkbox" checked={branch.active} onChange={onToggleActive} aria-label={`เปิดใช้งานสาขา ${branch.name}`} />
           <span aria-hidden="true"><i /></span>

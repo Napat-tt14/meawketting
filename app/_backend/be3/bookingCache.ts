@@ -1,4 +1,5 @@
 import type { Be1ServiceModule } from "../be1/contracts";
+import { readBusinessSession } from "../be1/configurationCache";
 import type {
   BookingCatalogView,
   BookingResourceView,
@@ -36,14 +37,19 @@ const listeners = new Set<() => void>();
 let revision = 0;
 
 function catalogKey(businessId: string, branchId: string) {
-  return `${businessId}\u0000${branchId}`;
+  return `${be3ScopeKey(businessId)}\u0000${branchId}`;
+}
+export function be3ScopeKey(businessId: string) {
+  const session = readBusinessSession(), workspace = session?.workspaces.find(w => w.business.id === businessId);
+  return JSON.stringify([session?.person.id ?? "", businessId, workspace?.membership.id, workspace?.membership.role, workspace?.membership.updatedAt,
+    workspace?.permittedBranches.map(b => [b.id, b.updatedAt]).sort()]);
 }
 
 function directory(businessId: string) {
-  const current = directories.get(businessId);
+  const current = directories.get(be3ScopeKey(businessId));
   if (current) return current;
   const created: Directory = { status: "idle", bookings: new Map(), error: null };
-  directories.set(businessId, created);
+  directories.set(be3ScopeKey(businessId), created);
   return created;
 }
 
@@ -80,7 +86,7 @@ export function installBe3Directory(businessId: string, bookings: readonly Booki
   if (bookings.some((booking) => booking.businessId !== businessId)) {
     throw new Error("BE3 directory response contained a Booking from another Business.");
   }
-  directories.set(businessId, {
+  directories.set(be3ScopeKey(businessId), {
     status: "ready",
     bookings: new Map(bookings.map((booking) => [booking.id, booking])),
     error: null,
@@ -102,6 +108,7 @@ export function markBe3DirectoryError(businessId: string, error: unknown) {
  */
 export function patchBe3Booking(booking: BookingView) {
   const current = directory(booking.businessId);
+  if ((current.bookings.get(booking.id)?.revision ?? 0) > booking.revision) return;
   current.bookings.set(booking.id, booking);
   if (current.status !== "ready" && current.status !== "loading") current.status = "partial";
   current.error = null;
@@ -109,11 +116,11 @@ export function patchBe3Booking(booking: BookingView) {
 }
 
 export function readBe3DirectoryStatus(businessId: string) {
-  return directories.get(businessId)?.status ?? "idle";
+  return directories.get(be3ScopeKey(businessId))?.status ?? "idle";
 }
 
 export function readBe3DirectoryError(businessId: string) {
-  return directories.get(businessId)?.error ?? null;
+  return directories.get(be3ScopeKey(businessId))?.error ?? null;
 }
 
 function filterAndSortBookings(bookings: readonly BookingView[], options: ReadBe3BookingsOptions) {
@@ -131,14 +138,20 @@ function filterAndSortBookings(bookings: readonly BookingView[], options: ReadBe
 
 /** Returns null until every server page for this Business has been installed. */
 export function readBe3Bookings(businessId: string, options: ReadBe3BookingsOptions = {}): BookingView[] | null {
-  const current = directories.get(businessId);
+  const current = directories.get(be3ScopeKey(businessId));
   if (current?.status !== "ready") return null;
   return filterAndSortBookings([...current.bookings.values()], options);
 }
 
 /** Reads a known partial or fully hydrated Booking, always within Business scope. */
 export function readBe3Booking(businessId: string, bookingId: string) {
-  return directories.get(businessId)?.bookings.get(bookingId) ?? null;
+  return directories.get(be3ScopeKey(businessId))?.bookings.get(bookingId) ?? null;
+}
+export function readKnownBe3Bookings(businessId: string, options: ReadBe3BookingsOptions = {}) {
+  return filterAndSortBookings([...(directories.get(be3ScopeKey(businessId))?.bookings.values() ?? [])], options);
+}
+export function readAllKnownBe3Directories() {
+  return [...directories].filter(([id]) => id === be3ScopeKey(JSON.parse(id)[1])).map(([id, entry]) => ({ businessId: JSON.parse(id)[1] as string, bookings: filterAndSortBookings([...entry.bookings.values()], {}) }));
 }
 
 /**
@@ -146,7 +159,8 @@ export function readBe3Booking(businessId: string, bookingId: string) {
  * stable BE3 ID. It is never an authorization boundary or a server query.
  */
 export function readBe3BookingByStableId(bookingId: string) {
-  for (const current of directories.values()) {
+  for (const [id, current] of directories) {
+    if (id !== be3ScopeKey(JSON.parse(id)[1])) continue;
     const booking = current.bookings.get(bookingId);
     if (booking) return booking;
   }
@@ -155,9 +169,9 @@ export function readBe3BookingByStableId(bookingId: string) {
 
 export function readAllReadyBe3Directories() {
   return [...directories.entries()]
-    .filter(([, current]) => current.status === "ready")
-    .map(([businessId, current]) => ({
-      businessId,
+    .filter(([id, current]) => current.status === "ready" && id === be3ScopeKey(JSON.parse(id)[1]))
+    .map(([id, current]) => ({
+      businessId: JSON.parse(id)[1] as string,
       bookings: filterAndSortBookings([...current.bookings.values()], {}),
     }));
 }
@@ -219,9 +233,10 @@ export function readBe3ServiceByStableId(serviceId: string): BookingServiceView 
 
 export function readAllReadyBe3Catalogs() {
   return [...catalogs.values()]
-    .filter((current) => current.status === "ready" && current.catalog)
+    .filter((current) => current.status === "ready" && current.catalog && catalogEntry(current.catalog.businessId, current.catalog.branchId) === current)
     .map((current) => current.catalog!);
 }
+export function invalidateBe3Catalog(businessId: string, branchId: string) { const entry = catalogs.get(catalogKey(businessId, branchId)); if (entry) { entry.status = "idle"; emit(); } }
 
 export function subscribeBe3Cache(listener: () => void) {
   listeners.add(listener);

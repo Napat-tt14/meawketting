@@ -34,8 +34,8 @@ export class Be4Application extends BusinessApplication {
   async executeBe4<T extends Be4Operation>(actor: PersonView, raw: T, metadata: RequestMetadata): Promise<Be4Result<T>> {
     const operation = parseBe4Operation(raw), input = operation.type === "operations.change" ? operation.input : operation;
     const now = this.clock();
-    const context = await this.scope(actor, input.businessId, input.branchId, metadata, now, !["operations.list", "operations.get"].includes(operation.type));
-    const permitted = new Set((await this.listPermittedBranches(context.actor, input.businessId, true)).map((b) => b.id));
+    const context = await this.scope(actor, input.businessId, input.branchId, metadata, now, !["operations.list", "operations.get", "operations.metadata"].includes(operation.type));
+    const permitted = new Set((await this.listPermittedBranchesForMembership(context.membership, context.membership.role === "OWNER")).map((b) => b.id));
     const visibleStaff = (staff: StaffView) => ({ ...staff, branchIds: staff.branchIds.filter((id) => permitted.has(id)) });
     const required = async (id: string) => {
       const found = await this.operations.get(input.businessId, input.branchId, id);
@@ -56,8 +56,12 @@ export class Be4Application extends BusinessApplication {
       return required(id);
     };
     if (operation.type === "operations.get") return await required(operation.executionId) as Be4Result<T>;
+    if (operation.type === "operations.metadata") {
+      const [staff, rooms] = await Promise.all([this.operations.staff(input.businessId, input.branchId), this.operations.rooms(input.businessId, input.branchId)]);
+      return { executions: [], records: [], staff: staff.map(visibleStaff), rooms } as unknown as Be4Result<T>;
+    }
     if (operation.type === "operations.list") {
-      const executions = await this.operations.list(input.businessId, input.branchId, operation.afterId ?? "", operation.limit ?? 100);
+      const executions = await this.operations.list(input.businessId, input.branchId, operation.afterId ?? "", operation.limit ?? 100, operation);
       const [records, staff, rooms] = await Promise.all([this.operations.records(input.businessId, input.branchId, executions.map(executionId)),
         this.operations.staff(input.businessId, input.branchId), this.operations.rooms(input.businessId, input.branchId)]);
       return { executions, records, staff: staff.map(visibleStaff), rooms } as Be4Result<T>;

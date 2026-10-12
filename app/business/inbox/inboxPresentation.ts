@@ -16,6 +16,7 @@ import type {
   PrototypeStructuredRequestStatus,
 } from "../../_prototype/inboxState";
 import { bookingTimeLabel, calendarDateLabel } from "../calendar/calendarPresentation";
+import type { ConversationView } from "../../_backend/be6/contracts";
 
 export type ConversationCustomerContext = { id: string; name: string };
 export type ConversationPetContext = { id: string; name: string; species: "cat" | "dog" };
@@ -68,7 +69,8 @@ export function resolvePrototypeConversationContext(
     ? getDemoBusinessContextForBranch(validBooking.businessId, validBooking.branchId)
     : null;
   const branchName = branchContext ? getDemoBusinessContextDetails(branchContext).branch?.name ?? "สาขาที่เกี่ยวข้อง" : "สาขาที่เกี่ยวข้อง";
-  const booking = validBooking ? {
+  const projectedBooking = !fixtureOnly ? (conversation as ConversationView).bookingContext : null;
+  const booking = projectedBooking?.businessId === conversation.businessId && projectedBooking.customerId === conversation.customerId ? projectedBooking : validBooking ? {
     bookingId: validBooking.bookingId,
     businessId: validBooking.businessId,
     customerId: validBooking.customer.id,

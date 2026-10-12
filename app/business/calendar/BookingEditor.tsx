@@ -1,6 +1,9 @@
 "use client";
 
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+
 import { businessToday } from "../../_backend/shared/businessClock";
+import { getDurableCustomer, searchDurableCustomers } from "../../_backend/be2/client";
 
 import { type FormEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
@@ -155,6 +158,26 @@ export function BookingEditor({
   const [notice, setNotice] = useState<string | null>(null);
   const [relationshipEditor, setRelationshipEditor] = useState<RelationshipEditorState>(null);
   const [relationshipRevision, setRelationshipRevision] = useState(0);
+  const [customerSearch, setCustomerSearch] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => void searchDurableCustomers(context.businessId, customerSearch, 50, 0, controller.signal)
+      .then(() => { if (!controller.signal.aborted) setRelationshipRevision(value => value + 1); })
+      .catch(() => { if (!controller.signal.aborted) setNotice("โหลดรายชื่อลูกค้าไม่สำเร็จ กรุณาค้นหาอีกครั้ง"); }), 180);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [context.businessId, customerSearch]);
+  useEffect(() => {
+    const id = initialBooking?.customer.id ?? preselectedCustomerId;
+    if (!id) return;
+    const controller = new AbortController();
+    void getDurableCustomer(context.businessId, id, controller.signal).then(customer => {
+      if (controller.signal.aborted) return;
+      setRelationshipRevision(value => value + 1);
+      if (!initialBooking && preselectedCustomerId) setDraft(current => current.customer ? current : { ...current, customer: { id: customer.id, name: customer.displayName },
+        pets: customer.pets.filter(pet => pet.id === preselectedPetId).map(pet => ({ id: pet.id, name: pet.name, species: pet.species })) });
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [context.businessId, initialBooking, preselectedCustomerId, preselectedPetId]);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -463,8 +486,8 @@ export function BookingEditor({
         <header className="booking-editor__header" inert={cancelConfirmation ? true : undefined}>
           <h2 id="booking-editor-title">{initialBooking ? "แก้ไขการจอง" : "เพิ่มการจอง"}</h2>
           <div className="booking-editor__header-actions">
-            {initialBooking?.serviceModule === "grooming" ? <a href={`/business/grooming?jobId=${encodeURIComponent(initialBooking.bookingId)}`}><BusinessServiceIcon module="grooming" size={18} />ดูงานบริการ</a> : null}
-            {initialBooking ? <a href={`/business/inbox?customerId=${encodeURIComponent(initialBooking.customer.id)}&petId=${encodeURIComponent(initialBooking.pets[0]?.id ?? "")}&bookingId=${encodeURIComponent(initialBooking.bookingId)}`}><MessageCircle size={18} />ส่งข้อความ</a> : null}
+            {initialBooking?.serviceModule === "grooming" ? <Link href={`/business/grooming?jobId=${encodeURIComponent(initialBooking.bookingId)}`}><BusinessServiceIcon module="grooming" size={18} />ดูงานบริการ</Link> : null}
+            {initialBooking ? <Link href={`/business/inbox?customerId=${encodeURIComponent(initialBooking.customer.id)}&petId=${encodeURIComponent(initialBooking.pets[0]?.id ?? "")}&bookingId=${encodeURIComponent(initialBooking.bookingId)}`}><MessageCircle size={18} />ส่งข้อความ</Link> : null}
             <button ref={closeButtonRef} type="button" aria-label="ปิดการแก้ไขการจอง" onClick={onClose}><X size={20} /></button>
           </div>
         </header>
@@ -512,6 +535,7 @@ export function BookingEditor({
               <div className="booking-form-grid booking-relationship-fields">
                 <div className="booking-field-with-action">
                   <BookingCustomerCombobox
+                    onSearch={setCustomerSearch}
                     key={draft.customer?.id ?? "unselected-customer"}
                     contacts={contacts}
                     selectedId={draft.customer?.id ?? null}

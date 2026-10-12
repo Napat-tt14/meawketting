@@ -51,10 +51,10 @@ function TimelineIcon({ kind }: { kind: CustomerTimelineKind }) {
   return <MessageCircle size={17} />;
 }
 
-export function CustomerCrmOverview({ profiles }: { profiles: readonly CustomerCrmProfile[] }) {
-  const regularCount = profiles.filter((profile) => profile.lifecycle === "regular").length;
-  const noNextBookingCount = profiles.filter((profile) => !profile.nextBooking).length;
-  const inactiveCount = profiles.filter((profile) => profile.lifecycle === "inactive").length;
+export function CustomerCrmOverview({ profiles, summary }: { profiles: readonly CustomerCrmProfile[]; summary?: Record<import("../../_backend/be8/contracts").CrmSegment, number> }) {
+  const regularCount = summary?.regular ?? profiles.filter((profile) => profile.lifecycle === "regular").length;
+  const noNextBookingCount = summary?.["no-next-booking"] ?? profiles.filter((profile) => !profile.nextBooking).length;
+  const inactiveCount = summary?.inactive ?? profiles.filter((profile) => profile.lifecycle === "inactive").length;
 
   return (
     <section className="crm-overview" aria-labelledby="crm-overview-title">
@@ -66,7 +66,7 @@ export function CustomerCrmOverview({ profiles }: { profiles: readonly CustomerC
         </div>
       </div>
       <dl className="crm-overview__metrics">
-        <div><dt>ลูกค้าทั้งหมด</dt><dd>{profiles.length}</dd></div>
+        <div><dt>ลูกค้าทั้งหมด</dt><dd>{summary?.all ?? profiles.length}</dd></div>
         <div><dt>กลับมาใช้บริการ</dt><dd>{regularCount}</dd></div>
         <div><dt>ไม่มีนัดถัดไป</dt><dd>{noNextBookingCount}</dd></div>
         <div><dt>ไม่ได้มาสักพัก</dt><dd>{inactiveCount}</dd></div>

@@ -11,6 +11,7 @@ import type {
   UpdateBusinessProfileInput,
 } from "./contracts";
 import { be1Error } from "./errors";
+import { verifiedRequestRead } from "../runtime";
 import type { RequestMetadata } from "./metadata";
 import type { AuthorizedMutation, Be1Repository } from "./repository";
 import {
@@ -42,19 +43,25 @@ export class Be1Application {
   }
 
   async resolvePerson(personId: string) {
-    const actor = await this.repository.findPersonById(validateId(personId));
-    if (!actor) throw be1Error("UNAUTHENTICATED");
-    if (actor.status !== "active") throw be1Error("PERSON_INACTIVE");
-    return actor;
+    const id = validateId(personId);
+    return verifiedRequestRead(`person:${id}`, async () => {
+      const actor = await this.repository.findPersonById(id);
+      if (!actor) throw be1Error("UNAUTHENTICATED");
+      if (actor.status !== "active") throw be1Error("PERSON_INACTIVE");
+      return actor;
+    });
   }
 
   async resolveMembership(actor: PersonView, businessId: string) {
-    const membership = await this.repository.findMembership(actor.id, validateId(businessId));
-    if (!membership) throw be1Error("FORBIDDEN");
-    if (membership.status !== "active") throw be1Error("MEMBERSHIP_INACTIVE");
-    const business = await this.repository.getBusiness(membership.businessId);
-    if (!business || business.status !== "active") throw be1Error("FORBIDDEN");
-    return { membership, business };
+    const id = validateId(businessId);
+    return verifiedRequestRead(`membership:${actor.id}:${id}`, async () => {
+      const membership = await this.repository.findMembership(actor.id, id);
+      if (!membership) throw be1Error("FORBIDDEN");
+      if (membership.status !== "active") throw be1Error("MEMBERSHIP_INACTIVE");
+      const business = await this.repository.getBusiness(membership.businessId);
+      if (!business || business.status !== "active") throw be1Error("FORBIDDEN");
+      return { membership, business };
+    });
   }
 
   async resolveSession(actor: PersonView): Promise<BusinessSessionView> {
@@ -254,14 +261,14 @@ export class Be1Application {
     return result as Be1OperationResult<T>;
   }
 
-  private async listPermittedBranchesForMembership(membership: BusinessMembershipView, includeInactive: boolean) {
+  protected async listPermittedBranchesForMembership(membership: BusinessMembershipView, includeInactive: boolean) {
     if (membership.role === "OWNER") {
       return this.repository.listBranchesForBusiness(membership.businessId, includeInactive);
     }
     return this.repository.listBranchesForMembership(membership, false);
   }
 
-  private async authorizeBranch(membership: BusinessMembershipView, branchId: string) {
+  protected async authorizeBranch(membership: BusinessMembershipView, branchId: string) {
     const branch = await this.repository.getBranch(membership.businessId, branchId);
     if (!branch) throw be1Error("NOT_FOUND");
     if (membership.role !== "OWNER") {

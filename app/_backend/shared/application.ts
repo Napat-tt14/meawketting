@@ -11,7 +11,7 @@ export class BusinessApplication extends Be1Application {
   async scope(actor: PersonView, businessId: string, branchId: string, metadata: RequestMetadata, now: string, write = false) {
     const currentActor = await this.resolvePerson(actor.id);
     const { membership } = await this.resolveMembership(currentActor, validateId(businessId));
-    const branch = await this.getBranch(currentActor, businessId, validateId(branchId));
+    const branch = await this.authorizeBranch(membership, validateId(branchId));
     if (write && branch.status !== "active") throw be1Error("FORBIDDEN");
     return { actor: currentActor, membership, branch, metadata, occurredAt: now };
   }

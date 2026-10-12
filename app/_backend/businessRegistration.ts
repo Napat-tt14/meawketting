@@ -28,7 +28,7 @@ export async function registerBusiness(value: unknown) {
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(input)))), b => b.toString(16).padStart(2,"0")).join("");
   const db = database();
   return db.sql.begin(async tx => {
-    await tx.unsafe(`SET LOCAL search_path TO "${db.schema}", pg_catalog`);
+    await db.configureTransaction(tx);
     await tx`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`;
     const [receipt] = await tx`SELECT r.*, p.status person_status, b.status business_status, m.status membership_status
       FROM business_registrations r JOIN auth_person_links l USING(auth_user_id)

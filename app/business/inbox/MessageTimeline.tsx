@@ -94,20 +94,23 @@ export function MessageTimeline({
   context,
   businessId,
   onMutation,
+  historyControl,
 }: {
   conversation: PrototypeConversation;
   context: ResolvedConversationContext;
   businessId: string;
   onMutation: (notice: string) => void;
+  historyControl?: React.ReactNode;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const latestMessageId = conversation.messages.at(-1)?.messageId;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({
       block: "end",
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     });
-  }, [conversation.messages.length]);
+  }, [latestMessageId]);
 
   if (conversation.messages.length === 0) {
     return (
@@ -119,6 +122,7 @@ export function MessageTimeline({
 
   return (
     <div className="message-timeline" role="log" aria-live="polite" aria-label={`ข้อความกับ ${context.customer?.name ?? "ลูกค้า"}`}>
+      {historyControl}
       <ol>
         {conversation.messages.map((message, index) => {
           const previous = conversation.messages[index - 1] ?? null;

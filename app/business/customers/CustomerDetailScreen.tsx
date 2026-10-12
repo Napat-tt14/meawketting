@@ -1,4 +1,5 @@
 "use client";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
 
 import { type FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import { getDurableCustomer, updateDurableCustomerTags } from "../../_backend/be2/client";
@@ -137,10 +138,9 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
   const crmKey = JSON.stringify([businessId, branchId, customerId]);
   useEffect(() => {
     if (!isContextReady) return;
-    let stopped = false;
-    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }, customerId); if (!stopped) { setCrmLoadedKey(crmKey); setNotice((v) => v === "โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ" ? null : v); } } catch { if (!stopped) setNotice("โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ"); } };
-    void load(); const timer = window.setInterval(() => void load(), 5000);
-    return () => { stopped = true; window.clearInterval(timer); };
+    const refresh = startBusinessRefresh(async signal => { await ensureDurableCrm({ businessId, branchId }, customerId, { signal }); if (!signal.aborted) { setCrmLoadedKey(crmKey); setNotice((v) => v === "โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ" ? null : v); } },
+      { businessId, targets: ["crm"], onError: () => setNotice("โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ") });
+    return refresh.stop;
   }, [businessId, branchId, customerId, isContextReady, crmKey]);
 
   useEffect(() => {
@@ -150,9 +150,13 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
   }, []);
 
   useEffect(() => {
-    void getDurableCustomer(context.businessId, customerId).catch(() => {
+    const controller = new AbortController();
+    if (readPrototypeCustomer(customerId)?.businessId === context.businessId) return;
+    void getDurableCustomer(context.businessId, customerId, controller.signal).catch(() => {
+      if (controller.signal.aborted) return;
       setNotice("ไม่สามารถโหลดข้อมูลลูกค้าจาก Business นี้ได้");
     });
+    return () => controller.abort();
   }, [context.businessId, customerId]);
 
   void revision;
@@ -265,7 +269,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
         </div>}
         actions={<nav className="business-customer-detail__actions" aria-label="การทำงานกับลูกค้า">
           <Link className="button button--business" href={`/business/calendar?customerId=${encodeURIComponent(customer.id)}`} title="เพิ่มการจอง" aria-label={`เพิ่มการจองให้ ${customer.name}`}><CalendarDays size={20} /><span>เพิ่มการจอง</span></Link>
-          <a className="customer-detail-icon-action" href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}`} title="ส่งข้อความ" aria-label={`ส่งข้อความถึง ${customer.name}`}><MessageCircle size={20} /></a>
+          <Link className="customer-detail-icon-action" href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}`} title="ส่งข้อความ" aria-label={`ส่งข้อความถึง ${customer.name}`}><MessageCircle size={20} /></Link>
         </nav>}
       />
 

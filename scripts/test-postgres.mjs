@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:net";
 
-// This runner only creates/deletes its own named test database in its own cluster.
+// Each run owns a disposable cluster; stop removes only that run's generated data.
 mkdirSync("work", { recursive: true });
 const probe = createServer();
 await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
@@ -13,7 +13,7 @@ const port = probe.address().port;
 await new Promise(resolve => probe.close(resolve));
 const password = randomUUID();
 const pg = new EmbeddedPostgres({ databaseDir: resolve("work", `pg-${randomUUID()}`), user: "postgres", password,
-  port, persistent: true, initdbFlags: ["--locale=C", "--encoding=UTF8"], postgresFlags: ["-h", "127.0.0.1"], onLog: () => {}, onError: console.error });
+  port, persistent: false, initdbFlags: ["--locale=C", "--encoding=UTF8"], postgresFlags: ["-h", "127.0.0.1"], onLog: () => {}, onError: console.error });
 await pg.initialise();
 await pg.start();
 const database = `test_${randomUUID().replaceAll("-", "")}`;
@@ -25,5 +25,8 @@ try {
       MEAWKETTING_TEST_DATABASE_URL: `postgres://postgres:${password}@127.0.0.1:${port}/${database}` },
   });
   process.exitCode = await new Promise((resolve, reject) => { child.on("exit", resolve); child.on("error", reject); });
-} finally { await pg.dropDatabase(database); await pg.stop(); }
+} finally {
+  try { await pg.dropDatabase(database); }
+  finally { await pg.stop(); }
+}
 process.exit(process.exitCode ?? 0);

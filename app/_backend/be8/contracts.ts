@@ -91,6 +91,7 @@ export type BusinessReportsSummary = {
 };
 
 export type ReportView = BusinessReportsSummary & {
+  readScope?: import("../shared/readScope").BusinessReadScope;
   generatedAt: string;
   waitingIntake: number;
   financials: { grossReceived: number; refunded: number; netReceived: number; unallocated: number };
@@ -99,6 +100,15 @@ export type ReportView = BusinessReportsSummary & {
 
 export type RevenueBreakdown = { module: BusinessServiceModule; revenue: number; paymentCount: number };
 export type RevenueSummary = { revenueToday: number; paymentCountToday: number; unpaidBalance: number; unpaidCount: number; partialCount: number; breakdown: RevenueBreakdown[] };
+export type BillingSummary = { generatedAt: string; revenueSummary: RevenueSummary; readScope?: import("../shared/readScope").BusinessReadScope };
+export type HomeSummary = BillingSummary & {
+  waitingIntake: number; unreadMessages: number;
+  bookings: Pick<import("../be3/contracts").BookingView, "id" | "businessId" | "branchId" | "customerId" | "customerName" | "pets" | "serviceId" | "serviceLabel" | "serviceModule" | "timeModel" | "start" | "end" | "status">[];
+  bookingTrend: { date: string; count: number }[];
+  grooming: { total: number; readyForPickup: number };
+  hotel: { occupied: number; reserved: number; capacity: number; available: number; readyForPickup: number; attention: number; unassignedArrivals: number; careDue: number; departures: number };
+  daycare: { booked: number; readyForPickup: number; occupied: number; capacity: number; available: number; careEvents: number };
+};
 
 export type BookingPet = { id: string; name: string; species: "cat" | "dog" };
 export type CrmBooking = {
@@ -142,9 +152,13 @@ export type CustomerCrmProfile = {
 export type CustomerTimelineKind = "booking" | "service" | "payment" | "message";
 export type CustomerTimelineItem = { id: string; kind: CustomerTimelineKind; at: string; title: string; detail: string; href: string; serviceModule: BusinessServiceModule | null };
 export type CrmView = { profile: CustomerCrmProfile; upcoming: CrmBooking[]; timeline: CustomerTimelineItem[]; timelineNext: { at: string; id: string } | null };
-export type CrmPage = { generatedAt: string; items: CrmView[]; nextAfterId: string | null };
+export type CrmSegment = "all" | "new" | "regular" | "no-next-booking" | "grooming" | "hotel" | "daycare" | "inactive";
+export type CrmListOptions = { afterId?: string; offset?: number; limit?: number; query?: string; segment?: CrmSegment };
+export type CrmPage = { generatedAt: string; items: CrmView[]; nextAfterId: string | null; nextOffset?: number | null; customers?: import("../be2/contracts").CustomerView[]; total?: number; segments?: Record<CrmSegment, number>; readScope?: import("../shared/readScope").BusinessReadScope };
 export type Be8Operation = { businessId: string; branchId: string } & (
   | { type: "reports.get"; options: ReportOptions }
-  | { type: "crm.list"; afterId?: string; limit?: number }
+  | { type: "home.summary" }
+  | { type: "billing.summary" }
+  | ({ type: "crm.list" } & CrmListOptions)
   | { type: "crm.get"; customerId: string; before?: { at: string; id: string } }
 );

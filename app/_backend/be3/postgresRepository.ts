@@ -100,6 +100,11 @@ function bookingAuditShape(booking: BookingView) {
 
 function constraintAware(error: unknown): never {
   const message = error instanceof Error ? error.message : String(error);
+  const query = (error as { query?: unknown } | null)?.query;
+  if (/ck_backend_version/.test(message) && typeof query === "string") {
+    if (query.includes("SELECT 'BE3_TIME_CONFLICT-'")) throw be3WriteConflict("TIME_CONFLICT", error);
+    if (query.includes("SELECT 'BE3_CAPACITY_CONFLICT-'")) throw be3WriteConflict("CAPACITY_CONFLICT", error);
+  }
   const markers: [RegExp, Parameters<typeof be3WriteConflict>[0]][] = [
     [/ck_backend_version|BE4_VERSION|BE5_SCOPE|BE7_SCOPE/i, "VERSION_CONFLICT"],
     [/BE4_CAPACITY/i, "CAPACITY_CONFLICT"],
@@ -339,7 +344,17 @@ export class PostgresBe3Repository implements Be3Repository {
 
   async replaceBooking(before: BookingView, write: BookingPersistenceWrite, action: string, context: AuthorizedMutation) {
     const booking = write.booking;
-    const update = this.database.prepare(`
+    const samePets = JSON.stringify(before.pets.map(pet => pet.id)) === JSON.stringify(booking.pets.map(pet => pet.id));
+    const sameAssignments = JSON.stringify(before.assignedResourceIds) === JSON.stringify(booking.assignedResourceIds);
+    const sameReservations = samePets && sameAssignments && before.timeModel === booking.timeModel && before.start === booking.start && before.end === booking.end
+      && (before.status === "cancelled") === (booking.status === "cancelled");
+    const samePlanning = samePets && sameAssignments && before.customerId === booking.customerId && before.serviceId === booking.serviceId
+      && before.serviceModule === booking.serviceModule && before.timeModel === booking.timeModel && before.start === booking.start && before.end === booking.end;
+    const changed = [["notes", booking.notes, before.notes], ["estimate", booking.estimate, before.estimate], ["status", booking.status, before.status], ["cancelled_at", booking.cancelledAt, before.cancelledAt]].filter(([, after, previous]) => after !== previous);
+    if (booking.cancelledAt !== before.cancelledAt) changed.push(["cancelled_by_person_id", booking.cancelledAt ? context.actor.id : null, null]);
+    const update = samePlanning ? this.database.prepare(`UPDATE bookings SET ${changed.map(([column]) => `${column}=?,`).join("")}revision=?,write_token=?,updated_at=?,updated_by_person_id=?
+      WHERE business_id=? AND branch_id=? AND id=? AND revision=?`).bind(...changed.map(([, value]) => value), booking.revision, context.metadata.requestId, booking.updatedAt, context.actor.id, booking.businessId, booking.branchId, booking.id, before.revision)
+      : this.database.prepare(`
       UPDATE bookings
       SET customer_id = ?, service_id = ?, service_module = ?, time_model = ?, start_local = ?, end_local = ?,
           start_minute = ?, end_minute = ?, start_weekday = ?, status = ?, estimate = ?, notes = ?,
@@ -356,16 +371,50 @@ export class PostgresBe3Repository implements Be3Repository {
     const statements: PreparedStatement[] = [
       update,
       this.database.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(:previous_row_count::integer=1)::integer").bind(`booking-${context.metadata.requestId}`),
-      this.database.prepare(`DELETE FROM booking_resource_reservations WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings),
-      this.database.prepare(`DELETE FROM booking_resource_assignments WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings),
-      this.database.prepare(`DELETE FROM booking_pets WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings),
-      ...this.petStatements(write, context, true),
-      ...this.assignmentStatements(write, context, true),
-      ...this.reservationStatements(write, true, context.metadata.requestId),
+      ...(!sameReservations ? [this.database.prepare(`DELETE FROM booking_resource_reservations WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings)] : []),
+      ...(!sameAssignments ? [this.database.prepare(`DELETE FROM booking_resource_assignments WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings)] : []),
+      ...(!samePets ? [this.database.prepare(`DELETE FROM booking_pets WHERE business_id = ? AND branch_id = ? AND booking_id = ? AND ${scoped}`).bind(booking.businessId, booking.branchId, booking.id, ...scopeBindings)] : []),
+      ...(!samePets ? this.petStatements(write, context, true) : []),
+      ...(!sameAssignments ? this.assignmentStatements(write, context, true) : []),
+      ...(!sameReservations ? this.reservationStatements(write, true, context.metadata.requestId) : []),
+      // Revalidate unchanged reservations in the commit snapshot without firing INSERT guards on the same rows again.
+      ...(sameReservations && booking.status !== "cancelled" ? [this.database.prepare(`INSERT INTO backend_guards(id,allowed,version_ok)
+        SELECT 'BE3_TIME_CONFLICT-'||?,1,(NOT EXISTS(
+          SELECT 1 FROM booking_resource_reservations r JOIN booking_resources resource
+          ON resource.business_id=r.business_id AND resource.branch_id=r.branch_id AND resource.id=r.resource_id
+          JOIN bookings source ON source.business_id=r.business_id AND source.branch_id=r.branch_id AND source.id=r.booking_id
+          WHERE r.business_id=? AND r.branch_id=? AND r.booking_id=? AND (
+            (resource.capacity_mode='exclusive' AND EXISTS(SELECT 1 FROM booking_resource_reservations occupied JOIN bookings existing ON existing.business_id=occupied.business_id AND existing.branch_id=occupied.branch_id AND existing.id=occupied.booking_id
+              WHERE occupied.business_id=r.business_id AND occupied.branch_id=r.branch_id AND occupied.resource_id=r.resource_id AND occupied.booking_id<>r.booking_id AND existing.status<>'cancelled' AND occupied.start_minute<r.end_minute AND occupied.end_minute>r.start_minute))
+            OR (source.service_module='grooming' AND EXISTS(SELECT 1 FROM execution_assignments a JOIN service_executions e ON e.business_id=a.business_id AND e.branch_id=a.branch_id AND e.id=a.execution_id
+              WHERE a.business_id=r.business_id AND a.branch_id=r.branch_id AND a.resource_id=r.resource_id AND e.booking_id<>r.booking_id AND e.status<>'cancelled'
+                AND extract(epoch from a.start_local::timestamp)::bigint/60<r.end_minute AND r.start_minute<extract(epoch from a.end_local::timestamp)::bigint/60))
+          )))::integer`).bind(`booking-reservations-${context.metadata.requestId}`, booking.businessId, booking.branchId, booking.id),
+        this.database.prepare(`INSERT INTO backend_guards(id,allowed,version_ok)
+        SELECT 'BE3_CAPACITY_CONFLICT-'||?,1,(NOT EXISTS(
+          SELECT 1 FROM booking_resource_reservations r JOIN booking_resources resource
+          ON resource.business_id=r.business_id AND resource.branch_id=r.branch_id AND resource.id=r.resource_id
+          JOIN bookings source ON source.business_id=r.business_id AND source.branch_id=r.branch_id AND source.id=r.booking_id
+          WHERE r.business_id=? AND r.branch_id=? AND r.booking_id=? AND (
+            (resource.capacity_mode='capacity' AND (r.reservation_date IS NULL OR r.units+coalesce((SELECT sum(occupied.units) FROM booking_resource_reservations occupied JOIN bookings existing ON existing.business_id=occupied.business_id AND existing.branch_id=occupied.branch_id AND existing.id=occupied.booking_id
+              WHERE occupied.business_id=r.business_id AND occupied.branch_id=r.branch_id AND occupied.resource_id=r.resource_id AND occupied.reservation_date=r.reservation_date AND occupied.booking_id<>r.booking_id AND existing.status<>'cancelled'),0)>resource.capacity))
+            OR (source.service_module='daycare' AND r.units+(SELECT count(*) FROM (
+              SELECT p.booking_id,p.pet_id FROM booking_resource_reservations occupied JOIN bookings existing ON existing.business_id=occupied.business_id AND existing.branch_id=occupied.branch_id AND existing.id=occupied.booking_id
+                JOIN booking_pets p ON p.business_id=existing.business_id AND p.branch_id=existing.branch_id AND p.booking_id=existing.id
+                WHERE occupied.business_id=r.business_id AND occupied.branch_id=r.branch_id AND occupied.resource_id=r.resource_id AND occupied.reservation_date=r.reservation_date AND occupied.booking_id<>r.booking_id AND existing.status<>'cancelled'
+              UNION SELECT e.booking_id,e.pet_id FROM execution_assignments a JOIN service_executions e ON e.business_id=a.business_id AND e.branch_id=a.branch_id AND e.id=a.execution_id
+                WHERE a.business_id=r.business_id AND a.branch_id=r.branch_id AND a.resource_id=r.resource_id AND e.booking_id<>r.booking_id AND e.status IN ('checked-in','active','ready-for-pickup')
+                  AND a.start_local<=r.reservation_date AND a.end_local>r.reservation_date
+              ) occupants)>resource.capacity)
+          )))::integer`).bind(`booking-reservations-${context.metadata.requestId}`, booking.businessId, booking.branchId, booking.id)] : []),
       this.commitStatement(write, context, true),
       this.auditStatement(action, before, booking, context, true),
       ...await new PostgresBe4Repository(this.database).bookingStatements(booking, context),
       this.database.prepare("DELETE FROM backend_guards WHERE id=?").bind(`booking-${context.metadata.requestId}`),
+      ...(sameReservations && booking.status !== "cancelled" ? [
+        this.database.prepare("DELETE FROM backend_guards WHERE id=?").bind(`BE3_TIME_CONFLICT-booking-reservations-${context.metadata.requestId}`),
+        this.database.prepare("DELETE FROM backend_guards WHERE id=?").bind(`BE3_CAPACITY_CONFLICT-booking-reservations-${context.metadata.requestId}`),
+      ] : []),
     ];
     try {
       const results = await this.database.batch(statements);
@@ -449,30 +498,30 @@ export class PostgresBe3Repository implements Be3Repository {
   private async hydrateResources(businessId: string, branchId: string, rows: ResourceRow[]) {
     if (!rows.length) return [];
     const ids = rows.map((row) => row.id);
-    const [links, windows] = await Promise.all([
+    const [links, windows] = await this.database.batch([
       this.database.prepare(`
         SELECT resource_id, service_id FROM booking_resource_service_links
         WHERE business_id = ? AND branch_id = ?
           AND resource_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY resource_id, service_id
-      `).bind(businessId, branchId, JSON.stringify(ids)).all<ResourceServiceRow>(),
+      `).bind(businessId, branchId, JSON.stringify(ids)),
       this.database.prepare(`
         SELECT resource_id, id, state, start_local, end_local FROM booking_resource_availability_windows
         WHERE business_id = ? AND branch_id = ?
           AND resource_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY resource_id, start_minute, id
-      `).bind(businessId, branchId, JSON.stringify(ids)).all<AvailabilityRow>(),
+      `).bind(businessId, branchId, JSON.stringify(ids)),
     ]);
     assertSuccess(links);
     assertSuccess(windows);
     const services = new Map<string, string[]>();
-    for (const row of links.results ?? []) {
+    for (const row of (links.results ?? []) as ResourceServiceRow[]) {
       const current = services.get(row.resource_id) ?? [];
       current.push(row.service_id);
       services.set(row.resource_id, current);
     }
     const availability = new Map<string, BookingResourceView["availability"]>();
-    for (const row of windows.results ?? []) {
+    for (const row of (windows.results ?? []) as AvailabilityRow[]) {
       const current = availability.get(row.resource_id) ?? [];
       current.push({ id: row.id, state: row.state, start: row.start_local, end: row.end_local });
       availability.set(row.resource_id, current);
@@ -499,7 +548,7 @@ export class PostgresBe3Repository implements Be3Repository {
     if (!rows.length) return [];
     const ids = rows.map((row) => row.id);
     const serviceIds = [...new Set(rows.map((row) => row.service_id))];
-    const [pets, assignments, requirements] = await Promise.all([
+    const [pets, assignments, requirements] = await this.database.batch([
       this.database.prepare(`
         SELECT link.booking_id, profile.pet_id, profile.name, profile.species
         FROM booking_pets link
@@ -508,37 +557,37 @@ export class PostgresBe3Repository implements Be3Repository {
         WHERE link.business_id = ?
           AND link.booking_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY link.booking_id, link.position, link.pet_id
-      `).bind(businessId, JSON.stringify(ids)).all<PetRow>(),
+      `).bind(businessId, JSON.stringify(ids)),
       this.database.prepare(`
         SELECT booking_id, resource_id FROM booking_resource_assignments
         WHERE business_id = ?
           AND booking_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY booking_id, position, resource_id
-      `).bind(businessId, JSON.stringify(ids)).all<AssignmentRow>(),
+      `).bind(businessId, JSON.stringify(ids)),
       this.database.prepare(`
         SELECT service_id, resource_kind FROM booking_service_resource_requirements
         WHERE business_id = ?
           AND service_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY service_id, position, resource_kind
-      `).bind(businessId, JSON.stringify(serviceIds)).all<RequirementRow>(),
+      `).bind(businessId, JSON.stringify(serviceIds)),
     ]);
     assertSuccess(pets);
     assertSuccess(assignments);
     assertSuccess(requirements);
     const petsByBooking = new Map<string, BookingView["pets"]>();
-    for (const row of pets.results ?? []) {
+    for (const row of (pets.results ?? []) as PetRow[]) {
       const current = petsByBooking.get(row.booking_id) ?? [];
       current.push({ id: row.pet_id, name: row.name, species: row.species });
       petsByBooking.set(row.booking_id, current);
     }
     const resourcesByBooking = new Map<string, string[]>();
-    for (const row of assignments.results ?? []) {
+    for (const row of (assignments.results ?? []) as AssignmentRow[]) {
       const current = resourcesByBooking.get(row.booking_id) ?? [];
       current.push(row.resource_id);
       resourcesByBooking.set(row.booking_id, current);
     }
     const requirementsByService = new Map<string, BookingResourceKind[]>();
-    for (const row of requirements.results ?? []) {
+    for (const row of (requirements.results ?? []) as RequirementRow[]) {
       const current = requirementsByService.get(row.service_id) ?? [];
       current.push(row.resource_kind);
       requirementsByService.set(row.service_id, current);

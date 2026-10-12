@@ -1,8 +1,9 @@
 "use client";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
 
 import { businessToday } from "../../_backend/shared/businessClock";
 import { useEffect, useState } from "react";
-import { ensureDurableReport } from "../../_backend/be8/client";
+import { ensureDurableSummary, readHomeSummary } from "../../_backend/be8/client";
 
 import {
   BUSINESS_SERVICE_MODULES,
@@ -16,6 +17,7 @@ import {
   listPrototypeBookingFixtures,
   listPrototypeBookings,
   resolvePrototypeBookingRelationship,
+  projectDurableBooking,
 } from "../../_prototype/businessState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
@@ -33,6 +35,7 @@ import { useBusinessContext, useBusinessStateReady } from "../_components/useBus
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { DashboardOverview } from "./DashboardOverview";
 import { BusinessHomeSpotlight } from "./BusinessHomeSpotlight";
+import { BusinessGettingStarted } from "./BusinessGettingStarted";
 import { formatBusinessMoney } from "../billing/billingPresentation";
 
 function bookingIsOnDemoDay(booking: ReturnType<typeof listPrototypeBookings>[number]) {
@@ -57,28 +60,29 @@ export function BusinessHome() {
   const [refreshFailed, setRefreshFailed] = useState(false);
   useEffect(() => {
     if (!isContextReady) return;
-    let active = true;
-    const load = () => ensureDurableReport({ businessId, branchId }).then(() => { if (active) setRefreshFailed(false); }).catch(() => { if (active) setRefreshFailed(true); });
-    void load(); const timer = window.setInterval(() => void load(), 5000);
-    return () => { active = false; window.clearInterval(timer); };
+    const refresh = startBusinessRefresh(async signal => { await ensureDurableSummary({ businessId, branchId }, true, { signal }); if (!signal.aborted) setRefreshFailed(false); },
+      { businessId, targets: ["home"], intervalMs: 60_000, initial: false, onError: () => setRefreshFailed(true) });
+    return refresh.stop;
   }, [businessId, branchId, isContextReady]);
   const businessStateReady = useBusinessStateReady();
   const details = getDemoBusinessContextDetails(context, !businessStateReady);
   const demo = getBusinessHomeDemo(context);
+  const home = businessStateReady ? readHomeSummary(context) : null;
   const enabledModules = getEnabledBusinessModules(context, !businessStateReady);
   void revision;
-  const allBranchBookings = businessStateReady
+  const allBranchBookings = home ? home.bookings.map(booking => projectDurableBooking({ ...booking, notes: "", estimate: null, revision: 0,
+    requiredResourceKinds: [], assignedResourceIds: [], createdAt: "", updatedAt: "", cancelledAt: null })) : businessStateReady
     ? listPrototypeBookings(context, { includeCancelled: false })
     : listPrototypeBookingFixtures(context, { includeCancelled: false });
   const branchBookings = allBranchBookings.filter((booking) => enabledModules.includes(booking.serviceModule));
-  const unreadMessageCount = getPrototypeInboxUnreadCount(context, !businessStateReady);
-  const groomingSummary = getGroomingServiceJobSummary(context, businessToday(context), !businessStateReady);
+  const unreadMessageCount = home?.unreadMessages ?? getPrototypeInboxUnreadCount(context, !businessStateReady);
+  const groomingSummary = home?.grooming ?? getGroomingServiceJobSummary(context, businessToday(context), !businessStateReady);
   const groomingEnabled = enabledModules.includes("grooming");
   const hotelEnabled = enabledModules.includes("hotel");
-  const hotelSummary = getPrototypeHotelStaySummary(context, businessToday(context), !businessStateReady);
+  const hotelSummary = home?.hotel ?? getPrototypeHotelStaySummary(context, businessToday(context), !businessStateReady);
   const daycareEnabled = enabledModules.includes("daycare");
-  const daycareSummary = summarizePrototypeDaycare(context, businessToday(context), !businessStateReady);
-  const revenueSummary = getPrototypeRevenueSummary(context, businessToday(context), !businessStateReady);
+  const daycareSummary = home?.daycare ?? summarizePrototypeDaycare(context, businessToday(context), !businessStateReady);
+  const revenueSummary = home?.revenueSummary ?? getPrototypeRevenueSummary(context, businessToday(context), !businessStateReady);
   const attentionItems = [
     ...demo.attention.filter((item) => !(groomingEnabled && item.id === "pickup")),
     ...(groomingEnabled && groomingSummary.readyForPickup > 0 ? [{
@@ -116,7 +120,7 @@ export function BusinessHome() {
     module: booking.serviceModule,
   }));
   const todaySummary = {
-    waitingIntake: demo.today.waitingIntake,
+    waitingIntake: home?.waitingIntake ?? demo.today.waitingIntake,
     bookingsToday: branchBookings.filter(bookingIsOnDemoDay).length,
     readyForPickup: (groomingEnabled ? groomingSummary.readyForPickup : demo.today.readyForPickup ?? 0)
       + (hotelEnabled ? hotelSummary.readyForPickup : 0)
@@ -128,7 +132,9 @@ export function BusinessHome() {
       <BusinessPageHeader title="ภาพรวมวันนี้" context={`${details.business?.name ?? "ร้าน"} · ${details.branch?.name ?? "สาขา"}`} />
       {refreshFailed ? <p role="status">อัปเดตข้อมูลล่าสุดไม่สำเร็จ กำลังแสดงข้อมูลที่โหลดไว้และลองใหม่</p> : null}
 
-      <DashboardOverview today={businessToday(context)} bookings={branchBookings} summary={todaySummary} />
+      <BusinessGettingStarted context={context} />
+
+      <DashboardOverview today={businessToday(context)} bookings={branchBookings} summary={todaySummary} trend={home?.bookingTrend} />
       <nav className="dashboard-actions" aria-label="งานด่วน">
         <Link className="dashboard-actions__primary" href="/business/calendar?new=1"><Plus size={18} />เพิ่มการจอง</Link>
         <Link href="/business/scan"><Scan size={18} />สแกนรับเข้า</Link>
@@ -147,10 +153,10 @@ export function BusinessHome() {
               {attentionItems.map((item) => (
                 <li key={item.id} className={`business-attention__item business-attention__item--${item.tone}`}>
                   {item.id === "messages" || item.id === "hotel-attention" || item.id === "daycare-attention" ? (
-                    <a href={item.id === "messages" ? "/business/inbox" : item.id === "daycare-attention" ? "/business/daycare?filter=attention" : "/business/hotel?filter=attention"}>
+                    <Link href={item.id === "messages" ? "/business/inbox" : item.id === "daycare-attention" ? "/business/daycare?filter=attention" : "/business/hotel?filter=attention"}>
                       <span className="business-attention__cue">{item.id === "messages" ? <MessageCircle size={20} /> : <BusinessServiceIcon module={item.id === "daycare-attention" ? "daycare" : "hotel"} size={20} />}</span>
                       <span><strong>{item.title}</strong><small>{item.detail}</small></span>
-                    </a>
+                    </Link>
                   ) : (
                     <>
                       <span className="business-attention__cue">

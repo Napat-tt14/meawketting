@@ -1,3 +1,6 @@
+"use client";
+
+import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
 type BusinessDocumentLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
@@ -5,10 +8,6 @@ type BusinessDocumentLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "
   children: ReactNode;
 };
 
-/**
- * Keep business navigation reliable while vinext's beta RSC client-navigation
- * shim is unavailable. Session-backed prototype data survives document loads.
- */
 export function BusinessDocumentLink({ href, children, ...props }: BusinessDocumentLinkProps) {
-  return <a href={href} {...props}>{children}</a>;
+  return <Link href={href} prefetch={false} {...props}>{children}</Link>;
 }

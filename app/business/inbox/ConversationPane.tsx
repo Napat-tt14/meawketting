@@ -1,8 +1,10 @@
 "use client";
 
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type PrototypeConversation } from "../../_prototype/inboxState";
-import { sendDurableTextMessage as sendPrototypeTextMessage } from "../../_backend/be6/client";
+import { loadDurableConversation, readInboxDirectory, sendDurableTextMessage as sendPrototypeTextMessage } from "../../_backend/be6/client";
 import { ArrowLeft, CalendarDays, MessageCircle, Plus, UserRound } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
@@ -33,6 +35,17 @@ export function ConversationPane({
   const [notice, setNotice] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const requestTriggerRef = useRef<HTMLButtonElement>(null);
+  const olderRequest = useRef<AbortController | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  useEffect(() => () => olderRequest.current?.abort(), []);
+  const hasOlder = readInboxDirectory(businessId, currentBranchId).find(c => c.conversationId === conversation.conversationId)?.hasOlderMessages;
+  async function loadOlder() {
+    if (olderRequest.current) return;
+    const controller = new AbortController(); olderRequest.current = controller; setLoadingOlder(true);
+    try { await loadDurableConversation(businessId, currentBranchId, conversation.conversationId, { older: true, signal: controller.signal }); }
+    catch { if (!controller.signal.aborted) setNotice("โหลดข้อความก่อนหน้าไม่สำเร็จ กรุณาลองอีกครั้ง"); }
+    finally { olderRequest.current = null; if (!controller.signal.aborted) setLoadingOlder(false); }
+  }
 
   useEffect(() => {
     if (!window.matchMedia("(max-width: 767px)").matches) return;
@@ -73,7 +86,7 @@ export function ConversationPane({
           </div>
         </div>
         <div className="conversation-header__actions">
-          <a className="conversation-header__action conversation-header__action--customer" aria-label="ดูลูกค้า" href={`/business/customers/${encodeURIComponent(conversation.customerId)}`}><UserRound size={18} /><span>ดูลูกค้า</span></a>
+          <Link className="conversation-header__action conversation-header__action--customer" aria-label="ดูลูกค้า" href={`/business/customers/${encodeURIComponent(conversation.customerId)}`}><UserRound size={18} /><span>ดูลูกค้า</span></Link>
           {canRequestService ? <button ref={requestTriggerRef} className="conversation-header__action conversation-header__action--request" type="button" aria-label="ขอเพิ่มบริการ" onClick={() => setRequestOpen(true)}><Plus size={18} /><span>ขอเพิ่มบริการ</span></button> : null}
         </div>
       </header>
@@ -85,7 +98,7 @@ export function ConversationPane({
             <span><strong>{context.booking.serviceLabel}</strong><small>{prototypeConversationContextLabel(context)}</small></span>
             {!bookingInCurrentBranch ? <span className="conversation-context-strip__branch">{context.booking.branchName}</span> : null}
             {bookingInCurrentBranch ? (
-              <a aria-label="ดูการจอง" href={`/business/calendar?bookingId=${encodeURIComponent(context.booking.bookingId)}`}><CalendarDays size={17} /><span>ดูการจอง</span></a>
+              <Link aria-label="ดูการจอง" href={`/business/calendar?bookingId=${encodeURIComponent(context.booking.bookingId)}`}><CalendarDays size={17} /><span>ดูการจอง</span></Link>
             ) : null}
           </>
         ) : (
@@ -96,7 +109,8 @@ export function ConversationPane({
       <div className="conversation-notice-slot">
         {notice ? <p className="conversation-notice" role="status">{notice}</p> : null}
       </div>
-      <MessageTimeline conversation={conversation} context={context} businessId={businessId} onMutation={handleMutation} />
+      <MessageTimeline conversation={conversation} context={context} businessId={businessId} onMutation={handleMutation}
+        historyControl={hasOlder ? <button className="button button--business-ghost" type="button" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "กำลังโหลด…" : "โหลดข้อความก่อนหน้า"}</button> : null} />
       <MessageComposer onSend={send} />
 
       {requestOpen && context.booking ? (

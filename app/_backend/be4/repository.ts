@@ -11,7 +11,7 @@ export type ExecutionWrite = {
 };
 export interface Be4Repository {
   receipt(businessId: string, command: string, requestKey: string): Promise<{ branchId: string; requestHash: string; targetId: string } | null>;
-  list(businessId: string, branchId: string, afterId: string, limit: number): Promise<ExecutionView[]>;
+  list(businessId: string, branchId: string, afterId: string, limit: number, filter?: { bookingId?: string; executionId?: string; customerId?: string; date?: string; module?: ExecutionView["kind"] }): Promise<ExecutionView[]>;
   get(businessId: string, branchId: string, id: string): Promise<ExecutionView | null>;
   forBooking(businessId: string, branchId: string, bookingId: string): Promise<ExecutionView[]>;
   save(write: ExecutionWrite, additionalStatements?: PreparedStatement[]): Promise<void>;

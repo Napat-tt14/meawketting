@@ -1,4 +1,5 @@
 "use client";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
 
 import { useEffect, useMemo, useState } from "react";
 import { ensureDurableReport, readReport } from "../../_backend/be8/client";
@@ -59,10 +60,9 @@ export function ReportsScreen() {
   const queryKey = JSON.stringify([businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope]);
   useEffect(() => {
     if (!isContextReady) return;
-    let stopped = false;
-    const load = async () => { try { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }); if (!stopped) { setError(false); setLoadedQuery(queryKey); } } catch { if (!stopped) setError(true); } };
-    void load(); const timer = window.setInterval(() => void load(), 5000);
-    return () => { stopped = true; window.clearInterval(timer); };
+    const refresh = startBusinessRefresh(async signal => { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }, { signal }); if (!signal.aborted) { setError(false); setLoadedQuery(queryKey); } },
+      { businessId, targets: ["reports"], intervalMs: dateRangePreset === "today" ? 60_000 : undefined, onError: () => setError(true) });
+    return refresh.stop;
   }, [businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope, isContextReady, queryKey]);
 
   const report = useMemo(() => {

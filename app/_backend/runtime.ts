@@ -12,8 +12,16 @@ export type BackendEnvironment = {
   MEAWKETTING_PUBLIC_ORIGIN?: string;
   MEAWKETTING_AUTH_MODE?: string;
 };
-type Context = { env: BackendEnvironment; request: Request; cookies: string[]; database?: PostgresDatabase; auth?: SupabaseClient };
+type Context = { env: BackendEnvironment; request: Request; cookies: string[]; database?: PostgresDatabase; auth?: SupabaseClient; verifiedReads: Map<string, Promise<unknown>> };
 const context = new AsyncLocalStorage<Context>();
+/** Verified reads live for this HTTP request only; commit guards still read the database. */
+export function verifiedRequestRead<T>(key: string, read: () => Promise<T>): Promise<T> {
+  const current = context.getStore();
+  if (!current) return read();
+  const previous = current.verifiedReads.get(key);
+  if (previous) return previous as Promise<T>;
+  const value = read(); current.verifiedReads.set(key, value); return value;
+}
 export function backendContext() {
   const current = context.getStore();
   if (!current) throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
@@ -26,10 +34,10 @@ export function database() {
   const hyperdrive = current.env.HYPERDRIVE;
   const url = hyperdrive?.connectionString ?? current.env.DATABASE_URL;
   if (!url) throw be1Error("PERSISTENCE_ERROR");
-  return current.database ??= connectPostgres(url, "public", Boolean(hyperdrive));
+  return current.database ??= connectPostgres(url, "public", Boolean(hyperdrive), current.request.signal);
 }
 export async function withBackend(request: Request, env: BackendEnvironment, next: () => Promise<Response>) {
-  const current: Context = { env, request, cookies: [] };
+  const current: Context = { env, request, cookies: [], verifiedReads: new Map() };
   return context.run(current, async () => {
     try {
       const response = await next();

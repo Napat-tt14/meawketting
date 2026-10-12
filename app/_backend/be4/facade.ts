@@ -1,7 +1,7 @@
 import type * as Prototype from "../../_prototype/businessState";
 import type { DemoBusinessContext } from "../../_prototype/businessState";
 import { BusinessRequestError } from "../shared/client";
-import { ensureDurableOperations, mutateOperations } from "./client";
+import { mutateOperations, refreshExecution } from "./client";
 import type { ExecutionChange } from "./contracts";
 import { readExecution, readOperationStaff } from "./operationsCache";
 
@@ -26,7 +26,7 @@ async function change(id: string, input: ExecutionChange, context: DemoBusinessC
   } catch (error) {
     if (error instanceof BusinessRequestError && error.reason === "version-conflict") {
       pendingKeys.delete(fingerprint);
-      try { await ensureDurableOperations(context.businessId, context.branchId, true); } catch { /* Keep the typed failure. */ }
+      try { await refreshExecution(context.businessId, context.branchId, id); } catch { /* Keep the typed failure. */ }
     }
     return failure(error);
   }

@@ -9,12 +9,16 @@ import { Be3Application } from "../app/_backend/be3/application";
 import type { CreateBookingInput } from "../app/_backend/be3/contracts";
 import { PostgresBe3Repository } from "../app/_backend/be3/postgresRepository";
 import { Be4Application } from "../app/_backend/be4/application";
+import { Be2Application } from "../app/_backend/be2/application";
+import { Be6Application } from "../app/_backend/be6/application";
+import { PostgresBe6Repository } from "../app/_backend/be6/postgresRepository";
+import { Be8Application } from "../app/_backend/be8/application";
 import type { ExecutionChange, ExecutionView } from "../app/_backend/be4/contracts";
 import { PostgresBe4Repository } from "../app/_backend/be4/postgresRepository";
 import { executionId } from "../app/_backend/be4/domain";
 import { BackendConflict } from "../app/_backend/shared/errors";
 import { businessRequest } from "../app/_backend/shared/http";
-import { ARI, INACTIVE, MANAGER, metadata, ONNUT, OUTSIDER, OWNER, PAW, seededDatabase, THONGLOR, WHISKER } from "./postgresFixtures";
+import { ARI, INACTIVE, MANAGER, STAFF, metadata, ONNUT, OUTSIDER, OWNER, PAW, seededDatabase, THONGLOR, WHISKER } from "./postgresFixtures";
 
 async function fixture() {
   const db = seededDatabase(), auth = new PostgresBe1Repository(db), identities = new PostgresBe2Repository(db), bookings = new PostgresBe3Repository(db), operations = new PostgresBe4Repository(db);
@@ -37,6 +41,29 @@ const reason = (expected: string) => (error: unknown) => error instanceof Backen
 const code = (expected: string) => (error: unknown) => error instanceof Be1Error && error.code === expected;
 const hotel = { serviceId: "ari-hotel-stay", start: "2026-08-27", end: "2026-08-30", assignedResourceIds: ["ari-hotel-capacity"] };
 const daycare = { businessId: PAW, branchId: ONNUT, serviceId: "onnut-daycare-full-day", customerId: "booking-contact-onnut-aom", petIds: ["booking-pet-pudding"], start: "2026-08-27", end: null, assignedResourceIds: ["onnut-daycare-quiet"] };
+
+test("Manager and Staff read granted operations without gaining another Branch or Business; Owner retains inactive access", async () => {
+  const f = await fixture();
+  const auth = new PostgresBe1Repository(f.db), customers = new Be2Application(auth, new PostgresBe2Repository(f.db)), inbox = new Be6Application(auth, new PostgresBe6Repository(f.db)), reports = new Be8Application(auth, f.db);
+  for (const [person, branch, denied] of [[MANAGER, ARI, THONGLOR], [STAFF, THONGLOR, ARI]]) {
+    const actor = await f.app.resolvePerson(person);
+    const result = await f.app.executeBe4(actor, { type: "operations.list", businessId: WHISKER, branchId: branch }, metadata());
+    assert.ok(result.executions.every(e => e.record.businessId === WHISKER && e.record.branchId === branch));
+    assert.ok(result.staff.every(s => s.branchIds.every(id => id === branch)));
+    await customers.executeBe2(actor, { type: "customer.list", input: { businessId: WHISKER, limit: 100, offset: 0 } }, metadata());
+    await f.planning.getCatalog(actor, WHISKER, branch);
+    await f.planning.listBookings(actor, { businessId: WHISKER, includeCancelled: true });
+    await inbox.executeBe6(actor, { type: "inbox.list", businessId: WHISKER, branchId: branch }, metadata());
+    await reports.executeBe8(actor, { type: "reports.get", businessId: WHISKER, branchId: branch, options: {} }, metadata());
+    for (const e of result.executions) assert.equal(executionId(await f.app.executeBe4(actor, { type: "operations.get", businessId: WHISKER, branchId: branch, executionId: executionId(e) }, metadata())), executionId(e));
+    await assert.rejects(f.app.executeBe4(actor, { type: "operations.list", businessId: WHISKER, branchId: denied }, metadata()), code("NOT_FOUND"));
+    await assert.rejects(f.app.executeBe4(actor, { type: "operations.list", businessId: PAW, branchId: ONNUT }, metadata()), code("FORBIDDEN"));
+  }
+  f.db.inspect.prepare("UPDATE membership_branch_access SET status='inactive' WHERE business_id=? AND branch_id=?").run(WHISKER, ARI);
+  await assert.rejects(f.app.executeBe4(await f.app.resolvePerson(MANAGER), { type: "operations.list", businessId: WHISKER, branchId: ARI }, metadata()), code("NOT_FOUND"));
+  f.db.inspect.prepare("UPDATE branches SET status='inactive' WHERE business_id=? AND id=?").run(WHISKER, THONGLOR);
+  await f.app.executeBe4(f.actor, { type: "operations.list", businessId: WHISKER, branchId: THONGLOR }, metadata());
+});
 
 test("PostgreSQL synthetic plans create per-Pet execution once, retain inactive references and never invent completion", (t) => {
   const db = new TestSql(); t.after(() => db.close()); migrate(db);

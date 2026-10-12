@@ -1,5 +1,7 @@
 "use client";
 
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   evaluatePrototypeTeamMemberAvailability,
@@ -17,6 +19,7 @@ import {
   type PrototypeAddServiceRequestMessage,
 } from "../../_prototype/inboxState";
 import { ensureDurableConversation as ensurePrototypeConversation } from "../../_backend/be6/client";
+import { getDurableBooking } from "../../_backend/be3/client";
 import {
   CheckCircle,
   CircleAlert,
@@ -89,6 +92,15 @@ export function GroomingJobDetail({
     .filter((message) => message.serviceJobId === job.serviceJobId || (!message.serviceJobId && message.bookingId === job.bookingId)), [context, job.bookingId, job.serviceJobId]);
 
   const close = useCallback(() => onCloseRef.current(), []);
+
+  useEffect(() => {
+    if (readPrototypeBooking(job.bookingId)) return;
+    const controller = new AbortController();
+    void getDurableBooking(context.businessId, context.branchId, job.bookingId, controller.signal).catch(() => {
+      if (!controller.signal.aborted) setNotice("โหลดการจองของงานนี้ไม่สำเร็จ กรุณาเปิดรายการอีกครั้ง");
+    });
+    return () => controller.abort();
+  }, [context.businessId, context.branchId, job.bookingId]);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -219,8 +231,8 @@ export function GroomingJobDetail({
               {customer.phone ? <a aria-label={`โทร ${customer.name}`} href={`tel:${customer.phone.replace(/[^0-9+]/g, "")}`}><Phone size={18} /></a> : null}
             </div>
             <div className="grooming-detail-section__actions">
-              <a href={`/business/customers/${encodeURIComponent(customer.id)}`}><UserRound size={17} />ดูลูกค้า</a>
-              <a href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />ส่งข้อความ</a>
+              <Link href={`/business/customers/${encodeURIComponent(customer.id)}`}><UserRound size={17} />ดูลูกค้า</Link>
+              <Link href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />ส่งข้อความ</Link>
             </div>
           </section>
 
@@ -256,7 +268,7 @@ export function GroomingJobDetail({
                 );
               })}
             </div>
-            {checkoutAvailable ? <div className="grooming-detail-checkout"><span><Wallet size={17} /><strong>พร้อมตรวจยอด</strong><small>สถานะงานและการชำระเงินแยกกัน</small></span><a className="button button--business" href={`/business/billing?serviceJobId=${encodeURIComponent(job.serviceJobId)}`}><Wallet size={17} />ไปชำระเงิน</a></div> : null}
+            {checkoutAvailable ? <div className="grooming-detail-checkout"><span><Wallet size={17} /><strong>พร้อมตรวจยอด</strong><small>สถานะงานและการชำระเงินแยกกัน</small></span><Link className="button button--business" href={`/business/billing?serviceJobId=${encodeURIComponent(job.serviceJobId)}`}><Wallet size={17} />ไปชำระเงิน</Link></div> : null}
             {job.status === "completed" ? <p className="grooming-detail-section__hint grooming-detail-service-record"><CheckCircle size={16} />บันทึกประวัติบริการแล้ว · เปิดดูได้จากหน้าลูกค้าและสัตว์เลี้ยง</p> : null}
           </section>
 
@@ -293,7 +305,7 @@ export function GroomingJobDetail({
           <section className="grooming-detail-section" aria-labelledby="grooming-note-title">
             <header><h3 id="grooming-note-title">หมายเหตุของร้าน</h3></header>
             <textarea aria-labelledby="grooming-note-title" value={note} rows={3} maxLength={360} placeholder="ใช้ภายในทีมเท่านั้น" onInput={(event) => setNote(event.currentTarget.value)} />
-            <div className="grooming-detail-section__actions"><button type="button" onClick={saveNote}><Save size={17} />บันทึกหมายเหตุ</button><a href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />เปิดข้อความลูกค้า</a></div>
+            <div className="grooming-detail-section__actions"><button type="button" onClick={saveNote}><Save size={17} />บันทึกหมายเหตุ</button><Link href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />เปิดข้อความลูกค้า</Link></div>
           </section>
 
           <section className="grooming-detail-section" aria-labelledby="grooming-history-title">

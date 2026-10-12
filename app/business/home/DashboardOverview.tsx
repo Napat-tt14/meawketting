@@ -1,18 +1,20 @@
 import type { listPrototypeBookings } from "../../_prototype/businessState";
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 
 const number = new Intl.NumberFormat("th-TH");
 const date = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-export function DashboardOverview({ today, bookings, summary }: {
+export function DashboardOverview({ today, bookings, summary, trend }: {
   today: string;
   bookings: ReturnType<typeof listPrototypeBookings>;
   summary: { bookingsToday: number; waitingIntake: number; readyForPickup: number; newMessages: number };
+  trend?: { date: string; count: number }[];
 }) {
   const days = Array.from({ length: 7 }, (_, index) => {
     const day = new Date(`${today}T12:00:00Z`);
     day.setUTCDate(day.getUTCDate() - 6 + index);
     const key = day.toISOString().slice(0, 10);
-    return { key, value: bookings.filter((booking) => booking.timeModel === "date-range"
+    return { key, value: trend?.find(day => day.date === key)?.count ?? bookings.filter((booking) => booking.timeModel === "date-range"
       ? booking.start <= key && Boolean(booking.end && key < booking.end)
       : booking.start.slice(0, 10) === key).length };
   });
@@ -29,7 +31,7 @@ export function DashboardOverview({ today, bookings, summary }: {
       <div className="dashboard-overview__date"><time dateTime={today}>{formatDate(today)}</time><span>ข้อมูลของสาขาที่เลือก</span></div>
       <div className="dashboard-overview__metrics">
         <div className="dashboard-primary">
-          <div><h2>การจองวันนี้</h2><p className="dashboard-primary__value"><strong>{number.format(summary.bookingsToday)}</strong><span>รายการ</span></p><a href="/business/calendar">ดูตารางการจอง →</a></div>
+          <div><h2>การจองวันนี้</h2><p className="dashboard-primary__value"><strong>{number.format(summary.bookingsToday)}</strong><span>รายการ</span></p><Link href="/business/calendar">ดูตารางการจอง →</Link></div>
           <figure className="dashboard-trend">
             <svg viewBox="0 0 260 68" role="img" aria-label={`จำนวนการจองตามวันให้บริการ: ${days.map((day) => `${formatDate(day.key)} ${number.format(day.value)} รายการ`).join(", ")}`}>
               <path d="M4 60H256" stroke="var(--border)" />
@@ -39,7 +41,7 @@ export function DashboardOverview({ today, bookings, summary }: {
             <figcaption>การจองตามวันให้บริการ · 7 วัน<br />{formatDate(days[0].key)} – {formatDate(today)}</figcaption>
           </figure>
         </div>
-        <dl className="dashboard-secondary">{secondary.map((item) => <div key={item.label}><dt>{item.label}</dt><dd><strong>{number.format(item.value)}</strong><span>{item.unit}</span></dd><a href={item.href}>ดูรายการ<span className="sr-only">{item.label}</span> →</a></div>)}</dl>
+        <dl className="dashboard-secondary">{secondary.map((item) => <div key={item.label}><dt>{item.label}</dt><dd><strong>{number.format(item.value)}</strong><span>{item.unit}</span></dd><Link href={item.href}>ดูรายการ<span className="sr-only">{item.label}</span> →</Link></div>)}</dl>
       </div>
     </section>
   );

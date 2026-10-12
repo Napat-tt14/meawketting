@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, BedDouble, Check, CheckCircle, LogOut, PawPrint, Scissors, ShieldCheck, Storefront } from "../../_components/icons";
+import { ArrowLeft, ArrowRight, BedDouble, Check, CheckCircle, LogOut, PawPrint, Scissors, Storefront } from "../../_components/icons";
 import { changeBusinessView } from "../_components/businessViewTransition";
 
 const steps = [
@@ -32,7 +32,7 @@ export function BusinessSetupScreen() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/business/register", { credentials: "same-origin", cache: "no-store" })
+    void fetch("/api/business/register", { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(20_000) })
       .then(async response => {
         if (response.status === 401) { if (active) window.location.replace("/business/login"); return; }
         if (!response.ok) throw new Error();
@@ -69,7 +69,7 @@ export function BusinessSetupScreen() {
     event.preventDefault();
     if (busy || loadState !== "ready") return;
     if (step === 0) {
-      if (!details.businessName.trim() || !details.branchName.trim()) { setMessage("กรุณากรอกชื่อร้านและชื่อสาขา"); return; }
+      if (!details.businessName.trim()) { setMessage("กรุณากรอกชื่อร้าน"); return; }
       moveTo(1); return;
     }
     if (step === 1) {
@@ -82,7 +82,7 @@ export function BusinessSetupScreen() {
     }
     setBusy(true); setMessage("");
     try {
-      const response = await fetch("/api/business/register", { method: "POST", credentials: "same-origin",
+      const response = await fetch("/api/business/register", { method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(20_000),
         headers: { "content-type": "application/json" }, body: JSON.stringify({ ...details, modules, confirmed }) });
       if (response.status === 401) { setLoadState("auth"); return; }
       if (!response.ok) {
@@ -112,7 +112,6 @@ export function BusinessSetupScreen() {
   return <section className="business-setup shell" data-step={step} data-direction={direction} data-motion={motion} aria-labelledby="setup-title">
     <div className="business-setup__backdrop" aria-hidden="true"><span /><span /><PawPrint size={32} /><PawPrint size={22} /></div>
     <header className="business-setup__header">
-      <span className="business-setup__account">{loadState === "ready" ? <><CheckCircle size={16} /> บัญชีพร้อมแล้ว มาเริ่มกันเลย</> : <><Storefront size={16} /> เตรียมพื้นที่ทำงานของร้านคุณ</>}</span>
       <h1 id="setup-title">ตั้งค่าร้านของคุณ</h1>
       <p>4 ช่วงสั้น ๆ เพื่อเตรียมพื้นที่ทำงานให้ร้านคุณ</p>
     </header>
@@ -138,7 +137,7 @@ export function BusinessSetupScreen() {
             {step === 3 && <span className="business-setup__scene-caption"><CheckCircle size={15} /> อีกเพียงก้าวเดียว</span>}
           </div>
           <div className="business-setup__intro">
-            <p className="business-setup__position">ขั้นตอน {step + 1} จาก {steps.length} <span>·</span> {current.label}</p>
+            <p className="business-setup__position">ขั้นตอน {step + 1} จาก {steps.length}</p>
             <h2 ref={heading} tabIndex={-1}>{current.title}</h2>
             <p className="business-setup__description">{current.description}</p>
           </div>
@@ -147,10 +146,6 @@ export function BusinessSetupScreen() {
             {step === 0 && <div className="business-setup__fields business-setup__fields--shop">
               <label htmlFor="setup-business-name">ชื่อร้านของคุณ</label>
               <input id="setup-business-name" name="businessName" required maxLength={160} autoComplete="organization" value={details.businessName} placeholder="เช่น บ้านอุ่นใจ Pet Care" onChange={event => setDetails({ ...details, businessName: event.target.value })} />
-              <p className="business-setup__hint">ใช้ภาษาไทยหรืออังกฤษก็ได้ แก้ไขได้ภายหลัง</p>
-              <details className="business-setup__optional"><summary>มีชื่อสาขา? เพิ่มได้ที่นี่</summary>
-                <label>ชื่อสาขาแรก<input name="branchName" required maxLength={160} value={details.branchName} onChange={event => setDetails({ ...details, branchName: event.target.value })} /></label>
-              </details>
             </div>}
 
             {step === 1 && <div className="business-setup__fields business-setup__fields--contact">
@@ -182,7 +177,6 @@ export function BusinessSetupScreen() {
                 <div className="business-setup__review-services"><div>{selectedServices.map(({ value, label, Icon }) => <span key={value}><Icon size={15} />{label}</span>)}</div><button className="business-setup__edit" type="button" aria-label="แก้ไขบริการ" onClick={() => moveTo(2)}>แก้ไข</button></div>
               </div>
               <label className="business-setup__confirm"><input type="checkbox" required checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /><span>ฉันยืนยันว่าข้อมูลถูกต้อง และมีสิทธิ์สร้างและจัดการร้านนี้ในฐานะเจ้าของร้าน</span></label>
-              <p className="business-setup__notice"><ShieldCheck size={17} /><span>หลังเข้าระบบ ตั้งค่าวันเวลาเปิดบริการก่อนรับจองได้ที่เมนูตั้งค่าร้าน</span></p>
             </div>}
           </div>
 
@@ -195,6 +189,6 @@ export function BusinessSetupScreen() {
       </form>}
       {message && loadState !== "ready" && <p className="business-setup__error" role="alert">{message}</p>}
     </div>
-    <footer className="business-setup__footer"><span><ShieldCheck size={15} /> ข้อมูลแก้ไขเพิ่มเติมได้ภายหลัง</span><button className="business-setup__logout" type="button" disabled={busy} onClick={() => { void logout(); }}><LogOut size={15} /> ออกจากระบบ</button></footer>
+    <footer className="business-setup__footer"><button className="business-setup__logout" type="button" disabled={busy} onClick={() => { void logout(); }}><LogOut size={15} /> ออกจากระบบ</button></footer>
   </section>;
 }

@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     };
     return new Response(JSON.stringify(body), {
       status: 200,
-      headers: responseHeaders(metadata.requestId, metadata.correlationId),
+      headers: { ...responseHeaders(metadata.requestId, metadata.correlationId), "x-meawketting-person-id": identity.personId },
     });
   } catch (error) {
     const failure = asBe1Error(error);

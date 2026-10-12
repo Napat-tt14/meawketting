@@ -83,17 +83,19 @@ export function normalizeTags(value: unknown) {
   return tags;
 }
 
-export function validateCustomerListInput(value: unknown): Required<CustomerListInput> {
+export function validateCustomerListInput(value: unknown): Required<Omit<CustomerListInput, "customerIds">> & Pick<CustomerListInput, "customerIds"> {
   const input = record(value);
+  if (input.customerIds !== undefined && (!Array.isArray(input.customerIds) || input.customerIds.length > 100)) throw be1Error("INVALID_INPUT");
   return {
     businessId: validateId(input.businessId),
+    customerIds: input.customerIds === undefined ? undefined : [...new Set((input.customerIds as unknown[]).map(validateId))],
     includeInactive: booleanField(input.includeInactive),
     limit: integerField(input.limit, 50, 1, 100),
     offset: integerField(input.offset, 0, 0, 1_000_000),
   };
 }
 
-export function validateCustomerSearchInput(value: unknown): Required<CustomerSearchInput> {
+export function validateCustomerSearchInput(value: unknown): Required<Omit<CustomerSearchInput, "customerIds">> & Pick<CustomerSearchInput, "customerIds"> {
   const input = record(value);
   return {
     ...validateCustomerListInput(input),

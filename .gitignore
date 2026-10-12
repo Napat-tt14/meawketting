@@ -35,7 +35,10 @@
 /.vinext/
 /dist/
 /.wrangler/
+# Keep tests/, fixtures and build/sites-vite-plugin.ts in Git.
+# Ignore generated test results, not regression test source.
 /coverage/
+/.nyc_output/
 # Browser QA reports and local authenticated session snapshots
 /playwright-report/
 /test-results/
@@ -80,6 +83,9 @@ Thumbs.db
 # Local tool caches
 .eslintcache
 *.tsbuildinfo
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
 /.cache/
 /.vite/
 /.turbo/

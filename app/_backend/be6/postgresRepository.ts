@@ -63,27 +63,39 @@ export class PostgresBe6Repository {
   async views(context: AuthorizedMutation, branchId: string, ids: string[], messageLimit: number, beforeSequence = Number.MAX_SAFE_INTEGER): Promise<ConversationView[]> {
     if (!ids.length) return [];
     const biz = context.membership.businessId, marks = ids.map(() => "?").join(",");
-    const contexts = await this.rows<{ id: string; customer_id: string; created_at: string; pet_id: string | null; booking_id: string | null; execution_id: string | null; branch_id: string; revision: number; updated_at: string }>(
+    const contexts = await this.rows<{ id: string; customer_id: string; created_at: string; pet_id: string | null; booking_id: string | null; execution_id: string | null; branch_id: string; revision: number; updated_at: string; booking_context: ConversationView["bookingContext"] }>(
       `SELECT * FROM (SELECT c.id,c.customer_id,c.created_at,x.pet_id,x.booking_id,x.execution_id,x.branch_id,x.revision,x.updated_at,
+      (SELECT jsonb_build_object('bookingId',b.id,'businessId',b.business_id,'customerId',b.customer_id,'branchId',b.branch_id,'branchName',br.name,
+        'serviceModule',b.service_module,'serviceLabel',s.label,'timeModel',b.time_model,'start',b.start_local,'end',b.end_local,'status',b.status)
+        FROM bookings b JOIN branches br ON br.business_id=b.business_id AND br.id=b.branch_id JOIN booking_services s ON s.business_id=b.business_id AND s.branch_id=b.branch_id AND s.id=b.service_id
+        WHERE b.business_id=x.business_id AND b.branch_id=x.branch_id AND b.id=x.booking_id AND b.customer_id=c.customer_id) booking_context,
       row_number() OVER(PARTITION BY c.id ORDER BY x.branch_id=? DESC,x.updated_at DESC,x.branch_id) rn
       FROM conversations c JOIN conversation_contexts x ON x.business_id=c.business_id AND x.conversation_id=c.id WHERE c.business_id=? AND c.id IN (${marks}) AND ${this.visibility("x")}) WHERE rn=1`, branchId, biz, ...ids, ...this.bindings(context));
     const messages = await this.rows<MessageRow>(`SELECT * FROM (SELECT q.*,row_number() OVER(PARTITION BY q.conversation_id ORDER BY q.sequence DESC) rn FROM (${MESSAGE} WHERE m.business_id=? AND m.conversation_id IN (${marks}) AND m.sequence<? AND ${this.visibility("m")}) q) WHERE rn<=? ORDER BY sequence`, biz, ...ids, beforeSequence, ...this.bindings(context), messageLimit + 1);
     const totals = await this.rows<{ conversation_id: string; unread: number; updated_at: string; read_at: string | null }>(`SELECT m.conversation_id,sum(CASE WHEN m.direction='customer' AND m.sequence>coalesce(r.through_sequence,0) THEN 1 ELSE 0 END) unread,max(coalesce(a.responded_at,m.created_at)) updated_at,max(r.read_at) read_at
       FROM messages m LEFT JOIN conversation_reads r ON r.business_id=m.business_id AND r.branch_id=m.branch_id AND r.conversation_id=m.conversation_id AND r.person_id=? LEFT JOIN message_approvals a ON a.message_id=m.id
       WHERE m.business_id=? AND m.conversation_id IN (${marks}) AND ${this.visibility("m")} GROUP BY m.conversation_id`, context.actor.id, biz, ...ids, ...this.bindings(context));
-    return contexts.map((x) => {
+    const permitted = await this.rows<{ id: string; updated_at: string; role: import("../shared/readScope").BusinessReadScope["role"]; membership_updated_at: string }>(`SELECT br.id,br.updated_at,m.role,m.updated_at membership_updated_at FROM branches br JOIN businesses b ON b.id=br.business_id JOIN business_memberships m ON m.business_id=b.id JOIN persons p ON p.id=m.person_id
+      WHERE b.id=? AND b.status='active' AND p.id=? AND p.status='active' AND m.id=? AND m.status='active'
+      AND (m.role='OWNER' OR (br.status='active' AND EXISTS(SELECT 1 FROM membership_branch_access g WHERE g.business_id=m.business_id AND g.membership_id=m.id AND g.branch_id=br.id AND g.status='active')))`, biz, context.actor.id, context.membership.id);
+    if (!permitted.some(b => b.id === branchId)) throw be1Error("FORBIDDEN");
+    return contexts.filter(x => permitted.some(b => b.id === x.branch_id)).map((x) => {
       const all = messages.filter((m) => m.conversation_id === x.id), total = totals.find((t) => t.conversation_id === x.id);
       return { conversationId: x.id, businessId: biz, customerId: x.customer_id, branchId: x.branch_id, petId: x.pet_id, bookingId: x.booking_id, serviceJobId: x.execution_id,
+        bookingContext: x.booking_context,
         messages: all.slice(-messageLimit).map((m) => this.messageView(m)), hasOlderMessages: all.length > messageLimit, unreadCount: total?.unread ?? 0,
-        lastReadAt: total?.read_at ?? null, createdAt: x.created_at, updatedAt: total?.updated_at && total.updated_at > x.updated_at ? total.updated_at : x.updated_at, contextRevision: x.revision };
+        lastReadAt: total?.read_at ?? null, createdAt: x.created_at, updatedAt: total?.updated_at && total.updated_at > x.updated_at ? total.updated_at : x.updated_at, contextRevision: x.revision, readableBranchIds: permitted.map(b => b.id),
+        readScope: { personId: context.actor.id, membershipId: context.membership.id, role: permitted[0].role, membershipUpdatedAt: permitted[0].membership_updated_at, branches: permitted.map(b => ({ id: b.id, updatedAt: b.updated_at })) } };
     });
   }
-  async get(context: AuthorizedMutation, branchId: string, id: string, beforeSequence?: number) {
+  async get(context: AuthorizedMutation, branchId: string, id: string, beforeSequence?: number, refreshMessageIds?: string[]) {
     const view = (await this.views(context, branchId, [id], 100, beforeSequence))[0];
-    if (!view) throw be1Error("NOT_FOUND"); return view;
+    if (!view) throw be1Error("NOT_FOUND");
+    if (refreshMessageIds?.length) view.refreshedMessages = (await this.rows<MessageRow>(`${MESSAGE} WHERE m.business_id=? AND m.conversation_id=? AND m.id IN (${refreshMessageIds.map(() => "?").join(",")}) AND ${this.visibility("m")}`, context.membership.businessId, id, ...refreshMessageIds, ...this.bindings(context))).map(m => this.messageView(m));
+    return view;
   }
-  async list(context: AuthorizedMutation, branchId: string, afterId: string, limit: number) {
-    const ids = await this.rows<{ id: string }>(`SELECT c.id FROM conversations c WHERE c.business_id=? AND c.id>? AND EXISTS(SELECT 1 FROM conversation_contexts x WHERE x.business_id=c.business_id AND x.conversation_id=c.id AND ${this.visibility("x")}) ORDER BY c.id LIMIT ?`, context.membership.businessId, afterId, ...this.bindings(context), limit + 1);
+  async list(context: AuthorizedMutation, branchId: string, afterId: string, limit: number, customerId?: string) {
+    const ids = await this.rows<{ id: string }>(`SELECT c.id FROM conversations c WHERE c.business_id=? AND c.id>? AND (?::text IS NULL OR c.customer_id=?) AND EXISTS(SELECT 1 FROM conversation_contexts x WHERE x.business_id=c.business_id AND x.conversation_id=c.id AND ${this.visibility("x")}) ORDER BY c.id LIMIT ?`, context.membership.businessId, afterId, customerId ?? null, customerId ?? null, ...this.bindings(context), limit + 1);
     return { conversations: await this.views(context, branchId, ids.slice(0, limit).map((x) => x.id), 1), nextAfterId: ids.length > limit ? ids[limit - 1].id : null };
   }
   outboxStatement(context: AuthorizedMutation, branchId: string, conversationId: string, messageId: string) {

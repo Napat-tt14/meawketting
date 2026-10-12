@@ -12,12 +12,12 @@ function enqueue<T>(id: string, task: () => Promise<T>) {
   const tail = result.then(() => undefined, () => undefined); queues.set(id, tail);
   void tail.finally(() => { if (queues.get(id) === tail) queues.delete(id); }); return result;
 }
-function install(scope: Be5Scope, result: IntakeResult, actorId: string | undefined) {
+function install(scope: Be5Scope, result: IntakeResult, actorId: string | undefined, startedAt = performance.now()) {
   if (actorId !== readBusinessSession()?.person.id || result.record.businessId !== scope.businessId || result.record.branchId !== scope.branchId
     || result.access.businessId !== scope.businessId || result.access.branchId !== scope.branchId || result.record.accessId !== result.access.id) throw new Error("Intake response scope changed");
   const id = key(scope, result.record.id); entries.set(id, result);
-  leases.set(id, performance.now() + Math.max(0, Math.min(6000, Date.parse(result.access.expiresAt) - Date.parse(result.access.checkedAt))));
-  return result;
+  leases.set(id, performance.now() + Math.max(0, Math.min(6000, Date.parse(result.access.expiresAt) - Date.parse(result.access.checkedAt)) - (performance.now() - startedAt)));
+  return readCachedIntake(scope, result.record.id) ?? { ...result, passport: null };
 }
 export function readCachedIntake(scope: Be5Scope, intakeId: string) {
   const permitted = readBusinessSession()?.workspaces.some((w) => w.business.id === scope.businessId && w.permittedBranches.some((b) => b.id === scope.branchId));
@@ -33,10 +33,12 @@ export async function startDurableIntake(scope: Be5Scope, value: string, executi
   const result = await request<IntakeResult>({ ...scope, type: "intake.start", value, executionId, requestKey });
   keys.delete(fingerprint); return install(scope, result, actor);
 }
-export function loadDurableIntake(scope: Be5Scope, intakeId: string) {
+export function expireIntakeLease(scope: Be5Scope, intakeId: string) { leases.delete(key(scope, intakeId)); }
+export function intakeLeaseRemainingMs(scope: Be5Scope, intakeId: string) { return readCachedIntake(scope, intakeId)?.passport ? Math.max(0, (leases.get(key(scope, intakeId)) ?? 0) - performance.now()) : 0; }
+export function loadDurableIntake(scope: Be5Scope, intakeId: string, signal?: AbortSignal) {
   const actor = readBusinessSession()?.person.id, id = key(scope, intakeId);
   return enqueue(id, async () => {
-    try { return install(scope, await request<IntakeResult>({ ...scope, type: "intake.get", intakeId }), actor); }
+    try { signal?.throwIfAborted(); const started = performance.now(); const result = await businessCommand<IntakeResult>("/api/be5", { ...scope, type: "intake.get", intakeId }, signal); signal?.throwIfAborted(); return install(scope, result, actor, started); }
     catch (error) { leases.delete(id); throw error; }
   });
 }

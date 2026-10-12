@@ -30,6 +30,24 @@ async function fixture() {
   return { db, repo, app, actor, run, ensure, send, adapter, transport, incoming, now, setTime: (next: string) => { time = next; } };
 }
 
+test("Paged reads refresh only requested older message states and enforce the current Branch scope", async () => {
+  const f = await fixture(), c = await f.ensure();
+  const approval = await f.run({ ...scope, type: "approval.request", conversationId: c.conversationId, context: value, serviceName: "Add-on", additionalPrice: 50, additionalMinutes: 10, note: "", requestKey: "paged_approval_request" }) as ConversationView;
+  const old = approval.messages.find(m => m.kind === "add-service-request")!;
+  f.db.inspect.exec(`INSERT INTO messages(id,business_id,branch_id,conversation_id,kind,direction,body,occurred_at,created_at)
+    SELECT 'paged_message_'||n,'${WHISKER}','${ARI}','${c.conversationId}','text','customer','Synthetic','2050-08-18T02:00:00.000Z','2050-08-18T02:00:00.000Z' FROM generate_series(1,200) n`);
+  const latest = await f.run({ ...scope, type: "conversation.get", conversationId: c.conversationId }) as ConversationView;
+  assert.equal(latest.messages.length, 100); assert.ok(latest.hasOlderMessages); assert.ok(!latest.messages.some(m => m.messageId === old.messageId));
+  const cancelled = await f.run({ ...scope, type: "approval.cancel", conversationId: c.conversationId, messageId: old.messageId, expectedRevision: old.revision, requestKey: "paged_approval_cancel" }) as ConversationView;
+  assert.ok(cancelled.refreshedMessages?.some(m => m.messageId === old.messageId && m.kind === "add-service-request" && m.requestStatus === "cancelled"));
+  const refreshed = await f.run({ ...scope, type: "conversation.get", conversationId: c.conversationId, refreshMessageIds: [old.messageId, "foreign_message"] }, MANAGER) as ConversationView;
+  assert.equal(refreshed.messages.length, 100); assert.deepEqual(refreshed.refreshedMessages?.map(m => m.messageId), [old.messageId]); assert.deepEqual(refreshed.readableBranchIds, [ARI]);
+  assert.equal(refreshed.readScope?.role, "MANAGER");
+  await assert.rejects(f.run({ ...scope, type: "conversation.get", conversationId: c.conversationId, refreshMessageIds: Array(1001).fill(old.messageId) }), failure("INVALID_INPUT"));
+  f.db.inspect.prepare("UPDATE membership_branch_access SET status='inactive' WHERE business_id=? AND branch_id=?").run(WHISKER, ARI);
+  await assert.rejects(f.run({ ...scope, type: "conversation.get", conversationId: c.conversationId, refreshMessageIds: [old.messageId] }, MANAGER));
+});
+
 test("one Business/Customer Conversation survives concurrent creation; messages order and retry once with durable outbox", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close());
   const [one, two] = await Promise.all([f.ensure(), f.ensure()]); assert.equal(one.conversationId, two.conversationId);

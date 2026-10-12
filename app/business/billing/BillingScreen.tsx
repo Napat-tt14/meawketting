@@ -1,4 +1,5 @@
 "use client";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
@@ -12,9 +13,10 @@ import {
   type PrototypePaymentMethod,
 } from "../../_prototype/businessState";
 import { businessToday, businessTimezone } from "../../_backend/shared/businessClock";
-import { ensureDurableReport } from "../../_backend/be8/client";
+import { ensureKnownCustomers } from "../../_backend/be2/client";
+import { ensureDurableSummary } from "../../_backend/be8/client";
 import { adjustDurableCharge as addPrototypeChargeAdjustment, cancelDurableCharge as cancelPrototypeCharge, checkoutDurableCharge,
-  recordDurablePayment as recordPrototypePayment, ensureDurableBilling, readFinancialDirectory, canManageFinance } from "../../_backend/be7/client";
+  recordDurablePayment as recordPrototypePayment, ensureDurableBilling, billingBalancesLoaded, chargePaymentsReady, loadChargePayments, readFinancialDirectory, canManageFinance } from "../../_backend/be7/client";
 import { ensureDurableConversation as ensurePrototypeConversation, sendDurableTextMessage as sendPrototypeTextMessage } from "../../_backend/be6/client";
 import {
   CheckCircle,
@@ -148,19 +150,28 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
   const payments = billingReady ? listPrototypePayments(context) : listPrototypePaymentFixtures(context);
   const selected = balances.find((item) => item.charge.chargeId === selectedChargeId) ?? null;
   const financialDirectory = readFinancialDirectory(businessId, branchId);
+  const paymentCount = selected?.paymentCount;
+  const refunded = financialDirectory?.balances.find(b => b.charge.chargeId === selectedChargeId)?.refunded;
   const collectible = financialDirectory?.balances.find((b) => b.charge.chargeId === selectedChargeId)?.availableToCollect ?? selected?.remaining ?? 0;
   const visibleBalances = balances.filter((balance) => filter === "all" || balance.status === filter);
 
   useEffect(() => {
     if (!stateReady || !isContextReady) return;
-    let stopped = false;
-    const load = async () => {
-      try { await ensureDurableBilling(businessId, branchId, true); await ensureDurableReport({ businessId, branchId }); if (!stopped) setNotice((old) => old?.title === "โหลดการเงินล่าสุดไม่สำเร็จ" ? null : old); }
-      catch { if (!stopped) setNotice({ tone: "critical", title: "โหลดการเงินล่าสุดไม่สำเร็จ", detail: "กรุณาลองโหลดหน้าอีกครั้ง" }); }
-    };
-    void load(); const timer = window.setInterval(() => void load(), 5000);
-    return () => { stopped = true; window.clearInterval(timer); };
+    const refresh = startBusinessRefresh(async (signal, reason) => {
+      if (reason !== "invalidation") await ensureDurableBilling(businessId, branchId, reason !== "initial", signal, false);
+      await ensureKnownCustomers(businessId, readFinancialDirectory(businessId, branchId)?.balances.map(b => b.charge.customerId) ?? [], signal);
+      await ensureDurableSummary({ businessId, branchId }, false, { signal });
+      if (!signal.aborted) setNotice(old => old?.title === "โหลดการเงินล่าสุดไม่สำเร็จ" ? null : old);
+    }, { businessId, targets: ["billing"], intervalMs: 60_000, initial: !billingBalancesLoaded(businessId, branchId), onError: () => setNotice({ tone: "critical", title: "โหลดการเงินล่าสุดไม่สำเร็จ", detail: "กรุณาลองโหลดหน้าอีกครั้ง" }) });
+    return refresh.stop;
   }, [businessId, branchId, stateReady, isContextReady]);
+  useEffect(() => {
+    if (!billingReady || !selectedChargeId) return;
+    let active = true;
+    void loadChargePayments(businessId, branchId, selectedChargeId).then(() => { if (active) setNotice(old => old?.title === "โหลดประวัติการชำระไม่สำเร็จ" ? null : old); })
+      .catch(() => { if (active) setNotice({ tone: "critical", title: "โหลดประวัติการชำระไม่สำเร็จ" }); });
+    return () => { active = false; };
+  }, [businessId, branchId, billingReady, selectedChargeId, paymentCount, refunded]);
 
   useEffect(() => {
     if (!billingReady || !launchRequest || handledLaunchRef.current === launchRequest.key) return;
@@ -319,6 +330,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
 
   const modalTitle = mode === "payment" ? "รับชำระเงิน" : mode === "adjustment" ? "ปรับยอด" : mode === "cancel" ? "ยกเลิกยอด" : "ตรวจยอดและ Checkout";
   const paymentRecords = selected ? payments.filter((payment) => payment.allocations.some((allocation) => allocation.chargeId === selected.charge.chargeId)) : [];
+  const historyReady = !billingReady || !selected || chargePaymentsReady(businessId, branchId, selected.charge.chargeId);
 
   return (
     <div className="business-billing shell">
@@ -416,7 +428,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         {mode === "review" ? <>
           <section className="billing-checkout-overview" aria-labelledby="billing-checkout-overview-title"><div><span>รายการ</span><h3 id="billing-checkout-overview-title">{selected.charge.serviceLabel}</h3><ChargeFacts balance={selected} /></div><StatusPill status={selected.status} /></section>
           <section className="billing-breakdown" aria-labelledby="billing-breakdown-title"><header><h3 id="billing-breakdown-title">รายละเอียด Charge</h3><small>ยอดรวม {formatBusinessMoney(selected.total)}</small></header><ul>{selected.charge.lineItems.map((line) => <li key={line.id}><span><strong>{line.label}</strong>{line.reason ? <small>{line.reason}</small> : null}</span><b className={line.amount < 0 ? "is-discount" : ""}>{formatBusinessSignedMoney(line.amount)}</b></li>)}</ul><dl><div><dt>ยอดรวม</dt><dd>{formatBusinessMoney(selected.total)}</dd></div><div><dt>รับแล้ว</dt><dd>{formatBusinessMoney(selected.paid)}</dd></div><div><dt>คงเหลือ</dt><dd>{formatBusinessMoney(selected.remaining)}</dd></div></dl></section>
-          <section className="billing-payment-history" aria-labelledby="billing-payment-history-title"><header><h3 id="billing-payment-history-title">Payment record</h3><small>{selected.paymentCount} รายการ</small></header>{paymentRecords.length > 0 ? <ol>{paymentRecords.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"} · {new Date(payment.recordedAt).toLocaleTimeString("th-TH", { timeZone: businessTimezone(context), hour: "2-digit", minute: "2-digit" })}{(financialDirectory?.payments.find((p) => p.paymentId === payment.paymentId)?.refunded ?? 0) > 0 ? ` · คืนเงิน ${formatBusinessMoney(financialDirectory!.payments.find((p) => p.paymentId === payment.paymentId)!.refunded)}` : ""}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มีการรับชำระสำหรับยอดนี้</p>}</section>
+          <section className="billing-payment-history" aria-labelledby="billing-payment-history-title"><header><h3 id="billing-payment-history-title">Payment record</h3><small>{selected.paymentCount} รายการ</small></header>{!historyReady ? <p role="status">{notice?.title === "โหลดประวัติการชำระไม่สำเร็จ" ? "โหลดประวัติการชำระไม่สำเร็จ กรุณาเปิดรายการอีกครั้ง" : "กำลังโหลดประวัติการชำระ…"}</p> : paymentRecords.length > 0 ? <ol>{paymentRecords.map((payment) => <li key={payment.paymentId}><span><strong>{paymentMethodLabel(payment.method)}</strong><small>{payment.note || "ไม่มีหมายเหตุ"} · {new Date(payment.recordedAt).toLocaleTimeString("th-TH", { timeZone: businessTimezone(context), hour: "2-digit", minute: "2-digit" })}{(financialDirectory?.payments.find((p) => p.paymentId === payment.paymentId)?.refunded ?? 0) > 0 ? ` · คืนเงิน ${formatBusinessMoney(financialDirectory!.payments.find((p) => p.paymentId === payment.paymentId)!.refunded)}` : ""}</small></span><b>{formatBusinessMoney(payment.amount)}</b></li>)}</ol> : <p>ยังไม่มีการรับชำระสำหรับยอดนี้</p>}</section>
         </> : null}
 
         {mode === "payment" ? <form className="billing-form" onSubmit={submitPayment}><p>คงเหลือให้รับชำระ {formatBusinessMoney(collectible)}</p><label><span>ยอดที่รับชำระ</span><input inputMode="numeric" min="1" max={collectible} step="1" type="number" value={paymentAmount} onChange={(event) => setPaymentAmount(event.currentTarget.value)} required /></label><label><span>วิธีชำระ</span><select value={paymentMethod} onChange={(event) => setPaymentMethod(event.currentTarget.value as PrototypePaymentMethod)}>{(Object.entries(PAYMENT_METHOD_LABELS) as [PrototypePaymentMethod, string][]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>หมายเหตุ <small>ไม่บังคับ</small></span><input maxLength={160} value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="เช่น เลขอ้างอิงการโอน" /></label><button className="button button--business" type="submit" disabled={saving}><Wallet size={17} />บันทึกรับชำระ</button></form> : null}

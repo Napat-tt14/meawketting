@@ -387,32 +387,33 @@ export class PostgresBe1Repository implements Be1Repository {
 
   private async hydrateBranches(businessId: string, rows: BranchRow[]): Promise<BranchView[]> {
     if (!rows.length) return [];
-    const [modulesResult, hoursResult] = await Promise.all([
+    const branchIds = JSON.stringify(rows.map(row => row.id));
+    const [modulesResult, hoursResult] = await this.database.batch([
       this.database.prepare(`
         SELECT branch_id, module
         FROM branch_enabled_modules
-        WHERE business_id = ?
+        WHERE business_id = ? AND branch_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY branch_id, CASE module WHEN 'grooming' THEN 1 WHEN 'hotel' THEN 2 ELSE 3 END
-      `).bind(businessId).all<ModuleRow>(),
+      `).bind(businessId, branchIds),
       this.database.prepare(`
         SELECT branch_id, weekday, closed, opens_at, closes_at
         FROM branch_operating_hours
-        WHERE business_id = ?
+        WHERE business_id = ? AND branch_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))
         ORDER BY branch_id, CASE weekday
           WHEN 'monday' THEN 1 WHEN 'tuesday' THEN 2 WHEN 'wednesday' THEN 3
           WHEN 'thursday' THEN 4 WHEN 'friday' THEN 5 WHEN 'saturday' THEN 6 ELSE 7 END
-      `).bind(businessId).all<HoursRow>(),
+      `).bind(businessId, branchIds),
     ]);
     assertSuccess(modulesResult);
     assertSuccess(hoursResult);
     const modulesByBranch = new Map<string, Be1ServiceModule[]>();
-    for (const row of modulesResult.results ?? []) {
+    for (const row of (modulesResult.results ?? []) as ModuleRow[]) {
       const modules = modulesByBranch.get(row.branch_id) ?? [];
       modules.push(row.module);
       modulesByBranch.set(row.branch_id, modules);
     }
     const hoursByBranch = new Map<string, OperatingHoursView[]>();
-    for (const row of hoursResult.results ?? []) {
+    for (const row of (hoursResult.results ?? []) as HoursRow[]) {
       const hours = hoursByBranch.get(row.branch_id) ?? [];
       hours.push({ day: row.weekday, closed: row.closed === 1 || row.closed === true, open: row.opens_at, close: row.closes_at });
       hoursByBranch.set(row.branch_id, hours);

@@ -1,5 +1,7 @@
 # Current Implementation
 
+Business startup and guidance — 2026-10-12: setup copy is simplified and the first Branch uses `สาขาหลัก`. Home has a three-step walkthrough and a checklist derived from current opening hours, Customers and bookings. The guide can be skipped/replayed, with a Person/Business-scoped browser preference. The portal now loads route-specific projections for the selected scope instead of all data for every workspace, preserves client caches during navigation, and uses an animated shop/paw loading scene. API deadlines surface a retry state rather than waiting indefinitely. No schema or dependency change is required.
+
 Business setup UI — 2026-10-05: centered four-step onboarding now asks for shop name, caretaker/contact, illustrated service choices, and final review/declaration. Existing clay artwork, bounded welcome motion and native directional transitions make each step distinct. Back/edit retain values, reduced-motion preferences are respected, and the final API payload, access checks and atomic store creation are preserved.
 
 Business entry update — 2026-10-02: signup now collects only email/password or Google/LINE identity. The separate `/business/setup` wizard collects shop details, services and confirmation after authentication, then sends the user to Home. Password auth and shared server account routing preserve existing membership checks and duplicate-safe setup. See [Business registration](./BUSINESS_REGISTRATION.md) for implementation and provider configuration.

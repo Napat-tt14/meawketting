@@ -1,6 +1,8 @@
 "use client";
 
 import { businessToday } from "../../_backend/shared/businessClock";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
+import { be3ScopeKey } from "../../_backend/be3/bookingCache";
 
 import { type DragEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -118,6 +120,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const [moduleFilter, setModuleFilter] = useState<"all" | BusinessServiceModule>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [revision, setRevision] = useState(0);
+  const [selection, setSelection] = useState<{ key: string; ids: Set<string> } | null>(null);
   const [editor, setEditor] = useState<EditorState>(() => (
     launchKey && !launchBookingId
       ? { kind: "new", customerId: launchCustomerId, petId: launchPetId }
@@ -184,7 +187,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     if (settledTimerRef.current) clearTimeout(settledTimerRef.current);
     if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
     if (suppressSelectTimerRef.current) clearTimeout(suppressSelectTimerRef.current);
-    if (document.fullscreenElement === fullscreenFrameRef.current) void document.exitFullscreen();
+    if (fullscreenFrameRef.current && document.fullscreenElement === fullscreenFrameRef.current) void document.exitFullscreen().catch(() => {});
     fullscreenFallbackRef.current = false;
   }, []);
 
@@ -205,7 +208,8 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
     if (launchBookingId) {
       if (!bookingStateReady || handledLaunchRef.current === launchKey) return;
       let cancelled = false;
-      void getDurableBooking(context.businessId, context.branchId, launchBookingId)
+      const controller = new AbortController();
+      void getDurableBooking(context.businessId, context.branchId, launchBookingId, controller.signal)
         .then((durable) => {
           if (cancelled) return;
           handledLaunchRef.current = launchKey;
@@ -218,7 +222,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
           handledLaunchRef.current = launchKey;
           setConfirmation("การจองนี้อยู่คนละสาขาหรือไม่พบในบริบทปัจจุบัน");
         });
-      return () => { cancelled = true; };
+      return () => { cancelled = true; controller.abort(); };
     }
     if (editor || handledLaunchRef.current === launchKey) return;
     handledLaunchRef.current = launchKey;
@@ -232,14 +236,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   const effectiveModuleFilter = moduleFilter === "all" || enabledModuleList.includes(moduleFilter) ? moduleFilter : "all";
 
   void revision;
-  const bookings = bookingStateReady
-    ? listPrototypeBookings(context, { includeCancelled: true })
-    : listPrototypeBookingFixtures(context, { includeCancelled: true });
   const enabledModules = new Set(enabledModuleList);
-  const filteredBookings = bookings.filter((booking) => (
-    (effectiveModuleFilter === "all" || booking.serviceModule === effectiveModuleFilter)
-    && (statusFilter === "all" || (statusFilter === "active" ? booking.status !== "cancelled" : booking.status === statusFilter))
-  ));
   const filterModules = moduleFilterOptions.filter((option) => option.value === "all" || enabledModules.has(option.value));
   const displayedDays = view === "day"
     ? [selectedDate]
@@ -250,12 +247,21 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
         : daysForCustomRange(selectedDate, customRangeDays);
   const queryRangeStart = displayedDays[0] ?? selectedDate;
   const queryRangeEnd = addCalendarDays(displayedDays.at(-1) ?? selectedDate, 1);
+  const selectionKey = JSON.stringify([be3ScopeKey(context.businessId), context.branchId, queryRangeStart, queryRangeEnd, effectiveModuleFilter]);
+  const bookings = bookingStateReady
+    ? listPrototypeBookings(context, { includeCancelled: true }).filter(b => selection?.key === selectionKey && selection.ids.has(b.bookingId))
+    : listPrototypeBookingFixtures(context, { includeCancelled: true });
+  const filteredBookings = bookings.filter((booking) => (
+    (effectiveModuleFilter === "all" || booking.serviceModule === effectiveModuleFilter)
+    && (statusFilter === "all" || (statusFilter === "active" ? booking.status !== "cancelled" : booking.status === statusFilter))
+  ));
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+    const refresh = startBusinessRefresh(async signal => {
+      const ids = new Set<string>();
       let offset = 0;
       let total = 0;
+      let pages = 0;
       do {
         const page = await queryDurableBookings({
           businessId: context.businessId,
@@ -263,23 +269,25 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
           rangeStart: queryRangeStart,
           rangeEnd: queryRangeEnd,
           modules: effectiveModuleFilter === "all" ? undefined : [effectiveModuleFilter],
-          statuses: statusFilter === "all" || statusFilter === "active"
-            ? statusFilter === "active" ? ["pending", "confirmed", "arrived"] : undefined
-            : [statusFilter],
           includeCancelled: true,
           limit: 100,
           offset,
-        });
-        if (cancelled) return;
+        }, signal);
+        signal.throwIfAborted();
+        if (page.items.some(b => ids.has(b.id))) throw new Error("Calendar pagination repeated a booking");
+        page.items.forEach(b => ids.add(b.id));
         total = page.total;
         offset += page.items.length;
-        if (page.items.length === 0) break;
+        if (++pages >= 10_000 && offset < total) throw new Error("Calendar pagination made no progress");
       } while (offset < total);
-    })().catch(() => {
-      if (!cancelled) setAnnouncement("โหลดช่วงปฏิทินจากระบบไม่สำเร็จ");
-    });
-    return () => { cancelled = true; };
-  }, [context.branchId, context.businessId, effectiveModuleFilter, queryRangeEnd, queryRangeStart, statusFilter]);
+      setSelection({ key: selectionKey, ids });
+    }, { businessId: context.businessId, targets: ["booking"], onError: () => setAnnouncement("โหลดช่วงปฏิทินจากระบบไม่สำเร็จ") });
+    return refresh.stop;
+  }, [context.branchId, context.businessId, effectiveModuleFilter, queryRangeEnd, queryRangeStart, selectionKey]);
+
+  function includeAcknowledgedBooking(booking: PrototypeBooking) {
+    setSelection(current => ({ key: selectionKey, ids: new Set([...(current?.key === selectionKey ? current.ids : []), booking.bookingId]) }));
+  }
 
   function moveDate(direction: -1 | 1) {
     if (view === "month") setSelectedDate((current) => addCalendarMonths(current, direction));
@@ -395,6 +403,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
   }
 
   function completeSave(booking: PrototypeBooking, created: boolean) {
+    includeAcknowledgedBooking(booking);
     setSelectedBookingId(booking.bookingId);
     if (created) {
       recordUndo({ kind: "cancel-created", bookingId: booking.bookingId, petName: booking.pets[0]?.name ?? "สัตว์เลี้ยง" });
@@ -477,6 +486,7 @@ export function BusinessCalendar({ launchRequest = null }: { launchRequest?: Cal
         return;
       }
       const saved = projectDurableBooking(result.booking);
+      includeAcknowledgedBooking(saved);
       synchronizePrototypeExecutionCompatibilityForBooking(saved);
       recordUndo(copy
         ? { kind: "cancel-created", bookingId: saved.bookingId, petName: saved.pets[0]?.name ?? "สัตว์เลี้ยง" }

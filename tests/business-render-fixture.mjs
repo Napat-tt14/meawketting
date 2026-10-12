@@ -12,7 +12,7 @@ export async function businessFixtureHtml(pathname, { empty = false } = {}) {
   const cache = await mkdtemp(join(tmpdir(), "meawketting-ui-fixture-"));
   const server = await createServer({ configFile: false, cacheDir: cache, server: { middlewareMode: true, watch: null }, appType: "custom", logLevel: "silent",
     define: { "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify(empty ? "off" : "test") },
-    resolve: { alias: { "next/image": resolve("node_modules/vinext/dist/shims/image.js") } },
+    resolve: { alias: { "next/image": resolve("node_modules/vinext/dist/shims/image.js"), "next/link": resolve("node_modules/vinext/dist/shims/link.js") } },
     plugins: [{ name: "business-fixture-navigation", resolveId(id) { if (id === "next/navigation") return "\0fixture-navigation"; },
       load(id) { if (id === "\0fixture-navigation") return `export const usePathname = () => ${JSON.stringify(url.pathname)};`; } }],
   });

@@ -11,10 +11,10 @@ export type StayView = PrototypeHotelStay & ExecutionSource;
 export type AttendanceView = PrototypeDaycareAttendance & ExecutionSource;
 export type ServiceRecordView = PrototypeServiceRecord & { revision: number };
 export type StaffView = PrototypeTeamMember & { revision: number };
-export type ExecutionView =
+export type ExecutionView = (
   | { kind: "grooming"; record: JobView }
   | { kind: "hotel"; record: StayView }
-  | { kind: "daycare"; record: AttendanceView };
+  | { kind: "daycare"; record: AttendanceView }) & { awaitingApproval?: boolean };
 export type ExecutionChange =
   | { type: "transition"; status: ServiceJobStatus | HotelStayStatus | DaycareAttendanceStatus }
   | { type: "note"; note: string }
@@ -34,11 +34,12 @@ export type OperationDirectory = {
   executions: ExecutionView[]; records: ServiceRecordView[]; staff: StaffView[]; rooms: DemoBookingResource[];
 };
 export type Be4Operation =
-  | { type: "operations.list"; businessId: string; branchId: string; afterId?: string; limit?: number }
+  | { type: "operations.list"; businessId: string; branchId: string; afterId?: string; limit?: number; bookingId?: string; executionId?: string; customerId?: string; date?: string; module?: ExecutionView["kind"] }
+  | { type: "operations.metadata"; businessId: string; branchId: string }
   | { type: "operations.get"; businessId: string; branchId: string; executionId: string }
   | { type: "operations.change"; input: MutationInput }
   | { type: "staff.save"; businessId: string; branchId: string; draft: PrototypeTeamMemberDraft; expectedRevision: number | null; requestKey: string }
   | { type: "record.correct"; businessId: string; branchId: string; recordId: string; field: "summary" | "business-note"; value: string; reason: string; expectedRevision: number; requestKey: string };
-export type Be4Result<T extends Be4Operation> = T extends { type: "operations.list" } ? OperationDirectory
+export type Be4Result<T extends Be4Operation> = T extends { type: "operations.list" | "operations.metadata" } ? OperationDirectory
   : T extends { type: "staff.save" } ? StaffView
     : T extends { type: "record.correct" } ? ServiceRecordView : ExecutionView;

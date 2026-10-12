@@ -10,8 +10,12 @@ export function parseInboxContext(value: unknown): InboxContext {
 export function parseBe6Operation(value: unknown): Be6Operation {
   const v = object(value), type = choice(v.type, ["inbox.list", "conversation.get", "conversation.ensure", "conversation.read", "message.send", "approval.request", "approval.cancel"] as const);
   const scope = { businessId: validateId(v.businessId), branchId: validateId(v.branchId) };
-  if (type === "inbox.list") return { ...scope, type, afterId: v.afterId == null ? "" : string(v.afterId, 100), limit: v.limit == null ? 50 : integer(v.limit, 1, 50) };
-  if (type === "conversation.get") return { ...scope, type, conversationId: validateId(v.conversationId), beforeSequence: v.beforeSequence == null ? undefined : integer(v.beforeSequence, 1, Number.MAX_SAFE_INTEGER) };
+  if (type === "inbox.list") return { ...scope, type, afterId: v.afterId == null ? "" : string(v.afterId, 100), limit: v.limit == null ? 50 : integer(v.limit, 1, 50), customerId: v.customerId === undefined ? undefined : validateId(v.customerId) };
+  if (type === "conversation.get") {
+    if (v.refreshMessageIds !== undefined && (!Array.isArray(v.refreshMessageIds) || v.refreshMessageIds.length > 1000)) throw be1Error("INVALID_INPUT");
+    const refreshMessageIds = v.refreshMessageIds === undefined ? undefined : [...new Set((v.refreshMessageIds as unknown[]).map(validateId))];
+    return { ...scope, type, conversationId: validateId(v.conversationId), beforeSequence: v.beforeSequence == null ? undefined : integer(v.beforeSequence, 1, Number.MAX_SAFE_INTEGER), refreshMessageIds };
+  }
   const requestKey = validateId(v.requestKey);
   if (type === "conversation.ensure") return { ...scope, type, requestKey, context: parseInboxContext(v.context) };
   const conversationId = validateId(v.conversationId);

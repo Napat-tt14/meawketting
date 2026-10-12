@@ -10,7 +10,7 @@ import type { CustomerPage, CustomerView, PetDetailView, PetProfileSource, PetSp
 import type { Be2Repository, CustomerQuery } from "./repository";
 import { normalizeCustomerSearchKey, normalizePhoneKey } from "./validation";
 
-type CustomerRow = {
+export type CustomerRow = {
   id: string;
   business_id: string;
   display_name: string;
@@ -51,7 +51,7 @@ function constraintAware(error: unknown): never {
   throw be1Error("PERSISTENCE_ERROR", error);
 }
 
-function customerBase(row: CustomerRow): CustomerView {
+export function customerBase(row: CustomerRow): CustomerView {
   return {
     id: row.id,
     businessId: row.business_id,
@@ -67,7 +67,7 @@ function customerBase(row: CustomerRow): CustomerView {
   };
 }
 
-function petView(row: PetProfileRow): PetView {
+export function petView(row: PetProfileRow): PetView {
   return {
     id: row.pet_id,
     businessId: row.business_id,
@@ -145,13 +145,15 @@ export class PostgresBe2Repository implements Be2Repository {
           `%${escapeLike(query.queryKey)}%`,
         ]
       : [];
-    const whereValues = [query.businessId, query.includeInactive ? 1 : 0, ...searchValues];
+    const selectedClause = query.customerIds !== undefined ? "AND c.id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))" : "";
+    const whereValues = [query.businessId, query.includeInactive ? 1 : 0, ...searchValues, ...(query.customerIds !== undefined ? [JSON.stringify(query.customerIds)] : [])];
     const count = await this.database.prepare(`
       SELECT COUNT(*) AS total
       FROM customers c
       WHERE c.business_id = ?
         AND (? = 1 OR c.status = 'active')
         ${searchClause}
+        ${selectedClause}
     `).bind(...whereValues).first<{ total: number }>();
     const result = await this.database.prepare(`
       SELECT c.id, c.business_id, c.display_name, c.phone, c.email, c.business_notes,
@@ -160,6 +162,7 @@ export class PostgresBe2Repository implements Be2Repository {
       WHERE c.business_id = ?
         AND (? = 1 OR c.status = 'active')
         ${searchClause}
+        ${selectedClause}
       ORDER BY c.display_name_key, c.id
       LIMIT ? OFFSET ?
     `).bind(...whereValues, query.limit, query.offset).all<CustomerRow>();

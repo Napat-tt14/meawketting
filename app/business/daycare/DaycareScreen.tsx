@@ -2,7 +2,10 @@
 
 import { businessToday } from "../../_backend/shared/businessClock";
 
-import { type KeyboardEvent, useCallback, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { loadFilteredOperations } from "../../_backend/be4/client";
+import { ensureKnownCustomers } from "../../_backend/be2/client";
+import { readOperationDirectory } from "../../_backend/be4/operationsCache";
 import {
   DAYCARE_ATTENDANCE_STATUS_LABELS,
   getEnabledBusinessModules,
@@ -104,6 +107,14 @@ export function DaycareScreen({ launchAttendanceId = null }: { launchAttendanceI
   const [mobileView, setMobileView] = useState<DaycareMobileView>("all");
   const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(launchAttendanceId);
   const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!stateReady) return;
+    const controller = new AbortController();
+    void loadFilteredOperations(context.businessId, context.branchId, { date, module: "daycare" }, controller.signal)
+      .then(() => ensureKnownCustomers(context.businessId, readOperationDirectory(context.businessId, context.branchId)?.executions.map(e => e.record.customerId) ?? [], controller.signal))
+      .catch(() => { if (!controller.signal.aborted) setNotice("โหลดงานดูแลของวันที่เลือกไม่สำเร็จ"); });
+    return () => controller.abort();
+  }, [context.businessId, context.branchId, date, stateReady]);
   const openerRef = useRef<HTMLElement | null>(null);
   void revision;
 

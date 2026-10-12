@@ -88,14 +88,14 @@ export function BusinessMobileNavigation() {
         <Link className={`business-mobile-navigation__item business-mobile-navigation__item--scan${pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? " is-active" : ""}`} href="/business/scan" aria-current={pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? "page" : undefined}>
           <Scan size={20} /><span>สแกน</span>
         </Link>
-        <a
+        <Link
           className={`business-mobile-navigation__item${pathname.startsWith(BUSINESS_MESSAGES_DESTINATION.href) ? " is-active" : ""}`}
           href={BUSINESS_MESSAGES_DESTINATION.href}
           aria-current={pathname.startsWith(BUSINESS_MESSAGES_DESTINATION.href) ? "page" : undefined}
         >
           <MessageCircle size={20} /><span>{BUSINESS_MESSAGES_DESTINATION.label}</span>
           {unreadCount > 0 ? <span className="business-mobile-unread-badge" aria-label={`ข้อความใหม่ ${unreadCount} ข้อความ`}>{unreadCount}</span> : null}
-        </a>
+        </Link>
         <button ref={triggerRef} className={`business-mobile-navigation__item${open || moreActive ? " is-active" : ""}`} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
           <List size={20} /><span>เพิ่มเติม</span>
         </button>

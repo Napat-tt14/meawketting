@@ -6,6 +6,7 @@ import type { AttemptView, ChargeBalanceView, ChargeView, FinancialPage, Payment
 
 export type ChargeRow = { id: string; business_id: string; branch_id: string; booking_id: string; customer_id: string; pet_id: string | null; execution_id: string | null; module: ChargeView["serviceModule"]; service_label: string; cancelled_at: string | null; cancellation_reason: string | null; revision: number; created_at: string; updated_at: string };
 type AmountRow = ChargeRow & { total_minor: number; paid_minor: number; refunded_minor: number; reserved_minor: number; payment_count: number };
+type ChargeIdentity = Pick<ChargeRow, "id" | "business_id" | "branch_id">;
 type ItemRow = { id: string; charge_id: string; kind: ChargeView["lineItems"][number]["kind"]; label: string; amount_minor: number; reason: string | null; source_event_id: string | null; execution_id: string | null; created_at: string };
 type EventRow = { id: string; charge_id: string; kind: ChargeView["history"][number]["type"]; summary: string; occurred_at: string };
 export type PaymentRow = { id: string; business_id: string; branch_id: string; customer_id: string; method: PaymentView["method"]; amount_minor: number; source: PaymentView["source"]; note: string; occurred_at: string; recorded_at: string; recorded_by: string };
@@ -28,24 +29,25 @@ export class PostgresBe7Repository {
   async row(businessId: string, branchId: string, id: string) { return this.database.prepare("SELECT * FROM charges WHERE business_id=? AND branch_id=? AND id=?").bind(businessId, branchId, id).first<ChargeRow>(); }
   async forBooking(businessId: string, branchId: string, id: string) { return this.database.prepare("SELECT * FROM charges WHERE business_id=? AND branch_id=? AND booking_id=?").bind(businessId, branchId, id).first<ChargeRow>(); }
   async get(context: AuthorizedMutation, branchId: string, id: string) {
-    const rows = await this.rows<AmountRow>(`${AMOUNTS} WHERE c.business_id=? AND c.branch_id=? AND c.id=? AND ${this.visible("c")}`, context.membership.businessId, branchId, id, ...this.bindings(context));
+    const rows = await this.rows<ChargeIdentity>(`SELECT c.id,c.business_id,c.branch_id FROM charges c WHERE c.business_id=? AND c.branch_id=? AND c.id=? AND ${this.visible("c")}`, context.membership.businessId, branchId, id, ...this.bindings(context));
     if (!rows.length) throw be1Error("NOT_FOUND"); return (await this.hydrate(rows, context))[0];
   }
   async list(context: AuthorizedMutation, branchId: string, afterId: string, limit: number, customerId?: string): Promise<FinancialPage> {
-    const rows = await this.rows<AmountRow>(`${AMOUNTS} WHERE c.business_id=? AND c.branch_id=? AND c.id>? AND (?::text IS NULL OR c.customer_id=?) AND ${this.visible("c")} ORDER BY c.id LIMIT ?`, context.membership.businessId, branchId, afterId, customerId ?? null, customerId ?? null, ...this.bindings(context), limit + 1);
+    const rows = await this.rows<ChargeIdentity>(`SELECT c.id,c.business_id,c.branch_id FROM charges c WHERE c.business_id=? AND c.branch_id=? AND c.id>? AND (?::text IS NULL OR c.customer_id=?) AND ${this.visible("c")} ORDER BY c.id LIMIT ?`, context.membership.businessId, branchId, afterId, customerId ?? null, customerId ?? null, ...this.bindings(context), limit + 1);
     return { balances: await this.hydrate(rows.slice(0, limit), context), nextAfterId: rows.length > limit ? rows[limit - 1].id : null };
   }
-  private async hydrate(rows: AmountRow[], context: AuthorizedMutation): Promise<ChargeBalanceView[]> {
-    if (!rows.length) return [];
-    const ids = JSON.stringify(rows.map((r) => r.id)), bindings = [rows[0].business_id, rows[0].branch_id, ids], scope = "business_id=? AND branch_id=? AND charge_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))";
+  private async hydrate(selected: ChargeIdentity[], context: AuthorizedMutation): Promise<ChargeBalanceView[]> {
+    const identities = selected;
+    if (!identities.length) return [];
+    const ids = JSON.stringify(identities.map((r) => r.id)), bindings = [identities[0].business_id, identities[0].branch_id, ids], scope = "business_id=? AND branch_id=? AND charge_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))";
     const snapshot = await batch(this.database, [
       this.database.prepare(`${AMOUNTS} WHERE c.business_id=? AND c.branch_id=? AND c.id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb)) AND ${this.visible("c")} ORDER BY c.id`).bind(...bindings, ...this.bindings(context)),
       this.database.prepare(`SELECT * FROM charge_items WHERE ${scope} ORDER BY created_at,event_sequence`).bind(...bindings),
       this.database.prepare(`SELECT * FROM charge_events WHERE ${scope} ORDER BY occurred_at,event_sequence`).bind(...bindings),
       this.database.prepare(`SELECT * FROM payment_attempts WHERE ${scope} ORDER BY created_at,id`).bind(...bindings),
     ]);
-    rows = (snapshot[0].results ?? []) as AmountRow[];
-    if (!rows.length) throw be1Error("FORBIDDEN");
+    const rows = (snapshot[0].results ?? []) as AmountRow[];
+    if (rows.length !== identities.length) throw be1Error("FORBIDDEN");
     const items = (snapshot[1].results ?? []) as ItemRow[], events = (snapshot[2].results ?? []) as EventRow[];
     const attempts = (snapshot[3].results ?? []) as { id: string; charge_id: string; amount_minor: number; state: AttemptView["state"]; attempts: number; failure_code: string | null; revision: number; created_at: string; updated_at: string }[];
     return rows.map((r) => {
@@ -62,8 +64,10 @@ export class PostgresBe7Repository {
     const row = await this.database.prepare(`SELECT p.* FROM payments p WHERE p.business_id=? AND p.branch_id=? AND p.id=? AND ${this.visible("p")}`).bind(context.membership.businessId, branchId, id, ...this.bindings(context)).first<PaymentRow>();
     if (!row) throw be1Error("NOT_FOUND"); return row;
   }
-  async paymentPage(context: AuthorizedMutation, branchId: string, afterId: string, limit: number, customerId?: string): Promise<PaymentPage> {
-    const rows = await this.rows<PaymentRow>(`SELECT p.* FROM payments p WHERE p.business_id=? AND p.branch_id=? AND p.id>? AND (?::text IS NULL OR p.customer_id=?) AND ${this.visible("p")} ORDER BY p.id LIMIT ?`, context.membership.businessId, branchId, afterId, customerId ?? null, customerId ?? null, ...this.bindings(context), limit + 1);
+  async paymentPage(context: AuthorizedMutation, branchId: string, afterId: string, limit: number, customerId?: string, chargeId?: string): Promise<PaymentPage> {
+    const rows = await this.rows<PaymentRow>(`SELECT p.* FROM payments p WHERE p.business_id=? AND p.branch_id=? AND p.id>? AND (?::text IS NULL OR p.customer_id=?)
+      AND (?::text IS NULL OR EXISTS(SELECT 1 FROM payment_allocations x WHERE x.business_id=p.business_id AND x.branch_id=p.branch_id AND x.payment_id=p.id AND x.charge_id=?))
+      AND ${this.visible("p")} ORDER BY p.id LIMIT ?`, context.membership.businessId, branchId, afterId, customerId ?? null, customerId ?? null, chargeId ?? null, chargeId ?? null, ...this.bindings(context), limit + 1);
     const page = rows.slice(0, limit), args = [context.membership.businessId, branchId, JSON.stringify(page.map((p) => p.id))], scope = "business_id=? AND branch_id=? AND payment_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))";
     const snapshot = await batch(this.database, [
       this.database.prepare(`SELECT p.id FROM payments p WHERE p.business_id=? AND p.branch_id=? AND p.id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb)) AND ${this.visible("p")}`).bind(...args, ...this.bindings(context)),

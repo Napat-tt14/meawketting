@@ -1,7 +1,9 @@
 "use client";
 
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { rescheduleDurableBooking } from "../../_backend/be3/client";
+import { getDurableBooking, rescheduleDurableBooking } from "../../_backend/be3/client";
 import {
   evaluatePrototypeHotelStayDateChange,
   getHotelRooms,
@@ -15,7 +17,7 @@ import {
   type PrototypeHotelStay,
 } from "../../_prototype/businessState";
 import { addPrototypeHotelIncidentNote, assignPrototypeHotelCareTaskStaff, assignPrototypeHotelStayRoom, checkInPrototypeHotelStay, completePrototypeHotelCareTask, movePrototypeHotelStayRoom, resolvePrototypeHotelIncidentNote, transitionPrototypeHotelStay, updatePrototypeHotelStayNote } from "../../_backend/be4/facade";
-import { ensureDurableOperations } from "../../_backend/be4/client";
+import { refreshBookingOperations } from "../../_backend/be4/client";
 import { ensureDurableConversation as ensurePrototypeConversation } from "../../_backend/be6/client";
 import {
   BedDouble,
@@ -97,6 +99,16 @@ export function HotelStayDetail({
   const careStaff = getTeamMembersForCapability(context, "hotel-care", { includeInactive: true, includeUnavailable: true });
 
   const close = useCallback(() => onClose(), [onClose]);
+
+  useEffect(() => {
+    if (fixtureOnly) return;
+    const controller = new AbortController();
+    void Promise.all([
+      readPrototypeBooking(stay.bookingId) ? Promise.resolve() : getDurableBooking(context.businessId, context.branchId, stay.bookingId, controller.signal),
+      refreshBookingOperations(context.businessId, context.branchId, stay.bookingId, controller.signal),
+    ]).catch(() => { if (!controller.signal.aborted) setNotice("โหลดรายละเอียดการจองไม่สำเร็จ กรุณาเปิดรายการอีกครั้ง"); });
+    return () => controller.abort();
+  }, [context.businessId, context.branchId, stay.bookingId, fixtureOnly]);
 
   useEffect(() => {
     requestOpenRef.current = Boolean(requestOpen);
@@ -190,11 +202,6 @@ export function HotelStayDetail({
           ok: false,
           notice: result.availability.conflicts.map((conflict) => conflict.message).join(" · ") || "ปรับวันเข้าพักไม่สำเร็จ",
         });
-        return;
-      }
-      try { await ensureDurableOperations(context.businessId, context.branchId, true); }
-      catch {
-        publish({ ok: true, notice: "บันทึกวันเข้าพักแล้ว กรุณาโหลดหน้าใหม่เพื่อดูข้อมูลล่าสุด" });
         return;
       }
       publish({ ok: true, notice: "ปรับวันเข้าพักและตารางการจองแล้ว" });
@@ -321,8 +328,8 @@ export function HotelStayDetail({
             <header><h3 id="hotel-person-title">น้องและลูกค้า</h3></header>
             <div className="hotel-detail-person"><BusinessCustomerAvatar name={customer.name} /><span><strong>{customer.name}</strong><small>{customer.phone ?? "ยังไม่มีเบอร์โทร"}</small></span></div>
             <div className="hotel-detail-section__actions">
-              <a href={`/business/customers/${encodeURIComponent(customer.id)}`}><UserRound size={17} />ดูลูกค้า</a>
-              <a href={inboxHref}><MessageCircle size={17} />ส่งข้อความ</a>
+              <Link href={`/business/customers/${encodeURIComponent(customer.id)}`}><UserRound size={17} />ดูลูกค้า</Link>
+              <Link href={inboxHref}><MessageCircle size={17} />ส่งข้อความ</Link>
             </div>
           </section>
 
@@ -349,9 +356,9 @@ export function HotelStayDetail({
             <header><h3 id="hotel-lifecycle-title">สถานะการเข้าพัก</h3></header>
             <div className="hotel-detail-lifecycle">
               <span><Clock size={16} />{hotelStatusLabel(stay.status)}</span>
-              {stay.status === "booked" || stay.status === "expected-today" ? <a href={intakeHref}><Scan size={17} />{stay.intakeId ? "ดู Intake" : "ทำ Intake"}</a> : null}
+              {stay.status === "booked" || stay.status === "expected-today" ? <Link href={intakeHref}><Scan size={17} />{stay.intakeId ? "ดู Intake" : "ทำ Intake"}</Link> : null}
               {action ? <button type="button" onClick={(stay.status === "booked" || stay.status === "expected-today") && !stay.intakeId ? () => { window.location.href = intakeHref; } : advanceLifecycle}>{action.icon === "scan" ? <Scan size={17} /> : <CheckCircle size={17} />}{action.label}</button> : null}
-              {checkoutAvailable ? <a className="hotel-detail-lifecycle__billing" href={`/business/billing?hotelStayId=${encodeURIComponent(stay.hotelStayId)}`}><Wallet size={17} />ตรวจยอด / รับชำระ</a> : null}
+              {checkoutAvailable ? <Link className="hotel-detail-lifecycle__billing" href={`/business/billing?hotelStayId=${encodeURIComponent(stay.hotelStayId)}`}><Wallet size={17} />ตรวจยอด / รับชำระ</Link> : null}
               {stay.status === "checked-out" || stay.status === "completed" ? <p className="hotel-detail-section__hint hotel-detail-service-record"><CheckCircle size={16} />บันทึกประวัติบริการแล้ว · เปิดดูได้จากหน้าลูกค้าและสัตว์เลี้ยง</p> : null}
             </div>
             <p className="hotel-detail-section__hint"><CheckCircle size={16} />ก่อนเช็กเอาต์ ระบบตรวจงานดูแลที่ยังค้างอยู่แบบ lightweight · การชำระเงินทำผ่าน Checkout แยกต่างหาก</p>
@@ -383,7 +390,7 @@ export function HotelStayDetail({
 
           <section className="hotel-detail-section" aria-labelledby="hotel-addon-title">
             <header><h3 id="hotel-addon-title">บริการเพิ่มเติม</h3><button type="button" onClick={openAddServiceRequest}><Plus size={17} />ขออนุมัติ</button></header>
-            {linkedGroomingJobs.length > 0 ? <ul className="hotel-linked-jobs">{linkedGroomingJobs.map((job) => <li key={job.serviceJobId}><span><Scissors size={17} /><strong>อาบน้ำ / ตัดขน</strong><small>{calendarDateLabel(job.scheduledStart.slice(0, 10), { day: "numeric", month: "short" })} · {job.scheduledStart.slice(11, 16)}</small></span><a href={`/business/grooming?jobId=${encodeURIComponent(job.serviceJobId)}`}>เปิดงาน</a></li>)}</ul> : <p className="hotel-detail-empty">ยังไม่มีงานบริการเพิ่มเติมที่เชื่อมกับน้องตัวนี้</p>}
+            {linkedGroomingJobs.length > 0 ? <ul className="hotel-linked-jobs">{linkedGroomingJobs.map((job) => <li key={job.serviceJobId}><span><Scissors size={17} /><strong>อาบน้ำ / ตัดขน</strong><small>{calendarDateLabel(job.scheduledStart.slice(0, 10), { day: "numeric", month: "short" })} · {job.scheduledStart.slice(11, 16)}</small></span><Link href={`/business/grooming?jobId=${encodeURIComponent(job.serviceJobId)}`}>เปิดงาน</Link></li>)}</ul> : <p className="hotel-detail-empty">ยังไม่มีงานบริการเพิ่มเติมที่เชื่อมกับน้องตัวนี้</p>}
             <p className="hotel-detail-section__hint"><MessageCircle size={16} />ร้านส่งคำขอเพิ่มบริการผ่าน Inbox ได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้</p>
           </section>
 

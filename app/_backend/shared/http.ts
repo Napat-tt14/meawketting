@@ -40,7 +40,7 @@ export async function businessRequest(request: Request, authMode: string | undef
     requireSameOrigin(request);
     const identity = await resolveIdentity(request, authMode, database);
     const data = await execute(identity.personId, await readJson(request), metadata);
-    return new Response(JSON.stringify({ ok: true, data, meta }), { headers });
+    return new Response(JSON.stringify({ ok: true, data, meta }), { headers: { ...headers, "x-meawketting-person-id": identity.personId } });
   } catch (error) {
     const failure = asBe1Error(error);
     return new Response(JSON.stringify({ ok: false, error: error instanceof BackendConflict

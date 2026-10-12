@@ -74,6 +74,7 @@ export class Be2Application extends Be1Application {
     return this.customerPetRepository.listCustomers({
       businessId: input.businessId,
       queryKey: normalizeCustomerSearchKey(input.query),
+      customerIds: input.customerIds,
       phoneKey: normalizePhoneKey(input.query),
       includeInactive: input.includeInactive,
       limit: input.limit,

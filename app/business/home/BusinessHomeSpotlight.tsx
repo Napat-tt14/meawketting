@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { ArrowLeft, ArrowRight } from "../../_components/icons";
+import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 
 type BannerVariant = {
   id: "care-lounge" | "grooming" | "hotel";
@@ -97,7 +98,7 @@ export function BusinessHomeSpotlight() {
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
     >
-      <a
+      <Link
         className="dashboard-banner__link"
         id={panelId}
         href={active.href}
@@ -117,7 +118,7 @@ export function BusinessHomeSpotlight() {
           <h2>{active.title}</h2>
           <span className="dashboard-banner__cta">{active.href === "/business/scan" ? "เปิดหน้ารับเข้าบริการ" : "เปิดตารางการจอง"}<ArrowRight size={16} aria-hidden="true" /></span>
         </div>
-      </a>
+      </Link>
       <div className="dashboard-banner__controls">
       <span className="dashboard-banner__section-label">ข่าวสารและบริการ</span>
       <span className="dashboard-banner__counter" aria-live="polite" aria-atomic="true"><span className="sr-only">แบนเนอร์</span>{activeIndex + 1} / {variants.length}</span>

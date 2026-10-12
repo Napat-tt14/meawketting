@@ -72,7 +72,7 @@ export function projectBooking(booking: BookingView, existing: ExecutionView[], 
       after.record.serviceId = booking.serviceId; after.record.serviceLabel = booking.serviceLabel;
       if (after.kind === "grooming") {
         after.record.baseServiceId = booking.serviceId; after.record.scheduledStart = booking.start; after.record.scheduledEnd = booking.end;
-        if (after.record.status === "booked") after.record.assignedResourceIds = [...booking.assignedResourceIds];
+        if (after.record.status === "booked" && JSON.stringify([...after.record.assignedResourceIds].sort()) !== JSON.stringify([...booking.assignedResourceIds].sort())) after.record.assignedResourceIds = [...booking.assignedResourceIds];
       }
       if (after.kind === "hotel" && before.kind === "hotel") {
         after.record.scheduledCheckIn = booking.start; after.record.scheduledCheckOut = booking.end!;

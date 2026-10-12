@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronRight } from "../../_components/icons";
+import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 
 export type BusinessBreadcrumbItem = {
   label: string;
@@ -23,7 +24,7 @@ export function BusinessBreadcrumbs({
           return (
             <li key={`${item.label}-${index}`}>
               {index > 0 ? <ChevronRight className="business-breadcrumbs__separator" size={15} aria-hidden="true" /> : null}
-              {item.href && !current ? <a href={item.href}>{item.label}</a> : <span aria-current={current ? "page" : undefined}>{item.label}</span>}
+              {item.href && !current ? <Link href={item.href}>{item.label}</Link> : <span aria-current={current ? "page" : undefined}>{item.label}</span>}
             </li>
           );
         })}

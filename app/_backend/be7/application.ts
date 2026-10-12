@@ -17,7 +17,7 @@ export class Be7Application extends BusinessApplication {
     const op = parseBe7Operation(raw), repo = this.billing, db = repo.database, now = this.clock();
     const context = await this.scope(actor, op.businessId, op.branchId, metadata, now, !["charges.list", "payments.list", "charge.get"].includes(op.type));
     if (op.type === "charges.list") return repo.list(context, op.branchId, op.afterId ?? "", op.limit ?? 50, op.customerId);
-    if (op.type === "payments.list") return repo.paymentPage(context, op.branchId, op.afterId ?? "", op.limit ?? 50, op.customerId);
+    if (op.type === "payments.list") return repo.paymentPage(context, op.branchId, op.afterId ?? "", op.limit ?? 50, op.customerId, op.chargeId);
     if (op.type === "charge.get") return repo.get(context, op.branchId, op.chargeId);
     const privileged = ["charge.adjust", "charge.cancel", "refund.record"].includes(op.type);
     if (privileged && !["OWNER", "MANAGER"].includes(context.membership.role)) throw be1Error("FORBIDDEN");

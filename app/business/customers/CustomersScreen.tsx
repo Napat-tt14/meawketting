@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { searchDurableCustomers } from "../../_backend/be2/client";
-import { ensureDurableCrm } from "../../_backend/be8/client";
+import { crmScopeKey, loadCrmPage } from "../../_backend/be8/client";
+import type { CrmPage } from "../../_backend/be8/contracts";
+import { invalidateBusinessData } from "../../_backend/shared/client";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
+import { ensureBusinessSession } from "../../_backend/be1/client";
 import { BUSINESS_FIXTURE_TEST_MODE } from "../../_prototype/fixtureRuntime";
 import {
   getDemoBusinessContextDetails,
   getDemoBusinessContextForBranch,
   listPrototypeCustomerFixtures,
   listPrototypeCustomers,
+  projectDurableCustomer,
   listPrototypeBookingFixtures,
   listPrototypeBookings,
   listPrototypeChargeFixtures,
@@ -57,20 +61,31 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const [editorOpen, setEditorOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [crmLoadedKey, setCrmLoadedKey] = useState("");
-  const [searchResult, setSearchResult] = useState<{ businessId: string; query: string; customerIds: string[] } | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [cursorTrail, setCursorTrail] = useState<number[]>([]);
+  const [page, setPage] = useState<CrmPage | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const relationshipStateReady = useIsClient();
   const { businessId, branchId } = context;
-  const crmKey = JSON.stringify([businessId, branchId]);
+  const offset = cursorTrail.at(-1) ?? 0;
+  const crmKey = JSON.stringify([crmScopeKey({ businessId, branchId }), debouncedQuery, filter, offset]);
   const crmReady = BUSINESS_FIXTURE_TEST_MODE || crmLoadedKey === crmKey;
+  const currentPage = crmLoadedKey === crmKey ? page : null;
+  const searching = !crmReady;
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setDebouncedQuery(query.trim()); setCursorTrail([]); }, 180);
+    return () => window.clearTimeout(timer);
+  }, [query]);
   useEffect(() => {
     if (!isContextReady) return;
-    let stopped = false;
-    const load = async () => { try { await ensureDurableCrm({ businessId, branchId }); if (!stopped) { setCrmLoadedKey(crmKey); setNotice((v) => v === "โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ" ? null : v); } } catch { if (!stopped) setNotice("โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ"); } };
-    void load(); const timer = window.setInterval(() => void load(), 5000);
-    return () => { stopped = true; window.clearInterval(timer); };
-  }, [businessId, branchId, isContextReady, crmKey]);
+    let initial = true;
+    const refresh = startBusinessRefresh(async signal => {
+      const next = await loadCrmPage({ businessId, branchId }, { offset, query: debouncedQuery, segment: filter }, { force: !initial, signal });
+      initial = false;
+      if (!signal.aborted) { setPage(next); setCrmLoadedKey(crmKey); setNotice(v => v === "โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ" ? null : v); }
+    }, { businessId, targets: ["crm"], onError: () => setNotice("โหลดข้อมูลความสัมพันธ์ลูกค้าล่าสุดไม่สำเร็จ") });
+    return refresh.stop;
+  }, [businessId, branchId, isContextReady, crmKey, offset, debouncedQuery, filter]);
 
   useEffect(() => {
     const sync = () => setRevision((current) => current + 1);
@@ -90,36 +105,8 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
     };
   }, [focusSearch]);
 
-  useEffect(() => {
-    const normalizedQuery = query.trim();
-    if (!normalizedQuery) return;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      setSearching(true);
-      void searchDurableCustomers(context.businessId, normalizedQuery)
-        .then((page) => {
-          if (cancelled) return;
-          setSearchResult({
-            businessId: context.businessId,
-            query: normalizedQuery,
-            customerIds: page.items.map((customer) => customer.id),
-          });
-        })
-        .catch(() => {
-          if (!cancelled) setNotice("ค้นหาข้อมูลไม่สำเร็จ ลองอีกครั้ง");
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false);
-        });
-    }, 180);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [context.businessId, query]);
-
   void revision;
-  const customers = relationshipStateReady
+  const customers = !BUSINESS_FIXTURE_TEST_MODE ? (currentPage?.customers ?? []).map(projectDurableCustomer) : relationshipStateReady
     ? listPrototypeCustomers(context)
     : listPrototypeCustomerFixtures(context);
   const bookings = relationshipStateReady
@@ -138,13 +125,8 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
   const crmProfiles = customers.map((customer) => deriveCustomerCrmProfile(customer, crmDataset, referenceAt));
   const crmProfilesByCustomer = new Map(crmProfiles.map((profile) => [profile.customerId, profile]));
   const normalizedQuery = query.trim();
-  const backendSearchIds = normalizedQuery
-    && searchResult?.businessId === context.businessId
-    && searchResult.query === normalizedQuery
-    ? new Set(searchResult.customerIds)
-    : null;
-  const visibleCustomers = customers.filter((customer) => (
-    (!normalizedQuery || backendSearchIds?.has(customer.id) === true)
+  const visibleCustomers = !BUSINESS_FIXTURE_TEST_MODE ? customers : customers.filter((customer) => (
+    (!normalizedQuery || `${customer.name} ${customer.phone ?? ""} ${customer.pets.map(p => p.name).join(" ")}`.toLowerCase().includes(normalizedQuery.toLowerCase()))
     && (!crmReady || customerMatchesCrmSegment(crmProfilesByCustomer.get(customer.id)!, filter))
   ));
   return (
@@ -154,7 +136,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
         actions={<button className="button button--business business-signature-sweep" type="button" onClick={() => { setNotice(null); setEditorOpen(true); }}><Plus size={19} /><span>เพิ่มลูกค้า</span></button>}
       />
 
-      {crmReady ? <CustomerCrmOverview profiles={crmProfiles} /> : <p role="status">กำลังโหลดข้อมูลความสัมพันธ์ลูกค้า…</p>}
+      {crmReady ? <CustomerCrmOverview profiles={crmProfiles} summary={currentPage?.segments} /> : <p role="status">กำลังโหลดข้อมูลความสัมพันธ์ลูกค้า…</p>}
 
       <section className="customer-search-panel" aria-label="ค้นหาและกรองลูกค้า">
         <BusinessSearchField
@@ -165,10 +147,6 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
           onInput={(event) => {
             const nextQuery = event.currentTarget.value;
             setQuery(nextQuery);
-            if (!nextQuery.trim()) {
-              setSearchResult(null);
-              setSearching(false);
-            }
           }}
           placeholder="ค้นหาชื่อลูกค้า ชื่อน้อง หรือเบอร์โทร"
           autoComplete="off"
@@ -180,7 +158,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
             value={filter}
             options={CUSTOMER_CRM_SEGMENTS.map((option) => ({
               ...option,
-              count: crmProfiles.filter((profile) => customerMatchesCrmSegment(profile, option.value)).length,
+              count: currentPage?.segments?.[option.value] ?? crmProfiles.filter((profile) => customerMatchesCrmSegment(profile, option.value)).length,
               icon: option.value === "grooming" || option.value === "hotel" || option.value === "daycare"
                 ? <BusinessServiceIcon module={option.value} size={16} />
                 : option.value === "all" ? <UsersRound size={16} />
@@ -189,7 +167,7 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
                 : option.value === "inactive" ? <Clock size={16} /> : <CircleDashed size={16} />,
             }))}
             ariaLabel="กรองกลุ่มลูกค้า"
-            onChange={setFilter}
+            onChange={value => { setFilter(value); setCursorTrail([]); }}
           />
         </div> : null}
       </section>
@@ -199,13 +177,13 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
       <section className="customer-results" aria-label="รายชื่อลูกค้า" aria-live="polite">
         <header className="customer-results__heading">
           <h2>ลูกค้า {visibleCustomers.length} ราย</h2>
-          {query || filter !== "all" ? <span>จากทั้งหมด {customers.length} ราย</span> : null}
+          {currentPage ? <span>จากผลลัพธ์ทั้งหมด {currentPage.total ?? customers.length} ราย</span> : query || filter !== "all" ? <span>จากทั้งหมด {customers.length} ราย</span> : null}
         </header>
-        {searching && normalizedQuery && !backendSearchIds ? (
+        {searching ? (
           <div className="customer-empty-state customer-empty-state--search"><div><strong>กำลังค้นหา…</strong><p>ค้นหาจากข้อมูลลูกค้าและสัตว์เลี้ยงของ Business นี้</p></div></div>
         ) : customers.length === 0 ? (
           <div className="customer-empty-state">
-            <div><strong>ยังไม่มีลูกค้าในรายการ</strong><p>เพิ่มลูกค้าและสัตว์เลี้ยงเพื่อใช้กับการจองและงานบริการ</p></div>
+            <div><strong>{currentPage?.total ? "ไม่มีรายการในหน้านี้" : "ยังไม่มีลูกค้าในรายการ"}</strong><p>{currentPage?.total ? "กลับหน้าก่อนหน้าหรือเปลี่ยนตัวกรองเพื่อดูรายการอื่น" : "เพิ่มลูกค้าและสัตว์เลี้ยงเพื่อใช้กับการจองและงานบริการ"}</p></div>
             <button className="button button--business business-signature-sweep" type="button" onClick={() => setEditorOpen(true)}><Plus size={18} /><span>เพิ่มลูกค้า</span></button>
           </div>
         ) : visibleCustomers.length === 0 ? (
@@ -272,6 +250,12 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
           </>
         )}
       </section>
+      {!BUSINESS_FIXTURE_TEST_MODE ? <nav aria-label="หน้ารายชื่อลูกค้า" className="customer-results__heading" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+        <button type="button" className="button button--business-ghost" disabled={searching || !cursorTrail.length} onClick={() => setCursorTrail(v => v.slice(0, -1))}>หน้าก่อนหน้า</button>
+        <span>หน้า {cursorTrail.length + 1}</span>
+        <button type="button" className="button button--business-ghost" disabled={searching || currentPage?.nextOffset == null} onClick={() => { if (currentPage?.nextOffset != null) setCursorTrail(v => [...v, currentPage.nextOffset!]); }}>หน้าถัดไป</button>
+        <button type="button" className="button button--business-ghost" onClick={() => { void ensureBusinessSession(true).catch(() => setNotice("เซสชันหมดอายุหรือยังไม่มีสิทธิ์ กรุณาเข้าสู่ระบบอีกครั้ง")); }}>รีเฟรช</button>
+      </nav> : null}
 
       {editorOpen ? (
         <CustomerEditor
@@ -280,6 +264,8 @@ export function CustomersScreen({ focusSearch = false }: { focusSearch?: boolean
           onClose={() => setEditorOpen(false)}
           onSaved={(customer) => {
             setEditorOpen(false);
+            setCursorTrail([]);
+            invalidateBusinessData(businessId);
             setNotice(`เพิ่มลูกค้า ${customer.name} แล้ว`);
           }}
         />

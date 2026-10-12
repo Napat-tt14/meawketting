@@ -156,11 +156,8 @@ export class Be3Application extends Be1Application {
 
   async getCatalog(actor: PersonView, businessId: string, branchId: string) {
     const branch = await this.getBranch(actor, validateId(businessId), validateId(branchId));
-    await this.ensurePlanningCatalog(branch, actor);
-    const [services, resources] = await Promise.all([
-      this.bookingRepository.listServices(branch.businessId, branch.id),
-      this.bookingRepository.listResources(branch.businessId, branch.id),
-    ]);
+    const services = await this.ensurePlanningCatalog(branch, actor);
+    const resources = await this.bookingRepository.listResources(branch.businessId, branch.id);
     return {
       businessId: branch.businessId,
       branchId: branch.id,
@@ -575,7 +572,7 @@ export class Be3Application extends Be1Application {
   private async ensurePlanningCatalog(branch: BranchView, actor: PersonView) {
     const existing = await this.bookingRepository.listServices(branch.businessId, branch.id);
     const missing = branch.enabledModules.filter((module) => !existing.some((service) => service.module === module));
-    if (!missing.length) return;
+    if (!missing.length) return existing;
     const services = missing.map((module) => defaultService(branch, module));
     await this.bookingRepository.ensureDefaultCatalog({
       businessId: branch.businessId,
@@ -583,6 +580,7 @@ export class Be3Application extends Be1Application {
       services,
       resources: services.flatMap(defaultResources),
     }, this.be3Now(), actor.id);
+    return this.bookingRepository.listServices(branch.businessId, branch.id);
   }
 
   private async requireBooking(businessId: string, branchId: string, bookingId: string) {

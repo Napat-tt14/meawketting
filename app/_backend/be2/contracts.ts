@@ -65,6 +65,7 @@ export type CreatePetResult =
 
 export type CustomerListInput = {
   businessId: string;
+  customerIds?: string[];
   includeInactive?: boolean;
   limit?: number;
   offset?: number;

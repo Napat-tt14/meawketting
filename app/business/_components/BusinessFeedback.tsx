@@ -1,6 +1,6 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import type { IconType } from "react-icons";
-import { CheckCircle, CircleAlert, Info, TriangleAlert } from "../../_components/icons";
+import { CheckCircle, CircleAlert, Info, PawPrint, Storefront, TriangleAlert } from "../../_components/icons";
 
 type BusinessAlertTone = "success" | "warning" | "critical" | "info";
 
@@ -72,4 +72,19 @@ export function BusinessSkeleton({
   className?: string;
 }) {
   return <span className={`business-skeleton${variant ? ` business-skeleton--${variant}` : ""} ${className}`.trim()} aria-hidden="true" />;
+}
+
+export function BusinessLoadingScene({ titleId, title = "กำลังเตรียมพื้นที่ของคุณ" }: { titleId?: string; title?: string }) {
+  return <div className="business-loading-scene" role="status" aria-live="polite">
+    <div className="business-loading-scene__art" aria-hidden="true">
+      <span className="business-loading-scene__halo" />
+      <span className="business-loading-scene__shop"><Storefront size={42} weight="duotone" /></span>
+      <span className="business-loading-scene__paw"><PawPrint size={22} weight="fill" /></span>
+      <span className="business-loading-scene__paw"><PawPrint size={18} weight="fill" /></span>
+      <span className="business-loading-scene__paw"><PawPrint size={24} weight="fill" /></span>
+    </div>
+    <h1 id={titleId}>{title}</h1>
+    <p>เตรียมพื้นที่ให้คุณและเพื่อนตัวเล็ก สักครู่นะ</p>
+    <span className="business-loading-scene__dots" aria-hidden="true"><i /><i /><i /></span>
+  </div>;
 }

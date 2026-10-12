@@ -1,6 +1,7 @@
 "use client";
 
 import { businessToday } from "../../_backend/shared/businessClock";
+import { readExecution } from "../../_backend/be4/operationsCache";
 
 import { type DragEvent, type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -102,7 +103,8 @@ export function GroomingOperations({ launchJobId = null }: { launchJobId?: strin
     const pet = customer?.pets.find((item) => item.id === job.petId) ?? null;
     if (!customer || !pet) return [];
     const resources = getBookingResources(context, job.baseServiceId);
-    const waitingApproval = requests.some((request) => request.requestStatus === "waiting" && requestMatchesJob(request, job));
+    const matchingRequests = requests.filter(request => requestMatchesJob(request, job));
+    const waitingApproval = matchingRequests.length ? matchingRequests.some(request => request.requestStatus === "waiting") : readExecution(job.serviceJobId)?.awaitingApproval ?? false;
     return [{ job, customer, pet, resources, waitingApproval }];
   }), [context, jobs, requests, stateReady]);
 

@@ -1,5 +1,5 @@
 import type { ShareableScopeKey, TemporaryAccess } from "./sharingState";
-import { readReport } from "../_backend/be8/client";
+import { readReport, readBillingSummary } from "../_backend/be8/client";
 import {
   addAccessEvent,
   BUSINESS_FIXTURES,
@@ -22,6 +22,7 @@ import {
   readAllReadyBe2Directories,
   readBe2CustomerByStableId,
   readBe2Customers,
+  readKnownBe2Customers,
   readBe2DirectoryStatus,
 } from "../_backend/be2/customerPetCache";
 import type {
@@ -36,8 +37,10 @@ import type {
 } from "../_backend/be3/contracts";
 import {
   readAllReadyBe3Directories,
+  readAllKnownBe3Directories,
   readBe3BookingByStableId,
   readBe3Bookings,
+  readKnownBe3Bookings,
   readBe3Catalog,
   readBe3DirectoryStatus,
   readBe3ResourceByStableId,
@@ -2624,7 +2627,7 @@ function cloneCustomer(customer: PrototypeCustomer): PrototypeCustomer {
   };
 }
 
-function projectDurableCustomer(customer: CustomerView): PrototypeCustomer {
+export function projectDurableCustomer(customer: CustomerView): PrototypeCustomer {
   return {
     id: customer.id,
     businessId: customer.businessId,
@@ -2711,7 +2714,8 @@ export function findKnownBusinessCustomerPetByPassportSlug(businessId: string, p
 }
 
 export function getDemoBookingContacts(context?: DemoBusinessContext | null) {
-  return listPrototypeCustomers(context).map((customer) => ({
+  const customers = !BUSINESS_FIXTURE_TEST_MODE && context ? readKnownBe2Customers(context.businessId).map(projectDurableCustomer) : listPrototypeCustomers(context);
+  return customers.map((customer) => ({
     id: customer.id,
     name: customer.name,
     businessIds: [customer.businessId],
@@ -2868,7 +2872,7 @@ export function projectDurableBooking(booking: BookingView): PrototypeBooking {
 }
 
 function mergedPrototypeBookings() {
-  const readyDirectories = readAllReadyBe3Directories();
+  const readyDirectories = BUSINESS_FIXTURE_TEST_MODE ? readAllReadyBe3Directories() : readAllKnownBe3Directories();
   if (!readyDirectories.length) return BUSINESS_FIXTURE_TEST_MODE ? DEMO_BOOKING_FIXTURES.map(cloneBooking) : [];
   const readyBusinessIds = new Set(readyDirectories.map((entry) => entry.businessId));
   const durable = readyDirectories.flatMap((entry) => entry.bookings.map(projectDurableBooking));
@@ -2908,7 +2912,7 @@ export function listPrototypeBookingFixtures(context?: DemoBusinessContext | nul
 
 export function listPrototypeBookings(context?: DemoBusinessContext | null, options: ListPrototypeBookingsOptions = {}) {
   if (context) {
-    const durable = readBe3Bookings(context.businessId, {
+    const durable = (BUSINESS_FIXTURE_TEST_MODE ? readBe3Bookings : readKnownBe3Bookings)(context.businessId, {
       branchId: context.branchId,
       includeCancelled: options.includeCancelled,
     });
@@ -5816,7 +5820,8 @@ export function getPrototypeRevenueSummary(
   date: string = BOOKING_DEMO_DATE,
   fixtureOnly = false,
 ): PrototypeRevenueSummary {
-  if (!BUSINESS_FIXTURE_TEST_MODE) return readReport(context, date === dateInZone(new Date(), businessTimezone(context)) ? {} : { dateRangePreset: "custom", customStartDate: date, customEndDate: date }).revenueSummary;
+  if (!BUSINESS_FIXTURE_TEST_MODE) return date === dateInZone(new Date(), businessTimezone(context)) ? readBillingSummary(context)?.revenueSummary ?? readReport(context).revenueSummary
+    : readReport(context, { dateRangePreset: "custom", customStartDate: date, customEndDate: date }).revenueSummary;
   const charges = fixtureOnly ? listPrototypeChargeFixtures(context) : listPrototypeCharges(context);
   const payments = fixtureOnly ? listPrototypePaymentFixtures(context) : listPrototypePayments(context);
   const balances = charges.map((charge) => getPrototypeChargeBalance(charge, payments));

@@ -65,17 +65,6 @@ export function LiveBusinessDestination({
       {badge > 0 ? <span className="business-nav-unread-badge" aria-label={`ข้อความใหม่ ${badge} ข้อความ`}>{badge}</span> : null}
     </>
   );
-  if (destination.key === "messages") {
-    return (
-      <a
-        className={`business-nav-item${active ? " is-active" : ""}`}
-        href={destination.href}
-        aria-current={active ? "page" : undefined}
-      >
-        {content}
-      </a>
-    );
-  }
   return (
     <Link
       className={`business-nav-item${active ? " is-active" : ""}`}

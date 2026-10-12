@@ -73,7 +73,8 @@ export function getBusinessConfigurationRevision() {
   return revision;
 }
 
-export function resetBusinessConfigurationForTests() {
+export function clearBusinessSession() {
   session = null;
   emit();
 }
+export { clearBusinessSession as resetBusinessConfigurationForTests };

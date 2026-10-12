@@ -1,11 +1,13 @@
 "use client";
+import { startBusinessRefresh } from "../../_backend/shared/refresh";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listPrototypeConversationFixtures,
   listPrototypeConversations,
 } from "../../_prototype/inboxState";
-import { ensureDurableConversation as ensurePrototypeConversation, ensureDurableInbox, isInboxLoaded, loadDurableConversation, markDurableConversationRead } from "../../_backend/be6/client";
+import { ensureDurableConversation as ensurePrototypeConversation, ensureDurableInbox, isInboxLoaded, loadDurableConversation, markDurableConversationRead, readInboxDirectory } from "../../_backend/be6/client";
+import { ensureKnownCustomers } from "../../_backend/be2/client";
 import { MessageCircle } from "../../_components/icons";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { useBusinessContext, useBusinessStateReady } from "../_components/useBusinessContext";
@@ -87,19 +89,19 @@ export function BusinessInbox({ launchRequest = null }: { launchRequest?: InboxL
 
   useEffect(() => {
     if (!stateReady || !isContextReady) return;
-    let cancelled = false;
-    const refresh = async () => {
-      try {
-        await ensureDurableInbox(context.businessId, context.branchId, true);
-        if (!cancelled && selectedConversationId) {
-          await loadDurableConversation(context.businessId, context.branchId, selectedConversationId);
-          if (!cancelled) await markDurableConversationRead(selectedConversationId, context.businessId, context.branchId);
+    let initial = true;
+    const refresh = startBusinessRefresh(async signal => {
+        await ensureDurableInbox(context.businessId, context.branchId, !initial, signal);
+        await ensureKnownCustomers(context.businessId, readInboxDirectory(context.businessId, context.branchId).map(c => c.customerId), signal);
+        if (selectedConversationId) {
+          await loadDurableConversation(context.businessId, context.branchId, selectedConversationId, { force: !initial, signal });
+          signal.throwIfAborted();
+          await markDurableConversationRead(selectedConversationId, context.businessId, context.branchId);
         }
-        if (!cancelled) setNotice((current) => current === "โหลดข้อความล่าสุดไม่สำเร็จ กรุณาลองอีกครั้ง" ? null : current);
-      } catch { if (!cancelled) setNotice("โหลดข้อความล่าสุดไม่สำเร็จ กรุณาลองอีกครั้ง"); }
-    };
-    void refresh(); const timer = window.setInterval(() => void refresh(), 5000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+        initial = false;
+        if (!signal.aborted) setNotice(current => current === "โหลดข้อความล่าสุดไม่สำเร็จ กรุณาลองอีกครั้ง" ? null : current);
+    }, { businessId: context.businessId, targets: ["inbox"], intervalMs: 10_000, onError: () => setNotice("โหลดข้อความล่าสุดไม่สำเร็จ กรุณาลองอีกครั้ง") });
+    return refresh.stop;
   }, [context.businessId, context.branchId, isContextReady, selectedConversationId, stateReady]);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { businessToday } from "../../_backend/shared/businessClock";
+import { readExecution } from "../../_backend/be4/operationsCache";
 
 import { type CSSProperties, type DragEvent, useMemo, useRef, useState } from "react";
 import {
@@ -125,8 +126,8 @@ export function HotelOperations({
   const rooms = getHotelRooms(context);
   const summary = summarizePrototypeHotelStays(stays, context, date);
   const days = useMemo(() => Array.from({ length: range }, (_, index) => addCalendarDays(date, index)), [date, range]);
-  const waitingRequests = conversations.flatMap((conversation) => conversation.messages)
-    .filter((message): message is PrototypeAddServiceRequestMessage => message.kind === "add-service-request" && message.requestStatus === "waiting");
+  const requests = conversations.flatMap((conversation) => conversation.messages)
+    .filter((message): message is PrototypeAddServiceRequestMessage => message.kind === "add-service-request");
 
   const items = stays.flatMap((stay) => {
     const customer = stateReady ? readPrototypeCustomer(stay.customerId) : readPrototypeCustomerFixture(stay.customerId);
@@ -136,7 +137,8 @@ export function HotelOperations({
     const room = rooms.find((resource) => resource.id === assignment?.roomId) ?? null;
     const pendingCare = stay.dailyCareTasks.filter((task) => task.scheduledDate === date && task.state === "pending").length;
     const incidentCount = stay.incidentNotes.filter((incident) => incident.severity === "attention" && !incident.resolvedAt).length;
-    const waitingApproval = waitingRequests.some((request) => request.bookingId === stay.bookingId);
+    const matchingRequests = requests.filter(request => request.bookingId === stay.bookingId);
+    const waitingApproval = matchingRequests.length ? matchingRequests.some(request => request.requestStatus === "waiting") : readExecution(stay.hotelStayId)?.awaitingApproval ?? false;
     return [{
       stay,
       pet,

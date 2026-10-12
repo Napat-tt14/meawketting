@@ -1,4 +1,5 @@
 import type { CustomerView, PetDetailView, PetView } from "./contracts";
+import { readBusinessSession } from "../be1/configurationCache";
 
 export type Be2DirectoryStatus = "idle" | "partial" | "loading" | "ready" | "error";
 
@@ -9,14 +10,20 @@ type Directory = {
 };
 
 const directories = new Map<string, Directory>();
+export function be2ScopeKey(businessId: string) {
+  const session = readBusinessSession(), workspace = session?.workspaces.find(w => w.business.id === businessId);
+  return JSON.stringify([session?.person.id ?? "", businessId, workspace?.membership.id, workspace?.membership.role, workspace?.membership.updatedAt,
+    workspace?.permittedBranches.map(b => [b.id, b.updatedAt]).sort()]);
+}
+const key = be2ScopeKey;
 const listeners = new Set<() => void>();
 let revision = 0;
 
 function directory(businessId: string) {
-  const current = directories.get(businessId);
+  const current = directories.get(key(businessId));
   if (current) return current;
   const created: Directory = { status: "idle", customers: new Map(), error: null };
-  directories.set(businessId, created);
+  directories.set(key(businessId), created);
   return created;
 }
 
@@ -36,7 +43,7 @@ export function markBe2DirectoryLoading(businessId: string) {
 }
 
 export function installBe2Directory(businessId: string, customers: readonly CustomerView[]) {
-  directories.set(businessId, {
+  directories.set(key(businessId), {
     status: "ready",
     customers: new Map(customers.map((customer) => [customer.id, customer])),
     error: null,
@@ -97,24 +104,26 @@ export function patchBe2Pet(pet: PetView | PetDetailView) {
 }
 
 export function readBe2DirectoryStatus(businessId: string) {
-  const current = directories.get(businessId);
+  const current = directories.get(key(businessId));
   return current?.status ?? "idle";
 }
 
 export function readBe2DirectoryError(businessId: string) {
-  return directories.get(businessId)?.error ?? null;
+  return directories.get(key(businessId))?.error ?? null;
 }
 
 /** Returns null until server truth has been installed. */
 export function readBe2Customers(businessId: string): CustomerView[] | null {
-  const current = directories.get(businessId);
+  const current = directories.get(key(businessId));
   if (current?.status !== "ready") return null;
   return [...current.customers.values()].filter((customer) => customer.status === "active");
 }
 
 export function readBe2Customer(businessId: string, customerId: string) {
-  return directories.get(businessId)?.customers.get(customerId) ?? null;
+  return directories.get(key(businessId))?.customers.get(customerId) ?? null;
 }
+/** Partial reads are usable by pickers; this never claims a complete directory. */
+export function readKnownBe2Customers(businessId: string) { return [...(directories.get(key(businessId))?.customers.values() ?? [])].filter(c => c.status === "active"); }
 
 /**
  * Compatibility-only global lookup for frozen local records that carry a
@@ -122,7 +131,8 @@ export function readBe2Customer(businessId: string, customerId: string) {
  * authorization.
  */
 export function readBe2CustomerByStableId(customerId: string) {
-  for (const current of directories.values()) {
+  for (const [id, current] of directories) {
+    if (id !== key(JSON.parse(id)[1])) continue;
     const customer = current.customers.get(customerId);
     if (customer) return customer;
   }
@@ -131,9 +141,9 @@ export function readBe2CustomerByStableId(customerId: string) {
 
 export function readAllReadyBe2Directories() {
   return [...directories.entries()]
-    .filter(([, current]) => current.status === "ready")
-    .map(([businessId, current]) => ({
-      businessId,
+    .filter(([id, current]) => current.status === "ready" && id === key(JSON.parse(id)[1]))
+    .map(([id, current]) => ({
+      businessId: JSON.parse(id)[1] as string,
       customers: [...current.customers.values()].filter((customer) => customer.status === "active"),
     }));
 }

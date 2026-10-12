@@ -11,7 +11,7 @@ import { createServer as createViteServer } from "vite";
 // The production Worker built by `build` keeps this flag disabled.
 function createServer(config) {
   // Immutable SSR fixtures need no watcher; do not crawl native test clusters.
-  return createViteServer({ ...config, server: { ...config.server, watch: null }, define: { ...config.define, "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("test") } });
+  return createViteServer({ ...config, resolve: { ...config.resolve, alias: { ...config.resolve?.alias, "next/link": join(projectRoot, "node_modules/vinext/dist/shims/link.js") } }, server: { ...config.server, watch: null }, define: { ...config.define, "process.env.MEAWKETTING_FIXTURE_MODE": JSON.stringify("test") } });
 }
 
 const appRoot = new URL("../app/", import.meta.url);
@@ -1157,6 +1157,9 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(source, /revenueSummary\.revenueToday/);
   assert.match(source, /รายรับวันนี้/);
   assert.match(source, /BusinessHomeSpotlight/);
+  assert.match(html, /เริ่มต้นดูแลร้านของคุณ/);
+  assert.match(html, /ตั้งค่าเวลาเปิดร้าน|กำหนดเวลาเปิดร้าน/);
+  assert.match(html, /ดูคำแนะนำ/);
   assert.match(source, /BusinessServiceIcon/);
   assert.equal((spotlight.match(/\/images\/business\/business-banner-[^"']+\.png/g) ?? []).length, 3);
   assert.match(spotlight, /business-banner-care-lounge\.png/);
@@ -1209,7 +1212,7 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.match(desktopNav, /href=\{destination\.href\}/);
   assert.match(mobileNav, /BUSINESS_CALENDAR_DESTINATION\.href/);
   assert.match(header + mobileNav, /href="\/business\/scan"/);
-  assert.match(documentLink, /return <a href=\{href\}/);
+  assert.match(documentLink, /return <Link href=\{href\}/);
   assert.doesNotMatch(desktopNav + mobileNav + header, /from "next\/link"/);
   assert.match(desktopNav, /BUSINESS_MANAGEMENT_DESTINATIONS/);
   assert.match(mobileNav, /BUSINESS_SETTINGS_DESTINATION/);
@@ -1301,7 +1304,7 @@ test("switches the shared Business and Branch context through one keyboard-usabl
   assert.match(scanner, /meawketting:business-state/);
   assert.match(intake, /readActiveBusinessContext/);
   assert.match(intake, /intakeAccessGate\(access, activeContext\)/);
-  assert.match(intake, /loadDurableIntake\(context, intakeId\)/);
+  assert.match(intake, /loadDurableIntake\(context, intakeId, signal\)/);
   assert.match(state, /whisker-thonglor-frontdesk/);
   assert.match(fixtures, /whisker-thonglor/);
 });
@@ -2474,7 +2477,8 @@ test("renders a backend-searchable Customers & Pets route for Business frontdesk
   assert.match(html, /นัดถัดไป/);
   assert.match(page, /CustomersScreen/);
   assert.match(screen, /CUSTOMER_CRM_SEGMENTS/);
-  assert.match(screen, /searchDurableCustomers/);
+  assert.match(screen, /loadCrmPage/);
+  assert.match(screen, /offset, query: debouncedQuery, segment: filter/);
   assert.match(durableClient, /type: "customer\.search"/);
   assert.match(screen, /customerMatchesCrmSegment/);
   assert.match(screen, /customer-list-item__identity/);
@@ -2712,7 +2716,7 @@ test("integrates Inbox with Customer, Booking, Home, unread navigation, and stab
   assert.match(bookingEditor, /\/business\/inbox\?customerId=/);
   assert.match(bookingEditor, /bookingId=/);
   assert.match(calendarPage, /bookingId/);
-  assert.match(calendar, /getDurableBooking\(context\.businessId, context\.branchId, launchBookingId\)/);
+  assert.match(calendar, /getDurableBooking\(context\.businessId, context\.branchId, launchBookingId, controller\.signal\)/);
   assert.match(inbox, /ensurePrototypeConversation/);
   assert.match(inbox, /params\.set\("conversation"/);
   assert.match(home, /getPrototypeInboxUnreadCount/);
@@ -3494,10 +3498,10 @@ test("renders BF10 Settings, BF11 Daycare, and BF12 CRM with shared state and ho
   assert.match(settings, /getBookingServices\(branchContext, fixtureOnly\)/);
   assert.match(settings, /getHotelRooms\(branchContext, fixtureOnly\)/);
   assert.match(settings, /getPrototypeDaycareZones\(branchContext, fixtureOnly\)/);
-  assert.match(settings, /<details className="settings-branch-services">[\s\S]*?<summary>บริการและทรัพยากร<\/summary>/);
+  assert.match(settings, /<details className="settings-branch-services"[^>]*>[\s\S]*?<summary>บริการและทรัพยากร<\/summary>/);
   assert.match(settings, /ใช้เวลาและทรัพยากรชุดเดียวกับปฏิทินและงานบริการ/);
   assert.match(settings, /onOpenTeam=\{\(\) => selectContext\(getDemoBusinessContextForBranch\(branch\.businessId, branch\.branchId\)\.key\)\}/);
-  assert.match(settings, /branch\.active \? <a[^>]+href="\/business\/team" onClick=\{onOpenTeam\} aria-label=\{`ดูทีม \$\{branch\.name\}`\}/);
+  assert.match(settings, /branch\.active \? <Link[^>]+href="\/business\/team" onClick=\{onOpenTeam\} aria-label=\{`ดูทีม \$\{branch\.name\}`\}/);
   assert.doesNotMatch(settings, /createPrototypeTeamMember|updatePrototypeTeamMember|settingsTeam|branchTeamMembers/);
   assert.equal(countRenderedElements(daycareHtml, "h1"), 1);
   assert.match(daycareHtml, /<h1[^>]*>Daycare<\/h1>/);
@@ -4134,7 +4138,7 @@ test("keeps the requested Business interaction and component refinements explici
     readFile(businessCssUrl, "utf8"),
   ]);
 
-  assert.match(frame, /key=\{pathname\}[\s\S]*?business-route-stage/);
+  assert.match(frame, /key=\{.*pathname.*context.key.*\}[\s\S]*?business-route-stage/);
   assert.match(businessCss, /@keyframes business-route-enter/);
   assert.match(businessCss, /@keyframes business-section-enter/);
   assert.match(calendar, /key === "z"/);
@@ -4209,8 +4213,7 @@ test("promotes navigation, data, feedback, modal, progress, skeleton, and signat
   assert.match(modal, /aria-modal="true"/);
   assert.match(modal, /event\.key === "Escape"/);
   assert.match(modal, /event\.key !== "Tab"/);
-  assert.match(loading, /BusinessProgress/);
-  assert.match(loading, /BusinessSkeleton/);
+  assert.match(loading, /BusinessLoadingScene/);
   assert.match(businessCss, /--segmented-bg:/);
   assert.match(businessCss, /\.business-data-table/);
   assert.match(businessCss, /\.business-alert--critical/);

@@ -14,7 +14,7 @@ type Write = Scope & { requestKey: string };
 type Versioned = Write & { chargeId: string; expectedRevision: number };
 export type Be7Operation =
   | (Scope & { type: "charges.list"; afterId?: string; limit?: number; customerId?: string })
-  | (Scope & { type: "payments.list"; afterId?: string; limit?: number; customerId?: string })
+  | (Scope & { type: "payments.list"; afterId?: string; limit?: number; customerId?: string; chargeId?: string })
   | (Scope & { type: "charge.get"; chargeId: string })
   | (Write & { type: "charge.checkout"; executionId: string })
   | (Versioned & { type: "charge.adjust"; kind: "manual-adjustment" | "discount"; label: string; amount: number; reason: string })

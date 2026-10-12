@@ -10,7 +10,10 @@ import { decode, encode, type AssignmentRow, type EventRow, type ExecutionRow, t
 import { executionId, projectBooking } from "./domain";
 import type { BookingView } from "../be3/contracts";
 
-const SELECT = `SELECT e.*, b.service_id, s.label AS service_label FROM service_executions e JOIN bookings b ON b.business_id=e.business_id AND b.branch_id=e.branch_id AND b.id=e.booking_id JOIN booking_services s ON s.business_id=b.business_id AND s.branch_id=b.branch_id AND s.id=b.service_id`;
+const SELECT = `SELECT e.*, b.service_id, s.label AS service_label,
+  EXISTS(SELECT 1 FROM messages m JOIN message_approvals a ON a.message_id=m.id WHERE m.business_id=e.business_id AND m.branch_id=e.branch_id AND a.status='waiting'
+    AND (m.execution_id=e.id OR (m.execution_id IS NULL AND m.booking_id=e.booking_id))) awaiting_approval
+  FROM service_executions e JOIN bookings b ON b.business_id=e.business_id AND b.branch_id=e.branch_id AND b.id=e.booking_id JOIN booking_services s ON s.business_id=b.business_id AND s.branch_id=b.branch_id AND s.id=b.service_id`;
 const COLUMNS = "id,business_id,branch_id,booking_id,customer_id,pet_id,module,status,intake_id,scheduled_start,scheduled_end,business_note,details_json,revision,write_token,created_at,updated_at,cancelled_at";
 
 function assignmentState(value: ExecutionView) {
@@ -95,8 +98,14 @@ export class PostgresBe4Repository implements Be4Repository {
     if (result.success === false) throw be1Error("PERSISTENCE_ERROR");
     return result.results ?? [];
   }
-  async list(businessId: string, branchId: string, afterId: string, limit: number) {
-    return this.hydrate(await this.rows<ExecutionRow>(`${SELECT} WHERE e.business_id=? AND e.branch_id=? AND e.id>? ORDER BY e.id LIMIT ?`, businessId, branchId, afterId, limit));
+  async list(businessId: string, branchId: string, afterId: string, limit: number, filter: { bookingId?: string; executionId?: string; customerId?: string; date?: string; module?: ExecutionView["kind"] } = {}) {
+    const conditions = ["e.business_id=?", "e.branch_id=?", "e.id>?"]; const values: unknown[] = [businessId, branchId, afterId];
+    if (filter.bookingId) { conditions.push("e.booking_id=?"); values.push(filter.bookingId); }
+    if (filter.executionId) { conditions.push("e.id=?"); values.push(filter.executionId); }
+    if (filter.customerId) { conditions.push("e.customer_id=?"); values.push(filter.customerId); }
+    if (filter.module) { conditions.push("e.module=?"); values.push(filter.module); }
+    if (filter.date) { conditions.push("(substr(e.scheduled_start,1,10)=? OR (e.module='hotel' AND e.scheduled_start<=? AND e.scheduled_end>=? AND e.status NOT IN ('completed','checked-out','cancelled','no-show')))"); values.push(filter.date, filter.date, filter.date); }
+    return this.hydrate(await this.rows<ExecutionRow>(`${SELECT} WHERE ${conditions.join(" AND ")} ORDER BY e.id LIMIT ?`, ...values, limit));
   }
   async get(businessId: string, branchId: string, id: string) {
     return (await this.hydrate(await this.rows<ExecutionRow>(`${SELECT} WHERE e.business_id=? AND e.branch_id=? AND e.id=?`, businessId, branchId, id)))[0] ?? null;
@@ -109,11 +118,12 @@ export class PostgresBe4Repository implements Be4Repository {
     const businessId = rows[0].business_id, branchId = rows[0].branch_id;
     const keys = JSON.stringify(rows.map((r) => r.id));
     const scope = "business_id=? AND branch_id=? AND execution_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))";
-    const [assignments, events, tasks] = await Promise.all([
-      this.rows<AssignmentRow>(`SELECT * FROM execution_assignments WHERE ${scope} ORDER BY assigned_at,id`, businessId, branchId, keys),
-      this.rows<EventRow>(`SELECT * FROM execution_events WHERE ${scope} ORDER BY occurred_at,sequence`, businessId, branchId, keys),
-      this.rows<TaskRow>(`SELECT * FROM execution_care_tasks WHERE ${scope} ORDER BY scheduled_date,scheduled_time,id`, businessId, branchId, keys),
+    const snapshot = await batch(this.database, [
+      this.database.prepare(`SELECT * FROM execution_assignments WHERE ${scope} ORDER BY assigned_at,id`).bind(businessId, branchId, keys),
+      this.database.prepare(`SELECT * FROM execution_events WHERE ${scope} ORDER BY occurred_at,sequence`).bind(businessId, branchId, keys),
+      this.database.prepare(`SELECT * FROM execution_care_tasks WHERE ${scope} ORDER BY scheduled_date,scheduled_time,id`).bind(businessId, branchId, keys),
     ]);
+    const assignments = snapshot[0].results as AssignmentRow[], events = snapshot[1].results as EventRow[], tasks = snapshot[2].results as TaskRow[];
     return rows.map((r) => decode(r, assignments.filter((a) => a.execution_id === r.id), events.filter((e) => e.execution_id === r.id), tasks.filter((t) => t.execution_id === r.id)));
   }
 
@@ -126,10 +136,11 @@ export class PostgresBe4Repository implements Be4Repository {
     const rows = await this.rows<{ id: string; name: string; avatar_seed: string; display_role: StaffView["role"]; capabilities_json: string; status: string; revision: number; created_at: string; updated_at: string }>(
       `SELECT s.* FROM operation_staff s JOIN operation_staff_branches a ON a.business_id=s.business_id AND a.staff_id=s.id WHERE a.business_id=? AND a.branch_id=? ORDER BY s.id`, businessId, branchId);
     const ids = JSON.stringify(rows.map((r) => r.id));
-    const [links, windows] = await Promise.all([
-      this.rows<{ staff_id: string; branch_id: string }>("SELECT * FROM operation_staff_branches WHERE business_id=? AND staff_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))", businessId, ids),
-      this.rows<{ id: string; staff_id: string; state: StaffView["availability"][number]["state"]; start_local: string; end_local: string; note: string | null }>("SELECT * FROM operation_staff_windows WHERE business_id=? AND staff_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb)) ORDER BY id", businessId, ids),
+    const snapshot = await batch(this.database, [
+      this.database.prepare("SELECT * FROM operation_staff_branches WHERE business_id=? AND staff_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb))").bind(businessId, ids),
+      this.database.prepare("SELECT * FROM operation_staff_windows WHERE business_id=? AND staff_id IN (SELECT value FROM jsonb_array_elements_text((?)::text::jsonb)) ORDER BY id").bind(businessId, ids),
     ]);
+    const links = snapshot[0].results as { staff_id: string; branch_id: string }[], windows = snapshot[1].results as { id: string; staff_id: string; state: StaffView["availability"][number]["state"]; start_local: string; end_local: string; note: string | null }[];
     return rows.map((r) => ({ staffId: r.id, businessId, name: r.name, avatarSeed: r.avatar_seed, role: r.display_role, capabilities: JSON.parse(r.capabilities_json), active: r.status === "active", revision: r.revision,
       branchIds: links.filter((a) => a.staff_id === r.id).map((a) => a.branch_id), availability: windows.filter((w) => w.staff_id === r.id).map((w) => ({ id: w.id, state: w.state, start: w.start_local, end: w.end_local, note: w.note })),
       createdAt: r.created_at, updatedAt: r.updated_at }));

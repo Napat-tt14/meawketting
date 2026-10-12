@@ -14,6 +14,42 @@ import { PostgresBe7Repository } from "../app/_backend/be7/postgresRepository";
 import type { BillingMutationResult, ChargeBalanceView } from "../app/_backend/be7/contracts";
 import { ARI, PAW, WHISKER, ONNUT, OWNER, MANAGER, THONGLOR, OUTSIDER, metadata, seededDatabase } from "./postgresFixtures";
 
+test("CRM pages/search/segments retain whole-Business counts and hydrate only selected Customers", async () => {
+  const db = seededDatabase(), app = new Be8Application(new PostgresBe1Repository(db), db, () => "2026-08-18T04:00:00.000Z"), actor = await app.resolvePerson(OWNER);
+  db.inspect.exec(`INSERT INTO customers(id,business_id,display_name,display_name_key,business_notes,status,created_at,updated_at,created_by_person_id,updated_by_person_id)
+    SELECT 'audit_customer_'||lpad(n::text,4,'0'),'${WHISKER}','Cost Customer '||n,'cost customer '||n,'','active','2026-08-17T03:00:00.000Z','2026-08-17T03:00:00.000Z','${OWNER}','${OWNER}' FROM generate_series(0,999) n`);
+  const expected = db.inspect.prepare("SELECT id FROM customers WHERE business_id=? AND status='active' ORDER BY id").all(WHISKER).map(c => c.id);
+  const ids: string[] = []; let afterId = "";
+  for (let count = 0; count < 30; count++) {
+    const page = await app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, afterId, limit: 50 }, metadata()) as CrmPage;
+    assert.equal(page.total, expected.length); assert.equal(page.segments?.all, expected.length);
+    assert.equal(page.customers?.length, page.items.length); assert.ok(page.customers?.every(c => c.businessId === WHISKER));
+    assert.ok(page.items.length <= 50); ids.push(...page.items.map(c => c.profile.customerId));
+    if (!page.nextAfterId) break;
+    assert.ok(page.nextAfterId > afterId); afterId = page.nextAfterId;
+  }
+  assert.deepEqual(ids, expected);
+  const names = db.inspect.prepare("SELECT id,display_name FROM customers WHERE business_id=? AND status='active'").all(WHISKER).sort((a, b) => String(a.display_name).localeCompare(String(b.display_name), "th") || String(a.id).localeCompare(String(b.id)));
+  for (const offset of [0, 50, 1000]) {
+    const page = await app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, offset, limit: 50 }, metadata()) as CrmPage;
+    assert.deepEqual(page.customers?.map(c => c.id), names.slice(offset, offset + 50).map(c => c.id));
+    assert.equal(page.nextOffset, names.length > offset + 50 ? offset + 50 : null);
+  }
+  const search = await app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, query: "Ｃｏｓｔ Ｃｕｓｔｏｍｅｒ ９９９" }, metadata()) as CrmPage;
+  assert.deepEqual(search.customers?.map(c => c.id), ["audit_customer_0999"]); assert.equal(search.total, 1); assert.equal(search.segments?.all, expected.length);
+  const pet = db.inspect.prepare("SELECT p.name,r.customer_id FROM business_pet_profiles p JOIN customer_pet_relationships r ON r.business_id=p.business_id AND r.pet_id=p.pet_id WHERE p.business_id=? AND p.status='active' AND r.status='active' ORDER BY p.pet_id LIMIT 1").get(WHISKER)!;
+  const petSearch = await app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, query: String(pet.name) }, metadata()) as CrmPage;
+  assert.ok(petSearch.customers?.some(c => c.id === pet.customer_id)); assert.ok(petSearch.customers?.some(c => c.pets.some(p => p.name === pet.name)));
+  const empty = await app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, query: "%_" }, metadata()) as CrmPage;
+  assert.equal(empty.items.length, 0); assert.equal(empty.total, 0);
+  const noNext = await app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, segment: "no-next-booking", limit: 1 }, metadata()) as CrmPage;
+  assert.equal(noNext.items.length, 1); assert.equal(noNext.total, noNext.segments?.["no-next-booking"]); assert.ok(noNext.total! >= 1000); assert.equal(noNext.items[0].profile.nextBooking, null);
+  const manager = await app.executeBe8(await app.resolvePerson(MANAGER), { type: "crm.list", businessId: WHISKER, branchId: ARI }, metadata()) as CrmPage;
+  assert.ok(manager.items.every(c => c.upcoming.every(b => b.branchId === ARI)));
+  await assert.rejects(app.executeBe8(actor, { type: "crm.list", businessId: WHISKER, branchId: ARI, limit: 51 }, metadata()));
+  await assert.rejects(app.executeBe8(await app.resolvePerson(MANAGER), { type: "crm.list", businessId: PAW, branchId: ONNUT }, metadata()));
+});
+
 test("Reports and CRM query canonical sources through a consistent authorized snapshot", async (t) => {
   const db = seededDatabase(); t.after(() => db.inspect.close()); const app = new Be8Application(new PostgresBe1Repository(db), db, () => "2026-08-18T04:00:00.000Z"), actor = await app.resolvePerson(OWNER);
   const report = await app.executeBe8(actor, { type: "reports.get", businessId: WHISKER, branchId: ARI, options: {} }, metadata()) as ReportView;

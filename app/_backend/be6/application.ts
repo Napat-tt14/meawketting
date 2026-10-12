@@ -18,13 +18,13 @@ export class Be6Application extends BusinessApplication {
   private async executeAttempt(actor: PersonView, raw: Be6Operation, metadata: RequestMetadata, attempt: number): Promise<ConversationView | InboxDirectory> {
     const op = parseBe6Operation(raw), now = this.clock(), repo = this.inbox, db = repo.database;
     const context = await this.scope(actor, op.businessId, op.branchId, metadata, now, !["inbox.list", "conversation.get"].includes(op.type));
-    if (op.type === "inbox.list") return repo.list(context, op.branchId, op.afterId ?? "", op.limit ?? 50);
-    if (op.type === "conversation.get") return repo.get(context, op.branchId, op.conversationId, op.beforeSequence);
+    if (op.type === "inbox.list") return repo.list(context, op.branchId, op.afterId ?? "", op.limit ?? 50, op.customerId);
+    if (op.type === "conversation.get") return repo.get(context, op.branchId, op.conversationId, op.beforeSequence, op.refreshMessageIds);
     const digest = await hash({ actorId: actor.id, op });
     const replay = async () => {
       const previous = await findReceipt(db, op.businessId, op.type, op.requestKey); if (!previous) return null;
       if (previous.requestHash !== digest || previous.branchId !== op.branchId) conflict("idempotency");
-      return repo.get(context, op.branchId, previous.targetId);
+      return repo.get(context, op.branchId, previous.targetId, undefined, op.type === "approval.cancel" ? [op.messageId] : undefined);
     };
     const previous = await replay(); if (previous) return previous;
     let id: string;
@@ -69,7 +69,7 @@ export class Be6Application extends BusinessApplication {
         }
       }
       await repo.write(context, op.branchId, { command: op.type, requestKey: op.requestKey, requestHash: digest, targetId: id }, statements);
-      return repo.get(context, op.branchId, id);
+      return repo.get(context, op.branchId, id, undefined, op.type === "approval.cancel" ? [op.messageId] : undefined);
     } catch (error) {
       if (error instanceof BackendConflict && ["idempotency", "version-conflict"].includes(error.reason)) {
         const raced = await replay(); if (raced) return raced;

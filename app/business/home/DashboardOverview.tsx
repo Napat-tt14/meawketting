@@ -1,5 +1,6 @@
 import type { listPrototypeBookings } from "../../_prototype/businessState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 
 const number = new Intl.NumberFormat("th-TH");
 const date = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -24,7 +25,7 @@ export function DashboardOverview({ today, bookings, summary, trend }: {
   const secondary = [
     { label: "รอรับเข้า", value: summary.waitingIntake, unit: "รายการ", href: "/business/calendar" },
     { label: "พร้อมรับกลับ", value: summary.readyForPickup, unit: "ตัว", href: "/business/calendar" },
-    { label: "ข้อความที่ยังไม่อ่าน", value: summary.newMessages, unit: "ข้อความ", href: "/business/inbox" },
+    ...(BUSINESS_CHAT_ENABLED ? [{ label: "ข้อความที่ยังไม่อ่าน", value: summary.newMessages, unit: "ข้อความ", href: "/business/inbox" }] : []),
   ];
   return (
     <section className="dashboard-overview" aria-label="สรุปการทำงานวันนี้">

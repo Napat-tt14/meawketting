@@ -34,6 +34,7 @@ import {
 } from "../../_prototype/businessState";
 import { listPrototypeConversationFixtures, listPrototypeConversations } from "../../_prototype/inboxState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import { ArrowLeft, CalendarDays, CheckCircle, CircleAlert, CircleDashed, CircleOff, Clock, FileImage, Info, MessageCircle, Pencil, Phone, Plus, Wallet, X } from "../../_components/icons";
 import { useBusinessContext } from "../_components/useBusinessContext";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
@@ -269,7 +270,7 @@ export function CustomerDetailScreen({ customerId }: { customerId: string }) {
         </div>}
         actions={<nav className="business-customer-detail__actions" aria-label="การทำงานกับลูกค้า">
           <Link className="button button--business" href={`/business/calendar?customerId=${encodeURIComponent(customer.id)}`} title="เพิ่มการจอง" aria-label={`เพิ่มการจองให้ ${customer.name}`}><CalendarDays size={20} /><span>เพิ่มการจอง</span></Link>
-          <Link className="customer-detail-icon-action" href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}`} title="ส่งข้อความ" aria-label={`ส่งข้อความถึง ${customer.name}`}><MessageCircle size={20} /></Link>
+          {BUSINESS_CHAT_ENABLED ? <Link className="customer-detail-icon-action" href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}`} title="ส่งข้อความ" aria-label={`ส่งข้อความถึง ${customer.name}`}><MessageCircle size={20} /></Link> : null}
         </nav>}
       />
 

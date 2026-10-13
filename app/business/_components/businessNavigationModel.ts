@@ -1,4 +1,5 @@
 import type { BusinessServiceModule } from "../../_prototype/businessState";
+import { BUSINESS_CHAT_ENABLED } from "./businessFeatures";
 
 export type BusinessDestinationKey =
   | "calendar"
@@ -85,12 +86,19 @@ export const BUSINESS_SETTINGS_DESTINATION = {
 export const BUSINESS_TOP_DESTINATIONS = [
   BUSINESS_CALENDAR_DESTINATION,
   BUSINESS_CUSTOMERS_DESTINATION,
-  BUSINESS_MESSAGES_DESTINATION,
+  ...(BUSINESS_CHAT_ENABLED ? [BUSINESS_MESSAGES_DESTINATION] : []),
 ] as const satisfies readonly BusinessTopDestination[];
 
 export const BUSINESS_MANAGEMENT_DESTINATIONS = [
   BUSINESS_SETTINGS_DESTINATION,
 ] as const satisfies readonly BusinessLiveDestination[];
+
+export const BUSINESS_NAVIGATION_HREFS: readonly string[] = [
+  "/business/home", "/business/calendar", "/business/customers", "/business/settings",
+  "/business/billing", "/business/team", "/business/reports", "/business/scan",
+  ...(BUSINESS_CHAT_ENABLED ? ["/business/inbox"] : []),
+  "/business/grooming", "/business/hotel", "/business/daycare",
+];
 
 export const BUSINESS_MODULE_LABELS: Record<BusinessServiceModule, string> = {
   grooming: "อาบน้ำ / ตัดขน",

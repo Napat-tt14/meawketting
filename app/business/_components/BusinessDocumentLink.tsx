@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
+import { BUSINESS_NAVIGATION_HREFS } from "./businessNavigationModel";
 
 type BusinessDocumentLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   href: string;
@@ -9,5 +10,5 @@ type BusinessDocumentLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "
 };
 
 export function BusinessDocumentLink({ href, children, ...props }: BusinessDocumentLinkProps) {
-  return <Link href={href} prefetch={false} {...props}>{children}</Link>;
+  return <Link href={href} prefetch={BUSINESS_NAVIGATION_HREFS.includes(href)} {...props}>{children}</Link>;
 }

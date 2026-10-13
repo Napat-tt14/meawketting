@@ -8,6 +8,7 @@ import {
   UsersRound,
   Wallet,
 } from "../icons";
+import { BUSINESS_CHAT_ENABLED } from "../../business/_components/businessFeatures";
 
 const coreCapabilities = [
   {
@@ -31,13 +32,13 @@ const coreCapabilities = [
     status: "ข้อมูลลูกค้า",
     statusType: "information",
   },
-  {
+  ...(BUSINESS_CHAT_ENABLED ? [{
     icon: MessageCircle,
     title: "ข้อความ",
     copy: "ส่งสถานะ รูป และคำขออนุมัติในบริบทของงานนั้น ให้ทีมกับเจ้าของคุยกันรู้เรื่อง",
     status: "การสื่อสาร",
     statusType: "information",
-  },
+  }] : []),
   {
     icon: Scan,
     title: "รับเข้า",

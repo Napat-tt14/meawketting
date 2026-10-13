@@ -60,7 +60,7 @@ export function ReportsScreen() {
   const queryKey = JSON.stringify([businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope]);
   useEffect(() => {
     if (!isContextReady) return;
-    const refresh = startBusinessRefresh(async signal => { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }, { signal }); if (!signal.aborted) { setError(false); setLoadedQuery(queryKey); } },
+    const refresh = startBusinessRefresh(async (signal, reason) => { await ensureDurableReport({ businessId, branchId }, { dateRangePreset, customStartDate, customEndDate, branchScope }, { force: reason !== "initial", signal }); if (!signal.aborted) { setError(false); setLoadedQuery(queryKey); } },
       { businessId, targets: ["reports"], intervalMs: dateRangePreset === "today" ? 60_000 : undefined, onError: () => setError(true) });
     return refresh.stop;
   }, [businessId, branchId, dateRangePreset, customStartDate, customEndDate, branchScope, isContextReady, queryKey]);

@@ -21,6 +21,7 @@ import {
 } from "../../_prototype/businessState";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import {
   CheckCircle,
   Clock,
@@ -75,7 +76,7 @@ export function BusinessHome() {
     ? listPrototypeBookings(context, { includeCancelled: false })
     : listPrototypeBookingFixtures(context, { includeCancelled: false });
   const branchBookings = allBranchBookings.filter((booking) => enabledModules.includes(booking.serviceModule));
-  const unreadMessageCount = home?.unreadMessages ?? getPrototypeInboxUnreadCount(context, !businessStateReady);
+  const unreadMessageCount = BUSINESS_CHAT_ENABLED ? home?.unreadMessages ?? getPrototypeInboxUnreadCount(context, !businessStateReady) : 0;
   const groomingSummary = home?.grooming ?? getGroomingServiceJobSummary(context, businessToday(context), !businessStateReady);
   const groomingEnabled = enabledModules.includes("grooming");
   const hotelEnabled = enabledModules.includes("hotel");
@@ -84,7 +85,7 @@ export function BusinessHome() {
   const daycareSummary = home?.daycare ?? summarizePrototypeDaycare(context, businessToday(context), !businessStateReady);
   const revenueSummary = home?.revenueSummary ?? getPrototypeRevenueSummary(context, businessToday(context), !businessStateReady);
   const attentionItems = [
-    ...demo.attention.filter((item) => !(groomingEnabled && item.id === "pickup")),
+    ...demo.attention.filter((item) => !(groomingEnabled && item.id === "pickup") && (BUSINESS_CHAT_ENABLED || item.id !== "messages")),
     ...(groomingEnabled && groomingSummary.readyForPickup > 0 ? [{
       id: "grooming-pickup",
       tone: "ready" as const,

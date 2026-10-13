@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { LuHeart } from "react-icons/lu";
 import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle, MessageCircle, PawPrint, ShieldCheck, Wallet, QrCode, Sparkle } from "../icons";
+import { BUSINESS_CHAT_ENABLED } from "../../business/_components/businessFeatures";
 
 function Heart({ size }: { size: number }) {
   return <LuHeart size={size} strokeWidth={2.15} aria-hidden="true" focusable="false" />;
@@ -9,7 +10,7 @@ function Heart({ size }: { size: number }) {
 const capabilities = [
   { icon: CalendarDays, title: "จองห้อง & จัดตาราง", copy: "เห็นห้องว่างและงานของทีม" },
   { icon: BadgeCheck, title: "เช็กอิน & ดูแล", copy: "รับน้อง พร้อมข้อมูลที่จำเป็น" },
-  { icon: MessageCircle, title: "ข้อความลูกค้า", copy: "ติดตามข้อความในบริบทของงาน" },
+  ...(BUSINESS_CHAT_ENABLED ? [{ icon: MessageCircle, title: "ข้อความลูกค้า", copy: "ติดตามข้อความในบริบทของงาน" }] : []),
   { icon: Wallet, title: "รายรับ & รายงาน", copy: "ติดตามค่าบริการและการชำระ" },
 ];
 

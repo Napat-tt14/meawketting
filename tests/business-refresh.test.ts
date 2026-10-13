@@ -20,7 +20,8 @@ import { ensureDurableReport, ensureDurableSummary, loadCrmPage, readCrm } from 
 import { emptyCrm, emptyReport } from "../app/_backend/be8/projections";
 import { businessCommand, clearBusinessReadFailures, invalidateBusinessData } from "../app/_backend/shared/client";
 import { startBusinessRefresh } from "../app/_backend/shared/refresh";
-import { ensureBusinessPageData } from "../app/business/_components/businessPageData";
+import { businessStartupPages, ensureBusinessPageData, isBusinessPagePrepared, isBusinessWorkspacePrepared, prepareBusinessWorkspace } from "../app/business/_components/businessPageData";
+import { BUSINESS_NAVIGATION_HREFS } from "../app/business/_components/businessNavigationModel";
 import { expireIntakeLease, loadDurableIntake, readCachedIntake } from "../app/_backend/be5/client";
 
 let fixtureId = 0;
@@ -257,13 +258,145 @@ test("Home and Billing use frame-owned initial data, then make 60/120 refresh ca
   writeFileSync("work/p2-api-call-comparison.json", JSON.stringify({ note: "Synthetic transport and fake clock, not production usage or prices. Before counts from the original audit; exclude initial directory/session loads unless labelled initial.", comparisons }, null, 2));
 });
 
-test("Billing and Inbox cold frame data is reused on mount", async t => {
+test("Billing cold frame data is reused on mount and the paused Inbox frame makes no reads", async t => {
   const f = fixture(t); await ensureBusinessPageData("/business/billing", f.context);
   assert.equal(f.calls.length, 2); const before = f.calls.length;
   await ensureDurableBilling(f.scope.businessId, f.scope.branchId, false, undefined, false); await ensureDurableSummary(f.scope, false, { force: false });
   assert.equal(f.calls.length, before);
-  await ensureBusinessPageData("/business/inbox", f.context); const inbox = f.calls.length;
+  await ensureBusinessPageData("/business/inbox", f.context); assert.equal(f.calls.length, before);
+  await ensureDurableInbox(f.scope.businessId, f.scope.branchId); const inbox = f.calls.length;
   await ensureDurableInbox(f.scope.businessId, f.scope.branchId); assert.equal(f.calls.length, inbox);
+});
+
+test("Customer detail preload keeps booking, operations and balances without loading the paused chat", async t => {
+  const f = fixture(t), customerId = "customer_no_chat";
+  f.respond(op => {
+    if (op.type === "customer.get") return f.ok({ id: customerId, businessId: f.scope.businessId, displayName: "Customer", phone: null, email: null, businessNotes: "", tags: [], pets: [], status: "active", createdAt: "2026-10-12T00:00:00.000Z", updatedAt: "2026-10-12T00:00:00.000Z" });
+    if (op.type === "booking.list") return f.ok({ items: [], total: 0, offset: (op.input as Record<string, unknown>).offset, limit: 100 });
+    if (op.type === "operations.list") return f.ok({ executions: [], records: [], staff: [], rooms: [] });
+    if (op.type === "charges.list") return f.ok({ balances: [], nextAfterId: null });
+    if (op.type === "payments.list") return f.ok({ payments: [], refunds: [], nextAfterId: null });
+    throw new Error(`Unexpected ${op.type}`);
+  });
+  await ensureBusinessPageData(`/business/customers/${customerId}`, f.context);
+  assert.equal(f.calls.filter(c => c.type === "customer.get").length, 1);
+  assert.equal(f.calls.filter(c => c.type === "booking.list").length, 1);
+  assert.equal(f.calls.filter(c => c.type === "operations.list").length, 2);
+  assert.equal(f.calls.filter(c => c.type === "charges.list").length, 2);
+  assert.equal(f.calls.filter(c => c.type === "payments.list").length, 2);
+  assert.ok(f.calls.every(c => !String(c.type).startsWith("inbox.") && !String(c.type).startsWith("conversation.")));
+  assert.equal(readBe2DirectoryStatus(f.scope.businessId), "partial", "A single customer never completes the whole directory");
+});
+
+test("Workspace startup warms enabled current-branch pages once, with bounded CRM and no message history", async t => {
+  const f = fixture(t);
+  assert.equal(isBusinessWorkspacePrepared(f.context), false);
+  assert.equal(isBusinessPagePrepared("/business/home", f.context), false);
+  await ensureBusinessPageData("/business/home", f.context);
+  assert.equal(isBusinessWorkspacePrepared(f.context), true);
+  const ready: string[] = [];
+  await prepareBusinessWorkspace(f.context, new AbortController().signal, path => ready.push(path));
+  const paths = businessStartupPages(f.context);
+  assert.ok(!paths.includes("/business/inbox"), "Paused chat has no startup owner or preload");
+  assert.ok(paths.includes("/business/grooming"));
+  assert.ok(!paths.includes("/business/hotel") && !paths.includes("/business/daycare"));
+  assert.ok(!BUSINESS_NAVIGATION_HREFS.includes("/business/customers/private-customer"));
+  for (const path of paths) assert.equal(isBusinessPagePrepared(path, f.context), true, path);
+  assert.ok(ready.includes("/business/settings"), "Pages without backend reads also become ready for navigation");
+  assert.equal(f.calls.filter(c => c.type === "booking.catalog").length, 1);
+  assert.equal(f.calls.filter(c => c.type === "crm.list").length, 1);
+  assert.ok(f.calls.some(c => c.type === "crm.list" && c.offset === 0 && c.limit === 50));
+  assert.ok(f.calls.filter(c => c.type === "booking.list").every(c => (c.input as Record<string, unknown>).rangeStart && (c.input as Record<string, unknown>).rangeEnd));
+  assert.equal(f.calls.filter(c => String(c.type).startsWith("inbox.") || String(c.type).startsWith("conversation.") || c.type === "payments.list" || String(c.type).startsWith("intake.")).length, 0);
+  assert.ok(f.calls.every(c => (c.businessId ?? (c.input as Record<string, unknown>)?.businessId) === f.scope.businessId));
+  assert.ok(f.calls.every(c => !c.branchId || c.branchId === f.scope.branchId));
+  assert.equal(readBe2DirectoryStatus(f.scope.businessId), "idle");
+  const before = f.calls.length;
+  await prepareBusinessWorkspace(f.context, new AbortController().signal);
+  await ensureBusinessPageData("/business/calendar", f.context);
+  await loadCrmPage(f.scope, { offset: 0, query: "", segment: "all" });
+  const today = "2026-10-12";
+  await ensureDurableReport(f.scope, { dateRangePreset: "today", branchScope: "current", customStartDate: "2026-10-06", customEndDate: today }, { force: false });
+  assert.equal(f.calls.length, before, "Warm page navigation/mount reuse the same acknowledged reads");
+  writeFileSync("work/business-navigation-api-comparison-2026-10-12.json", JSON.stringify({
+    note: "Measured with synthetic fetch transport and fixed clock; route/RSC prefetch, production latency, SQL and billing are not measured here.",
+    customerCount: 1000, messageCount: 2000, routes: paths,
+    startupCalls: before, startupByOperation: Object.fromEntries([...new Set(f.calls.map(c => String(c.type)))].map(type => [type, f.calls.filter(c => c.type === type).length])),
+    cachedNavigationAndMountCalls: f.calls.length - before,
+  }, null, 2));
+  assert.equal(isBusinessPagePrepared("/business/home", { ...f.context, branchId: `${f.scope.businessId}_two` }), false);
+  installBusinessSession({ ...f.session, person: { ...f.session.person, id: "another_startup_person" } });
+  assert.equal(isBusinessWorkspacePrepared(f.context), false);
+  assert.equal(isBusinessPagePrepared("/business/home", f.context), false);
+  await assert.rejects(prepareBusinessWorkspace({ ...f.context, branchId: "private_branch" }, new AbortController().signal), /ไม่สามารถเปิดสาขานี้ได้/);
+  assert.equal(f.calls.length, before);
+});
+
+test("Hidden-tab startup pauses, drops an aborted response, and resumes without duplicate refresh work", async t => {
+  const f = fixture(t); let finish!: (response: Response) => void;
+  f.hide(true);
+  f.respond(() => new Promise(resolve => { finish = resolve; }));
+  const ready: string[] = [];
+  const refresh = startBusinessRefresh(signal => prepareBusinessWorkspace(f.context, signal, path => ready.push(path)), { businessId: f.scope.businessId, targets: [] });
+  f.track(refresh);
+  await flush(); assert.equal(f.calls.length, 0);
+  f.hide(false); await flush(); assert.equal(f.calls.length, 1);
+  f.hide(false); await flush(); assert.equal(f.calls.length, 1, "Only one startup read can be pending");
+  f.hide(true); finish(f.ok({ generatedAt: new Date().toISOString(), bookings: [] })); await flush();
+  assert.equal(isBusinessPagePrepared("/business/home", f.context), false);
+  assert.equal(ready.length, 0);
+  f.respond(undefined); f.hide(false);
+  for (let step = 0; step < 20; step++) await flush();
+  assert.equal(isBusinessPagePrepared("/business/settings", f.context), true);
+  assert.equal(f.calls.filter(c => c.type === "home.summary").length, 2);
+  const before = f.calls.length;
+  f.hide(true); f.hide(false); await flush();
+  assert.equal(f.calls.length, before, "Foreground resume does not repeat completed startup pages");
+});
+
+for (const status of [401, 403, 429]) test(`Workspace startup honors ${status} without loading other pages in a storm`, async t => {
+  const f = fixture(t); let reads = 0;
+  f.respond(() => {
+    reads++;
+    return new Response(JSON.stringify({ ok: false, error: { code: status === 401 ? "UNAUTHENTICATED" : status === 403 ? "FORBIDDEN" : "RATE_LIMITED", message: "Blocked" } }), { status, headers: { "retry-after": "120" } });
+  });
+  f.track(startBusinessRefresh(signal => prepareBusinessWorkspace(f.context, signal), { businessId: f.scope.businessId, targets: [] }));
+  await flush(); assert.equal(reads, 1);
+  await f.advance(60_000); f.hide(true); f.hide(false); await flush(); assert.equal(reads, 1);
+  assert.equal(isBusinessWorkspacePrepared(f.context), false);
+  if (status === 429) { await f.advance(60_000); assert.equal(reads, 2); }
+  else { await f.advance(600_000); assert.equal(reads, 1); }
+});
+
+test("Startup catalog respects server Retry-After before trying another Booking read", async t => {
+  const f = fixture(t);
+  await ensureBusinessPageData("/business/home", f.context);
+  let reads = 0;
+  f.respond(op => {
+    assert.equal(op.type, "booking.catalog"); reads++;
+    return new Response(JSON.stringify({ ok: false, error: { code: "RATE_LIMITED", message: "Wait" } }), { status: 429, headers: { "retry-after": "120" } });
+  });
+  f.track(startBusinessRefresh(signal => prepareBusinessWorkspace(f.context, signal), { businessId: f.scope.businessId, targets: [] }));
+  await flush(); assert.equal(reads, 1);
+  await f.advance(60_000); f.hide(true); f.hide(false); await flush(); assert.equal(reads, 1);
+  await f.advance(60_000); assert.equal(reads, 2);
+});
+
+test("An unavailable optional startup page does not discard the ready Home or stop other pages", async t => {
+  const f = fixture(t);
+  f.respond(op => op.type === "reports.get" ? Promise.reject(new Error("Reports unavailable"))
+    : op.type === "booking.catalog" ? f.ok({ ...f.scope, services: [], resources: [] })
+    : op.type === "home.summary" || op.type === "billing.summary" ? f.ok({ generatedAt: new Date().toISOString(), bookings: [] })
+    : op.type === "customer.list" || op.type === "booking.list" ? f.ok({ items: [], offset: (op.input as Record<string, unknown>).offset, total: 0, limit: 100 })
+    : op.type === "crm.list" ? f.ok({ items: [], total: 0, nextOffset: null })
+    : op.type === "charges.list" ? f.ok({ balances: [], nextAfterId: null })
+    : op.type === "inbox.list" ? f.ok({ conversations: [], nextAfterId: null })
+    : f.ok({ executions: [], records: [], staff: [], rooms: [] }));
+  await assert.rejects(prepareBusinessWorkspace(f.context, new AbortController().signal), /Reports unavailable/);
+  assert.equal(isBusinessPagePrepared("/business/home", f.context), true);
+  assert.equal(isBusinessPagePrepared("/business/settings", f.context), true);
+  assert.equal(isBusinessPagePrepared("/business/reports", f.context), false);
+  assert.equal(isBusinessPagePrepared("/business/grooming", f.context), true);
 });
 
 test("Changing conversation starts the needed read without waiting for an abandoned conversation", async t => {

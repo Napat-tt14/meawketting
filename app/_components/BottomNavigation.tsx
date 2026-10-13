@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { IconType } from "react-icons";
 import { BellRinging, House, MessageCircle, PawPrint } from "./icons";
+import { BUSINESS_CHAT_ENABLED } from "../business/_components/businessFeatures";
 
 export type BottomNavigationContext = "consumer" | "business";
 
@@ -18,7 +19,7 @@ const consumerItems: readonly BottomNavigationItem[] = [
   { label: "หน้าหลัก", icon: House, disabled: true },
   { href: "/my-pets", label: "สัตว์เลี้ยง", icon: PawPrint },
   { href: "/activity", label: "กิจกรรม", icon: BellRinging },
-  { label: "ข้อความ", icon: MessageCircle, disabled: true },
+  ...(BUSINESS_CHAT_ENABLED ? [{ label: "ข้อความ", icon: MessageCircle, disabled: true }] : []),
 ];
 
 const contextItems: Record<BottomNavigationContext, readonly BottomNavigationItem[]> = {

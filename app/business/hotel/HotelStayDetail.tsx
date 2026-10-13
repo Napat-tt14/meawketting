@@ -36,6 +36,7 @@ import {
 } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { AddServiceRequestDialog } from "../inbox/AddServiceRequestDialog";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import { addCalendarDays, calendarDateLabel } from "../calendar/calendarPresentation";
 import { hotelCareTaskIconLabel, hotelCareTaskStateLabel, hotelStatusLabel, hotelStayDateLabel } from "./hotelPresentation";
 
@@ -329,7 +330,7 @@ export function HotelStayDetail({
             <div className="hotel-detail-person"><BusinessCustomerAvatar name={customer.name} /><span><strong>{customer.name}</strong><small>{customer.phone ?? "ยังไม่มีเบอร์โทร"}</small></span></div>
             <div className="hotel-detail-section__actions">
               <Link href={`/business/customers/${encodeURIComponent(customer.id)}`}><UserRound size={17} />ดูลูกค้า</Link>
-              <Link href={inboxHref}><MessageCircle size={17} />ส่งข้อความ</Link>
+              {BUSINESS_CHAT_ENABLED ? <Link href={inboxHref}><MessageCircle size={17} />ส่งข้อความ</Link> : null}
             </div>
           </section>
 
@@ -391,7 +392,7 @@ export function HotelStayDetail({
           <section className="hotel-detail-section" aria-labelledby="hotel-addon-title">
             <header><h3 id="hotel-addon-title">บริการเพิ่มเติม</h3><button type="button" onClick={openAddServiceRequest}><Plus size={17} />ขออนุมัติ</button></header>
             {linkedGroomingJobs.length > 0 ? <ul className="hotel-linked-jobs">{linkedGroomingJobs.map((job) => <li key={job.serviceJobId}><span><Scissors size={17} /><strong>อาบน้ำ / ตัดขน</strong><small>{calendarDateLabel(job.scheduledStart.slice(0, 10), { day: "numeric", month: "short" })} · {job.scheduledStart.slice(11, 16)}</small></span><Link href={`/business/grooming?jobId=${encodeURIComponent(job.serviceJobId)}`}>เปิดงาน</Link></li>)}</ul> : <p className="hotel-detail-empty">ยังไม่มีงานบริการเพิ่มเติมที่เชื่อมกับน้องตัวนี้</p>}
-            <p className="hotel-detail-section__hint"><MessageCircle size={16} />ร้านส่งคำขอเพิ่มบริการผ่าน Inbox ได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้</p>
+            <p className="hotel-detail-section__hint"><MessageCircle size={16} />ร้านส่งคำขอเพิ่มบริการได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้</p>
           </section>
 
           <section className="hotel-detail-section" aria-labelledby="hotel-moves-title">

@@ -17,7 +17,7 @@ import { clearBusinessReadFailures, invalidateBusinessData } from "../shared/cli
 export class Be1ClientError extends Error {
   readonly code: Be1ApiErrorCode;
 
-  constructor(code: Be1ApiErrorCode, message: string) {
+  constructor(code: Be1ApiErrorCode, message: string, readonly status?: number, readonly retryAfterMs?: number) {
     super(message);
     this.name = "Be1ClientError";
     this.code = code;

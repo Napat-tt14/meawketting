@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import type { IconType } from "react-icons";
 import { getEnabledBusinessModules } from "../../_prototype/businessState";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
+import { BUSINESS_CHAT_ENABLED } from "./businessFeatures";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import {
   BedDouble,
@@ -81,7 +82,7 @@ export function BusinessNavigation() {
   const { context, revision } = useBusinessContext();
   const stateReady = useBusinessStateReady();
   const enabledModules = getEnabledBusinessModules(context, !stateReady);
-  const unreadCount = getPrototypeInboxUnreadCount(context, !stateReady);
+  const unreadCount = BUSINESS_CHAT_ENABLED ? getPrototypeInboxUnreadCount(context, !stateReady) : 0;
   void revision;
 
   return (

@@ -35,6 +35,7 @@ import {
 } from "../../_components/icons";
 import { BusinessCustomerAvatar, BusinessPetAvatar } from "../_components/BusinessIdentityAvatar";
 import { AddServiceRequestDialog } from "../inbox/AddServiceRequestDialog";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import {
   GROOMING_WORKFLOW_STATUSES,
   groomingDurationLabel,
@@ -232,7 +233,7 @@ export function GroomingJobDetail({
             </div>
             <div className="grooming-detail-section__actions">
               <Link href={`/business/customers/${encodeURIComponent(customer.id)}`}><UserRound size={17} />ดูลูกค้า</Link>
-              <Link href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />ส่งข้อความ</Link>
+              {BUSINESS_CHAT_ENABLED ? <Link href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />ส่งข้อความ</Link> : null}
             </div>
           </section>
 
@@ -305,7 +306,7 @@ export function GroomingJobDetail({
           <section className="grooming-detail-section" aria-labelledby="grooming-note-title">
             <header><h3 id="grooming-note-title">หมายเหตุของร้าน</h3></header>
             <textarea aria-labelledby="grooming-note-title" value={note} rows={3} maxLength={360} placeholder="ใช้ภายในทีมเท่านั้น" onInput={(event) => setNote(event.currentTarget.value)} />
-            <div className="grooming-detail-section__actions"><button type="button" onClick={saveNote}><Save size={17} />บันทึกหมายเหตุ</button><Link href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />เปิดข้อความลูกค้า</Link></div>
+            <div className="grooming-detail-section__actions"><button type="button" onClick={saveNote}><Save size={17} />บันทึกหมายเหตุ</button>{BUSINESS_CHAT_ENABLED ? <Link href={`/business/inbox?customerId=${encodeURIComponent(customer.id)}&petId=${encodeURIComponent(pet.id)}&bookingId=${encodeURIComponent(job.bookingId)}`}><MessageCircle size={17} />เปิดข้อความลูกค้า</Link> : null}</div>
           </section>
 
           <section className="grooming-detail-section" aria-labelledby="grooming-history-title">

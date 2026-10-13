@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import { BusinessInbox, type InboxLaunchRequest } from "./BusinessInbox";
 
 export const metadata: Metadata = {
@@ -20,6 +22,7 @@ function firstQueryValue(value: string | string[] | undefined) {
 }
 
 export default async function BusinessInboxPage({ searchParams }: BusinessInboxPageProps) {
+  if (!BUSINESS_CHAT_ENABLED) redirect("/business/home");
   const params = await searchParams;
   const conversationId = firstQueryValue(params.conversation);
   const customerId = firstQueryValue(params.customerId);

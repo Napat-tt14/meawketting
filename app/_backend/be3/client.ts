@@ -56,7 +56,11 @@ async function requestBe3<T extends Be3ApiOperation>(operation: T, signal?: Abor
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
   });
   const payload = await response.json() as Be1ApiResponse<Be3OperationResult<T>>;
-  if (!payload.ok) throw new Be1ClientError(payload.error.code, payload.error.message);
+  if (!payload.ok) {
+    const retryAfter = response.headers.get("retry-after");
+    const retryAfterMs = retryAfter === null ? undefined : Math.max(0, /^\d+(\.\d+)?$/.test(retryAfter) ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now());
+    throw new Be1ClientError(payload.error.code, payload.error.message, response.status, Number.isFinite(retryAfterMs) ? retryAfterMs : undefined);
+  }
   signal?.throwIfAborted();
   if (["booking.list", "booking.get", "booking.catalog", "booking.availability"].includes(operation.type) && session !== readBusinessSession()) throw new DOMException("Booking scope changed", "AbortError");
   const actor = response.headers.get("x-meawketting-person-id");

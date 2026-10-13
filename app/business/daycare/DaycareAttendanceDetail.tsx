@@ -1,4 +1,5 @@
 "use client";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 
 import { type FormEvent, useState } from "react";
 import {
@@ -198,7 +199,7 @@ export function DaycareAttendanceDetail({
             {attendance.status === "booked" || attendance.intakeId ? <Link href={intakeHref}><Scan size={17} />{attendance.intakeId ? "ดู Intake" : "ทำ Intake"}</Link> : null}
             {nextAction ? <button className="is-primary" type="button" onClick={advanceLifecycle}><CheckCircle size={17} />{nextAction.label}</button> : null}
             {showBilling ? <Link href={billingHref}><Wallet size={17} />ตรวจยอด / รับชำระ</Link> : null}
-            <Link href={inboxHref}><MessageCircle size={17} />เปิดข้อความ</Link>
+            {BUSINESS_CHAT_ENABLED ? <Link href={inboxHref}><MessageCircle size={17} />เปิดข้อความ</Link> : null}
             <Link href={`/business/calendar?bookingId=${encodeURIComponent(attendance.bookingId)}`}><CalendarDays size={17} />ดูการจอง</Link>
             {canCancel ? <button className="is-critical" type="button" onClick={cancelAttendance}>ยกเลิกรายการ</button> : null}
           </div>

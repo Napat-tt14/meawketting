@@ -7,7 +7,6 @@ import {
 } from "../../_backend/be1/configurationCache";
 import { ensureBusinessSession } from "../../_backend/be1/client";
 import {
-  getDemoBusinessContext,
   readActiveBusinessContext,
   writeActiveBusinessContext,
 } from "../../_prototype/businessState";
@@ -20,7 +19,7 @@ export function useBusinessStateReady() {
 }
 
 export function useBusinessContext(enabled = true) {
-  const [context, setContext] = useState(() => getDemoBusinessContext(null));
+  const [context, setContext] = useState(readActiveBusinessContext);
   const [revision, setRevision] = useState(0);
   const [isContextReady, setIsContextReady] = useState(false);
   const configurationRevision = useSyncExternalStore(

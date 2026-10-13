@@ -31,6 +31,7 @@ import {
 import { BusinessAlert } from "../_components/BusinessFeedback";
 import { BusinessDataTable } from "../_components/BusinessDataTable";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import { BusinessModal } from "../_components/BusinessModal";
 import { BusinessPageHeader } from "../_components/BusinessPageHeader";
 import { formatBusinessCount, formatBusinessDate } from "../_components/businessDisplay";
@@ -300,6 +301,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
   }
 
   async function sendBillingMessage(balance: PrototypeChargeBalance) {
+    if (!BUSINESS_CHAT_ENABLED) return;
     const customer = readPrototypeCustomer(balance.charge.customerId);
     if (!customer) {
       setNotice({ tone: "critical", title: "ส่งข้อความไม่ได้", detail: "ไม่พบความสัมพันธ์ลูกค้าสำหรับยอดนี้" });
@@ -419,7 +421,7 @@ export function BillingScreen({ launchRequest = null }: { launchRequest?: Billin
         title={modalTitle}
         description="ตรวจรายละเอียดรายการ ยอดคงเหลือ และประวัติการรับชำระเงิน"
         footer={mode === "review" ? <div className="billing-modal-actions">
-          <button className="button button--business-ghost" type="button" onClick={() => sendBillingMessage(selected)}><MessageCircle size={17} />ส่งข้อความ</button>
+          {BUSINESS_CHAT_ENABLED ? <button className="button button--business-ghost" type="button" onClick={() => sendBillingMessage(selected)}><MessageCircle size={17} />ส่งข้อความ</button> : null}
           {selected.status !== "cancelled" ? <button className="button button--business-ghost" type="button" disabled={!canManageFinance(businessId) || saving} onClick={() => { setAdjustmentKind("manual-adjustment"); beginFinancialForm("adjustment"); }}><Plus size={17} />ปรับยอด</button> : null}
           {selected.status !== "cancelled" && selected.paymentCount === 0 ? <button className="button button--business-ghost" type="button" disabled={!canManageFinance(businessId) || saving} onClick={() => beginFinancialForm("cancel")}>ยกเลิกยอด</button> : null}
           {selected.status !== "paid" && selected.status !== "cancelled" ? <button className="button button--business billing-modal-actions__primary" type="button" onClick={beginPayment}><Wallet size={17} />รับชำระ</button> : null}

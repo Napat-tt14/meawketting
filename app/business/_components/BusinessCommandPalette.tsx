@@ -5,6 +5,7 @@ import { getEnabledBusinessModules } from "../../_prototype/businessState";
 import { Search, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import { useBusinessContext, useBusinessStateReady } from "./useBusinessContext";
+import { BUSINESS_CHAT_ENABLED } from "./businessFeatures";
 
 type BusinessCommand = {
   label: string;
@@ -16,7 +17,7 @@ const BUSINESS_COMMANDS: readonly BusinessCommand[] = [
   { label: "หน้าหลัก", detail: "ภาพรวมร้านและงานวันนี้", href: "/business/home" },
   { label: "ปฏิทิน", detail: "ดูและจัดการการจอง", href: "/business/calendar" },
   { label: "ลูกค้าและสัตว์เลี้ยง", detail: "ค้นหาข้อมูลลูกค้า", href: "/business/customers" },
-  { label: "ข้อความ", detail: "คุยกับเจ้าของสัตว์เลี้ยง", href: "/business/inbox" },
+  ...(BUSINESS_CHAT_ENABLED ? [{ label: "ข้อความ", detail: "คุยกับเจ้าของสัตว์เลี้ยง", href: "/business/inbox" }] : []),
   { label: "การเงิน", detail: "ตรวจยอด รับชำระ และดูรายรับ", href: "/business/billing" },
   { label: "รายงาน", detail: "ภาพรวมธุรกิจ ยอดขาย และประสิทธิภาพ", href: "/business/reports" },
   { label: "ทีม", detail: "ดูทีม งาน และความพร้อมของสาขา", href: "/business/team" },

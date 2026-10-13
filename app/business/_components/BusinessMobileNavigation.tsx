@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDemoBusinessContextDetails, getEnabledBusinessModules } from "../../_prototype/businessState";
 import { getPrototypeInboxUnreadCount } from "../../_prototype/inboxState";
+import { BUSINESS_CHAT_ENABLED } from "./businessFeatures";
 import { BedDouble, CalendarDays, Chart, House, List, MessageCircle, PawPrint, Scan, Scissors, Settings, UserRoundCheck, UsersRound, Wallet, X } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "./BusinessDocumentLink";
 import {
@@ -26,7 +27,7 @@ export function BusinessMobileNavigation() {
   const stateReady = useBusinessStateReady();
   const details = getDemoBusinessContextDetails(context, !stateReady);
   const enabledModules = getEnabledBusinessModules(context, !stateReady);
-  const unreadCount = getPrototypeInboxUnreadCount(context, !stateReady);
+  const unreadCount = BUSINESS_CHAT_ENABLED ? getPrototypeInboxUnreadCount(context, !stateReady) : 0;
   const [open, setOpen] = useState(false);
   const moreActive = [BUSINESS_CUSTOMERS_DESTINATION, BUSINESS_BILLING_DESTINATION, BUSINESS_REPORTS_DESTINATION, BUSINESS_TEAM_DESTINATION, BUSINESS_SETTINGS_DESTINATION, BUSINESS_GROOMING_DESTINATION, BUSINESS_HOTEL_DESTINATION, BUSINESS_DAYCARE_DESTINATION]
     .some(({ href }) => pathname === href || pathname.startsWith(`${href}/`));
@@ -88,14 +89,14 @@ export function BusinessMobileNavigation() {
         <Link className={`business-mobile-navigation__item business-mobile-navigation__item--scan${pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? " is-active" : ""}`} href="/business/scan" aria-current={pathname === "/business/scan" || pathname.startsWith("/business/intake/") ? "page" : undefined}>
           <Scan size={20} /><span>สแกน</span>
         </Link>
-        <Link
+        {BUSINESS_CHAT_ENABLED ? <Link
           className={`business-mobile-navigation__item${pathname.startsWith(BUSINESS_MESSAGES_DESTINATION.href) ? " is-active" : ""}`}
           href={BUSINESS_MESSAGES_DESTINATION.href}
           aria-current={pathname.startsWith(BUSINESS_MESSAGES_DESTINATION.href) ? "page" : undefined}
         >
           <MessageCircle size={20} /><span>{BUSINESS_MESSAGES_DESTINATION.label}</span>
           {unreadCount > 0 ? <span className="business-mobile-unread-badge" aria-label={`ข้อความใหม่ ${unreadCount} ข้อความ`}>{unreadCount}</span> : null}
-        </Link>
+        </Link> : null}
         <button ref={triggerRef} className={`business-mobile-navigation__item${open || moreActive ? " is-active" : ""}`} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
           <List size={20} /><span>เพิ่มเติม</span>
         </button>

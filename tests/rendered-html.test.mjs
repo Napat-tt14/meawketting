@@ -6,6 +6,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { register } from "node:module";
 import { createServer as createViteServer } from "vite";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 // Local domain fixtures are opt-in for the isolated compatibility test server.
 // The production Worker built by `build` keeps this flag disabled.
@@ -51,8 +53,88 @@ async function htmlFor(pathname) {
   return response.text();
 }
 
+test("paused chat redirects direct and contextual Inbox URLs to Home", async () => {
+  for (const path of ["/business/inbox", "/business/inbox?conversation=old-conversation", "/business/inbox?customerId=customer-pim&petId=pet-mochi&bookingId=booking-old"]) {
+    const response = await render(path);
+    assert.equal(response.status, 307, path);
+    assert.equal(response.headers.get("location"), "/business/home", path);
+    assert.doesNotMatch(await response.text(), /<h1[^>]*>ข้อความ<\/h1>/);
+  }
+});
+
+test("paused chat hides service, booking, CRM and consumer entry points while preserving their other controls", async () => {
+  const cache = await mkdtemp(join(tmpdir(), "meawketting-chat-pause-"));
+  const vite = await createServer({ root: projectRoot, configFile: false, cacheDir: cache, server: { middlewareMode: true }, appType: "custom", logLevel: "silent",
+    resolve: { alias: { "next/image": join(projectRoot, "node_modules/vinext/dist/shims/image.js") } },
+    plugins: [{ name: "chat-pause-navigation", resolveId(id) { if (id === "next/navigation") return "\0chat-pause-navigation"; },
+      load(id) { if (id === "\0chat-pause-navigation") return 'export const usePathname = () => "/my-pets";'; } }],
+  });
+  try {
+    const [state, grooming, hotel, daycare, bookingEditor, crmPanel, projection, appNav, bottomNav] = await Promise.all([
+      vite.ssrLoadModule("/app/_prototype/businessState.ts"),
+      vite.ssrLoadModule("/app/business/grooming/GroomingJobDetail.tsx"),
+      vite.ssrLoadModule("/app/business/hotel/HotelStayDetail.tsx"),
+      vite.ssrLoadModule("/app/business/daycare/DaycareAttendanceDetail.tsx"),
+      vite.ssrLoadModule("/app/business/calendar/BookingEditor.tsx"),
+      vite.ssrLoadModule("/app/business/customers/CrmPanel.tsx"),
+      vite.ssrLoadModule("/app/_backend/be8/projections.ts"),
+      vite.ssrLoadModule("/app/_components/AppNav.tsx"),
+      vite.ssrLoadModule("/app/_components/BottomNavigation.tsx"),
+    ]);
+    const contextFor = item => state.getDemoBusinessContextForBranch(item.businessId, item.branchId, true);
+    const markup = (Component, props) => renderToStaticMarkup(createElement(Component, props));
+    const noChat = html => assert.doesNotMatch(html, /href="\/business\/inbox|ส่งข้อความ|เปิดข้อความ|ข้อความ — เร็ว/);
+    const noop = () => {};
+    const job = state.listPrototypeGroomingServiceJobFixtures(null)[0];
+    const groomingHtml = markup(grooming.GroomingJobDetail, { job, context: contextFor(job), onClose: noop, onTransition: noop, onAssign: noop, onSaveNote: noop });
+    noChat(groomingHtml);
+    assert.match(groomingHtml, /ขออนุมัติ|บันทึกหมายเหตุ/);
+    assert.match(groomingHtml, /ไม่สามารถอนุมัติแทนเจ้าของได้/);
+
+    const stay = state.listPrototypeHotelStayFixtures(null)[0];
+    const hotelHtml = markup(hotel.HotelStayDetail, { stay, context: contextFor(stay), referenceDate: stay.scheduledCheckIn, fixtureOnly: true, onClose: noop, onChanged: noop });
+    noChat(hotelHtml);
+    assert.match(hotelHtml, /ส่งคำขอเพิ่มบริการได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้/);
+
+    const attendance = state.listPrototypeDaycareAttendanceFixtures(null)[0];
+    const customer = state.readPrototypeCustomerFixture(attendance.customerId);
+    const daycareContext = contextFor(attendance);
+    const daycareHtml = markup(daycare.DaycareAttendanceDetail, { attendance, customer, pet: customer.pets.find(p => p.id === attendance.petId), context: daycareContext,
+      zones: state.getBookingResources(daycareContext, undefined, true).filter(r => r.kind === "daycare-zone"), staff: state.listPrototypeTeamMemberFixtures(daycareContext), onClose: noop, onChanged: noop });
+    noChat(daycareHtml);
+    assert.match(daycareHtml, /บันทึกการดูแล|หมายเหตุ/);
+
+    const booking = state.listPrototypeBookingFixtures(null)[0];
+    const bookingHtml = markup(bookingEditor.BookingEditor, { context: contextFor(booking), initialBooking: booking, selectedDate: booking.start.slice(0, 10), onClose: noop, onSaved: noop });
+    noChat(bookingHtml);
+    assert.match(bookingHtml, /แก้ไขการจอง/);
+
+    const profile = { ...projection.emptyCrm("customer_paused"), nextAction: { kind: "message", label: "เปิดบทสนทนาล่าสุด", detail: "ดูข้อความที่เกี่ยวข้อง", href: "/business/inbox?customerId=customer_paused" } };
+    const timeline = [
+      { id: "booking", kind: "booking", at: "2026-10-13T00:00:00.000Z", title: "นัดหมาย", detail: "Booking retained", href: "/business/calendar", serviceModule: "grooming" },
+      { id: "payment", kind: "payment", at: "2026-10-12T00:00:00.000Z", title: "การชำระ", detail: "Payment retained", href: "/business/billing", serviceModule: null },
+      { id: "message", kind: "message", at: "2026-10-11T00:00:00.000Z", title: "ข้อความ", detail: "Dormant message record", href: "/business/inbox?conversation=preserved", serviceModule: null },
+    ];
+    const original = JSON.stringify({ profile, timeline });
+    const crmHtml = markup(crmPanel.CustomerCrmPanel, { profile, timeline });
+    noChat(crmHtml);
+    assert.doesNotMatch(crmHtml, /เปิดบทสนทนาล่าสุด|Dormant message record|>ข้อความ</);
+    assert.match(crmHtml, /2 รายการ|Booking retained|Payment retained/);
+    assert.match(crmHtml, /href="\/business\/calendar"/);
+    assert.match(crmHtml, /href="\/business\/billing"/);
+    assert.equal(JSON.stringify({ profile, timeline }), original, "Hiding chat never removes or changes its cached records");
+
+    for (const html of [markup(appNav.AppNav, { mode: "consumer" }), markup(bottomNav.BottomNavigation, { context: "consumer" })]) {
+      noChat(html);
+      assert.doesNotMatch(html, /ข้อความ/);
+      assert.match(html, /href="\/my-pets"/);
+      assert.match(html, /href="\/activity"/);
+    }
+  } finally { await vite.close(); await rm(cache, { recursive: true, force: true }); }
+});
+
 test("production Business routes never render fixture identity, records or fake zero metrics before server data", async () => {
-  for (const route of ["home", "calendar", "customers", "customers/customer-pim", "inbox", "scan", "intake/missing", "grooming", "hotel", "daycare", "billing", "reports", "team", "settings", "settings?section=branches"]) {
+  for (const route of ["home", "calendar", "customers", "customers/customer-pim", "scan", "intake/missing", "grooming", "hotel", "daycare", "billing", "reports", "team", "settings", "settings?section=branches"]) {
     const html = await htmlFor(`/business/${route}`);
     const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
     assert.match(markup, /กำลังโหลดข้อมูลร้าน/);
@@ -1140,7 +1222,9 @@ test("renders Business Home as a priority-first local prototype with booking-der
   assert.match(html, /href="\/business\/scan"/);
   assert.match(html, /href="\/business\/calendar\?new=1"/);
   assert.match(html, /href="\/business\/customers\?focus=search"/);
-  assert.match(html, /href="\/business\/inbox"/);
+  assert.doesNotMatch(html, /href="\/business\/inbox|ข้อความที่ยังไม่อ่าน|ข้อความใหม่|business-(?:nav|mobile)-unread-badge/);
+  const mobileNavigation = html.match(/<nav class="business-mobile-navigation"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  assert.equal(countRenderedElements(mobileNavigation, "a") + countRenderedElements(mobileNavigation, "button"), 4);
   assert.equal(countRenderedElements(html, "h1"), 1);
   assert.match(source, /getEnabledBusinessModules\(context(?:, !businessStateReady)?\)/);
   assert.match(source, /enabledModules\.map/);
@@ -1259,7 +1343,7 @@ test("builds one Branch-aware Business shell with live Calendar, Customers, Inbo
   assert.doesNotMatch(menu, /href="\/business\/(?:home|scan)|ปฏิทิน|อาบน้ำ \/ ตัดขน|โรงแรม|Daycare|การเงิน/);
 });
 
-test("keeps the five-item Business mobile navigation and accessible More sheet", async () => {
+test("keeps the Business mobile navigation responsive with a paused chat item and accessible More sheet", async () => {
   const [source, css] = await Promise.all([
     readFile(new URL("business/_components/BusinessMobileNavigation.tsx", appRoot), "utf8"),
     readFile(new URL("globals.css", appRoot), "utf8"),
@@ -1280,7 +1364,8 @@ test("keeps the five-item Business mobile navigation and accessible More sheet",
   assert.match(source, /event\.key === "Escape"/);
   assert.match(source, /event\.key !== "Tab"/);
   assert.match(source, /aria-haspopup="dialog"/);
-  assert.match(css, /grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(css, /grid-auto-flow:\s*column/);
+  assert.match(css, /grid-auto-columns:\s*minmax\(0,\s*1fr\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /business-mobile-navigation__item--scan[\s\S]*?color-meaw-ink-950/);
 });
@@ -1685,7 +1770,7 @@ test("renders BF-6 Hotel as a capability-aware occupancy, lifecycle, and daily-c
   assert.match(detail, /Incident \/ note ที่ต้องติดตาม/);
   assert.match(detail, /หมายเหตุของร้าน/);
   assert.match(detail, /\/business\/inbox\?customerId=/);
-  assert.match(detail, /ร้านส่งคำขอเพิ่มบริการผ่าน Inbox ได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้/);
+  assert.match(detail, /ร้านส่งคำขอเพิ่มบริการได้ แต่ไม่สามารถอนุมัติแทนเจ้าของได้/);
   assert.match(detail, /\/business\/billing\?hotelStayId=/);
   assert.match(detail, /การชำระเงินทำผ่าน Checkout แยกต่างหาก/);
   assert.match(presentation, /HOTEL_LIST_FILTERS/);
@@ -2517,7 +2602,7 @@ test("renders stable Customer detail with Pets, Bookings, local notes, and Passp
   assert.match(html, /Passport และสิทธิ์เข้าถึง/);
   assert.match(html, /ประวัติบริการ/);
   assert.match(html, /href="\/business\/calendar\?customerId=booking-contact-pim"/);
-  assert.match(html, /href="\/business\/inbox\?customerId=booking-contact-pim"/);
+  assert.doesNotMatch(html, /href="\/business\/inbox|ส่งข้อความถึง คุณพิม/);
   assert.match(page, /CustomerDetailScreen/);
   assert.match(detail, /ผู้ติดต่อหลักไม่เท่ากับ Guardian/);
   assert.match(detail, /ข้อมูลจาก Pet Passport/);
@@ -2604,9 +2689,9 @@ test("reuses the Customer relationship source for Booking context and responsive
   assert.match(css, /min-height: 44px/);
 });
 
-test("renders BF-4 Inbox as a contextual Business communication route", async () => {
+test("preserves the dormant BF-4 Inbox component while its public route redirects", async () => {
   const [html, page, inbox, list, pane, timeline, composer, presentation, state] = await Promise.all([
-    businessFixtureHtml("/business/inbox?conversation=conversation-fixture-pim"),
+    businessFixtureHtml("/business/inbox?conversation=conversation-fixture-pim", { dormantInbox: true }),
     readFile(new URL("business/inbox/page.tsx", appRoot), "utf8"),
     readFile(new URL("business/inbox/BusinessInbox.tsx", appRoot), "utf8"),
     readFile(new URL("business/inbox/ConversationList.tsx", appRoot), "utf8"),
@@ -2624,9 +2709,7 @@ test("renders BF-4 Inbox as a contextual Business communication route", async ()
   assert.match(html, /ยังไม่ได้อ่าน/);
   assert.match(html, /กำลังใช้บริการ/);
   assert.doesNotMatch(html, /จบงานแล้ว/);
-  // Production SSR has no authenticated inbox data. Hydration reads the scoped API.
-  assert.doesNotMatch(await htmlFor("/business/inbox"), /คุณพิม|ได้รับข้อมูลแล้วค่ะ ขอบคุณค่ะ|แกะสางขน/);
-  assert.match(await businessFixtureHtml("/business/inbox", { empty: true }), /เลือกบทสนทนาเพื่อเริ่มงาน/);
+  assert.match(await businessFixtureHtml("/business/inbox", { empty: true, dormantInbox: true }), /เลือกบทสนทนาเพื่อเริ่มงาน/);
   assert.match(inbox, /ensureDurableInbox/);
   assert.match(inbox, /loadDurableConversation/);
   assert.match(timeline, /ร้านขอเพิ่มบริการ/);
@@ -4138,7 +4221,7 @@ test("keeps the requested Business interaction and component refinements explici
     readFile(businessCssUrl, "utf8"),
   ]);
 
-  assert.match(frame, /key=\{.*pathname.*context.key.*\}[\s\S]*?business-route-stage/);
+  assert.match(frame, /key=\{scopeKey \?\? context\.key\}[\s\S]*?business-route-stage/);
   assert.match(businessCss, /@keyframes business-route-enter/);
   assert.match(businessCss, /@keyframes business-section-enter/);
   assert.match(calendar, /key === "z"/);
@@ -4185,7 +4268,7 @@ test("promotes navigation, data, feedback, modal, progress, skeleton, and signat
     readFile(new URL("business/calendar/CalendarViewControl.tsx", appRoot), "utf8"),
     readFile(new URL("business/calendar/BookingItem.tsx", appRoot), "utf8"),
     readFile(new URL("business/_components/BusinessNavigation.tsx", appRoot), "utf8"),
-    readFile(new URL("business/loading.tsx", appRoot), "utf8"),
+    readFile(new URL("business/_components/BusinessPortalFrame.tsx", appRoot), "utf8"),
     readFile(businessCssUrl, "utf8"),
   ]);
 

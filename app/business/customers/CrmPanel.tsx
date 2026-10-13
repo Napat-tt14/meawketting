@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "../../_components/icons";
 import { BusinessDocumentLink as Link } from "../_components/BusinessDocumentLink";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { calendarDateLabel } from "../calendar/calendarPresentation";
 import { formatBusinessMoney } from "../billing/billingPresentation";
@@ -28,7 +29,7 @@ const TIMELINE_FILTERS: readonly { value: "all" | CustomerTimelineKind; label: s
   { value: "booking", label: "นัดหมาย" },
   { value: "service", label: "บริการ" },
   { value: "payment", label: "การชำระ" },
-  { value: "message", label: "ข้อความ" },
+  ...(BUSINESS_CHAT_ENABLED ? [{ value: "message" as const, label: "ข้อความ" }] : []),
 ] as const;
 
 const SERVICE_LABELS = {
@@ -62,7 +63,7 @@ export function CustomerCrmOverview({ profiles, summary }: { profiles: readonly 
         <span className="crm-overview__icon" aria-hidden="true"><Chart size={20} /></span>
         <div>
           <h2 id="crm-overview-title">ภาพรวมความสัมพันธ์ลูกค้า</h2>
-          <p>สรุปจากการจอง บริการ การชำระ และบทสนทนาที่มีอยู่</p>
+          <p>{BUSINESS_CHAT_ENABLED ? "สรุปจากการจอง บริการ การชำระ และบทสนทนาที่มีอยู่" : "สรุปจากการจอง บริการ และการชำระ"}</p>
         </div>
       </div>
       <dl className="crm-overview__metrics">
@@ -84,7 +85,8 @@ export function CustomerCrmPanel({
 }) {
   const headingId = useId();
   const [timelineFilter, setTimelineFilter] = useState<"all" | CustomerTimelineKind>("all");
-  const filteredTimeline = timeline.filter((item) => timelineFilter === "all" || item.kind === timelineFilter);
+  const visibleTimeline = timeline.filter((item) => BUSINESS_CHAT_ENABLED || item.kind !== "message");
+  const filteredTimeline = visibleTimeline.filter((item) => timelineFilter === "all" || item.kind === timelineFilter);
   const nextBooking = profile.nextBooking;
 
   return (
@@ -133,26 +135,26 @@ export function CustomerCrmPanel({
         ) : <span>ยังไม่มีบริการที่เสร็จแล้ว</span>}
       </div>
 
-      <div className="customer-crm-panel__focus">
+      {BUSINESS_CHAT_ENABLED || profile.nextAction.kind !== "message" ? <div className="customer-crm-panel__focus">
         <div className={`customer-crm-next-action customer-crm-next-action--${profile.nextAction.kind}`}>
           <span>แนะนำให้ทำต่อ</span>
           <strong>{profile.nextAction.label}</strong>
           <Link href={profile.nextAction.href}>ไปทำรายการ<ArrowUpRight size={16} /></Link>
         </div>
-      </div>
+      </div> : null}
 
       <details className="customer-detail-disclosure">
         <summary>รายละเอียดการใช้บริการ</summary>
         <ul>{profile.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
-        <p>{profile.nextAction.detail}</p>
+        {BUSINESS_CHAT_ENABLED || profile.nextAction.kind !== "message" ? <p>{profile.nextAction.detail}</p> : null}
       </details>
       <details className="customer-detail-disclosure">
-        <summary>กิจกรรมย้อนหลัง <span>{timeline.length} รายการ</span></summary>
+        <summary>กิจกรรมย้อนหลัง <span>{visibleTimeline.length} รายการ</span></summary>
       <div className="customer-crm-timeline">
         <header>
           <div>
             <h3>ไทม์ไลน์ลูกค้า</h3>
-            <p>นัดหมาย บริการ การชำระ และข้อความของลูกค้า</p>
+            <p>{BUSINESS_CHAT_ENABLED ? "นัดหมาย บริการ การชำระ และข้อความของลูกค้า" : "นัดหมาย บริการ และการชำระของลูกค้า"}</p>
           </div>
           <div className="customer-crm-timeline__filters" role="toolbar" aria-label="กรองไทม์ไลน์ลูกค้า">
             {TIMELINE_FILTERS.map((filter) => (

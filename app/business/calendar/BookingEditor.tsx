@@ -38,6 +38,7 @@ import {
   synchronizePrototypeExecutionCompatibilityForBooking,
 } from "../../_prototype/businessState";
 import { CheckCircle, CircleAlert, MessageCircle, Plus, X } from "../../_components/icons";
+import { BUSINESS_CHAT_ENABLED } from "../_components/businessFeatures";
 import { BusinessServiceIcon } from "../_components/BusinessServiceVisual";
 import { CustomerEditor } from "../customers/CustomerEditor";
 import { PetRelationshipEditor } from "../customers/PetRelationshipEditor";
@@ -487,7 +488,7 @@ export function BookingEditor({
           <h2 id="booking-editor-title">{initialBooking ? "แก้ไขการจอง" : "เพิ่มการจอง"}</h2>
           <div className="booking-editor__header-actions">
             {initialBooking?.serviceModule === "grooming" ? <Link href={`/business/grooming?jobId=${encodeURIComponent(initialBooking.bookingId)}`}><BusinessServiceIcon module="grooming" size={18} />ดูงานบริการ</Link> : null}
-            {initialBooking ? <Link href={`/business/inbox?customerId=${encodeURIComponent(initialBooking.customer.id)}&petId=${encodeURIComponent(initialBooking.pets[0]?.id ?? "")}&bookingId=${encodeURIComponent(initialBooking.bookingId)}`}><MessageCircle size={18} />ส่งข้อความ</Link> : null}
+            {BUSINESS_CHAT_ENABLED && initialBooking ? <Link href={`/business/inbox?customerId=${encodeURIComponent(initialBooking.customer.id)}&petId=${encodeURIComponent(initialBooking.pets[0]?.id ?? "")}&bookingId=${encodeURIComponent(initialBooking.bookingId)}`}><MessageCircle size={18} />ส่งข้อความ</Link> : null}
             <button ref={closeButtonRef} type="button" aria-label="ปิดการแก้ไขการจอง" onClick={onClose}><X size={20} /></button>
           </div>
         </header>

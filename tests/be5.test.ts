@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository";
 import { Be1Error } from "../app/_backend/be1/errors";
 import { Be5Application } from "../app/_backend/be5/application";
 import { GuardianGrantService } from "../app/_backend/be5/authority";
-import { PostgresBe5Repository } from "../app/_backend/be5/postgresRepository";
+import { D1Be5Repository } from "../app/_backend/be5/d1Repository";
 import type { Be5Operation, GuardianGrantInput, IntakeResult } from "../app/_backend/be5/contracts";
 import { parseBe5Operation, scanToken } from "../app/_backend/be5/validation";
 import { BackendConflict } from "../app/_backend/shared/errors";
 import { DevTestIdentityAdapter } from "../app/_backend/be1/identity";
-import { ARI, INACTIVE, metadata, OUTSIDER, OWNER, seededDatabase, THONGLOR, WHISKER } from "./postgresFixtures";
+import { ARI, INACTIVE, metadata, OUTSIDER, OWNER, seededDatabase, THONGLOR, WHISKER } from "./d1Fixtures";
 
 const GUARDIAN = "prs_be5_guardian_000001", CO = "prs_be5_guardian_000002";
 const scope = { businessId: WHISKER, branchId: ARI };
@@ -25,9 +25,9 @@ test("a production process rejects the development identity header even when its
   } finally { if (previous === undefined) Reflect.deleteProperty(process.env, "NODE_ENV"); else Reflect.set(process.env, "NODE_ENV", previous); }
 });
 async function fixture() {
-  const db = seededDatabase(); db.inspect.exec(readFileSync("supabase/seed-be5-dev.sql", "utf8"));
+  const db = seededDatabase(); db.inspect.exec(readFileSync("tests/fixtures/d1/seed-be5-dev.sql", "utf8"));
   let time = "2050-08-18T02:00:00.000Z";
-  const now = () => time, auth = new PostgresBe1Repository(db), repository = new PostgresBe5Repository(db, "dev-test"), guardian = new GuardianGrantService(db, "dev-test", now), app = new Be5Application(auth, repository, now), actor = await app.resolvePerson(OWNER);
+  const now = () => time, auth = new D1Be1Repository(db), repository = new D1Be5Repository(db, "dev-test"), guardian = new GuardianGrantService(db, "dev-test", now), app = new Be5Application(auth, repository, now), actor = await app.resolvePerson(OWNER);
   const run = (op: Be5Operation) => app.executeBe5(actor, op, metadata());
   const issue = (patch: Partial<GuardianGrantInput> = {}) => guardian.issue(GUARDIAN, { ...input, ...patch }, `issue_${crypto.randomUUID()}`);
   const start = async (token: string, executionId: string | null = null, requestKey = `start_${crypto.randomUUID()}`) => await run({ ...scope, type: "intake.start", value: token, executionId, requestKey }) as IntakeResult;
@@ -66,7 +66,7 @@ test("pending Consent reveals no Pet, then only approved fields; correction reta
   assert.equal(execution?.intake_id, result.record.id); assert.equal(execution?.status, "checked-in");
   assert.equal(f.db.inspect.prepare("SELECT status FROM bookings WHERE id=?").get(execution!.booking_id)?.status, "confirmed");
   assert.equal(f.db.inspect.prepare("SELECT count(*) n FROM service_records").get()?.n, 0);
-  assert.deepEqual(f.db.inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+  assert.deepEqual(f.db.inspect.prepare("PRAGMA foreign_key_check").all(), []);
 });
 
 test("revoke and expiry hide fields while retaining the Business draft, and deny replayed receives", async (t) => {

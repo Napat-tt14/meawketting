@@ -5,12 +5,12 @@ Owner: Product / Application Architecture. Canonical Guardian handoff; preserve 
 
 | Label | Current truth |
 |---|---|
-| IMPLEMENTED | Business BE1–BE8, PostgreSQL/Supabase repositories, Person/Pet, BE5 authority/Passport/consent/grants/Intake and external identity schema; locally tested, not production readiness |
+| IMPLEMENTED | Business BE1–BE8, D1 repositories, Person/Pet, BE5 authority/Passport/consent/grants/Intake and external identity schema; locally tested, not production readiness |
 | PLANNED | Guardian LINE Mini App, routes and application actions below; type-only scaffold exists |
 | PAUSED | Old standalone Consumer expansion; retained prototype is historical reference |
 | NOT IMPLEMENTED | Real Guardian LINE integration, onboarding/authority provisioning, Guardian session/APIs/screens, Mini App production deployment, Guardian service-history projection |
 | PRODUCT DECISION REQUIRED | Authority establishment, multi-Guardian policy, editable fields, history visibility and release choices in section 19 |
-| EXTERNAL DEPENDENCY | Selected Supabase/Cloudflare environment, LINE provider/channel configuration and Mini App release requirements; no credentials connected here |
+| EXTERNAL DEPENDENCY | Cloudflare D1/R2 environment, LINE provider/channel configuration and Mini App release requirements; no credentials connected here |
 
 Priority: **Business → production readiness/pilot → Guardian LINE Mini App → broader standalone Consumer expansion (PAUSED)**. Foundation work does not authorize implementation or deployment.
 
@@ -58,22 +58,22 @@ Guardian UI → Guardian Application API → identity adapter → LINE/provider 
 
 Repository evidence:
 
-- [`be1/identity.ts`](../app/_backend/be1/identity.ts) defines the Business identity boundary. [`supabaseAuth.ts`](../app/_backend/supabaseAuth.ts) verifies `getUser()` and resolves `auth_person_links`. Its callback routes to Business signup/home and checks Business membership; it is not a Guardian callback.
-- `/api/auth/line/start` selects Supabase `custom:line` for **Business** login. [Business registration](./BUSINESS_REGISTRATION.md) documents external configuration. Code existence does not mean a connected LINE provider or Mini App session.
-- `person_external_identities` maps unique `(provider, issuer, subject)` to Person, with verified timestamp and active/inactive status. `auth_person_links` separately maps a unique Supabase UUID to a unique Person. Reuse these foundations, without merging Persons by contact details.
+- [`be1/identity.ts`](../app/_backend/be1/identity.ts) defines the Business identity boundary. [`auth.ts`](../app/_backend/auth.ts) verifies direct Google/LINE login and resolves hashed D1 sessions/`auth_identities`. Its callback routes to Business setup/home and checks Business membership; it is not a Guardian callback.
+- `/api/auth/line/start` performs direct LINE authorization-code PKCE for **Business** login. [Auth/media configuration](./D1-AUTH-MEDIA.md) owns external setup. Code existence does not establish a deployed LINE provider or Mini App session.
+- `person_external_identities` maps unique `(provider, issuer, subject)` to Person, with verified timestamp and active/inactive status. Business `auth_identities` maps unique `(provider,provider_subject)` to Person and `auth_sessions` stores only opaque token hashes. Reuse verified subject linkage without merging Persons by contact details.
 - `business_channel_customer_links` maps Business OA contacts; it is not the Guardian mapping. Never copy OA subjects into central identity without verified provider/issuer/channel context.
 
-**PLANNED adapter choice, not selected implementation:** evaluate the existing Supabase custom OAuth2 path with a Guardian-specific callback/session flow. Supabase supports custom OAuth2/OIDC providers, but this repo has no demonstrated Mini App/LIFF-token-to-Supabase-session bridge. Do not assume direct token exchange works. If incompatible, keep server LINE verification behind the neutral adapter and design session persistence/revocation before integration. Do not force unsupported auth or reuse Business registration to provision Guardians.
+**PLANNED Guardian adapter:** keep server LINE verification behind the neutral identity boundary and use deliberately scoped D1 identity/session persistence. Business now verifies LINE ID tokens server-side, but no Guardian-specific LIFF/Mini App runtime is implemented. Do not infer Pet authority from an authenticated subject or reuse Business registration to provision Guardians.
 
 Verify provider proof server-side: issuer, audience/channel, signature/provider validation, expiry and nonce/state/request binding where applicable. Browser user IDs, decoded claims and profile objects are untrusted. Link conflicts fail closed with private recovery; no silent relink or phone/email match. Linking an existing Person requires control of the existing account and verified new identity.
 
 Sessions require secure HttpOnly host-only HTTPS cookies, bounded expiry, verified refresh/rotation, same-origin mutation protection and explicit logout/server invalidation. Disconnected/deleted LINE accounts or inactive mappings/Persons must lose access; define detection/revalidation and recovery before launch. Do not promise immediate provider-disconnect detection without an implemented signal. No Pet permissions in token/session claims, secrets in browser bundles or provider tokens in logs. Missing configuration, failed verification and unresolved mapping expose no Pet data.
 
-External evidence checked 2026-09-22: [Supabase custom providers](https://supabase.com/docs/guides/auth/custom-oauth-providers), [LINE server ID-token verification](https://developers.line.biz/en/docs/line-login/verify-id-token/), [LIFF user data on servers](https://developers.line.biz/en/docs/liff/using-user-profile/). These support the boundary, not an end-to-end compatibility or deployment claim.
+Provider references: [LINE server ID-token verification](https://developers.line.biz/en/docs/line-login/verify-id-token/), [LIFF user data on servers](https://developers.line.biz/en/docs/liff/using-user-profile/). These support the identity boundary; they do not establish deployed Guardian compatibility.
 
 ## 5. Core data relationships
 
-Schema authority: [`db/schema.ts`](../db/schema.ts), mirrored by `supabase/migrations`. No migration is introduced.
+Schema authority: [`db/schema.ts`](../db/schema.ts) and executable [`migrations/d1`](../migrations/d1). The Guardian type-only scaffold adds no separate schema or authority implementation.
 
 | Existing domain/table | Guardian reuse | Boundary / gap |
 |---|---|---|
@@ -88,7 +88,7 @@ Schema authority: [`db/schema.ts`](../db/schema.ts), mirrored by `supabase/migra
 | `business_intakes`, `intake_corrections` | Minimal Business-linked status | Notes/belongings/staff/correction text not automatically visible |
 | `service_records`, `service_record_revisions` | Shared Pet service-history source | Business/Branch-authored private fields; Guardian projection absent |
 | `person_external_identities` | Verified provider/issuer/subject → Person | Schema exists; real Guardian verifier/linking absent |
-| `auth_person_links` | Supabase UUID → Person if compatible | Existing Business bridge; no Pet permission |
+| `auth_identities` / `auth_sessions` | Verified provider subject → Person and hashed opaque session | Existing Business identity bridge; no Pet permission |
 | `customers`, `business_pet_profiles`, `customer_pet_relationships` | Business-local operational context only | Never Guardian authority/canonical Passport; notes/tags/CRM remain private |
 
 Global/shared does not mean public. Bookings, staffing, conversations, payments, CRM, resource assignments and raw Service Record snapshots are Business-local/private. Guardian APIs must construct allowlisted DTOs, never serialize Business responses or repository rows wholesale.
@@ -159,7 +159,7 @@ Repo uses App Router `page.tsx`/`layout.tsx`, BusinessPortalFrame and ConsumerSh
 ```text
 Guardian UI → Cloudflare Application/API → identity + Person resolution
             → per-Pet domain authorization → existing domain services
-            → repository → Supabase PostgreSQL
+            → repository → Cloudflare D1
 ```
 
 All actions below are **PLANNED**, not callable endpoints:
@@ -192,13 +192,13 @@ Production requirements, **not implemented Guardian claims**:
 - Audit/access history with safe presentation; fail closed on provider, database or authorization failure; no fake retry success.
 - Before release test forged subjects, conflicting mappings, inactive identities/Persons, missing/revoked/co-guardian authority, cross-Pet/Business/Branch access, expiry during writes, replays and private-field leakage.
 
-## 15. Supabase boundary
+## 15. D1 and private media boundary
 
-**IMPLEMENTED direction:** frontend → Cloudflare → Application/API → PostgreSQL/Supabase. D1 is superseded.
+**IMPLEMENTED direction:** frontend → Cloudflare → Application/API → Cloudflare D1, with private R2 for required objects. The Supabase architecture is superseded by the 2026-10-13 forward-only migration.
 
-PostgreSQL stores canonical domain data. Auth is relevant only if compatible with the chosen Guardian LINE flow. Storage may hold approved private Pet/avatar/media, but current `media.ts`/`media_objects` authorize **Business** scope, not shared Guardian Passport media. Document that ownership/policy gap before schema or adapter work; do not reuse Business membership for Guardian photos.
+D1 stores canonical domain data. The chosen Guardian LINE flow still needs its own verified identity and authorization implementation. R2 may hold approved private Pet/avatar/media, but current `media.ts`/`media_objects` authorize **Business** scope, not shared Guardian Passport media. Resolve that policy gap before new schema/adapter work; Business membership cannot authorize Guardian photos.
 
-Supabase Data API/RLS does not replace server domain authorization. Service-role keys and raw DB credentials never enter the browser. No live configuration/migration/deployment here.
+D1 has no Supabase RLS; all queries and mutations enforce server domain authorization explicitly. Provider secrets and privileged Cloudflare credentials never enter the browser. No Guardian deployment is claimed here.
 
 ## 16. Business integration
 
@@ -253,6 +253,6 @@ Recommendations are **not implemented policy** and do not choose legal ownership
 | Is Mini App required for first Business pilot? | Keep Business production/pilot first; explicitly decide any dependency |
 | Production QR duration/one-time policy (OQ-02) | Retain current 2/8/24-hour validation limits; no new duration or single-use promise |
 
-Separate technical/external gates: demonstrate provider/session compatibility, conflict-safe linking and disconnect handling; configure approved LINE/Supabase/Cloudflare environments; document pending-authority/media schema needs only after policy. No new table is needed for this scaffold.
+Separate technical/external gates: demonstrate provider/session compatibility, conflict-safe linking and disconnect handling; configure approved LINE/Cloudflare environments; document pending-authority/media schema needs only after policy. No new table is needed for this scaffold.
 
 **Exact next Guardian phase (not started):** identity/session boundary implementation with server verification and explicit Person mapping, testing unlinked/conflict/expiry/logout failures; no Pet creation or authority activation. Demonstrate provider compatibility before connecting a real environment.

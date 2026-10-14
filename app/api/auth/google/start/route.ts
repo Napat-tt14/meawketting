@@ -1,4 +1,4 @@
-import { businessLoginRequest } from "../../../../_backend/supabaseAuth";
+import { businessLoginRequest } from "../../../../_backend/auth";
 
 export const dynamic = "force-dynamic";
 

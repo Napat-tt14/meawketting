@@ -63,12 +63,12 @@ test("guest signup status is quiet, while real auth failures retain safe route e
   assert.deepEqual(events, []);
   assert.ok(guest.headers.get("x-request-id"));
   await run("/api/business/register", "POST");
-  await run("/api/auth/email/login?password=private", "POST");
+  await run("/api/auth/google/callback?code=private");
   await run("/api/business/register", "GET", 403);
-  assert.deepEqual(events.map(event => (event as { route: string }).route), ["/api/business/register", "/api/auth/email/login", "/api/business/register"]);
-  assert.doesNotMatch(JSON.stringify(events), /private|email=|password=/);
+  assert.deepEqual(events.map(event => (event as { route: string }).route), ["/api/business/register", "/api/auth/google/callback", "/api/business/register"]);
+  assert.doesNotMatch(JSON.stringify(events), /private|email=|code=/);
   let limiterKey = "";
-  await secureFetch(new Request("https://shop.test/api/auth/email/login"), { API_RATE_LIMITER: { limit: async ({ key }) => { limiterKey = key; return { success: true }; } } }, async () => new Response("ok"));
+  await secureFetch(new Request("https://shop.test/api/auth/google/callback"), { API_RATE_LIMITER: { limit: async ({ key }) => { limiterKey = key; return { success: true }; } } }, async () => new Response("ok"));
   assert.equal(limiterKey, "/api/other:unknown");
 });
 

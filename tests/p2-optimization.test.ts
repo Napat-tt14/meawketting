@@ -1,21 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, writeFileSync } from "node:fs";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository";
 import type { PreparedStatement } from "../app/_backend/be1/repository";
 import { Be3Application } from "../app/_backend/be3/application";
-import { PostgresBe2Repository } from "../app/_backend/be2/postgresRepository";
-import { PostgresBe3Repository } from "../app/_backend/be3/postgresRepository";
+import { D1Be2Repository } from "../app/_backend/be2/d1Repository";
+import { D1Be3Repository } from "../app/_backend/be3/d1Repository";
 import { Be4Application } from "../app/_backend/be4/application";
-import { PostgresBe4Repository } from "../app/_backend/be4/postgresRepository";
+import { D1Be4Repository } from "../app/_backend/be4/d1Repository";
 import { Be7Application } from "../app/_backend/be7/application";
-import { PostgresBe7Repository } from "../app/_backend/be7/postgresRepository";
+import { D1Be7Repository } from "../app/_backend/be7/d1Repository";
 import { Be8Application } from "../app/_backend/be8/application";
 import type { HomeSummary, BillingSummary, ReportView } from "../app/_backend/be8/contracts";
 import type { BillingMutationResult } from "../app/_backend/be7/contracts";
-import { PostgresDatabase, connectPostgres } from "../app/_backend/postgres";
+import { D1DatabaseAdapter } from "../app/_backend/d1";
 import { withBackend } from "../app/_backend/runtime";
-import { ARI, MANAGER, ONNUT, OWNER, PAW, WHISKER, metadata, seededDatabase } from "./postgresFixtures";
+import { ARI, MANAGER, ONNUT, OWNER, PAW, WHISKER, metadata, seededDatabase } from "./d1Fixtures";
 
 const now = () => "2026-08-18T04:00:00.000Z", scope = { businessId: WHISKER, branchId: ARI };
 const input = { ...scope, serviceId: "ari-grooming-bath-groom", customerId: "booking-contact-nalin", petIds: ["booking-pet-mochi"],
@@ -23,12 +23,12 @@ const input = { ...scope, serviceId: "ari-grooming-bath-groom", customerId: "boo
   status: "confirmed" as const, estimate: 850, notes: "", idempotencyKey: "p2-note-edit" };
 
 test("notes/estimate edits retain children, guards, revision, write token and audit; reschedules still replace reservations", async () => {
-  const db = seededDatabase(), app = new Be3Application(new PostgresBe1Repository(db), new PostgresBe2Repository(db), new PostgresBe3Repository(db));
+  const db = seededDatabase(), app = new Be3Application(new D1Be1Repository(db), new D1Be2Repository(db), new D1Be3Repository(db));
   const actor = await app.resolvePerson(OWNER), created = await app.createBooking(actor, input, metadata());
   assert.equal(created.outcome, "created");
   const executionRevision = db.inspect.prepare("SELECT revision FROM service_executions WHERE booking_id=?").get(created.booking.id)?.revision;
-  const original = db.batch.bind(db), queries: string[] = [];
-  db.batch = async statements => { queries.push(...statements.map(s => (s as PreparedStatement & { query: string }).query)); return original(statements); };
+  const queries: string[] = [];
+  db.onQuery = query => queries.push(query);
   const edit = { ...input }, request = metadata();
   const result = await app.updateBooking(actor, { ...edit, bookingId: created.booking.id, expectedRevision: created.booking.revision, notes: "Only the note", estimate: 900 }, request);
   assert.equal(result.outcome, "updated");
@@ -46,9 +46,9 @@ test("notes/estimate edits retain children, guards, revision, write token and au
 });
 
 test("request authorization is reused only inside one request and a commit still rejects a revoked grant", async () => {
-  const db = seededDatabase(), auth = new PostgresBe1Repository(db), app = new Be4Application(auth, new PostgresBe2Repository(db), new PostgresBe3Repository(db), new PostgresBe4Repository(db), now);
-  const original = db.batch.bind(db), queries: string[] = [];
-  db.batch = async statements => { queries.push(...statements.map(s => (s as PreparedStatement & { query: string }).query)); return original(statements); };
+  const db = seededDatabase(), auth = new D1Be1Repository(db), app = new Be4Application(auth, new D1Be2Repository(db), new D1Be3Repository(db), new D1Be4Repository(db), now);
+  const queries: string[] = [];
+  db.onQuery = query => queries.push(query);
   await withBackend(new Request("https://test.invalid/api/be4"), {}, async () => {
     const actor = await app.resolvePerson(MANAGER); await app.executeBe4(actor, { ...scope, type: "operations.metadata" }, metadata());
     assert.equal(queries.filter(q => /FROM persons\s+WHERE/i.test(q)).length, 1);
@@ -64,7 +64,7 @@ test("request authorization is reused only inside one request and a commit still
 });
 
 test("notes-only commit rechecks capacity if it changes after availability; rejection is atomic", async () => {
-  const db = seededDatabase(), app = new Be3Application(new PostgresBe1Repository(db), new PostgresBe2Repository(db), new PostgresBe3Repository(db));
+  const db = seededDatabase(), app = new Be3Application(new D1Be1Repository(db), new D1Be2Repository(db), new D1Be3Repository(db));
   const actor = await app.resolvePerson(OWNER);
   const hotel = { ...input, serviceId: "ari-hotel-stay", petIds: ["booking-pet-mochi", "booking-pet-biscuit"], start: "2026-09-10", end: "2026-09-12", assignedResourceIds: ["ari-hotel-capacity"], idempotencyKey: "p2-capacity-race" };
   const created = await app.createBooking(actor, hotel, metadata()); if (created.outcome === "conflict") throw new Error("Fixture unavailable");
@@ -84,7 +84,7 @@ test("notes-only commit rechecks capacity if it changes after availability; reje
 });
 
 test("notes-only commit rechecks Grooming execution assignments that move after availability; rejection is atomic", async () => {
-  const db = seededDatabase(), app = new Be3Application(new PostgresBe1Repository(db), new PostgresBe2Repository(db), new PostgresBe3Repository(db));
+  const db = seededDatabase(), app = new Be3Application(new D1Be1Repository(db), new D1Be2Repository(db), new D1Be3Repository(db));
   const actor = await app.resolvePerson(OWNER), created = await app.createBooking(actor, input, metadata());
   if (created.outcome === "conflict") throw new Error("Fixture unavailable");
   const other = await app.createBooking(actor, { ...input, start: "2026-09-10T12:00", end: "2026-09-10T13:30", idempotencyKey: "p2-other-execution" }, metadata());
@@ -106,7 +106,7 @@ test("notes-only commit rechecks Grooming execution assignments that move after 
 });
 
 test("notes-only commit rechecks Daycare occupancy outside Booking reservations; rejection is atomic", async () => {
-  const db = seededDatabase(), app = new Be3Application(new PostgresBe1Repository(db), new PostgresBe2Repository(db), new PostgresBe3Repository(db));
+  const db = seededDatabase(), app = new Be3Application(new D1Be1Repository(db), new D1Be2Repository(db), new D1Be3Repository(db));
   const actor = await app.resolvePerson(OWNER);
   db.inspect.prepare("UPDATE booking_resources SET capacity=1 WHERE business_id=? AND branch_id=? AND id=?").run(PAW, ONNUT, "onnut-daycare-social");
   const daycare = { ...input, businessId: PAW, branchId: ONNUT, serviceId: "onnut-daycare-full-day", customerId: "booking-contact-onnut-aom", petIds: ["booking-pet-pudding"],
@@ -132,8 +132,8 @@ test("notes-only commit rechecks Daycare occupancy outside Booking reservations;
 });
 
 test("summary projections match Reports money and waiting intake without analytical queries or cross-scope data", async () => {
-  const db = seededDatabase(); for (const phase of [5, 6, 7]) db.inspect.exec(readFileSync(`supabase/seed-be${phase}-dev.sql`, "utf8"));
-  const auth = new PostgresBe1Repository(db), billing = new Be7Application(auth, new PostgresBe7Repository(db, "dev-test"), undefined, now), app = new Be8Application(auth, db, now);
+  const db = seededDatabase(); for (const phase of [5, 6, 7]) db.inspect.exec(readFileSync(`tests/fixtures/d1/seed-be${phase}-dev.sql`, "utf8"));
+  const auth = new D1Be1Repository(db), billing = new Be7Application(auth, new D1Be7Repository(db, "dev-test"), undefined, now), app = new Be8Application(auth, db, now);
   const actor = await app.resolvePerson(OWNER), executionId = db.inspect.prepare("SELECT id FROM service_executions WHERE business_id=? AND branch_id=? AND module='grooming' LIMIT 1").get(WHISKER, ARI)!.id as string;
   const checkout = await billing.executeBe7(actor, { ...scope, type: "charge.checkout", executionId, requestKey: "p2-money" }, metadata()) as BillingMutationResult;
   await billing.executeBe7(actor, { ...scope, type: "payment.record", chargeId: checkout.balance.charge.chargeId, expectedRevision: checkout.balance.charge.revision, requestKey: "p2-payment", amount: 100, method: "cash", note: "" }, metadata());
@@ -154,45 +154,29 @@ test("summary projections match Reports money and waiting intake without analyti
   await assert.rejects(app.executeBe8(await app.resolvePerson(MANAGER), { businessId: PAW, branchId: ARI, type: "billing.summary" }, metadata()));
 });
 
-test("adapter enforces read/write budgets, schema isolation, cancels stale SELECTs and never cancels a started write", async () => {
+test("D1 ignores disconnects after a write starts and discards cancelled reads", async () => {
   const db = seededDatabase();
-  const settings = await db.prepare("SELECT current_schema() schema,current_setting('statement_timeout') statement,current_setting('lock_timeout') lock,current_setting('transaction_read_only') ro").first<{ schema: string; statement: string; lock: string; ro: string }>();
-  assert.deepEqual(settings, { schema: db.inspect.schema, statement: "10s", lock: "2s", ro: "on" });
-  db.inspect.exec("CREATE TABLE p2_budgets(id integer PRIMARY KEY,value integer); INSERT INTO p2_budgets VALUES(1,0)");
-  const write = (await db.batch([db.prepare("UPDATE p2_budgets SET value=1 WHERE id=1 RETURNING current_setting('statement_timeout') statement,current_setting('lock_timeout') lock,current_setting('transaction_read_only') ro")]))[0].results![0];
-  assert.deepEqual(write, { statement: "30s", lock: "5s", ro: "off" });
-  const controller = new AbortController(), readDb = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL!, db.inspect.schema, false, controller.signal);
-  const started = performance.now(), pending = readDb.prepare("SELECT pg_sleep(3)").all();
-  setTimeout(() => controller.abort(), 80); await assert.rejects(pending, { name: "AbortError" }); assert.ok(performance.now() - started < 1500);
-  await readDb.close();
+  db.inspect.exec("CREATE TABLE disconnects(id INTEGER PRIMARY KEY,value INTEGER); INSERT INTO disconnects VALUES(1,0)");
+  const readController = new AbortController(), readDb = new D1DatabaseAdapter(db.binding, readController.signal);
+  readController.abort();
+  await assert.rejects(readDb.prepare("SELECT value FROM disconnects").all(), { name: "AbortError" });
+  const writeController = new AbortController(), writeDb = new D1DatabaseAdapter(db.binding, writeController.signal);
+  const pending = writeDb.batch([writeDb.prepare("UPDATE disconnects SET value=2 WHERE id=1")]);
+  writeController.abort(); await pending;
+  assert.equal(await writeDb.prepare("SELECT value FROM disconnects WHERE id=1").first("value"), 2);
   assert.equal(await db.prepare("SELECT 42 value").first("value"), 42);
-  const writeController = new AbortController(), writeDb = new PostgresDatabase(db.sql, db.inspect.schema, false, writeController.signal);
-  setTimeout(() => writeController.abort(), 40);
-  await writeDb.batch([writeDb.prepare("UPDATE p2_budgets SET value=2 WHERE id=1 RETURNING pg_sleep(0.1)")]);
-  assert.equal(await writeDb.prepare("SELECT value FROM p2_budgets WHERE id=1").first("value"), 2);
-  await db.sql.unsafe("SET statement_timeout='40ms'");
-  await assert.rejects(db.prepare("SELECT pg_sleep(0.2)").all(), { code: "57014" });
-  await db.sql.unsafe("RESET statement_timeout");
-  const holder = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL!, db.inspect.schema);
-  let release!: () => void, locked!: () => void;
-  const ready = new Promise<void>(resolve => { locked = resolve; });
-  const wait = new Promise<void>(resolve => { release = resolve; });
-  const lock = holder.sql.begin(async tx => { await tx.unsafe(`LOCK TABLE "${db.inspect.schema}".p2_budgets IN ACCESS EXCLUSIVE MODE`); locked(); await wait; });
-  await ready; await db.sql.unsafe("SET lock_timeout='40ms'");
-  try { await assert.rejects(db.prepare("SELECT * FROM p2_budgets").all(), { code: "55P03" }); }
-  finally { release(); await lock; await holder.close(); await db.sql.unsafe("RESET lock_timeout"); }
 });
-
 test("P2 cost probe measures canonical reads, catalog reuse and notes-only writes", async () => {
-  const db = seededDatabase(); for (const phase of [5, 6, 7]) db.inspect.exec(readFileSync(`supabase/seed-be${phase}-dev.sql`, "utf8"));
-  const auth = new PostgresBe1Repository(db), identities = new PostgresBe2Repository(db), bookings = new PostgresBe3Repository(db);
-  const be3 = new Be3Application(auth, identities, bookings), be4 = new Be4Application(auth, identities, bookings, new PostgresBe4Repository(db), now);
-  const be7 = new Be7Application(auth, new PostgresBe7Repository(db, "dev-test"), undefined, now), be8 = new Be8Application(auth, db, now);
+  const db = seededDatabase(); for (const phase of [5, 6, 7]) db.inspect.exec(readFileSync(`tests/fixtures/d1/seed-be${phase}-dev.sql`, "utf8"));
+  const auth = new D1Be1Repository(db), identities = new D1Be2Repository(db), bookings = new D1Be3Repository(db);
+  const be3 = new Be3Application(auth, identities, bookings), be4 = new Be4Application(auth, identities, bookings, new D1Be4Repository(db), now);
+  const be7 = new Be7Application(auth, new D1Be7Repository(db, "dev-test"), undefined, now), be8 = new Be8Application(auth, db, now);
   const actor = await be3.resolvePerson(OWNER), created = await be3.createBooking(actor, input, metadata()); if (created.outcome === "conflict") throw new Error("Fixture unavailable");
   const executionId = db.inspect.prepare("SELECT id FROM service_executions WHERE business_id=? AND branch_id=? AND module='grooming' LIMIT 1").get(WHISKER, ARI)!.id as string;
   await be7.executeBe7(actor, { ...scope, type: "charge.checkout", executionId, requestKey: "p2-probe" }, metadata());
   const original = db.batch.bind(db); let queries: string[] = [], transactions = 0; const results: Record<string, unknown>[] = [];
-  db.batch = async statements => { transactions++; queries.push(...statements.map(s => (s as PreparedStatement & { query: string }).query)); return original(statements); };
+  db.onQuery = query => queries.push(query);
+  db.batch = async statements => { transactions++; return original(statements); };
   async function measure(label: string, task: () => Promise<unknown>) {
     queries = []; transactions = 0;
     await withBackend(new Request("https://test.invalid/api/probe"), {}, async () => { await task(); return new Response(null); });
@@ -214,6 +198,6 @@ test("P2 cost probe measures canonical reads, catalog reuse and notes-only write
   });
   assert.equal(results.at(-1)!.childWrites, 0);
   console.log(JSON.stringify({ results }));
-  writeFileSync("work/p2-after-query-counts.json", JSON.stringify({ note: "Measured against isolated PostgreSQL, request-scoped context; excludes auth network/link lookup, transaction-control SQL and trigger-internal work.", results }, null, 2));
+  writeFileSync("work/d1-query-counts.json", JSON.stringify({ note: "Measured against local SQLite/D1, request-scoped context; excludes auth network/link lookup, transaction-control SQL and trigger-internal work.", results }, null, 2));
   assert.ok((results.find(r => r.label === "home.summary")!.logicalStatements as number) < (results[0].logicalStatements as number));
 });

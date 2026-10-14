@@ -14911,13 +14911,13 @@ body:has(.page--public-safety) .site-footer {
    small click response as the semantic .button component. Controls that own
    a purposeful pseudo-element are excluded so their visual state remains
    intact. */
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle) {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option) {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle)::after {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)::after {
   content: "";
   position: absolute;
   z-index: 0;
@@ -14932,11 +14932,11 @@ button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-do
   transform: translate(-50%, -50%) scale(0);
 }
 
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle):active::after {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):active::after {
   animation: meaw-button-ripple 240ms ease-out;
 }
 
-button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option):not(.business-auth__password-toggle)>* {
+button:not(.button):not(.home-scroll-top):not([class*="backdrop"]):not(.style-dots button):not(.quick-passport__trigger):not(.user-menu__trigger):not(.quick-qr-refresh):not(.draft-passport-option)>* {
   position: relative;
   z-index: 1;
 }

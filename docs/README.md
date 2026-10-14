@@ -1,10 +1,10 @@
 # Meawketting Documentation
 
-Guardian foundation — 2026-09-22: [GUARDIAN_LINE_MINIAPP](./GUARDIAN_LINE_MINIAPP.md) is the main Guardian Product/architecture handoff, owning MVP, audited domain reuse, proposed routes/APIs and decisions. Read it first for Guardian work. **IMPLEMENTED:** Business PostgreSQL/Supabase foundations. **PLANNED:** Guardian Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** authority/disclosure policies. **EXTERNAL DEPENDENCY:** provider/environment configuration. Only type contracts were added; no Guardian runtime.
+Guardian foundation — 2026-09-22: [GUARDIAN_LINE_MINIAPP](./GUARDIAN_LINE_MINIAPP.md) is the main Guardian Product/architecture handoff, owning MVP, audited domain reuse, proposed routes/APIs and decisions. Read it first for Guardian work. **IMPLEMENTED:** Business D1 foundations. **PLANNED:** Guardian Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** authority/disclosure policies. **EXTERNAL DEPENDENCY:** provider/environment configuration. Only type contracts were added; no Guardian runtime.
 
 Status: **CANONICAL / BE1–BE8 BACKEND FOUNDATION IMPLEMENTED LOCALLY / BF1–BF12 UI FROZEN**
 
-Latest checkpoint: [owner setup and rotation guide](./คู่มือ-Supabase-Cloudflare.md), [technical runbook](./PRODUCTION_RUNBOOK.md), [target QA](./PILOT_QA.md). **NOT PRODUCTION READY**.
+Latest checkpoint: [D1 auth/media setup](./D1-AUTH-MEDIA.md), [technical runbook](./PRODUCTION_RUNBOOK.md), [target QA](./PILOT_QA.md). **NOT PRODUCTION READY**.
 
 2026-09-20 addition: [Business signup with Google/LINE](./BUSINESS_REGISTRATION.md), including the approved first-store creation policy and provider setup.
 
@@ -49,8 +49,10 @@ The derived [HTML manual](./.htmlmanual/manual.html) is a compact reading aid, n
 
 ## Current checkpoint
 
-Cloudflare Worker/API → Application/Domain → Repository → Supabase PostgreSQL is the only active Business database architecture. Supabase Auth authenticates; Meawketting authorizes Person/Membership/Business/Branch/target/action. Supabase Storage is private media.
+Cloudflare Worker/API → Application/Domain → D1 Repository → Cloudflare D1 is the only active Business database architecture. Direct Google/LINE OAuth and D1 sessions authenticate; Meawketting authorizes Person/Membership/Business/Branch/target/action. Private R2 stores media. Email/password login was removed by the 2026-10-13 Product Owner decision.
 
-BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY. The selected Supabase project has the four migrations, private media bucket and restricted Worker role. Real Google sign-in completed on localhost:3000 and reached new-business registration. A separate staging Worker is deployed, but its callback and production integration still need acceptance testing. See [the owner guide](./คู่มือ-Supabase-Cloudflare.md) and [validation](./VALIDATION.md) for limits.
+BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY with native SQLite semantics. The real production D1 schema is applied/verified through the Dashboard: 70 STRICT domain tables, 133 indexes, 81 triggers, one view and zero foreign-key orphans; `0001_initial.sql` is recorded once. Source data transfer, OAuth/environment setup, provider callbacks and deployed acceptance remain pending. The Wrangler credential still lacks D1 write permission. Earlier Supabase deployment/provider evidence is historical and does not prove the current D1 cutover. See [validation](./VALIDATION.md) for actual evidence.
+
+R2 subscription setup was declined. No private media bucket was created; the R2 binding and API are code-only until later authorized provisioning.
 
 Business UI and LINE Seed Sans TH stay frozen. Consumer is PAUSED. /workfiledesign is untouched. Staging uses a separate Worker from the production domain.

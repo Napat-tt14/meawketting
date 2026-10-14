@@ -19,33 +19,13 @@
 .business-auth__provider { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer; transition: border-color 180ms, background-color 180ms; }
 .business-auth__provider--line svg { color: #008a3e; }
 .business-auth__provider:hover { border-color: var(--foreground); background: var(--muted); }
-.business-auth__divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--muted-foreground); font-size: 12px; }
-.business-auth__divider::before, .business-auth__divider::after { content: ""; height: 1px; background: var(--border); flex: 1; }
-.business-auth__form fieldset { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
-.business-auth__form label { font-size: 14px; font-weight: 700; }
-.business-auth__form label:not(:first-child) { margin-top: 8px; }
-.business-auth__form input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; color: var(--foreground); background: var(--background); font: inherit; font-size: 16px; }
-.business-auth__form input::placeholder { color: var(--muted-foreground); }
-.business-auth__password { position: relative; }
-.business-auth__password input { padding-right: 52px; }
-.business-auth__password button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 8px; color: var(--muted-foreground); background: transparent; cursor: pointer; }
-.business-auth__password button:hover { background: var(--muted); color: var(--foreground); }
-.business-auth__form small { color: var(--muted-foreground); font-size: 12px; }
-.business-auth__form .business-auth__submit { width: 100%; min-height: 48px; border-radius: 12px; margin-top: 14px; gap: 10px; }
-.business-auth__form .business-auth__error { margin: 8px 0 0; padding: 12px; border-radius: 10px; background: var(--status-critical-soft); color: var(--status-critical); font-size: 13px; line-height: 1.75; }
+.business-auth__error { margin: 16px 0 0; padding: 12px; border-radius: 10px; background: var(--status-critical-soft); color: var(--status-critical); font-size: 13px; line-height: 1.75; }
 .business-auth__legal { margin: 16px 0 0; font-size: 12px; line-height: 1.8; color: var(--muted-foreground); }
 .business-auth__card a:not(.business-auth__provider):not(.button) { text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
 .business-auth__switch { margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; font-size: 14px; }
 .business-auth__secure { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 14px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.7; }
 .business-auth__secure svg { flex: none; }
-.business-auth__confirmation { display: grid; gap: 16px; }
-.business-auth__confirmation > svg { color: var(--status-success); }
-.business-auth__confirmation p { margin: 0; line-height: 1.8; color: var(--muted-foreground); font-size: 14px; overflow-wrap: anywhere; }
-.business-auth__confirmation strong { color: var(--foreground); }
-.business-auth__text-button { min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); text-decoration: underline; cursor: pointer; font: inherit; font-size: 14px; }
-.business-auth__text-button:hover { color: var(--foreground); }
 .business-auth :is(a, button, input):focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
-.business-auth :is(button, input):disabled { opacity: .65; cursor: not-allowed; }
 @media (max-width: 1000px) {
   .business-auth { width: calc(100% - 40px); gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); }
   .business-auth__card { padding: 28px; }

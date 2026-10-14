@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { Be1Application } from "../../_backend/be1/application";
 import type { Be1ApiFailure, Be1ApiSuccess } from "../../_backend/be1/contracts";
-import { PostgresBe1Repository } from "../../_backend/be1/postgresRepository";
+import { D1Be1Repository } from "../../_backend/be1/d1Repository";
 import { asBe1Error } from "../../_backend/be1/errors";
 import { resolveIdentity } from "../../_backend/be1/identity";
 import { createRequestMetadata } from "../../_backend/be1/metadata";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     requireSameOrigin(request);
     const database = getDatabase();
     const identity = await resolveIdentity(request, env.MEAWKETTING_AUTH_MODE, database);
-    const repository = new PostgresBe1Repository(database);
+    const repository = new D1Be1Repository(database);
     const application = new Be1Application(repository);
     const actor = await application.resolvePerson(identity.personId);
     const requestBody = await readJson(request);

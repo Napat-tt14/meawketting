@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { TestSql, TestPostgres, migrate } from "./postgresTestKit";
+import { TestSql, TestD1, migrate } from "./d1TestKit";
 import test from "node:test";
 import { Be1Application } from "../app/_backend/be1/application.ts";
 import {
@@ -12,13 +12,13 @@ import {
   type BranchConfigurationInput,
   type OperatingHoursView,
 } from "../app/_backend/be1/contracts.ts";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository.ts";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository.ts";
 import { Be1Error } from "../app/_backend/be1/errors.ts";
 import { DevTestIdentityAdapter } from "../app/_backend/be1/identity.ts";
 import type { RequestMetadata } from "../app/_backend/be1/metadata.ts";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const seedSql = readFileSync(resolve(projectRoot, "supabase", "seed-be1-dev.sql"), "utf8");
+const seedSql = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be1-dev.sql"), "utf8");
 const OWNER = BE1_DEV_OWNER_PERSON_ID;
 const MANAGER = "prs_01k47meawketting000000002";
 const STAFF = "prs_01k47meawketting000000003";
@@ -35,8 +35,8 @@ function fixture(file?: string) {
   const inspect = new TestSql(file ?? ":memory:");
   migrate(inspect);
   inspect.exec(seedSql);
-  const database = new TestPostgres(inspect);
-  const repository = new PostgresBe1Repository(database);
+  const database = new TestD1(inspect);
+  const repository = new D1Be1Repository(database);
   let sequence = 0;
   const application = new Be1Application(repository, {
     now: () => `2026-09-05T12:00:${String(sequence++).padStart(2, "0")}.000Z`,
@@ -235,7 +235,7 @@ test("relational constraints reject invalid roles, cross-Business access, and in
       INSERT INTO branch_operating_hours (business_id, branch_id, weekday, closed, opens_at, closes_at, updated_at)
       VALUES (?, ?, ?, 0, '20:00', '09:00', ?)
     `).run(WHISKER, ARI, "holiday", "2026-09-05T01:00:00.000Z"), /check constraint/i);
-    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+    assert.deepEqual(inspect.prepare("PRAGMA foreign_key_check").all(), []);
   } finally {
     inspect.close();
   }
@@ -251,8 +251,7 @@ test("migration-backed writes survive a database reopen", async () => {
     first.inspect.close();
 
     const reopened = new TestSql(path);
-    reopened.close();
-    const repository = new PostgresBe1Repository(new TestPostgres(reopened));
+    const repository = new D1Be1Repository(new TestD1(reopened));
     const durable = await repository.getBranch(WHISKER, created.id);
     assert.equal(durable?.name, "รัชดา");
     assert.deepEqual(durable?.enabledModules, ["grooming", "daycare"]);

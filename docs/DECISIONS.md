@@ -4,7 +4,7 @@
 
 **DECIDED:** authorize documentation and type-only Guardian boundaries; retain Business-first sequencing, separate Business OA chat from central Mini App, require verified identity → Person → durable Pet authority. No new routes, schema, real integration or ownership policy. [Guardian section 19](./GUARDIAN_LINE_MINIAPP.md#19-product-decisions-required) owns unresolved authority establishment, multi-Guardian/dispute rules, editable fields/photo, history disclosure, pilot dependency and production QR duration policy. Recommendations do not close decisions.
 
-**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+**IMPLEMENTED:** Business BE1–BE8 and D1 foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
 
 Status: **ACTIVE CANONICAL DECISION LOG (BUSINESS-FIRST REBASE)**  
 Owner: Product
@@ -24,11 +24,15 @@ Documentation and prototype behavior never close an OPEN question by convenience
 
 ## Active decisions
 
-### Supabase replacement — 2026-09-19
+### D1 forward-only replacement — 2026-10-13
 
-Product Owner explicitly replaced the former database and custom session architecture. Cloudflare remains the frontend/API/Worker host. Supabase PostgreSQL is the sole Business database, Supabase Auth supplies authentication, and Supabase Storage supplies private media. Meawketting retains server authorization; the browser never receives privileged credentials or directly accesses tables. Historical database selections below are SUPERSEDED on persistence/auth/storage only; their Product and domain rules remain locked.
+Product Owner selects Cloudflare D1 as the only relational database, direct Google/LINE OAuth with D1 hashed opaque sessions, and private R2 for necessary media. Email/password login is explicitly removed while existing Persons and memberships are preserved. Verified provider subject linkage must be migrated; contact email cannot silently link or duplicate a Person. Server authorization, booking capacity/revisions, payment receipts/idempotency, LINE dedup/outbox and audit remain mandatory.
 
-Four clean PostgreSQL migrations and native repository SQL replace the old migration/runtime stack. There is no production data transfer. Business UX/UI and LINE Seed Sans TH remain frozen, Consumer PAUSED, /workfiledesign untouched. The selected real Supabase configuration and verification are external; no production readiness claim.
+There is no dual write, database fallback, old executable migration path, manual backup/export or PostgreSQL restore implementation. Failures are fixed forward in D1. `migrations/d1` is the schema source of truth. D1 platform Time Travel does not authorize an application rollback flow. No commit/push/deploy is authorized. The production D1 schema is applied/verified through the Dashboard, with `0001_initial.sql` recorded once and zero foreign-key orphans. Source transfer, OAuth/environment setup and provider/deployment acceptance remain open; Wrangler credentials still lack D1 write permission. R2 provisioning was explicitly declined.
+
+### SUPERSEDED — Supabase replacement, 2026-09-19
+
+The earlier Supabase PostgreSQL/Auth/Storage selection is historical and fully superseded on persistence/auth/storage. Its domain and Product boundaries remain locked. [Historical checkpoint](./SUPABASE_MIGRATION_REPORT.md) explains the transition without executable setup or restore instructions. Business UX/UI and LINE Seed Sans TH remain frozen, Consumer PAUSED and /workfiledesign untouched.
 
 
 

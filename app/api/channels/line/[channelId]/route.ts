@@ -9,7 +9,7 @@ import { BackendConflict } from "../../../../_backend/shared/errors";
 export async function POST(request: Request, context: { params: Promise<{ channelId: string }> }) {
   const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
   const signature = request.headers.get("x-line-signature") ?? "";
-  // Reject unauthenticated probes before PostgreSQL; do not reveal channel provisioning.
+  // Reject unauthenticated probes before D1; do not reveal channel provisioning.
   if (!/^[A-Za-z0-9+/]{43}=$/.test(signature) || !env.MEAWKETTING_LINE_CREDENTIALS) return new Response(null, { status: 401, headers });
   try {
     const reader = request.body?.getReader(); if (!reader) return new Response(null, { status: 400, headers });

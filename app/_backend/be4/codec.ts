@@ -6,7 +6,7 @@ export type ExecutionRow = {
   module: ExecutionView["kind"]; status: string; intake_id: string | null; scheduled_start: string; scheduled_end: string | null;
   business_note: string; details_json: string; revision: number; write_token: string; created_at: string; updated_at: string; cancelled_at: string | null;
   service_id: string; service_label: string;
-  awaiting_approval?: boolean;
+  awaiting_approval?: number;
 };
 export type AssignmentRow = {
   id: string; execution_id: string; resource_id: string | null; space_id: string | null; staff_id: string | null;
@@ -40,7 +40,7 @@ export function decode(row: ExecutionRow, assignments: AssignmentRow[], events: 
   };
   if (row.module === "grooming") {
     const addOns = events.filter((e) => e.kind === "addon").map((e) => JSON.parse(e.data_json)) as JobView["addOns"];
-    return { kind: "grooming", awaitingApproval: row.awaiting_approval, record: {
+    return { kind: "grooming", awaitingApproval: Boolean(row.awaiting_approval), record: {
       ...common, ...details, serviceJobId: row.id, serviceModule: "grooming", baseServiceId: common.serviceId,
       scheduledStart: row.scheduled_start, scheduledEnd: row.scheduled_end, status: row.status, addOns,
       estimatedDurationMinutes: Math.max(1, (Date.parse(`${row.scheduled_end}:00Z`) - Date.parse(`${row.scheduled_start}:00Z`)) / 60000) + addOns.reduce((n, a) => n + a.additionalMinutes, 0),
@@ -54,7 +54,7 @@ export function decode(row: ExecutionRow, assignments: AssignmentRow[], events: 
       const incident = incidentNotes.find((i) => i.id === data.id);
       if (incident) Object.assign(incident, data);
     }
-    return { kind: "hotel", awaitingApproval: row.awaiting_approval, record: {
+    return { kind: "hotel", awaitingApproval: Boolean(row.awaiting_approval), record: {
       ...common, ...details, hotelStayId: row.id, scheduledCheckIn: row.scheduled_start, scheduledCheckOut: row.scheduled_end!, status: row.status,
       roomAssignments: assignments.filter((a) => a.space_id).map((a) => ({ id: a.id, roomId: a.space_id!, startDate: a.start_local, endDate: a.end_local, assignedAt: a.assigned_at, assignedBy: a.assigned_by, reason: a.reason })),
       roomMoveHistory: events.filter((e) => e.kind === "room-move").map((e) => JSON.parse(e.data_json)), incidentNotes,
@@ -63,7 +63,7 @@ export function decode(row: ExecutionRow, assignments: AssignmentRow[], events: 
         instructions: t.instructions, authorization: t.authorized_intake_id ? { source: "customer-confirmed-intake", intakeId: t.authorized_intake_id, confirmedAt: "" } : null })),
     } as StayView };
   }
-  return { kind: "daycare", awaitingApproval: row.awaiting_approval, record: {
+  return { kind: "daycare", awaitingApproval: Boolean(row.awaiting_approval), record: {
     ...common, ...details, daycareAttendanceId: row.id, attendanceDate: row.scheduled_start, status: row.status,
     zoneId: assignments.find((a) => a.resource_id)?.resource_id ?? null, responsibleStaffId: assignments.find((a) => a.staff_id)?.staff_id ?? null,
     careEvents: events.filter((e) => e.kind === "daycare-care").map((e) => JSON.parse(e.data_json)),

@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { PostgresBe1Repository } from "./be1/postgresRepository";
+import { D1Be1Repository } from "./be1/d1Repository";
 import { BusinessApplication } from "./shared/application";
 import { be1Error } from "./be1/errors";
 import { createRequestMetadata } from "./be1/metadata";
@@ -8,7 +7,6 @@ import { backendContext, database } from "./runtime";
 import { authorizationGuard, batch, deleteGuard } from "./shared/database";
 import { requireSameOrigin } from "./shared/requestSecurity";
 
-export const MEDIA_BUCKET = "business-media";
 export const MEDIA_LIMIT = 10 * 1024 * 1024;
 const kinds = ["business-logo", "pet-photo", "grooming-before", "grooming-after", "hotel", "daycare"] as const;
 type Media = { id: string; business_id: string; branch_id: string | null; kind: typeof kinds[number]; pet_id: string | null; execution_id: string | null; object_path: string };
@@ -21,11 +19,11 @@ export function imageType(bytes: Uint8Array) {
 }
 function storage() {
   const { env } = backendContext();
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || new URL(env.SUPABASE_URL).protocol !== "https:") throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } }).storage.from(MEDIA_BUCKET);
+  if (!env.MEDIA) throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
+  return env.MEDIA;
 }
 async function authorize(request: Request, target: Media, write: boolean) {
-  const db = database(), app = new BusinessApplication(new PostgresBe1Repository(db));
+  const db = database(), app = new BusinessApplication(new D1Be1Repository(db));
   const identity = await resolveIdentity(request, backendContext().env.MEAWKETTING_AUTH_MODE, db);
   const actor = await app.resolvePerson(identity.personId), metadata = createRequestMetadata(request.headers), occurredAt = new Date().toISOString();
   if (target.kind === "business-logo") {
@@ -50,9 +48,10 @@ export async function uploadMedia(request: Request) {
   const params = new URL(request.url).searchParams, kind = params.get("kind") as Media["kind"];
   if (!kinds.includes(kind) || !request.body) throw be1Error("INVALID_INPUT");
   const id = crypto.randomUUID();
-  const target: Media = { id, kind, business_id: params.get("businessId") ?? "", branch_id: params.get("branchId"), pet_id: params.get("petId"), execution_id: params.get("executionId"), object_path: `${crypto.randomUUID()}/${id}` };
+  const target: Media = { id, kind, business_id: params.get("businessId") ?? "", branch_id: params.get("branchId"), pet_id: params.get("petId"), execution_id: params.get("executionId"), object_path: "" };
   if (kind === "business-logo" && (target.branch_id || target.pet_id || target.execution_id)) throw be1Error("INVALID_INPUT");
   await authorize(request, target, true);
+  target.object_path = `${target.business_id}/${target.branch_id ?? "business"}/${target.pet_id ?? "logo"}/${id}`;
   const reader = request.body.getReader(), chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -69,26 +68,36 @@ export async function uploadMedia(request: Request) {
   const contentType = imageType(bytes);
   if (request.headers.get("content-type") !== contentType) throw be1Error("INVALID_INPUT");
   const bucket = storage();
-  const { error } = await bucket.upload(target.object_path, bytes, { contentType, upsert: false });
-  if (error) throw be1Error("PERSISTENCE_ERROR");
+  try { await bucket.put(target.object_path, bytes, { httpMetadata: { contentType } }); }
+  catch (error) { throw be1Error("PERSISTENCE_ERROR", error); }
   try {
     const context = await authorize(request, target, true), db = database(), token = crypto.randomUUID();
     const guard = target.branch_id ? authorizationGuard(db, context, target.branch_id, token) : db.prepare(`INSERT INTO backend_guards(id,allowed)
       SELECT ?, (EXISTS(SELECT 1 FROM persons p JOIN business_memberships m ON m.person_id=p.id JOIN businesses b ON b.id=m.business_id
-      WHERE p.id=? AND p.status='active' AND m.id=? AND m.business_id=? AND m.role='OWNER' AND m.status='active' AND b.status='active'))::integer`)
+      WHERE p.id=? AND p.status='active' AND m.id=? AND m.business_id=? AND m.role='OWNER' AND m.status='active' AND b.status='active'))`)
       .bind(token, context.actor.id, context.membership.id, target.business_id);
     await batch(db, [guard, db.prepare(`INSERT INTO media_objects(id,business_id,branch_id,kind,pet_id,execution_id,object_path,content_type,byte_size,created_by)
-      VALUES(?::uuid,?,?,?,?,?,?,?,?,?)`).bind(id, target.business_id, target.branch_id, kind, target.pet_id, target.execution_id, target.object_path, contentType, size, context.actor.id), deleteGuard(db, token)]);
-  } catch (error) { await bucket.remove([target.object_path]); throw error; }
+      VALUES(?,?,?,?,?,?,?,?,?,?)`).bind(id, target.business_id, target.branch_id, kind, target.pet_id, target.execution_id, target.object_path, contentType, size, context.actor.id), deleteGuard(db, token)]);
+  } catch (error) { await bucket.delete(target.object_path); throw error; }
   return Response.json({ id }, { status: 201, headers: { "cache-control": "no-store" } });
 }
 export async function readMedia(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id || !/^[0-9a-f-]{36}$/.test(id)) throw be1Error("INVALID_INPUT");
-  const target = await database().prepare("SELECT * FROM media_objects WHERE id=?::uuid").bind(id).first<Media>();
+  const db = database(), identity = await resolveIdentity(request, backendContext().env.MEAWKETTING_AUTH_MODE, db);
+  const target = await db.prepare(`SELECT o.* FROM media_objects o JOIN business_memberships m ON m.business_id=o.business_id
+    JOIN persons p ON p.id=m.person_id JOIN businesses b ON b.id=o.business_id
+    LEFT JOIN branches br ON br.id=o.branch_id AND br.business_id=o.business_id
+    WHERE o.id=? AND p.id=? AND p.status='active' AND m.status='active' AND b.status='active'
+      AND (o.kind='business-logo' OR (br.status='active' AND (m.role='OWNER' OR EXISTS(
+        SELECT 1 FROM membership_branch_access a WHERE a.membership_id=m.id AND a.business_id=o.business_id
+          AND a.branch_id=o.branch_id AND a.status='active'))))`).bind(id, identity.personId).first<Media>();
   if (!target) throw be1Error("NOT_FOUND");
   await authorize(request, target, false);
-  const { data, error } = await storage().createSignedUrl(target.object_path, 60);
-  if (error || !data.signedUrl) throw be1Error("PERSISTENCE_ERROR");
-  return Response.json({ url: data.signedUrl, expiresIn: 60 }, { headers: { "cache-control": "private, no-store" } });
+  if (new URL(request.url).searchParams.get("raw") !== "1") return Response.json({ url: `/api/media?id=${id}&raw=1` }, { headers: { "cache-control": "private, no-store" } });
+  const object = await storage().get(target.object_path);
+  if (!object) throw be1Error("NOT_FOUND");
+  const headers = new Headers({ "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" });
+  object.writeHttpMetadata(headers);
+  return new Response(object.body, { headers });
 }

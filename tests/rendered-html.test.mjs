@@ -144,8 +144,7 @@ test("production Business routes never render fixture identity, records or fake 
   const login = await htmlFor("/business/login");
   assert.match(login, /href="\/api\/auth\/google\/start"/);
   assert.match(login, /เข้าใช้ครั้งแรก เราจะพาคุณตั้งค่าร้าน/);
-  assert.match(login, /name="email"/);
-  assert.match(login, /autoComplete="current-password"/i);
+  assert.doesNotMatch(login, /name="email"|type="password"|\/api\/auth\/email/);
   assert.match(login, /href="\/api\/auth\/line\/start"/);
   assert.match(login, /href="\/business\/register"/);
   assert.equal((await render("/__debug")).status, 404);
@@ -173,9 +172,8 @@ test("Business signup is a public branded route with one heading and no fixture 
   assert.match(html, /สร้างบัญชีของคุณ/);
   assert.match(html, /business-header--auth/);
   const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
-  assert.equal((markup.match(/<input\b/g) ?? []).length, 2);
-  assert.match(markup, /name="email"/);
-  assert.match(markup, /autoComplete="new-password"/i);
+  assert.equal((markup.match(/<input\b/g) ?? []).length, 0);
+  assert.doesNotMatch(markup, /name="email"|type="password"|\/api\/auth\/email/);
   assert.match(markup, /\/api\/auth\/google\/start\?intent=register/);
   assert.match(markup, /\/api\/auth\/line\/start\?intent=register/);
   assert.doesNotMatch(markup, /name="businessName"|name="phone"|name="modules"/);
@@ -221,13 +219,13 @@ test("fixture-off selectors ignore poisoned browser records and never invent Bus
 test("production build fails closed for development identity and Guardian test adapters", async () => {
   // Node does not implement the Workers binding module. Supply only that binding;
   // execute the actual production bundle, and fail if it tries to use the database.
-  const binding = `export const env = { MEAWKETTING_AUTH_MODE: "dev-test", get DATABASE_URL() { throw new Error("Production queried PostgreSQL using development identity"); } };`;
+  const binding = `export const env = { MEAWKETTING_AUTH_MODE: "dev-test", get DB() { throw new Error("Production queried D1 using development identity"); } };`;
   const bindingUrl = `data:text/javascript,${encodeURIComponent(binding)}`;
   register(`data:text/javascript,${encodeURIComponent(`export async function resolve(specifier, context, next) { return specifier === "cloudflare:workers" ? { url: ${JSON.stringify(bindingUrl)}, shortCircuit: true } : next(specifier, context); }`)}`, import.meta.url);
   const { default: worker } = await import(new URL("../dist/server/index.js?production-auth-check", import.meta.url).href);
   for (const path of ["/api/be1", "/api/be2", "/api/be3", "/api/be4", "/api/be5", "/api/be6", "/api/be7", "/api/be8", "/api/dev/guardian"]) {
     const response = await worker.fetch(new Request(`http://localhost${path}`, { method: "POST", headers: { "content-type": "application/json", "x-meawketting-dev-person-id": "prs_01k47meawketting000000001" }, body: "{}" }),
-      { MEAWKETTING_AUTH_MODE: "dev-test", get DATABASE_URL() { throw new Error("Production must reject dev identity before querying PostgreSQL"); } }, { waitUntil() {}, passThroughOnException() {} });
+      { MEAWKETTING_AUTH_MODE: "dev-test", get DB() { throw new Error("Production must reject dev identity before querying D1"); } }, { waitUntil() {}, passThroughOnException() {} });
     assert.equal(response.status, path === "/api/dev/guardian" ? 404 : 501, path);
   }
 });
@@ -2643,7 +2641,7 @@ test("keeps durable Customer/Pet truth and non-authoritative Passport compatibil
   assert.match(durableClient, /BE2_API_PATH/);
   assert.match(durableCache, /readBe2CustomerByStableId/);
   assert.match(passportCompatibility, /DEV PROTOTYPE \/ NON-AUTHORITATIVE READ MODEL ONLY/);
-  assert.match(passportCompatibility, /not returned by BE2, persisted in PostgreSQL/);
+  assert.match(passportCompatibility, /not returned by BE2, persisted in D1/);
   assert.match(state, /findKnownBusinessCustomerPetByPassportSlug/);
   assert.match(state, /unknown QR never creates a permanent Customer relationship/);
   assert.match(editor, /อาจมีลูกค้ารายนี้อยู่แล้ว/);
@@ -3534,7 +3532,7 @@ test("keeps the derived manual aligned with the canonical hybrid Business archit
   assert.match(validation, /34 `page\.tsx` route entries/);
   assert.match(html, /Production Ready:.*NO/);
   assert.doesNotMatch(html, /Daycare operations ยังไม่เริ่ม|Daycare has no operations route|Stop after BF-9|32 route entries/);
-  assert.match(validation, /Cloudflare Worker\/Vinext \+ Supabase PostgreSQL is the BE1–BE8 local architecture/);
+  assert.match(validation, /Cloudflare Worker\/Vinext \+ D1 is the BE1–BE8 local architecture/);
   assert.match(architecture, /TARGET PLATFORM:\s*Cloudflare/);
   assert.match(architecture, /PRODUCTION:\s*NOT DEPLOYED \/ NOT VERIFIED/);
   assert.match(decisions, /Cloudflare replaces Vercel as the target production platform direction/);

@@ -1,24 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository";
 import { Be1Error } from "../app/_backend/be1/errors";
 import { Be6Application } from "../app/_backend/be6/application";
-import { PostgresBe6Repository } from "../app/_backend/be6/postgresRepository";
+import { D1Be6Repository } from "../app/_backend/be6/d1Repository";
 import { GuardianApprovalService } from "../app/_backend/be6/authority";
 import { LineChannelAdapter, MockChannelAdapter, testSignature } from "../app/_backend/be6/adapters";
 import { InboxTransport } from "../app/_backend/be6/transport";
 import type { Be6Operation, ConversationView, InboxContext, InboxDirectory } from "../app/_backend/be6/contracts";
 import { BackendConflict } from "../app/_backend/shared/errors";
-import { ARI, INACTIVE, MANAGER, metadata, OUTSIDER, OWNER, seededDatabase, THONGLOR, WHISKER } from "./postgresFixtures";
+import { ARI, INACTIVE, MANAGER, metadata, OUTSIDER, OWNER, seededDatabase, THONGLOR, WHISKER } from "./d1Fixtures";
 
 const scope = { businessId: WHISKER, branchId: ARI }, GUARDIAN = "prs_be5_guardian_000001";
 const value: InboxContext = { customerId: "booking-contact-nalin", petId: "booking-pet-mochi", bookingId: "booking-fixture-ari-grooming-1030", executionId: null };
 const failure = (code: string) => (e: unknown) => e instanceof Be1Error && e.code === code;
 const conflict = (reason: string) => (e: unknown) => e instanceof BackendConflict && e.reason === reason;
 async function fixture() {
-  const db = seededDatabase(); for (const n of [5, 6]) db.inspect.exec(readFileSync(`supabase/seed-be${n}-dev.sql`, "utf8"));
-  let time = "2050-08-18T02:00:00.000Z"; const now = () => time, repo = new PostgresBe6Repository(db, "dev-test"), app = new Be6Application(new PostgresBe1Repository(db), repo, now), actor = await app.resolvePerson(OWNER);
+  const db = seededDatabase(); for (const n of [5, 6]) db.inspect.exec(readFileSync(`tests/fixtures/d1/seed-be${n}-dev.sql`, "utf8"));
+  let time = "2050-08-18T02:00:00.000Z"; const now = () => time, repo = new D1Be6Repository(db, "dev-test"), app = new Be6Application(new D1Be1Repository(db), repo, now), actor = await app.resolvePerson(OWNER);
   const run = async (op: Be6Operation, personId = OWNER) => app.executeBe6(await app.resolvePerson(personId), op, metadata());
   const ensure = async (patch: Partial<InboxContext> = {}, branchId = ARI) => await run({ ...scope, branchId, type: "conversation.ensure", context: { ...value, ...patch }, requestKey: `ensure_${crypto.randomUUID()}` }) as ConversationView;
   const send = async (id: string, text: string, requestKey = `send_${crypto.randomUUID()}`, context = value, branchId = ARI) => await run({ ...scope, branchId, type: "message.send", conversationId: id, context, text, requestKey }) as ConversationView;
@@ -34,8 +34,9 @@ test("Paged reads refresh only requested older message states and enforce the cu
   const f = await fixture(), c = await f.ensure();
   const approval = await f.run({ ...scope, type: "approval.request", conversationId: c.conversationId, context: value, serviceName: "Add-on", additionalPrice: 50, additionalMinutes: 10, note: "", requestKey: "paged_approval_request" }) as ConversationView;
   const old = approval.messages.find(m => m.kind === "add-service-request")!;
-  f.db.inspect.exec(`INSERT INTO messages(id,business_id,branch_id,conversation_id,kind,direction,body,occurred_at,created_at)
-    SELECT 'paged_message_'||n,'${WHISKER}','${ARI}','${c.conversationId}','text','customer','Synthetic','2050-08-18T02:00:00.000Z','2050-08-18T02:00:00.000Z' FROM generate_series(1,200) n`);
+  f.db.inspect.exec(`WITH RECURSIVE series(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM series WHERE n<200)
+    INSERT INTO messages(id,business_id,branch_id,conversation_id,kind,direction,body,occurred_at,created_at)
+    SELECT 'paged_message_'||n,'${WHISKER}','${ARI}','${c.conversationId}','text','customer','Synthetic','2050-08-18T02:00:00.000Z','2050-08-18T02:00:00.000Z' FROM series`);
   const latest = await f.run({ ...scope, type: "conversation.get", conversationId: c.conversationId }) as ConversationView;
   assert.equal(latest.messages.length, 100); assert.ok(latest.hasOlderMessages); assert.ok(!latest.messages.some(m => m.messageId === old.messageId));
   const cancelled = await f.run({ ...scope, type: "approval.cancel", conversationId: c.conversationId, messageId: old.messageId, expectedRevision: old.revision, requestKey: "paged_approval_cancel" }) as ConversationView;
@@ -117,17 +118,17 @@ test("Guardian-only structured approval updates one Job atomically and never the
   assert.equal(f.db.inspect.prepare("SELECT count(*) n FROM execution_events WHERE execution_id=? AND kind='addon'").get(response.serviceJobId!)?.n, 1);
   assert.deepEqual(f.db.inspect.prepare("SELECT * FROM bookings WHERE id=?").get(value.bookingId!), booking);
   await assert.rejects(f.run({ ...scope, type: "approval.cancel", conversationId: c.conversationId, messageId: m.messageId, expectedRevision: 1, requestKey: "cancel-stale-request" }), conflict("version-conflict"));
-  assert.deepEqual(f.db.inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+  assert.deepEqual(f.db.inspect.prepare("PRAGMA foreign_key_check").all(), []);
 });
 
 test("failed approval side effects roll back the decision and a safe retry commits once", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close()); const c = await f.ensure();
   const response = await f.run({ ...scope, type: "approval.request", conversationId: c.conversationId, context: value, serviceName: "บริการทดสอบ", additionalPrice: 90, additionalMinutes: 10, note: "", requestKey: "request-rollback-case" }) as ConversationView;
   const m = response.messages[0], guardian = new GuardianApprovalService(f.db, "dev-test", f.now);
-  f.db.inspect.exec("CREATE FUNCTION test_approval_rollback_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test-unavailable'; END $$; CREATE TRIGGER test_approval_rollback BEFORE INSERT ON execution_events FOR EACH ROW WHEN (NEW.kind='addon') EXECUTE FUNCTION test_approval_rollback_fn()");
+  f.db.inspect.exec("CREATE TRIGGER test_approval_rollback BEFORE INSERT ON execution_events WHEN NEW.kind='addon' BEGIN SELECT RAISE(ABORT,'test-unavailable'); END");
   await assert.rejects(guardian.decide(GUARDIAN, WHISKER, ARI, m.messageId, "approved", 1, "retry-approval-atomic"), failure("PERSISTENCE_ERROR"));
   assert.equal(f.db.inspect.prepare("SELECT status FROM message_approvals WHERE message_id=?").get(m.messageId)?.status, "waiting");
-  f.db.inspect.exec("DROP TRIGGER test_approval_rollback ON execution_events");
+  f.db.inspect.exec("DROP TRIGGER test_approval_rollback");
   await guardian.decide(GUARDIAN, WHISKER, ARI, m.messageId, "approved", 1, "retry-approval-atomic");
   assert.equal(f.db.inspect.prepare("SELECT status FROM message_approvals WHERE message_id=?").get(m.messageId)?.status, "approved");
 });

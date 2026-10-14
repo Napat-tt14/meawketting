@@ -3,22 +3,21 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "vite";
-import { seededDatabase } from "../tests/postgresFixtures.ts";
-import { connectPostgres } from "../app/_backend/postgres.ts";
+import { seededDatabase } from "../tests/d1Fixtures.ts";
 
-// Execute actual HTTP route handlers with isolated native PostgreSQL persistence.
+
+// Execute actual HTTP route handlers with isolated SQLite/D1 persistence.
 // No network server, production DB, provider or real credential is used.
 const db = seededDatabase();
-for (const phase of [5, 6, 7]) db.inspect.exec(await readFile(`supabase/seed-be${phase}-dev.sql`, "utf8"));
+for (const phase of [5, 6, 7]) db.inspect.exec(await readFile(`tests/fixtures/d1/seed-be${phase}-dev.sql`, "utf8"));
 const cacheDir = await mkdtemp(join(tmpdir(), "meawketting-api-smoke-"));
-globalThis.__meawkettingProductionSmokeEnv = { MEAWKETTING_AUTH_MODE: "dev-test" };
+globalThis.__meawkettingProductionSmokeEnv = { MEAWKETTING_AUTH_MODE: "dev-test", DB: db.binding };
 const server = await createServer({ configFile: false, cacheDir, server: { middlewareMode: true, watch: null }, appType: "custom", logLevel: "silent",
   plugins: [{ name: "isolated-worker-binding", resolveId(id) { if (id === "cloudflare:workers") return "\0smoke-env"; }, load(id) { if (id === "\0smoke-env") return "export const env = globalThis.__meawkettingProductionSmokeEnv;"; } }],
 });
 const originalFetch = globalThis.fetch;
 const runtime = await server.ssrLoadModule("/app/_backend/runtime.ts");
 const invoke = (request, handler) => runtime.withBackend(request, globalThis.__meawkettingProductionSmokeEnv, async () => {
-  runtime.backendContext().database = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL, db.inspect.schema);
   return handler();
 });
 const routes = new Map(); let requests = 0;
@@ -51,7 +50,7 @@ try {
     assert.equal(response.status, 401); assert.equal(await response.text(), "");
   }
   routes.set("/api/channels/line/:channelId", webhook);
-  console.log(`PASS: ${requests} HTTP handler requests across ${routes.size} routes; isolated PostgreSQL, no provider deployment`);
+  console.log(`PASS: ${requests} HTTP handler requests across ${routes.size} routes; isolated SQLite/D1, no provider deployment`);
 } finally {
   globalThis.fetch = originalFetch;
   delete globalThis.__meawkettingProductionSmokeEnv;

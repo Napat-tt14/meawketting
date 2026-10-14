@@ -1,4 +1,4 @@
-import { verifiedBusinessUser, businessAccountDestination } from "./supabaseAuth";
+import { verifiedBusinessUser, businessAccountDestination } from "./auth";
 import { database } from "./runtime";
 import { asBe1Error, be1Error } from "./be1/errors";
 import { readJson } from "./shared/http";
@@ -21,46 +21,61 @@ function validate(value: unknown) {
   return { displayName, businessName, branchName, phone, email, modules: [...input.modules as string[]].sort(), confirmed: true };
 }
 
-/** Account-scoped transaction lock serializes retries before any authority is created. */
+/** The unlinked-identity guard and unique receipt serialize registration inside D1's atomic batch. */
 export async function registerBusiness(value: unknown) {
   const user = await verifiedBusinessUser();
   const input = validate(value);
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(input)))), b => b.toString(16).padStart(2,"0")).join("");
   const db = database();
-  return db.sql.begin(async tx => {
-    await db.configureTransaction(tx);
-    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`;
-    const [receipt] = await tx`SELECT r.*, p.status person_status, b.status business_status, m.status membership_status
-      FROM business_registrations r JOIN auth_person_links l USING(auth_user_id)
-      JOIN persons p ON p.id=l.person_id JOIN businesses b ON b.id=r.business_id
-      JOIN business_memberships m ON m.person_id=p.id AND m.business_id=b.id WHERE r.auth_user_id=${user.id}::uuid`;
+  const readReceipt = async () => {
+    const receipt = await db.prepare(`SELECT r.*,p.status person_status,b.status business_status,m.status membership_status
+      FROM business_registrations r JOIN persons p ON p.id=r.person_id JOIN businesses b ON b.id=r.business_id
+      JOIN business_memberships m ON m.person_id=p.id AND m.business_id=b.id WHERE r.identity_id=?`).bind(user.id)
+      .first<{ person_status: string; business_status: string; membership_status: string; request_hash: string; business_id: string; branch_id: string }>();
     if (receipt) {
       if ([receipt.person_status, receipt.business_status, receipt.membership_status].some(s => s !== "active")) throw be1Error("FORBIDDEN");
       if (receipt.request_hash !== hash) throw be1Error("CONFLICT");
-      return { businessId: receipt.business_id as string, branchId: receipt.branch_id as string };
+      return { businessId: receipt.business_id, branchId: receipt.branch_id };
     }
-    if ((await tx`SELECT 1 FROM auth_person_links WHERE auth_user_id=${user.id}::uuid`).length) throw be1Error("FORBIDDEN");
+    return null;
+  };
+  const receipt = await readReceipt();
+  if (receipt) return receipt;
+  if (user.person_id) throw be1Error("FORBIDDEN");
     const personId = crypto.randomUUID(), businessId = crypto.randomUUID(), branchId = crypto.randomUUID(), membershipId = crypto.randomUUID();
-    const now = new Date().toISOString();
-    await tx`INSERT INTO persons(id,display_name,primary_email,created_at,updated_at) VALUES(${personId},${input.displayName},${user.email ?? null},${now},${now})`;
-    await tx`INSERT INTO businesses(id,name,contact_name,phone,email,created_at,updated_at,created_by_person_id,updated_by_person_id)
-      VALUES(${businessId},${input.businessName},${input.displayName},${input.phone},${input.email},${now},${now},${personId},${personId})`;
-    await tx`INSERT INTO branches(id,business_id,name,name_key,phone,email,created_at,updated_at,created_by_person_id,updated_by_person_id)
-      VALUES(${branchId},${businessId},${input.branchName},${normalizeBranchNameKey(input.branchName)},${input.phone},${input.email},${now},${now},${personId},${personId})`;
-    await tx`INSERT INTO business_memberships(id,person_id,business_id,role,created_at,updated_at,created_by_person_id,updated_by_person_id)
-      VALUES(${membershipId},${personId},${businessId},'OWNER',${now},${now},${personId},${personId})`;
-    for (const service of input.modules) await tx`INSERT INTO branch_enabled_modules(business_id,branch_id,module,created_at,created_by_person_id) VALUES(${businessId},${branchId},${service},${now},${personId})`;
+    const now = new Date().toISOString(), guard = crypto.randomUUID();
+    const statements = [
+      db.prepare(`INSERT INTO backend_guards(id,allowed) SELECT ?,EXISTS(SELECT 1 FROM auth_identities i
+        JOIN auth_sessions s ON s.identity_id=i.id WHERE i.id=? AND i.person_id IS NULL AND s.id=? AND s.revoked_at IS NULL AND s.expires_at>?)`).bind(guard, user.id, user.session_id, now),
+      db.prepare("INSERT INTO persons(id,display_name,primary_email,created_at,updated_at) VALUES(?,?,?,?,?)").bind(personId, input.displayName, user.email, now, now),
+      db.prepare(`INSERT INTO businesses(id,name,contact_name,phone,email,created_at,updated_at,created_by_person_id,updated_by_person_id)
+        VALUES(?,?,?,?,?,?,?,?,?)`).bind(businessId, input.businessName, input.displayName, input.phone, input.email, now, now, personId, personId),
+      db.prepare(`INSERT INTO branches(id,business_id,name,name_key,phone,email,created_at,updated_at,created_by_person_id,updated_by_person_id)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).bind(branchId, businessId, input.branchName, normalizeBranchNameKey(input.branchName), input.phone, input.email, now, now, personId, personId),
+      db.prepare(`INSERT INTO business_memberships(id,person_id,business_id,role,created_at,updated_at,created_by_person_id,updated_by_person_id)
+        VALUES(?,?,?,'OWNER',?,?,?,?)`).bind(membershipId, personId, businessId, now, now, personId, personId),
+    ];
+    for (const service of input.modules) statements.push(db.prepare("INSERT INTO branch_enabled_modules(business_id,branch_id,module,created_at,created_by_person_id) VALUES(?,?,?,?,?)").bind(businessId, branchId, service, now, personId));
     for (const day of ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]) {
-      await tx`INSERT INTO branch_operating_hours(business_id,branch_id,weekday,closed,opens_at,closes_at,updated_at,updated_by_person_id)
-        VALUES(${businessId},${branchId},${day},1,'09:00','18:00',${now},${personId})`;
+      statements.push(db.prepare(`INSERT INTO branch_operating_hours(business_id,branch_id,weekday,closed,opens_at,closes_at,updated_at,updated_by_person_id)
+        VALUES(?,?,?,1,'09:00','18:00',?,?)`).bind(businessId, branchId, day, now, personId));
     }
-    await tx`INSERT INTO auth_person_links(auth_user_id,person_id) VALUES(${user.id}::uuid,${personId})`;
-    await tx`INSERT INTO business_registrations(auth_user_id,business_id,branch_id,request_hash) VALUES(${user.id}::uuid,${businessId},${branchId},${hash})`;
+    statements.push(db.prepare("UPDATE auth_identities SET person_id=?,updated_at=? WHERE id=? AND person_id IS NULL").bind(personId, now, user.id));
+    statements.push(db.prepare("UPDATE auth_sessions SET person_id=? WHERE identity_id=?").bind(personId, user.id));
+    statements.push(db.prepare("INSERT INTO business_registrations(identity_id,person_id,business_id,branch_id,request_hash,confirmed_at) VALUES(?,?,?,?,?,?)").bind(user.id, personId, businessId, branchId, hash, now));
     const requestId = crypto.randomUUID();
-    await tx`INSERT INTO audit_events(id,actor_person_id,actor_membership_id,business_id,branch_id,request_id,correlation_id,action,target_type,target_id,after_json,occurred_at)
-      VALUES(${crypto.randomUUID()},${personId},${membershipId},${businessId},${branchId},${requestId},${requestId},'business.register','business',${businessId},${JSON.stringify({ confirmed: true, policy: "self-service-2026-09-20", modules: input.modules })},${now})`;
+    statements.push(db.prepare(`INSERT INTO audit_events(id,actor_person_id,actor_membership_id,business_id,branch_id,request_id,correlation_id,action,target_type,target_id,after_json,occurred_at)
+      VALUES(?,?,?,?,?,?,?,'business.register','business',?,?,?)`)
+      .bind(crypto.randomUUID(), personId, membershipId, businessId, branchId, requestId, requestId, businessId, JSON.stringify({ confirmed: true, policy: "self-service-2026-09-20", modules: input.modules }), now));
+    statements.push(db.prepare("DELETE FROM backend_guards WHERE id=?").bind(guard));
+    try { await db.batch(statements); }
+    catch (error) {
+      const concurrent = await readReceipt();
+      if (concurrent) return concurrent;
+      if (String(error).includes("ck_backend_authorization")) throw be1Error("FORBIDDEN");
+      throw error;
+    }
     return { businessId, branchId };
-  });
 }
 
 export async function registrationRequest(request: Request) {

@@ -1,31 +1,28 @@
 import { sql } from "drizzle-orm";
 import {
   check,
-  type AnyPgColumn,
-  bigint,
+  type AnySQLiteColumn,
   foreignKey,
   index,
   integer,
   primaryKey,
-  pgTable,
+  sqliteTable,
   text,
-  timestamp,
-  uuid,
   uniqueIndex,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 
 // BE4 and later mutations use these relational guards/receipts. Guards exist
-// only inside a PostgreSQL transaction and are deleted before commit; they are not domain data.
-export const backendGuards = pgTable("backend_guards", {
+// only inside an atomic D1 batch and are deleted before commit; they are not domain data.
+export const backendGuards = sqliteTable("backend_guards", {
   id: text("id").primaryKey().notNull(),
   allowed: integer("allowed").notNull(),
   versionOk: integer("version_ok").notNull().default(1),
 }, (table) => [check("ck_backend_authorization", sql`${table.allowed} = 1`), check("ck_backend_version", sql`${table.versionOk} = 1`)]);
 
-const lifecycle = (column: AnyPgColumn) =>
+const lifecycle = (column: AnySQLiteColumn) =>
   check(`ck_${column.name}_lifecycle`, sql`${column} in ('active', 'inactive')`);
 
-export const persons = pgTable("persons", {
+export const persons = sqliteTable("persons", {
   id: text("id").primaryKey().notNull(),
   displayName: text("display_name").notNull(),
   primaryEmail: text("primary_email"),
@@ -39,7 +36,7 @@ export const persons = pgTable("persons", {
   lifecycle(table.status),
 ]);
 
-export const businesses = pgTable("businesses", {
+export const businesses = sqliteTable("businesses", {
   id: text("id").primaryKey().notNull(),
   name: text("name").notNull(),
   contactName: text("contact_name").notNull().default(""),
@@ -59,7 +56,7 @@ export const businesses = pgTable("businesses", {
   lifecycle(table.status),
 ]);
 
-export const branches = pgTable("branches", {
+export const branches = sqliteTable("branches", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
@@ -83,7 +80,7 @@ export const branches = pgTable("branches", {
   lifecycle(table.status),
 ]);
 
-export const branchEnabledModules = pgTable("branch_enabled_modules", {
+export const branchEnabledModules = sqliteTable("branch_enabled_modules", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   module: text("module").notNull(),
@@ -100,7 +97,7 @@ export const branchEnabledModules = pgTable("branch_enabled_modules", {
   check("ck_branch_enabled_modules_module", sql`${table.module} in ('grooming', 'hotel', 'daycare')`),
 ]);
 
-export const branchOperatingHours = pgTable("branch_operating_hours", {
+export const branchOperatingHours = sqliteTable("branch_operating_hours", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   weekday: text("weekday").notNull(),
@@ -122,7 +119,7 @@ export const branchOperatingHours = pgTable("branch_operating_hours", {
   check("ck_branch_operating_hours_range", sql`${table.closed} = 1 or ${table.opensAt} < ${table.closesAt}`),
 ]);
 
-export const businessMemberships = pgTable("business_memberships", {
+export const businessMemberships = sqliteTable("business_memberships", {
   id: text("id").primaryKey().notNull(),
   personId: text("person_id").notNull().references(() => persons.id, { onDelete: "restrict" }),
   businessId: text("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
@@ -142,7 +139,7 @@ export const businessMemberships = pgTable("business_memberships", {
   lifecycle(table.status),
 ]);
 
-export const membershipBranchAccess = pgTable("membership_branch_access", {
+export const membershipBranchAccess = sqliteTable("membership_branch_access", {
   membershipId: text("membership_id").notNull(),
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
@@ -168,7 +165,7 @@ export const membershipBranchAccess = pgTable("membership_branch_access", {
   lifecycle(table.status),
 ]);
 
-export const auditEvents = pgTable("audit_events", {
+export const auditEvents = sqliteTable("audit_events", {
   id: text("id").primaryKey().notNull(),
   actorPersonId: text("actor_person_id").notNull().references(() => persons.id, { onDelete: "restrict" }),
   actorMembershipId: text("actor_membership_id").notNull().references(() => businessMemberships.id, { onDelete: "restrict" }),
@@ -195,7 +192,7 @@ export const auditEvents = pgTable("audit_events", {
   check("ck_audit_events_action", sql`length(trim(${table.action})) between 1 and 120`),
 ]);
 
-export const customers = pgTable("customers", {
+export const customers = sqliteTable("customers", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   displayName: text("display_name").notNull(),
@@ -223,7 +220,7 @@ export const customers = pgTable("customers", {
   lifecycle(table.status),
 ]);
 
-export const pets = pgTable("pets", {
+export const pets = sqliteTable("pets", {
   id: text("id").primaryKey().notNull(),
   createdAt: text("created_at").notNull(),
   createdByPersonId: text("created_by_person_id").references(() => persons.id, { onDelete: "restrict" }),
@@ -235,7 +232,7 @@ export const pets = pgTable("pets", {
 ]);
 
 /** Business-local mutable profile for an opaque shared Pet identity. */
-export const businessPetProfiles = pgTable("business_pet_profiles", {
+export const businessPetProfiles = sqliteTable("business_pet_profiles", {
   businessId: text("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   petId: text("pet_id").notNull().references(() => pets.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
@@ -260,7 +257,7 @@ export const businessPetProfiles = pgTable("business_pet_profiles", {
   lifecycle(table.status),
 ]);
 
-export const customerTags = pgTable("customer_tags", {
+export const customerTags = sqliteTable("customer_tags", {
   businessId: text("business_id").notNull(),
   customerId: text("customer_id").notNull(),
   tagKey: text("tag_key").notNull(),
@@ -287,7 +284,7 @@ export const customerTags = pgTable("customer_tags", {
  * A Business-local contact association only. It does not represent legal
  * ownership, Guardian status, Passport authority, consent, or an access grant.
  */
-export const customerPetRelationships = pgTable("customer_pet_relationships", {
+export const customerPetRelationships = sqliteTable("customer_pet_relationships", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull(),
   customerId: text("customer_id").notNull(),
@@ -317,7 +314,7 @@ export const customerPetRelationships = pgTable("customer_pet_relationships", {
 ]);
 
 /** BE3 planning service catalog. This is not service execution configuration. */
-export const bookingServices = pgTable("booking_services", {
+export const bookingServices = sqliteTable("booking_services", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
@@ -344,11 +341,11 @@ export const bookingServices = pgTable("booking_services", {
   check("ck_booking_services_time_model", sql`${table.timeModel} in ('appointment', 'date-range', 'day')`),
   check("ck_booking_services_label", sql`length(trim(${table.label})) between 1 and 160`),
   check("ck_booking_services_duration", sql`${table.defaultDurationMinutes} is null or ${table.defaultDurationMinutes} between 1 and 1440`),
-  check("ck_booking_services_estimate", sql`${table.estimate} is null or ${table.estimate} between 0 and 1000000`),
+  check("ck_booking_services_estimate", sql`${table.estimate} is null or ${table.estimate} between 0 and 100000000 and ${table.estimate}%100=0`),
   lifecycle(table.status),
 ]);
 
-export const bookingServiceResourceRequirements = pgTable("booking_service_resource_requirements", {
+export const bookingServiceResourceRequirements = sqliteTable("booking_service_resource_requirements", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   serviceId: text("service_id").notNull(),
@@ -368,7 +365,7 @@ export const bookingServiceResourceRequirements = pgTable("booking_service_resou
 ]);
 
 /** Minimal durable schedulable Resource projection; not Team/HR or Hotel room truth. */
-export const bookingResources = pgTable("booking_resources", {
+export const bookingResources = sqliteTable("booking_resources", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
@@ -402,7 +399,7 @@ export const bookingResources = pgTable("booking_resources", {
   lifecycle(table.status),
 ]);
 
-export const bookingResourceServiceLinks = pgTable("booking_resource_service_links", {
+export const bookingResourceServiceLinks = sqliteTable("booking_resource_service_links", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   resourceId: text("resource_id").notNull(),
@@ -424,7 +421,7 @@ export const bookingResourceServiceLinks = pgTable("booking_resource_service_lin
   index("idx_booking_resource_links_service").on(table.businessId, table.branchId, table.serviceId, table.resourceId),
 ]);
 
-export const bookingResourceAvailabilityWindows = pgTable("booking_resource_availability_windows", {
+export const bookingResourceAvailabilityWindows = sqliteTable("booking_resource_availability_windows", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
@@ -449,7 +446,7 @@ export const bookingResourceAvailabilityWindows = pgTable("booking_resource_avai
   check("ck_booking_resource_windows_range", sql`${table.endMinute} > ${table.startMinute}`),
 ]);
 
-export const bookings = pgTable("bookings", {
+export const bookings = sqliteTable("bookings", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
@@ -493,7 +490,7 @@ export const bookings = pgTable("bookings", {
     columns: [table.businessId, table.branchId, table.serviceId],
     foreignColumns: [bookingServices.businessId, bookingServices.branchId, bookingServices.id],
   }).onDelete("restrict"),
-  index("idx_bookings_branch_range").on(table.businessId, table.branchId, table.startMinute, table.endMinute, table.id),
+  index("idx_bookings_branch_range").on(table.businessId, table.branchId, table.startMinute, table.id, table.endMinute),
   index("idx_bookings_business_customer_range").on(table.businessId, table.customerId, table.startMinute, table.id),
   index("idx_bookings_branch_module_status_range").on(table.businessId, table.branchId, table.serviceModule, table.status, table.startMinute),
   check("ck_bookings_id", sql`length(${table.id}) >= 8`),
@@ -502,13 +499,13 @@ export const bookings = pgTable("bookings", {
   check("ck_bookings_status", sql`${table.status} in ('pending', 'confirmed', 'arrived', 'cancelled')`),
   check("ck_bookings_interval", sql`${table.endMinute} > ${table.startMinute}`),
   check("ck_bookings_end_shape", sql`(${table.timeModel} = 'day' and ${table.endLocal} is null) or (${table.timeModel} <> 'day' and ${table.endLocal} is not null)`),
-  check("ck_bookings_estimate", sql`${table.estimate} is null or ${table.estimate} between 0 and 1000000`),
+  check("ck_bookings_estimate", sql`${table.estimate} is null or ${table.estimate} between 0 and 100000000 and ${table.estimate}%100=0`),
   check("ck_bookings_notes", sql`length(${table.notes}) <= 4000`),
   check("ck_bookings_revision", sql`${table.revision} >= 1`),
   check("ck_bookings_idempotency", sql`(${table.idempotencyKey} is null and ${table.createRequestHash} is null) or (${table.idempotencyKey} is not null and length(${table.idempotencyKey}) between 8 and 160 and length(${table.createRequestHash}) = 64)`),
 ]);
 
-export const bookingPets = pgTable("booking_pets", {
+export const bookingPets = sqliteTable("booking_pets", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   bookingId: text("booking_id").notNull(),
@@ -532,7 +529,7 @@ export const bookingPets = pgTable("booking_pets", {
   check("ck_booking_pets_position", sql`${table.position} between 0 and 23`),
 ]);
 
-export const bookingResourceAssignments = pgTable("booking_resource_assignments", {
+export const bookingResourceAssignments = sqliteTable("booking_resource_assignments", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   bookingId: text("booking_id").notNull(),
@@ -556,8 +553,8 @@ export const bookingResourceAssignments = pgTable("booking_resource_assignments"
   check("ck_booking_assignments_position", sql`${table.position} between 0 and 23`),
 ]);
 
-/** Write-time reservation ledger guarded inside serializable PostgreSQL transactions. */
-export const bookingResourceReservations = pgTable("booking_resource_reservations", {
+/** Write-time reservation ledger guarded inside atomic D1 transactions. */
+export const bookingResourceReservations = sqliteTable("booking_resource_reservations", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   bookingId: text("booking_id").notNull(),
@@ -581,7 +578,7 @@ export const bookingResourceReservations = pgTable("booking_resource_reservation
 ]);
 
 /** A final statement per mutation; its trigger revalidates the complete aggregate. */
-export const bookingWriteCommits = pgTable("booking_write_commits", {
+export const bookingWriteCommits = sqliteTable("booking_write_commits", {
   businessId: text("business_id").notNull(),
   branchId: text("branch_id").notNull(),
   bookingId: text("booking_id").notNull(),
@@ -598,7 +595,7 @@ export const bookingWriteCommits = pgTable("booking_write_commits", {
   index("idx_booking_write_commits_token").on(table.writeToken),
 ]);
 
-export const backendMutations = pgTable("backend_mutations", {
+export const backendMutations = sqliteTable("backend_mutations", {
   businessId: text("business_id").notNull().references(() => businesses.id),
   branchId: text("branch_id").notNull(),
   command: text("command").notNull(),
@@ -615,7 +612,7 @@ export const backendMutations = pgTable("backend_mutations", {
 
 // A Business-local operational staff profile is separate from a login or
 // membership. An optional Person link never creates authorization.
-export const operationStaff = pgTable("operation_staff", {
+export const operationStaff = sqliteTable("operation_staff", {
   id: text("id").primaryKey().notNull(),
   businessId: text("business_id").notNull().references(() => businesses.id),
   personId: text("person_id").references(() => persons.id),
@@ -630,11 +627,11 @@ export const operationStaff = pgTable("operation_staff", {
 }, (t) => [
   uniqueIndex("uq_operation_staff_scope").on(t.businessId, t.id),
   check("ck_operation_staff_role", sql`${t.displayRole} in ('owner','manager','staff')`),
-  check("ck_operation_staff_capabilities", sql`(${t.capabilities} IS JSON)`),
+  check("ck_operation_staff_capabilities", sql`json_valid(${t.capabilities})`),
   lifecycle(t.status),
 ]);
 
-export const operationStaffBranches = pgTable("operation_staff_branches", {
+export const operationStaffBranches = sqliteTable("operation_staff_branches", {
   businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), staffId: text("staff_id").notNull(),
 }, (t) => [
   primaryKey({ columns: [t.businessId, t.branchId, t.staffId] }),
@@ -642,7 +639,7 @@ export const operationStaffBranches = pgTable("operation_staff_branches", {
   foreignKey({ columns: [t.businessId, t.staffId], foreignColumns: [operationStaff.businessId, operationStaff.id] }),
 ]);
 
-export const operationStaffWindows = pgTable("operation_staff_windows", {
+export const operationStaffWindows = sqliteTable("operation_staff_windows", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), staffId: text("staff_id").notNull(),
   state: text("state").notNull(), startLocal: text("start_local").notNull(), endLocal: text("end_local").notNull(), note: text("note"),
 }, (t) => [
@@ -652,7 +649,7 @@ export const operationStaffWindows = pgTable("operation_staff_windows", {
   check("ck_operation_staff_window_range", sql`${t.startLocal} < ${t.endLocal} or (${t.startLocal} = ${t.endLocal} and length(${t.startLocal}) = 10)`),
 ]);
 
-export const hotelSpaces = pgTable("hotel_spaces", {
+export const hotelSpaces = sqliteTable("hotel_spaces", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
   serviceId: text("service_id").notNull(), label: text("label").notNull(), kind: text("kind").notNull(),
   capacity: integer("capacity").notNull(), status: text("status").notNull().default("active"),
@@ -667,7 +664,7 @@ export const hotelSpaces = pgTable("hotel_spaces", {
 // The discriminator represents three execution aggregates, not a Booking
 // status. Only operational scalar details are JSON; references, assignments,
 // events, care tasks and Service Records have independent constrained rows.
-export const serviceExecutions = pgTable("service_executions", {
+export const serviceExecutions = sqliteTable("service_executions", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
   bookingId: text("booking_id").notNull(), customerId: text("customer_id").notNull(), petId: text("pet_id").notNull(),
   module: text("module").notNull(), status: text("status").notNull(), intakeId: text("intake_id"),
@@ -685,12 +682,12 @@ export const serviceExecutions = pgTable("service_executions", {
   index("idx_executions_customer").on(t.businessId, t.customerId, t.branchId, t.updatedAt),
   check("ck_executions_module", sql`${t.module} in ('grooming','hotel','daycare')`),
   check("ck_executions_revision", sql`${t.revision} >= 1`),
-  check("ck_executions_details", sql`(${t.details} IS JSON) and length(${t.details}) <= 16000`),
+  check("ck_executions_details", sql`json_valid(${t.details}) and length(${t.details}) <= 16000`),
   check("ck_executions_note", sql`length(${t.businessNote}) <= 4000`),
   check("ck_executions_status", sql`(${t.module} = 'grooming' and ${t.status} in ('booked','checked-in','waiting','in-service','ready-for-pickup','completed','cancelled')) or (${t.module} = 'hotel' and ${t.status} in ('booked','expected-today','checked-in','in-stay','ready-for-checkout','checked-out','completed','cancelled','no-show')) or (${t.module} = 'daycare' and ${t.status} in ('booked','checked-in','active','ready-for-pickup','checked-out','completed','cancelled'))`),
 ]);
 
-export const executionAssignments = pgTable("execution_assignments", {
+export const executionAssignments = sqliteTable("execution_assignments", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
   executionId: text("execution_id").notNull(), resourceId: text("resource_id"), spaceId: text("space_id"), staffId: text("staff_id"),
   startLocal: text("start_local").notNull(), endLocal: text("end_local").notNull(),
@@ -703,23 +700,23 @@ export const executionAssignments = pgTable("execution_assignments", {
   index("idx_execution_assignments_source").on(t.businessId, t.branchId, t.executionId),
   index("idx_execution_assignments_resource").on(t.businessId, t.branchId, t.resourceId, t.startLocal, t.endLocal),
   index("idx_execution_assignments_space").on(t.businessId, t.branchId, t.spaceId, t.startLocal, t.endLocal),
-  check("ck_execution_assignment_target", sql`(${t.resourceId} is not null)::integer + (${t.spaceId} is not null)::integer + (${t.staffId} is not null)::integer = 1`),
+  check("ck_execution_assignment_target", sql`(${t.resourceId} is not null) + (${t.spaceId} is not null) + (${t.staffId} is not null) = 1`),
   check("ck_execution_assignment_range", sql`${t.endLocal} >= ${t.startLocal}`),
 ]);
 
-export const executionEvents = pgTable("execution_events", {
-  sequence: bigint("sequence", { mode: "number" }).generatedAlwaysAsIdentity().unique(),
-  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
+export const executionEvents = sqliteTable("execution_events", {
+  sequence: integer("sequence").primaryKey({ autoIncrement: true }),
+  id: text("id").notNull().unique(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
   kind: text("kind").notNull(), summary: text("summary").notNull(), data: text("data_json").notNull().default("{}"),
   actorPersonId: text("actor_person_id").references(() => persons.id), occurredAt: text("occurred_at").notNull(),
 }, (t) => [
   uniqueIndex("uq_execution_event_scope").on(t.businessId, t.branchId, t.id),
   foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
   index("idx_execution_events_source").on(t.businessId, t.branchId, t.executionId, t.occurredAt, t.id),
-  check("ck_execution_events_json", sql`(${t.data} IS JSON) and length(${t.data}) <= 16000`),
+  check("ck_execution_events_json", sql`json_valid(${t.data}) and length(${t.data}) <= 16000`),
 ]);
 
-export const executionCareTasks = pgTable("execution_care_tasks", {
+export const executionCareTasks = sqliteTable("execution_care_tasks", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
   kind: text("kind").notNull(), label: text("label").notNull(), scheduledDate: text("scheduled_date").notNull(), scheduledTime: text("scheduled_time").notNull(),
   staffId: text("staff_id"), completedAt: text("completed_at"), completedBy: text("completed_by").references(() => persons.id), instructions: text("instructions"), authorizedIntakeId: text("authorized_intake_id"),
@@ -730,7 +727,7 @@ export const executionCareTasks = pgTable("execution_care_tasks", {
   check("ck_execution_care_kind", sql`${t.kind} in ('meal','water','medication','activity','cleaning','check','note','other')`),
 ]);
 
-export const serviceRecords = pgTable("service_records", {
+export const serviceRecords = sqliteTable("service_records", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), executionId: text("execution_id").notNull(),
   customerId: text("customer_id").notNull(), petId: text("pet_id").notNull(), completedAt: text("completed_at").notNull(),
   summary: text("summary").notNull(), businessNote: text("business_note").notNull(), snapshot: text("snapshot_json").notNull(),
@@ -742,33 +739,33 @@ export const serviceRecords = pgTable("service_records", {
   foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
   foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
   index("idx_service_records_history").on(t.businessId, t.branchId, t.customerId, t.completedAt, t.id),
-  check("ck_service_record_snapshot", sql`(${t.snapshot} IS JSON)`),
+  check("ck_service_record_snapshot", sql`json_valid(${t.snapshot})`),
 ]);
 
-export const serviceRecordRevisions = pgTable("service_record_revisions", {
+export const serviceRecordRevisions = sqliteTable("service_record_revisions", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), recordId: text("record_id").notNull(),
   kind: text("kind").notNull(), data: text("data_json").notNull(), actorPersonId: text("actor_person_id").notNull().references(() => persons.id), occurredAt: text("occurred_at").notNull(),
 }, (t) => [
   foreignKey({ columns: [t.businessId, t.branchId, t.recordId], foreignColumns: [serviceRecords.businessId, serviceRecords.branchId, serviceRecords.id] }),
   index("idx_service_record_revisions").on(t.businessId, t.branchId, t.recordId, t.occurredAt, t.id),
   check("ck_service_record_revision_kind", sql`${t.kind} in ('correction','source-recompleted')`),
-  check("ck_service_record_revision_json", sql`(${t.data} IS JSON)`),
+  check("ck_service_record_revision_json", sql`json_valid(${t.data})`),
 ]);
 
 // BE5: Passport authority belongs to a Person/Pet relationship, never a Business Customer.
-export const passportProfiles = pgTable("passport_profiles", {
+export const passportProfiles = sqliteTable("passport_profiles", {
   petId: text("pet_id").primaryKey().notNull().references(() => pets.id),
   name: text("name").notNull(), species: text("species").notNull(), reference: text("reference").notNull(),
   photoObjectKey: text("photo_object_key"), revision: integer("revision").notNull().default(1), updatedAt: text("updated_at").notNull(),
 }, (t) => [check("ck_passport_species", sql`${t.species} in ('cat','dog')`), check("ck_passport_name", sql`length(${t.name}) between 1 and 160`)]);
-export const petAuthorities = pgTable("pet_authorities", {
+export const petAuthorities = sqliteTable("pet_authorities", {
   id: text("id").primaryKey().notNull(), personId: text("person_id").notNull().references(() => persons.id), petId: text("pet_id").notNull().references(() => pets.id),
   role: text("role").notNull(), status: text("status").notNull().default("active"), source: text("source").notNull(),
   providerReference: text("provider_reference"), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
 }, (t) => [uniqueIndex("uq_pet_authority_person").on(t.personId, t.petId), uniqueIndex("uq_pet_authority_pet").on(t.id, t.petId),
   check("ck_pet_authority_role", sql`${t.role} in ('primary','co-guardian')`), check("ck_pet_authority_status", sql`${t.status} in ('active','inactive')`),
   check("ck_pet_authority_source", sql`${t.source} in ('dev-test','verified-provider')`)]);
-export const consents = pgTable("consents", {
+export const consents = sqliteTable("consents", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(),
   authorityId: text("authority_id").notNull(), petId: text("pet_id").notNull(), status: text("status").notNull(),
   decidedAt: text("decided_at"), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
@@ -776,7 +773,7 @@ export const consents = pgTable("consents", {
   foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
   foreignKey({ columns: [t.authorityId, t.petId], foreignColumns: [petAuthorities.id, petAuthorities.petId] }),
   check("ck_consent_status", sql`${t.status} in ('pending','approved','denied')`)]);
-export const accessGrants = pgTable("access_grants", {
+export const accessGrants = sqliteTable("access_grants", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), consentId: text("consent_id").notNull(),
   tokenHash: text("token_hash").notNull(), purpose: text("purpose").notNull(), expiresAt: text("expires_at").notNull(), revokedAt: text("revoked_at"),
   revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
@@ -784,16 +781,16 @@ export const accessGrants = pgTable("access_grants", {
   foreignKey({ columns: [t.businessId, t.branchId, t.consentId], foreignColumns: [consents.businessId, consents.branchId, consents.id] }),
   index("idx_access_grant_expiry").on(t.businessId, t.branchId, t.expiresAt), check("ck_access_grant_token", sql`length(${t.tokenHash})=64`),
   check("ck_access_grant_expiry", sql`${t.expiresAt}>${t.createdAt}`), check("ck_access_grant_purpose", sql`length(${t.purpose}) between 1 and 500`)]);
-export const accessGrantScopes = pgTable("access_grant_scopes", {
+export const accessGrantScopes = sqliteTable("access_grant_scopes", {
   grantId: text("grant_id").notNull().references(() => accessGrants.id), scope: text("scope").notNull(),
 }, (t) => [primaryKey({ columns: [t.grantId, t.scope] }), check("ck_access_grant_scope", sql`${t.scope} in ('basicIdentity','photo','passportReference')`)]);
-export const accessEvents = pgTable("access_events", {
-  sequence: bigint("sequence", { mode: "number" }).generatedAlwaysAsIdentity().unique(),
-  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), grantId: text("grant_id").notNull(),
+export const accessEvents = sqliteTable("access_events", {
+  sequence: integer("sequence").primaryKey({ autoIncrement: true }),
+  id: text("id").notNull().unique(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), grantId: text("grant_id").notNull(),
   kind: text("kind").notNull(), actorPersonId: text("actor_person_id").notNull().references(() => persons.id), metadata: text("metadata_json").notNull().default("{}"), occurredAt: text("occurred_at").notNull(),
 }, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.grantId], foreignColumns: [accessGrants.businessId, accessGrants.branchId, accessGrants.id] }),
-  index("idx_access_events_grant").on(t.businessId, t.branchId, t.grantId, t.occurredAt), check("ck_access_event_json", sql`(${t.metadata} IS JSON) and length(${t.metadata})<=2000`)]);
-export const businessIntakes = pgTable("business_intakes", {
+  index("idx_access_events_grant").on(t.businessId, t.branchId, t.grantId, t.occurredAt), check("ck_access_event_json", sql`json_valid(${t.metadata}) and length(${t.metadata})<=2000`)]);
+export const businessIntakes = sqliteTable("business_intakes", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), grantId: text("grant_id").notNull(), targetKey: text("target_key").notNull(),
   customerId: text("customer_id"), petId: text("pet_id"), executionId: text("execution_id"), belongings: text("belongings_json").notNull().default("[]"),
   businessNote: text("business_note").notNull().default(""), taskState: text("task_state").notNull().default("allowed-data"), checkedInAt: text("checked_in_at"),
@@ -803,32 +800,33 @@ export const businessIntakes = pgTable("business_intakes", {
   foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
   foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
   foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
-  index("idx_intake_branch").on(t.businessId, t.branchId, t.updatedAt), check("ck_intake_belongings", sql`(${t.belongings} IS JSON) and length(${t.belongings})<=2000`),
+  index("idx_intake_branch").on(t.businessId, t.branchId, t.updatedAt), check("ck_intake_belongings", sql`json_valid(${t.belongings}) and length(${t.belongings})<=2000`),
   check("ck_intake_note", sql`length(${t.businessNote})<=4000`), check("ck_intake_task", sql`${t.taskState} in ('allowed-data','intake','review','complete')`)]);
-export const intakeCorrections = pgTable("intake_corrections", {
-  sequence: bigint("sequence", { mode: "number" }).generatedAlwaysAsIdentity().unique(),
-  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), intakeId: text("intake_id").notNull(),
+export const intakeCorrections = sqliteTable("intake_corrections", {
+  sequence: integer("sequence").primaryKey({ autoIncrement: true }),
+  id: text("id").notNull().unique(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), intakeId: text("intake_id").notNull(),
   topic: text("topic").notNull(), currentValue: text("current_value").notNull(), suggestedValue: text("suggested_value").notNull(), note: text("note").notNull(),
   actorPersonId: text("actor_person_id").notNull().references(() => persons.id), createdAt: text("created_at").notNull(),
 }, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.intakeId], foreignColumns: [businessIntakes.businessId, businessIntakes.branchId, businessIntakes.id] }),
   index("idx_intake_corrections_source").on(t.businessId, t.branchId, t.intakeId, t.createdAt), check("ck_intake_correction_topic", sql`${t.topic} in ('name','species','passport-reference')`)]);
 
 // BE6: Business/Customer conversation identity; each context and message retains Branch privacy.
-export const conversations = pgTable("conversations", {
+export const conversations = sqliteTable("conversations", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), customerId: text("customer_id").notNull(), createdAt: text("created_at").notNull(),
 }, (t) => [uniqueIndex("uq_conversation_customer").on(t.businessId, t.customerId), uniqueIndex("uq_conversation_scope").on(t.businessId, t.id),
   foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] })]);
-export const conversationContexts = pgTable("conversation_contexts", {
+export const conversationContexts = sqliteTable("conversation_contexts", {
   businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(),
   petId: text("pet_id"), bookingId: text("booking_id"), executionId: text("execution_id"), revision: integer("revision").notNull().default(1), updatedAt: text("updated_at").notNull(),
 }, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.conversationId] }),
+  index("idx_conversation_contexts_conversation").on(t.businessId, t.conversationId, t.branchId),
   foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
   foreignKey({ columns: [t.businessId, t.conversationId], foreignColumns: [conversations.businessId, conversations.id] }),
   foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.bookingId], foreignColumns: [bookings.businessId, bookings.branchId, bookings.id] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] })]);
-export const messages = pgTable("messages", {
-  sequence: bigint("sequence", { mode: "number" }).generatedByDefaultAsIdentity().primaryKey(), id: text("id").notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(),
+export const messages = sqliteTable("messages", {
+  sequence: integer("sequence").primaryKey({ autoIncrement: true }), id: text("id").notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(),
   kind: text("kind").notNull(), direction: text("direction").notNull(), body: text("body").notNull(), petId: text("pet_id"), bookingId: text("booking_id"), executionId: text("execution_id"),
   actorPersonId: text("actor_person_id").references(() => persons.id), occurredAt: text("occurred_at").notNull(), createdAt: text("created_at").notNull(),
 }, (t) => [uniqueIndex("uq_message_id").on(t.id), uniqueIndex("uq_message_scope").on(t.businessId, t.branchId, t.id),
@@ -838,35 +836,35 @@ export const messages = pgTable("messages", {
   foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
   index("idx_messages_conversation_order").on(t.businessId, t.conversationId, t.branchId, t.sequence),
   check("ck_message_kind", sql`${t.kind} in ('text','add-service-request')`), check("ck_message_direction", sql`${t.direction} in ('business','customer')`), check("ck_message_length", sql`length(${t.body}) between 1 and 5000`)]);
-export const conversationReads = pgTable("conversation_reads", {
+export const conversationReads = sqliteTable("conversation_reads", {
   businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), conversationId: text("conversation_id").notNull(), personId: text("person_id").notNull().references(() => persons.id),
-  throughSequence: bigint("through_sequence", { mode: "number" }).notNull(), readAt: text("read_at").notNull(),
+  throughSequence: integer("through_sequence").notNull(), readAt: text("read_at").notNull(),
 }, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.conversationId, t.personId] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.conversationId], foreignColumns: [conversationContexts.businessId, conversationContexts.branchId, conversationContexts.conversationId] }),
   check("ck_conversation_read_cursor", sql`${t.throughSequence}>=0`)]);
-export const messageApprovals = pgTable("message_approvals", {
+export const messageApprovals = sqliteTable("message_approvals", {
   messageId: text("message_id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), serviceName: text("service_name").notNull(),
   additionalPrice: integer("additional_price").notNull(), additionalMinutes: integer("additional_minutes").notNull(), note: text("note").notNull(),
   status: text("status").notNull().default("waiting"), revision: integer("revision").notNull().default(1), respondedAt: text("responded_at"), authorityId: text("authority_id").references(() => petAuthorities.id), responseSource: text("response_source"),
 }, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.messageId], foreignColumns: [messages.businessId, messages.branchId, messages.id] }),
-  check("ck_message_approval_status", sql`${t.status} in ('waiting','approved','declined','cancelled','expired')`), check("ck_message_approval_amounts", sql`${t.additionalPrice} between 0 and 10000000 and ${t.additionalMinutes} between 0 and 1440`)]);
-export const businessChannels = pgTable("business_channels", {
+  check("ck_message_approval_status", sql`${t.status} in ('waiting','approved','declined','cancelled','expired')`), check("ck_message_approval_amounts", sql`${t.additionalPrice} between 0 and 1000000000 and ${t.additionalPrice}%100=0 and ${t.additionalMinutes} between 0 and 1440`)]);
+export const businessChannels = sqliteTable("business_channels", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), provider: text("provider").notNull(), state: text("state").notNull(),
   externalAccountId: text("external_account_id").notNull(), secretRef: text("secret_ref").notNull(), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
 }, (t) => [uniqueIndex("uq_business_channel_provider").on(t.businessId, t.provider), uniqueIndex("uq_channel_external_account").on(t.provider, t.externalAccountId), uniqueIndex("uq_channel_scope").on(t.businessId, t.id),
   foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }), check("ck_channel_provider", sql`${t.provider} in ('line','mock')`), check("ck_channel_state", sql`${t.state} in ('active','disconnected')`)]);
-export const customerChannelLinks = pgTable("customer_channel_links", {
+export const customerChannelLinks = sqliteTable("customer_channel_links", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), channelId: text("channel_id").notNull(), customerId: text("customer_id").notNull(),
   externalSubject: text("external_subject").notNull(), status: text("status").notNull(), verificationSource: text("verification_source").notNull(), revision: integer("revision").notNull().default(1), createdAt: text("created_at").notNull(),
 }, (t) => [uniqueIndex("uq_channel_customer").on(t.channelId, t.customerId), uniqueIndex("uq_channel_subject").on(t.channelId, t.externalSubject), uniqueIndex("uq_channel_link_scope").on(t.businessId, t.channelId, t.id),
   foreignKey({ columns: [t.businessId, t.channelId], foreignColumns: [businessChannels.businessId, businessChannels.id] }), foreignKey({ columns: [t.businessId, t.customerId], foreignColumns: [customers.businessId, customers.id] }),
   check("ck_channel_link_status", sql`${t.status} in ('active','inactive')`), check("ck_channel_link_source", sql`${t.verificationSource} in ('dev-test','verified-provider')`)]);
 // Provider proof links Person only. It confers no Customer relationship or Pet authority.
-export const personExternalIdentities = pgTable("person_external_identities", {
+export const personExternalIdentities = sqliteTable("person_external_identities", {
   id: text("id").primaryKey().notNull(), personId: text("person_id").notNull().references(() => persons.id), provider: text("provider").notNull(), issuer: text("issuer").notNull(),
   subject: text("subject").notNull(), verifiedAt: text("verified_at").notNull(), status: text("status").notNull(),
 }, (t) => [uniqueIndex("uq_external_identity_subject").on(t.provider, t.issuer, t.subject), check("ck_external_identity_status", sql`${t.status} in ('active','inactive')`)]);
-export const messageOutbox = pgTable("message_outbox", {
+export const messageOutbox = sqliteTable("message_outbox", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), messageId: text("message_id").notNull(), channelId: text("channel_id"), linkId: text("link_id"), recipient: text("recipient"),
   retryKey: text("retry_key").notNull(), state: text("state").notNull(), attempts: integer("attempts").notNull().default(0), firstAttemptAt: text("first_attempt_at"), availableAt: text("available_at").notNull(),
   leaseToken: text("lease_token"), leaseUntil: text("lease_until"), providerMessageId: text("provider_message_id"), providerRequestId: text("provider_request_id"), failureCode: text("failure_code"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
@@ -875,21 +873,21 @@ export const messageOutbox = pgTable("message_outbox", {
   foreignKey({ columns: [t.businessId, t.channelId, t.linkId], foreignColumns: [customerChannelLinks.businessId, customerChannelLinks.channelId, customerChannelLinks.id] }),
   foreignKey({ columns: [t.businessId, t.channelId], foreignColumns: [businessChannels.businessId, businessChannels.id] }),
   index("idx_outbox_due").on(t.state, t.availableAt, t.leaseUntil), check("ck_outbox_state", sql`${t.state} in ('blocked','queued','sending','retry','sent','failed')`)]);
-export const channelWebhookEvents = pgTable("channel_webhook_events", {
+export const channelWebhookEvents = sqliteTable("channel_webhook_events", {
   channelId: text("channel_id").notNull(), eventId: text("event_id").notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), eventHash: text("event_hash").notNull(),
   providerMessageId: text("provider_message_id").notNull(), externalSubject: text("external_subject").notNull(), messageId: text("message_id"), state: text("state").notNull(), pendingBody: text("pending_body"), occurredAt: text("occurred_at").notNull(), receivedAt: text("received_at").notNull(),
 }, (t) => [primaryKey({ columns: [t.channelId, t.eventId] }), uniqueIndex("uq_channel_provider_message").on(t.channelId, t.providerMessageId),
   foreignKey({ columns: [t.businessId, t.channelId], foreignColumns: [businessChannels.businessId, businessChannels.id] }), foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.messageId], foreignColumns: [messages.businessId, messages.branchId, messages.id] }),
   index("idx_channel_pending_events").on(t.channelId, t.state, t.receivedAt), check("ck_channel_event_state", sql`${t.state} in ('received','unlinked')`)]);
-export const outboxAttempts = pgTable("outbox_attempts", {
+export const outboxAttempts = sqliteTable("outbox_attempts", {
   id: text("id").primaryKey().notNull(), outboxId: text("outbox_id").notNull().references(() => messageOutbox.id),
   startedAt: text("started_at").notNull(), finishedAt: text("finished_at"), outcome: text("outcome").notNull().default("sending"), failureCode: text("failure_code"), providerRequestId: text("provider_request_id"),
 }, (t) => [index("idx_outbox_attempt_history").on(t.outboxId, t.startedAt), check("ck_outbox_attempt_outcome", sql`${t.outcome} in ('sending','accepted','retry','failed','not-connected')`)]);
 
 // BE7 stores integer satang. The current Product accepts whole THB only.
 // Charge items describe debt; Payments and Refunds describe money movement.
-export const charges = pgTable("charges", {
+export const charges = sqliteTable("charges", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), bookingId: text("booking_id").notNull(), customerId: text("customer_id").notNull(),
   petId: text("pet_id"), executionId: text("execution_id"), module: text("module").notNull(), serviceLabel: text("service_label").notNull(), currency: text("currency").notNull().default("THB"),
   cancelledAt: text("cancelled_at"), cancellationReason: text("cancellation_reason"), revision: integer("revision").notNull().default(1),
@@ -902,29 +900,30 @@ export const charges = pgTable("charges", {
   index("idx_charge_customer").on(t.businessId, t.branchId, t.customerId, t.createdAt), check("ck_charge_currency", sql`${t.currency}='THB'`),
   check("ck_charge_module", sql`${t.module} in ('grooming','hotel','daycare')`), check("ck_charge_revision", sql`${t.revision}>0`),
   check("ck_charge_cancellation", sql`(${t.cancelledAt} is null and ${t.cancellationReason} is null) or (${t.cancelledAt} is not null and length(trim(${t.cancellationReason})) between 1 and 1000)`)]);
-export const chargeItems = pgTable("charge_items", {
-  eventSequence: bigint("event_sequence", { mode: "number" }).generatedAlwaysAsIdentity().notNull(),
-  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(), kind: text("kind").notNull(), label: text("label").notNull(),
+export const chargeItems = sqliteTable("charge_items", {
+  eventSequence: integer("event_sequence").primaryKey({ autoIncrement: true }),
+  id: text("id").notNull().unique(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(), kind: text("kind").notNull(), label: text("label").notNull(),
   amountMinor: integer("amount_minor").notNull(), reason: text("reason"), sourceEventId: text("source_event_id"), executionId: text("execution_id"), createdAt: text("created_at").notNull(),
 }, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.executionId], foreignColumns: [serviceExecutions.businessId, serviceExecutions.branchId, serviceExecutions.id] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.sourceEventId], foreignColumns: [executionEvents.businessId, executionEvents.branchId, executionEvents.id] }),
+  uniqueIndex("uq_charge_base_item").on(t.chargeId).where(sql`${t.kind}='base-service'`),
   uniqueIndex("uq_charge_source_event").on(t.chargeId, t.sourceEventId), index("idx_charge_items").on(t.businessId, t.branchId, t.chargeId),
   check("ck_charge_item_kind", sql`${t.kind} in ('base-service','add-on','manual-adjustment','discount')`),
   check("ck_charge_item_amount", sql`abs(${t.amountMinor})<=1000000000 and ${t.amountMinor}%100=0 and ((${t.kind}='discount' and ${t.amountMinor}<0) or (${t.kind}<>'discount' and ${t.amountMinor}>=0))`),
   check("ck_charge_item_label", sql`length(trim(${t.label})) between 1 and 160`), check("ck_charge_item_reason", sql`${t.kind} not in ('discount','manual-adjustment') or length(trim(${t.reason})) between 1 and 1000`)]);
-export const chargeEvents = pgTable("charge_events", {
-  eventSequence: bigint("event_sequence", { mode: "number" }).generatedAlwaysAsIdentity().notNull(),
-  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(),
+export const chargeEvents = sqliteTable("charge_events", {
+  eventSequence: integer("event_sequence").primaryKey({ autoIncrement: true }),
+  id: text("id").notNull().unique(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(),
   kind: text("kind").notNull(), summary: text("summary").notNull(), actorPersonId: text("actor_person_id").notNull().references(() => persons.id), occurredAt: text("occurred_at").notNull(),
 }, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }),
   index("idx_charge_events").on(t.businessId, t.branchId, t.chargeId, t.occurredAt), check("ck_charge_event_kind", sql`${t.kind} in ('created','adjusted','cancelled')`)]);
-export const paymentProviderAccounts = pgTable("payment_provider_accounts", {
+export const paymentProviderAccounts = sqliteTable("payment_provider_accounts", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull().references(() => businesses.id), provider: text("provider").notNull(), externalAccountId: text("external_account_id").notNull(),
   secretRef: text("secret_ref").notNull(), source: text("source").notNull(), status: text("status").notNull().default("active"), revision: integer("revision").notNull().default(1),
 }, (t) => [uniqueIndex("uq_payment_account_scope").on(t.businessId, t.id), uniqueIndex("uq_payment_external_account").on(t.provider, t.externalAccountId),
   check("ck_payment_account_source", sql`${t.source} in ('dev-test','verified-provider')`), check("ck_payment_account_status", sql`${t.status} in ('active','inactive')`)]);
-export const paymentAttempts = pgTable("payment_attempts", {
+export const paymentAttempts = sqliteTable("payment_attempts", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), chargeId: text("charge_id").notNull(), accountId: text("account_id").notNull(),
   amountMinor: integer("amount_minor").notNull(), currency: text("currency").notNull().default("THB"), idempotencyKey: text("idempotency_key").notNull(), state: text("state").notNull().default("created"),
   providerReference: text("provider_reference"), attempts: integer("attempts").notNull().default(0), leaseToken: text("lease_token"), leaseUntil: text("lease_until"),
@@ -936,7 +935,7 @@ export const paymentAttempts = pgTable("payment_attempts", {
   index("idx_payment_attempt_due").on(t.state, t.nextAttemptAt, t.leaseUntil), index("idx_payment_attempt_charge").on(t.businessId, t.branchId, t.chargeId, t.state),
   check("ck_payment_attempt_amount", sql`${t.amountMinor} between 100 and 1000000000 and ${t.amountMinor}%100=0 and ${t.currency}='THB'`),
   check("ck_payment_attempt_state", sql`${t.state} in ('created','pending','retry','failed','succeeded','reconciliation')`)]);
-export const payments = pgTable("payments", {
+export const payments = sqliteTable("payments", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), customerId: text("customer_id").notNull(),
   amountMinor: integer("amount_minor").notNull(), currency: text("currency").notNull().default("THB"), method: text("method").notNull(), source: text("source").notNull(),
   attemptId: text("attempt_id"), accountId: text("account_id"), providerReference: text("provider_reference"), note: text("note").notNull().default(""),
@@ -948,44 +947,80 @@ export const payments = pgTable("payments", {
   index("idx_payment_branch_date").on(t.businessId, t.branchId, t.occurredAt), index("idx_payment_customer").on(t.businessId, t.customerId, t.branchId, t.occurredAt),
   check("ck_payment_amount", sql`${t.amountMinor} between 100 and 1000000000 and ${t.amountMinor}%100=0 and ${t.currency}='THB'`),
   check("ck_payment_method", sql`${t.method} in ('cash','bank-transfer','other')`), check("ck_payment_source", sql`(${t.source}='manual' and ${t.attemptId} is null and ${t.accountId} is null and ${t.providerReference} is null) or (${t.source}='provider' and ${t.attemptId} is not null and ${t.accountId} is not null and ${t.providerReference} is not null)`)]);
-export const paymentAllocations = pgTable("payment_allocations", {
+export const paymentAllocations = sqliteTable("payment_allocations", {
   businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), paymentId: text("payment_id").notNull(), chargeId: text("charge_id").notNull(), amountMinor: integer("amount_minor").notNull(),
 }, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.paymentId, t.chargeId] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.paymentId], foreignColumns: [payments.businessId, payments.branchId, payments.id] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.chargeId], foreignColumns: [charges.businessId, charges.branchId, charges.id] }), index("idx_payment_allocation_charge").on(t.businessId, t.branchId, t.chargeId),
   check("ck_payment_allocation_amount", sql`${t.amountMinor}>0 and ${t.amountMinor}%100=0`)]);
-export const paymentRefunds = pgTable("payment_refunds", {
+export const paymentRefunds = sqliteTable("payment_refunds", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), paymentId: text("payment_id").notNull(),
   amountMinor: integer("amount_minor").notNull(), reason: text("reason").notNull(), recordedBy: text("recorded_by").notNull().references(() => persons.id), recordedAt: text("recorded_at").notNull(),
 }, (t) => [uniqueIndex("uq_refund_scope").on(t.businessId, t.branchId, t.id), uniqueIndex("uq_refund_payment_scope").on(t.businessId, t.branchId, t.paymentId, t.id),
   foreignKey({ columns: [t.businessId, t.branchId, t.paymentId], foreignColumns: [payments.businessId, payments.branchId, payments.id] }), index("idx_refund_payment").on(t.businessId, t.branchId, t.paymentId), index("idx_refund_branch_date").on(t.businessId, t.branchId, t.recordedAt),
   check("ck_refund_amount", sql`${t.amountMinor}>0 and ${t.amountMinor}%100=0`), check("ck_refund_reason", sql`length(trim(${t.reason})) between 1 and 1000`)]);
-export const refundAllocations = pgTable("refund_allocations", {
+export const refundAllocations = sqliteTable("refund_allocations", {
   businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), refundId: text("refund_id").notNull(), paymentId: text("payment_id").notNull(), chargeId: text("charge_id").notNull(), amountMinor: integer("amount_minor").notNull(),
 }, (t) => [primaryKey({ columns: [t.businessId, t.branchId, t.refundId, t.chargeId] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.paymentId, t.refundId], foreignColumns: [paymentRefunds.businessId, paymentRefunds.branchId, paymentRefunds.paymentId, paymentRefunds.id] }),
   foreignKey({ columns: [t.businessId, t.branchId, t.paymentId, t.chargeId], foreignColumns: [paymentAllocations.businessId, paymentAllocations.branchId, paymentAllocations.paymentId, paymentAllocations.chargeId] }), index("idx_refund_allocation_charge").on(t.businessId, t.branchId, t.chargeId),
   check("ck_refund_allocation_amount", sql`${t.amountMinor}>0 and ${t.amountMinor}%100=0`)]);
-export const paymentWebhookEvents = pgTable("payment_webhook_events", {
+export const paymentWebhookEvents = sqliteTable("payment_webhook_events", {
   accountId: text("account_id").notNull(), eventId: text("event_id").notNull(), businessId: text("business_id").notNull(), eventHash: text("event_hash").notNull(),
   attemptId: text("attempt_id").references(() => paymentAttempts.id), state: text("state").notNull(), normalizedEvent: text("normalized_event_json").notNull(), failureCode: text("failure_code"), receivedAt: text("received_at").notNull(),
 }, (t) => [primaryKey({ columns: [t.accountId, t.eventId] }), foreignKey({ columns: [t.businessId, t.accountId], foreignColumns: [paymentProviderAccounts.businessId, paymentProviderAccounts.id] }),
-  index("idx_payment_webhook_review").on(t.businessId, t.state, t.receivedAt), check("ck_payment_webhook_state", sql`${t.state} in ('applied','ignored','reconciliation')`), check("ck_payment_webhook_json", sql`(${t.normalizedEvent} IS JSON) and length(${t.normalizedEvent})<=4000`)]);
-export const paymentAttemptEvents = pgTable("payment_attempt_events", {
+  index("idx_payment_webhook_review").on(t.businessId, t.state, t.receivedAt), check("ck_payment_webhook_state", sql`${t.state} in ('applied','ignored','reconciliation')`), check("ck_payment_webhook_json", sql`json_valid(${t.normalizedEvent}) and length(${t.normalizedEvent})<=4000`)]);
+export const paymentAttemptEvents = sqliteTable("payment_attempt_events", {
   id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull(), branchId: text("branch_id").notNull(), attemptId: text("attempt_id").notNull(), kind: text("kind").notNull(),
   failureCode: text("failure_code"), occurredAt: text("occurred_at").notNull(),
 }, (t) => [foreignKey({ columns: [t.businessId, t.branchId, t.attemptId], foreignColumns: [paymentAttempts.businessId, paymentAttempts.branchId, paymentAttempts.id] }), index("idx_payment_attempt_history").on(t.businessId, t.branchId, t.attemptId, t.occurredAt)]);
 
-export const authPersonLinks = pgTable("auth_person_links", {
-  authUserId: uuid("auth_user_id").primaryKey(),
-  personId: text("person_id").notNull().unique().references(() => persons.id, { onDelete: "restrict" }),
-  linkedAt: timestamp("linked_at", { withTimezone: true }).notNull().defaultNow(),
-});
-export const mediaObjects = pgTable("media_objects", {
-  id: uuid("id").primaryKey(), businessId: text("business_id").notNull().references(() => businesses.id),
+export const authIdentities = sqliteTable("auth_identities", {
+  id: text("id").primaryKey().notNull(),
+  personId: text("person_id").references(() => persons.id, { onDelete: "restrict" }),
+  provider: text("provider").notNull(),
+  providerSubject: text("provider_subject").notNull(),
+  email: text("email"),
+  displayName: text("display_name"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("uq_auth_identity_subject").on(t.provider, t.providerSubject),
+  index("idx_auth_identity_person").on(t.personId),
+  check("ck_auth_identity_provider", sql`${t.provider} in ('google','line')`),
+  check("ck_auth_identity_subject", sql`length(${t.providerSubject}) between 1 and 255`),
+]);
+export const authSessions = sqliteTable("auth_sessions", {
+  id: text("id").primaryKey().notNull(),
+  identityId: text("identity_id").notNull().references(() => authIdentities.id, { onDelete: "restrict" }),
+  personId: text("person_id").references(() => persons.id, { onDelete: "restrict" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
+  lastSeenAt: text("last_seen_at").notNull(),
+  revokedAt: text("revoked_at"),
+}, (t) => [
+  uniqueIndex("uq_auth_session_token_hash").on(t.tokenHash),
+  index("idx_auth_session_person").on(t.personId, t.expiresAt),
+  index("idx_auth_session_identity").on(t.identityId),
+  check("ck_auth_session_hash", sql`length(${t.tokenHash})=64`),
+  check("ck_auth_session_expiry", sql`${t.expiresAt}>${t.createdAt}`),
+]);
+export const authOauthStates = sqliteTable("auth_oauth_states", {
+  tokenHash: text("token_hash").primaryKey().notNull(),
+  provider: text("provider").notNull(),
+  codeVerifier: text("code_verifier").notNull(),
+  nonce: text("nonce").notNull(),
+  expiresAt: text("expires_at").notNull(),
+}, (t) => [
+  check("ck_auth_oauth_provider", sql`${t.provider} in ('google','line')`),
+  check("ck_auth_oauth_hash", sql`length(${t.tokenHash})=64`),
+]);
+export const mediaObjects = sqliteTable("media_objects", {
+  id: text("id").primaryKey().notNull(), businessId: text("business_id").notNull().references(() => businesses.id),
   branchId: text("branch_id"), kind: text("kind").notNull(), petId: text("pet_id"), executionId: text("execution_id"),
   objectPath: text("object_path").notNull().unique(), contentType: text("content_type").notNull(), byteSize: integer("byte_size").notNull(),
-  createdBy: text("created_by").notNull().references(() => persons.id), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text("created_by").notNull().references(() => persons.id), createdAt: text("created_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
 }, t => [
   foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
   foreignKey({ columns: [t.businessId, t.petId], foreignColumns: [businessPetProfiles.businessId, businessPetProfiles.petId] }),
@@ -999,10 +1034,11 @@ export const mediaObjects = pgTable("media_objects", {
     or (${t.kind} in ('grooming-before','grooming-after','hotel','daycare') and ${t.branchId} is not null and ${t.petId} is not null and ${t.executionId} is not null)`),
 ]);
 
-export const businessRegistrations = pgTable("business_registrations", {
-  authUserId: uuid("auth_user_id").primaryKey().references(() => authPersonLinks.authUserId),
+export const businessRegistrations = sqliteTable("business_registrations", {
+  identityId: text("identity_id").unique().references(() => authIdentities.id),
+  personId: text("person_id").primaryKey().notNull().references(() => persons.id),
   businessId: text("business_id").notNull().unique().references(() => businesses.id),
   branchId: text("branch_id").notNull(), requestHash: text("request_hash").notNull(),
-  confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
+  confirmedAt: text("confirmed_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
 }, t => [foreignKey({ columns: [t.businessId, t.branchId], foreignColumns: [branches.businessId, branches.id] }),
   check("business_registrations_request_hash_check", sql`length(${t.requestHash})=64`)]);

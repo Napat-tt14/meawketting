@@ -1,6 +1,7 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { sites } from "./build/sites-vite-plugin";
+import bindings from "./wrangler.d1.json";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -34,18 +35,19 @@ export default defineConfig(async ({ command }) => {
           ...localBindingConfig,
           name: "meawketting",
           compatibility_date: "2026-05-15",
+          d1_databases: bindings.d1_databases,
+          r2_buckets: bindings.r2_buckets,
           // Secrets stay in Cloudflare/.dev.vars. Keep production bindings in
           // the build so GitHub deployments retain the real login configuration.
           vars: command === "serve"
-            ? { MEAWKETTING_AUTH_MODE: process.env.MEAWKETTING_AUTH_MODE ?? "supabase" }
+            ? { MEAWKETTING_AUTH_MODE: process.env.MEAWKETTING_AUTH_MODE ?? "session" }
             : {
-              MEAWKETTING_AUTH_MODE: "supabase",
+              MEAWKETTING_AUTH_MODE: "session",
               MEAWKETTING_ENV: "production",
               MEAWKETTING_FIXTURE_MODE: "off",
               MEAWKETTING_PUBLIC_ORIGIN: "https://meawketting.com",
             },
           ...(command === "build" ? {
-            hyperdrive: [{ binding: "HYPERDRIVE", id: "ce743e399bc94e67a5b525a679f556bf" }],
             ratelimits: [{ name: "API_RATE_LIMITER", namespace_id: "1002", simple: { limit: 300, period: 60 as const } }],
           } : {}),
         },

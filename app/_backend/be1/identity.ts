@@ -1,11 +1,11 @@
 import { BE1_DEV_ACTOR_HEADER } from "./contracts";
 import { be1Error } from "./errors";
-import { SupabaseIdentityAdapter } from "../supabaseAuth";
+import { SessionIdentityAdapter } from "../auth";
 import type { Database } from "./repository";
 
 export type AuthenticatedIdentity = {
   personId: string;
-  provider: "dev-test" | "supabase";
+  provider: "dev-test" | "session";
 };
 
 export interface IdentityAdapter {
@@ -15,7 +15,7 @@ export interface IdentityAdapter {
 /** Selects the only identity provider allowed by the server environment. */
 export function resolveIdentityAdapter(mode: string | undefined, database?: Database): IdentityAdapter {
   if (mode === "dev-test") return new DevTestIdentityAdapter(mode);
-  if (mode === "supabase" && database) return new SupabaseIdentityAdapter();
+  if (mode === "session" && database) return new SessionIdentityAdapter();
   throw be1Error("AUTHENTICATION_NOT_CONFIGURED");
 }
 

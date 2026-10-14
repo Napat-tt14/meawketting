@@ -4,7 +4,7 @@
 
 Priority: **Business → production readiness/pilot → Guardian LINE Mini App → standalone Consumer expansion (PAUSED)**. The Guardian MVP is LINE entry/Person linking, My Pets, Add Dog/Cat subject to authority policy, profile/Passport, Temporary Business QR, consent/revoke and safe Intake status. Service History is conditional on an approved safe projection. No social/marketplace/loyalty/chat super-app. See the [canonical Guardian definition](./GUARDIAN_LINE_MINIAPP.md).
 
-**IMPLEMENTED:** Business BE1–BE8 and PostgreSQL/Supabase foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE and selected Supabase/Cloudflare configuration. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
+**IMPLEMENTED:** Business BE1–BE8 and Cloudflare D1 foundations locally. **PLANNED:** Guardian LINE Mini App. **PAUSED:** standalone Consumer expansion. **NOT IMPLEMENTED:** real Guardian LINE integration/onboarding/deployment. **PRODUCT DECISION REQUIRED:** Guardian authority/visibility policies. **EXTERNAL DEPENDENCY:** real LINE/Cloudflare configuration and production transfer/acceptance. Details: [Guardian foundation](./GUARDIAN_LINE_MINIAPP.md).
 
 Status: **CANONICAL PRODUCT DIRECTION (BUSINESS-FIRST REBASE)**  
 Owner: Product

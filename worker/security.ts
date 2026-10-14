@@ -7,7 +7,7 @@ function routeGroup(path: string) {
   return /^\/api\/be[1-8]$/.test(path) ? path : path.startsWith("/api/channels/line/") ? "/api/channels/line/:channelId" : "/api/other";
 }
 function logRoute(path: string) {
-  return path === "/api/business/register" || /^\/api\/auth\/(?:google\/(?:start|callback|logout)|line\/start|email\/(?:register|login))$/.test(path) ? path : routeGroup(path);
+  return path === "/api/business/register" || /^\/api\/auth\/(?:google\/(?:start|callback|logout)|line\/start)$/.test(path) ? path : routeGroup(path);
 }
 
 /** No query, raw path IDs, headers, IP, body or exception text in application logs. */

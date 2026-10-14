@@ -1,62 +1,44 @@
-# Supabase and Cloudflare setup
+# Cloudflare D1 forward-only production runbook
 
-Status: migrations and private Storage configured in the selected Supabase project; `meawketting-pilot` deployed on workers.dev with server secrets. Real Google OAuth completed on localhost:3000 and reached the new-business registration form. The staging Worker callback still requires retesting after the local code is pushed and deployed; production release is not verified. This is not Production Ready. See [the owner guide](./คู่มือ-Supabase-Cloudflare.md).
+The working tree uses Cloudflare Worker/Vinext → `env.DB` → D1 only. Authentication is direct Google/LINE OAuth with hashed opaque D1 sessions. Email/password was removed by the owner. No PostgreSQL fallback, dual-write, rollback adapter or manual data backup exists.
 
-## Architecture and authority
+Production D1 `meawketting-production` was created in the existing account through Dashboard with Asia Pacific location hint. Its real ID is configured in `wrangler.d1.json`: `3e920509-817c-4d36-9243-7ad0afe4a874`. The reviewed schema was applied through the Dashboard on 2026-10-13 and verified remotely: 70 domain tables, all STRICT; 133 explicit indexes; 81 triggers; one view; zero foreign-key orphans. The Wrangler migration ledger records `0001_initial.sql` once. Production source records have not been transferred and the Worker has not been deployed. No commit, push or Worker deployment is authorized by this runbook.
 
-Browser → Cloudflare Worker/API → application/domain authorization → PostgreSQL repositories → Supabase PostgreSQL.
-Supabase Auth authenticates Google and LINE identities. An auth_person_links row maps the verified Supabase UUID to Person. Existing accounts can be linked by an operator; new accounts can explicitly register their first store after completing and confirming store details. Active Person, Membership, Business, Branch and target/action checks remain in Meawketting on every request. Email, client claims and LINE identity confer no authority. OAuth login alone never creates an Owner. See [Business registration](./BUSINESS_REGISTRATION.md).
+Remote Persons, Bookings and Payments are still empty. Read-only source inspection found 37 application rows containing real identity, Business/Branch authority, service configuration and audit history; the reviewed transformation produces 38 D1 rows, including Google and LINE identities. Source Customer, Booking, Payment and media rows are zero. Preserve the existing authority/configuration records during cutover.
 
-Supabase Storage holds private media; PostgreSQL holds scoped metadata only. No privileged credentials enter the browser.
+## Local verification
 
-## Product Owner configuration
+Use Node 22.13+ and `npm ci`. Run `npm run test:backend`, `npm run test:production`, `npm run test:api:smoke`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, then `npm run test:frontend`. Run build and rendered HTML serially because both use `dist/`. SQL tests execute native SQLite, including real constraints and atomic transactions; they do not simulate PostgreSQL semantics. Wrangler/Miniflare platform checks must also pass before cutover.
 
-Use the already selected real Supabase project. Do not create another staging/test project. PostgreSQL 16 or newer is required.
+`npm run db:migrate` applies only local D1 migrations. `npm run db:seed:test` seeds only local D1 with synthetic fixtures; never import test seeds into the production database. Reviewed `migrations/d1/*.sql` is the schema source of truth. Drizzle generates review drafts in `migrations/generated`; those drafts do not contain the full guard/UTC checks and must not be applied as authoritative migrations.
 
-Provide the Worker values through Cloudflare Secrets (never source code, Git, screenshots or chat):
-- DATABASE_URL: TLS PostgreSQL connection URI from Supabase Connect for the Worker runtime, using the transaction pooler on port 6543. Prepared statements are disabled and the application pool is limited to one connection. Use a server database role authorized for the Business schema; anonymous/authenticated API roles are deliberately denied.
-- SUPABASE_URL: project HTTPS URL.
-- SUPABASE_PUBLISHABLE_KEY: project publishable/anon key used by the server Auth client.
-- SUPABASE_SERVICE_ROLE_KEY: server-only Storage credential. Never use a NEXT_PUBLIC prefix.
+## Runtime configuration
 
-Keep DATABASE_MIGRATION_URL operator-only in the local migration process. It must use a direct connection or session pooler, never the transaction pooler on port 6543, and must not be passed to the Worker.
+- Binding `DB`: the actual production D1 above; runtime uses native binding methods, never public REST.
+- `MEAWKETTING_AUTH_MODE=session`, `MEAWKETTING_ENV=production`, `MEAWKETTING_FIXTURE_MODE=off`, `MEAWKETTING_PUBLIC_ORIGIN=https://meawketting.com`.
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINE_LOGIN_CHANNEL_ID`, `LINE_LOGIN_CHANNEL_SECRET`: server secrets, configured by the owner. Keep `MEAWKETTING_LINE_CREDENTIALS` for Messaging API channels and existing payment-provider credentials if applicable.
+- `API_RATE_LIMITER`: existing production rate-limit binding. Keep current image/assets bindings.
+- Private object storage code uses `MEDIA`. R2 subscription was explicitly declined on 2026-10-13; `meawketting-private-media` has **not** been created. Desired binding remains in configuration pending provisioning. Do not deploy with a nonexistent bucket. Current source media rows are zero; media API fails closed if the binding is unavailable. Enabling paid R2 requires a separate owner approval.
 
-Set non-secret environment values: MEAWKETTING_AUTH_MODE=supabase, MEAWKETTING_ENV=staging, MEAWKETTING_FIXTURE_MODE=off, MEAWKETTING_PUBLIC_ORIGIN=the exact HTTPS staging origin. Configure API_RATE_LIMITER and distinct staging hostname/Worker name using wrangler.pilot.example.json. The example is not a deployment authorization. The generated build has no database binding or fallback.
+See [OAuth/session/media configuration](./D1-AUTH-MEDIA.md) for exact callbacks and private object rules. Google and LINE both return to the fixed `/api/auth/google/callback` route; state identifies the verified provider. All existing Person/provider-subject links must migrate before real sign-in. Never infer linkage from email. Login issues new sessions; previous provider sessions are not transferred.
 
-In Supabase Auth, enable Google. Put Google client ID/secret in the Supabase provider settings, not Cloudflare or the browser. Google Authorized redirect URI is the Supabase Auth callback URL shown in that dashboard. Keep the Supabase Site URL at the production origin and allow exactly https://STAGING_HOST/api/auth/google/callback as an additional Redirect URL. Do not use wildcard production callback URLs. Configure Google consent/test users and recovery/support policy.
+Old relational runtime passwords, Hyperdrive binding, Supabase DB/Auth/Storage keys have no application callers. Operator-only source connection has been moved out of `.dev.vars` into ignored `.env.d1-transfer`; it must never be bound into a Worker or committed. A PostgreSQL source reader may exist only in the one-time transfer tool until the source has been verified and the tool removed.
 
-## Migrations and private bucket
+## Cutover gate and sequence
 
-An engineer/operator supplies DATABASE_MIGRATION_URL in the local process environment and runs:
+1. Finish local correctness, build, lint, typechecks and rendering checks. Resolve any failure forward in D1.
+2. Confirm the already applied remote schema still matches the reviewed migration and the `0001_initial.sql` ledger entry. Recheck table/trigger/index inventory and `PRAGMA foreign_key_check`; no synthetic seeds. Add any later schema correction as a forward migration.
+3. Obtain explicit deployment authorization and agree a maintenance window. Freeze production writes and provider/outbox processing for the whole transfer; do not freeze a live app indefinitely while deployment remains unauthorized.
+4. Stream the frozen source into D1 in foreign-key order, preserving IDs, revisions, event sequence, receipts, audit, provider linkage and LINE dedup/outbox state. Convert only baht-valued estimates/additional price to integer satang; preserve existing `*_minor` and API JSON prices. No full dump or permanent transfer/backup file.
+5. Verify every table count/hash and foreign-key orphans; check financial totals by Business/Branch, bookings/reservations, customers/pets and LINE protection state. Source has real authority/configuration data even though it has no customer/payment rows. Do not infer an empty source from old historical documentation.
+6. Configure direct OAuth and required bindings, then deploy only after explicit owner instruction. Runtime is D1 only. Verify Google/LINE, Owner/Manager/Staff grants, Home, CRM, booking, operations, QR, Inbox, billing and reports on production.
+7. Open writes to D1 after smoke passes. If a failure occurs, keep maintenance and fix D1 forward. Do not switch relational datasource back.
+8. Delete one-time source tools/operator credentials/transfer artifacts after successful invariant verification and cutover. Keep the final migration report, migrations, tests and useful evidence.
 
-```powershell
-npm.cmd ci
-npm.cmd run db:migrate
-npm.cmd run storage:setup
-```
+Wrangler's connected token currently lacks `d1:write`. Browser Dashboard was used to create D1 and apply/verify its schema as the owner requested. Creating persistent API credentials requires a separate action-time confirmation; none have been created. Source transfer, OAuth/environment configuration and production provider verification remain pending until the cutover gates are met. See the [one-time operator transfer instructions](../scripts/d1-transfer.md) for safe source inspection and the deliberate transfer prerequisites.
 
-storage:setup also requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. It creates/updates only business-media as private, limits objects to 10 MiB, and allows JPEG/PNG/WebP. Do not add public read/write policies.
+## Performance and external retirement
 
-Four ordered migrations under supabase/migrations create the clean baseline, Auth/media foundation, explicit event ordering and confirmed registration foundation. They are not SQLite migration replays. The runner uses an advisory lock, one atomic transaction and a checksum ledger; repeat execution is safe, modifying an applied file is rejected. Drizzle generates review drafts in supabase/generated; only reviewed SQL in supabase/migrations is authoritative.
+`Server-Timing` reports API wall duration, native binding elapsed duration, submitted statements, batch calls, metadata coverage and available read/write row counts. Pair response diagnostics with the operation name and HTTP status in request traces; never capture raw tokens or request bodies. `d1-reported` is the sum of metadata available from `all/run/batch`; native `first()` has no metadata. These are distinct measurements. Local probes do not prove production latency. Read replication is not enabled; primary reads retain immediate write visibility.
 
-No production data exists to migrate. Never seed staging for real users. For an isolated developer database only, set MEAWKETTING_ENV=test and run npm.cmd run db:seed:test with synthetic fixtures.
-
-## Explicit identity provisioning and recovery
-
-Existing Person/Business/Membership/Branch grants must be explicitly provisioned by an authorized operator. Synthetic Owners are never production onboarding. After verifying the intended Supabase Auth user UUID, set SUPABASE_AUTH_USER_ID and MEAWKETTING_PERSON_ID and run npm.cmd run auth:link with the operator-only DATABASE_MIGRATION_URL. The script refuses an inactive or unprovisioned Person and never creates authority. New, unlinked verified accounts use `/business/register`: explicit store details and confirmation create the Person, store, first Branch and Owner membership atomically. Existing linked accounts cannot use registration to elevate privileges or create another Owner workspace.
-
-Google account recovery is handled by the configured provider/Supabase Auth. The durable mapping uses UUID, not mutable email. Any account replacement/relink requires operator identity verification and session revocation; never copy a role from claims. Test recovery and revocation with actual target accounts before release.
-
-## Media and operational safety
-
-POST /api/media authorizes Business/Branch/Pet/execution context before accepting a bounded body, checks allowed MIME plus image signature, uses opaque random paths and rechecks authorization before metadata commit. Failed metadata persistence attempts object cleanup. Monitor/reconcile private orphan objects if cleanup fails. GET /api/media?id=… reauthorizes and returns a signed URL valid for 60 seconds. A previously issued URL remains usable until expiry; it is a bearer credential and must not be logged. Images are not fully decoded or transcoded by this foundation. No new media UI is exposed.
-
-Run only read-only aggregate checks from scripts/production-operations.sql for operational inspection. Keep request bodies, credentials, signed URLs, customer names and Passport fields out of logs.
-
-## Target acceptance and rollback
-
-Before release approval, verify real Google PKCE callback, refresh, logout, revoked/unmapped users, recovery, expired cookies, active/inactive memberships, tenant/Branch denial, media upload/read denial and expiry, pooler/TLS connectivity from Cloudflare, and two-operator Booking/payment conflicts. Repeat API smoke using synthetic local records. Measure latency, connection limits and provider outages.
-
-Use Supabase backup/PITR appropriate to the chosen plan and rehearse restore without resetting the selected project. Restore Storage separately and reconcile metadata/object references; database backup is not an object backup. A code rollback cannot restore the removed database architecture. Back up before later migrations and prefer reviewed forward fixes; never drop an unknown schema/database. Real target backup/restore, load, security and provider integration remain unverified.
-
-Consumer stays PAUSED. This staging setup does not release the LINE Mini App, select a payment provider or deploy the production Worker.
+After successful D1 cutover and provider verification, the owner can manually retire the former Supabase project/database, its old secrets and Hyperdrive configuration. Do not delete these external resources before the source data and provider subjects have been verified. Do not create restore or rollback implementation.

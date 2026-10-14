@@ -7,11 +7,11 @@ import { findReceipt } from "../shared/database";
 import { BackendConflict, conflict } from "../shared/errors";
 import { hash, opaqueId } from "../shared/validation";
 import type { Be7Operation, BillingMutationResult, ChargeBalanceView, FinancialPage, PaymentPage, PaymentProviderResolver } from "./contracts";
-import { PostgresBe7Repository } from "./postgresRepository";
+import { D1Be7Repository } from "./d1Repository";
 import { parseBe7Operation } from "./validation";
 
 export class Be7Application extends BusinessApplication {
-  constructor(auth: Be1Repository, private readonly billing: PostgresBe7Repository, private readonly resolveProvider: PaymentProviderResolver = async () => null, private readonly clock = () => new Date().toISOString()) { super(auth); }
+  constructor(auth: Be1Repository, private readonly billing: D1Be7Repository, private readonly resolveProvider: PaymentProviderResolver = async () => null, private readonly clock = () => new Date().toISOString()) { super(auth); }
   executeBe7(actor: PersonView, raw: Be7Operation, metadata: RequestMetadata): Promise<FinancialPage | PaymentPage | ChargeBalanceView | BillingMutationResult> { return this.executeAttempt(actor, raw, metadata, 0); }
   private async executeAttempt(actor: PersonView, raw: Be7Operation, metadata: RequestMetadata, attempt: number): Promise<FinancialPage | PaymentPage | ChargeBalanceView | BillingMutationResult> {
     const op = parseBe7Operation(raw), repo = this.billing, db = repo.database, now = this.clock();
@@ -38,14 +38,14 @@ export class Be7Application extends BusinessApplication {
           .bind(op.businessId, op.branchId, op.executionId).first<{ id: string; pet_id: string; module: string; status: string; booking_id: string; customer_id: string; booking_status: string; estimate: number | null; booking_revision: number; label: string; pet_count: number }>();
         if (!source) throw be1Error("NOT_FOUND");
         if (["cancelled", "no-show"].includes(source.status) || source.booking_status === "cancelled") conflict("unavailable");
-        if (!Number.isSafeInteger(source.estimate) || source.estimate! < 0 || source.estimate! > 10000000) throw be1Error("INVALID_INPUT");
+        if (!Number.isSafeInteger(source.estimate) || source.estimate! < 0 || source.estimate! > 1000000000) throw be1Error("INVALID_INPUT");
         const existing = await repo.forBooking(op.businessId, op.branchId, source.booking_id); chargeId = existing?.id ?? opaqueId("charge"); created = !existing;
         if (!existing) {
           statements.push(db.prepare("INSERT INTO charges(id,business_id,branch_id,booking_id,customer_id,pet_id,execution_id,module,service_label,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
             .bind(chargeId, op.businessId, op.branchId, source.booking_id, source.customer_id, source.pet_count === 1 ? source.pet_id : null, source.pet_count === 1 ? source.id : null, source.module, source.label, actor.id, now, now));
-          statements.push(db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(EXISTS(SELECT 1 FROM bookings WHERE business_id=? AND branch_id=? AND id=? AND revision=? AND status<>'cancelled'))::integer").bind(token, op.businessId, op.branchId, source.booking_id, source.booking_revision), db.prepare("DELETE FROM backend_guards WHERE id=?").bind(token));
+          statements.push(db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(EXISTS(SELECT 1 FROM bookings WHERE business_id=? AND branch_id=? AND id=? AND revision=? AND status<>'cancelled'))").bind(token, op.businessId, op.branchId, source.booking_id, source.booking_revision), db.prepare("DELETE FROM backend_guards WHERE id=?").bind(token));
           statements.push(db.prepare("INSERT INTO charge_items(id,business_id,branch_id,charge_id,kind,label,amount_minor,execution_id,created_at) VALUES(?,?,?,?,'base-service',?,?,?,?)")
-            .bind(opaqueId("item"), op.businessId, op.branchId, chargeId, source.label, source.estimate! * 100, source.pet_count === 1 ? source.id : null, now), repo.event(context, op.branchId, chargeId, "created", "สร้างยอดจากรายการบริการ"));
+            .bind(opaqueId("item"), op.businessId, op.branchId, chargeId, source.label, source.estimate!, source.pet_count === 1 ? source.id : null, now), repo.event(context, op.branchId, chargeId, "created", "สร้างยอดจากรายการบริการ"));
         }
         const addOns = source.module === "grooming" && !existing?.cancelled_at ? await repo.rows<{ id: string; summary: string; data_json: string }>(`SELECT e.id,e.summary,e.data_json FROM execution_events e WHERE e.business_id=? AND e.branch_id=? AND e.execution_id=? AND e.kind='addon' AND NOT EXISTS(SELECT 1 FROM charge_items i WHERE i.charge_id=? AND i.source_event_id=e.id) ORDER BY e.occurred_at,e.id`, op.businessId, op.branchId, source.id, chargeId) : [];
         if (existing && addOns.length) statements.push(...repo.version((await repo.get(context, op.branchId, existing.id)).charge, now, token));

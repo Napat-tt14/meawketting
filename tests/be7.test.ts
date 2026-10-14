@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository";
 import { Be1Error } from "../app/_backend/be1/errors";
 import { Be7Application } from "../app/_backend/be7/application";
-import { PostgresBe7Repository } from "../app/_backend/be7/postgresRepository";
+import { D1Be7Repository } from "../app/_backend/be7/d1Repository";
 import { PaymentProviderService } from "../app/_backend/be7/providerService";
 import { MockPaymentProvider } from "../app/_backend/be7/mockProvider";
 import type { Be7Operation, BillingMutationResult, ChargeBalanceView, PaymentPage, ProviderOutcome } from "../app/_backend/be7/contracts";
 import { BackendConflict } from "../app/_backend/shared/errors";
-import { ARI, INACTIVE, MANAGER, metadata, OUTSIDER, OWNER, seededDatabase, STAFF, THONGLOR, WHISKER } from "./postgresFixtures";
+import { ARI, INACTIVE, MANAGER, metadata, OUTSIDER, OWNER, seededDatabase, STAFF, THONGLOR, WHISKER } from "./d1Fixtures";
 
 const scope = { businessId: WHISKER, branchId: ARI }, accountId = "payment_account_test_001";
 const failure = (code: string) => (e: unknown) => e instanceof Be1Error && e.code === code;
@@ -16,7 +16,7 @@ const conflict = (reason: string) => (e: unknown) => e instanceof BackendConflic
 async function fixture() {
   const db = seededDatabase(); let time = "2050-08-18T02:00:00.000Z"; const now = () => time;
   db.inspect.prepare("INSERT INTO payment_provider_accounts(id,business_id,provider,external_account_id,secret_ref,source) VALUES(?,?,'mock','TEST-MERCHANT','test-secret-reference','dev-test')").run(accountId, WHISKER);
-  const provider = new MockPaymentProvider("test-only-payment-secret", now), resolver = async () => provider, repo = new PostgresBe7Repository(db, "dev-test"), app = new Be7Application(new PostgresBe1Repository(db), repo, resolver, now);
+  const provider = new MockPaymentProvider("test-only-payment-secret", now), resolver = async () => provider, repo = new D1Be7Repository(db, "dev-test"), app = new Be7Application(new D1Be1Repository(db), repo, resolver, now);
   const run = async (op: Be7Operation, actor = OWNER) => app.executeBe7(await app.resolvePerson(actor), op, metadata());
   const source = db.inspect.prepare("SELECT id FROM service_executions WHERE booking_id='booking-fixture-ari-grooming-1030'").get()!.id as string;
   const checkout = async (key = crypto.randomUUID()) => await run({ ...scope, type: "charge.checkout", executionId: source, requestKey: key }) as BillingMutationResult;
@@ -40,7 +40,7 @@ test("checkout creates one canonical Booking Charge; concurrent same-payment ret
   const b = await f.get(one.balance.charge.chargeId); assert.equal(b.paid, 200); assert.equal(b.status, "partial"); assert.equal(b.paymentCount, 1);
   await assert.rejects(f.pay(one.balance, 201, "same-payment-key"), conflict("idempotency"));
   await f.pay(b, b.remaining); assert.equal((await f.get(b.charge.chargeId)).status, "paid");
-  assert.deepEqual(f.db.inspect.prepare("SELECT * FROM service_executions").all(), before); assert.deepEqual(f.db.inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+  assert.deepEqual(f.db.inspect.prepare("SELECT * FROM service_executions").all(), before); assert.deepEqual(f.db.inspect.prepare("PRAGMA foreign_key_check").all(), []);
 });
 test("competing payment, discount, and cancellation respect revision and debt constraints atomically", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close()); const { balance: b } = await f.checkout();
@@ -79,10 +79,10 @@ test("partial and full refunds are immutable, idempotent and do not cancel debt 
 });
 test("persistence failure rolls back Payment, allocation, audit, receipt and revision before safe retry", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close()); const { balance: b } = await f.checkout();
-  f.db.inspect.exec("CREATE FUNCTION test_payment_failure_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test-payment-failure'; END $$; CREATE TRIGGER test_payment_failure BEFORE INSERT ON payment_allocations FOR EACH ROW EXECUTE FUNCTION test_payment_failure_fn()");
+  f.db.inspect.exec("CREATE TRIGGER test_payment_failure BEFORE INSERT ON payment_allocations BEGIN SELECT RAISE(ABORT,'test-payment-failure'); END");
   await assert.rejects(f.pay(b, 100, "payment-rollback-key"), failure("PERSISTENCE_ERROR"));
   assert.equal(f.db.inspect.prepare("SELECT count(*) n FROM payments").get()?.n, 0); assert.equal((await f.get(b.charge.chargeId)).charge.revision, b.charge.revision);
-  f.db.inspect.exec("DROP TRIGGER test_payment_failure ON payment_allocations"); await f.pay(b, 100, "payment-rollback-key");
+  f.db.inspect.exec("DROP TRIGGER test_payment_failure"); await f.pay(b, 100, "payment-rollback-key");
 });
 test("provider-neutral Attempt reserves outstanding money, deduplicates signed webhooks and separates provider success from service status", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close()); const { balance: b } = await f.checkout(); const reserved = await f.attempt(b);
@@ -95,7 +95,7 @@ test("provider-neutral Attempt reserves outstanding money, deduplicates signed w
   await assert.rejects(f.event(attemptId, { ...outcome, amountMinor: 100 }, "same-event"), conflict("idempotency"));
   await assert.rejects(f.event(attemptId, outcome, "foreign-destination", "OTHER-MERCHANT"), failure("INVALID_INPUT"));
   await assert.rejects(f.service.webhook(accountId, new TextEncoder().encode("[]"), "forged"), failure("UNAUTHENTICATED"));
-  assert.deepEqual(f.db.inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+  assert.deepEqual(f.db.inspect.prepare("PRAGMA foreign_key_check").all(), []);
 });
 test("an ambiguous provider result reconciles the original intent and concurrent workers cannot collect twice", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close()); const { balance: b } = await f.checkout(); const a = (await f.attempt(b)).balance.attempts[0];

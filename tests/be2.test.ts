@@ -2,17 +2,17 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { TestSql, TestPostgres, migrate } from "./postgresTestKit";
+import { TestSql, TestD1, migrate } from "./d1TestKit";
 import test from "node:test";
 import { Be2Application } from "../app/_backend/be2/application.ts";
-import { PostgresBe2Repository } from "../app/_backend/be2/postgresRepository.ts";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository.ts";
+import { D1Be2Repository } from "../app/_backend/be2/d1Repository.ts";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository.ts";
 import { Be1Error } from "../app/_backend/be1/errors.ts";
 import type { RequestMetadata } from "../app/_backend/be1/metadata.ts";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const be1Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be1-dev.sql"), "utf8");
-const be2Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be2-dev.sql"), "utf8");
+const be1Seed = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be1-dev.sql"), "utf8");
+const be2Seed = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be2-dev.sql"), "utf8");
 
 const OWNER = "prs_01k47meawketting000000001";
 const MANAGER = "prs_01k47meawketting000000002";
@@ -27,9 +27,9 @@ function fixture(file?: string) {
   migrate(inspect);
   inspect.exec(be1Seed);
   inspect.exec(be2Seed);
-  const database = new TestPostgres(inspect);
-  const authorizationRepository = new PostgresBe1Repository(database);
-  const repository = new PostgresBe2Repository(database);
+  const database = new TestD1(inspect);
+  const authorizationRepository = new D1Be1Repository(database);
+  const repository = new D1Be2Repository(database);
   let timeSequence = 0;
   let idSequence = 0;
   const application = new Be2Application(authorizationRepository, repository, {
@@ -82,6 +82,42 @@ test("seeded Customer/Pet directory is Business-wide, searchable, and paginated"
   } finally {
     inspect.close();
   }
+});
+
+test("Customer search accepts long Thai terms and treats wildcard characters literally", async (t) => {
+  const { inspect, database, application } = fixture();
+  t.after(() => inspect.close());
+  const owner = await actor(application);
+  const longName = "ก".repeat(25), longPetName = "ข".repeat(25), literal = "%_\\";
+  assert.ok(Buffer.byteLength(longName, "utf8") > 50);
+  assert.ok(Buffer.byteLength(longPetName, "utf8") > 50);
+  const named = await application.createCustomer(owner, {
+    businessId: WHISKER, displayName: longName, phone: null, email: null, businessNotes: "",
+  }, metadata("corr-long-name"));
+  const literalNamed = await application.createCustomer(owner, {
+    businessId: WHISKER, displayName: `literal ${literal}`, phone: null, email: null, businessNotes: "",
+  }, metadata("corr-literal-name"));
+  assert.equal(named.outcome, "created");
+  assert.equal(literalNamed.outcome, "created");
+  if (named.outcome !== "created" || literalNamed.outcome !== "created") return;
+  const pet = await application.createPet(owner, {
+    businessId: WHISKER, customerId: literalNamed.customer.id, name: longPetName,
+    species: "cat", businessNotes: "",
+  }, metadata("corr-long-pet-name"));
+  assert.equal(pet.outcome, "created");
+  // Node SQLite has a higher LIKE limit than D1. Keep these searches off LIKE,
+  // whose deployed 50-byte pattern limit rejects these otherwise valid names.
+  database.onQuery = sql => assert.doesNotMatch(sql, /\bLIKE\b/i);
+  const searches: [string, string][] = [[longName, named.customer.id], [longPetName, literalNamed.customer.id], [literal, literalNamed.customer.id]];
+  for (const [query, expected] of searches) {
+    const page = await application.searchCustomers(owner, { businessId: WHISKER, query });
+    assert.deepEqual(page.items.map(customer => customer.id), [expected]);
+    assert.equal(page.total, 1);
+  }
+  const noPhoneMatch = await application.searchCustomers(owner, { businessId: WHISKER, query: "not-a-phone" });
+  assert.equal(noPhoneMatch.total, 0);
+  assert.equal((await application.listCustomers(owner, { businessId: WHISKER })).total, 4);
+  await assert.rejects(application.searchCustomers(owner, { businessId: WHISKER, query: "" }), hasCode("INVALID_INPUT"));
 });
 
 test("Customer create/read/update notes/tags/lifecycle is durable and duplicate warnings never merge", async () => {
@@ -332,10 +368,10 @@ test("relational constraints enforce lifecycle, profile vocabulary, and cross-Bu
       "2026-09-07T01:00:00.000Z",
       "2026-09-07T01:00:00.000Z",
     ), /unique constraint/i);
-    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
-    assert.equal(inspect.prepare("SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND NOT convalidated) THEN 'ok' ELSE 'invalid' END integrity_check").get()?.integrity_check, "ok");
+    assert.deepEqual(inspect.prepare("PRAGMA foreign_key_check").all(), []);
+    assert.equal(inspect.prepare("PRAGMA integrity_check").get()?.integrity_check, "ok");
 
-    const petColumns = new Set(inspect.prepare("SELECT column_name AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pets'").all().map((row) => row.name));
+    const petColumns = new Set(inspect.prepare("PRAGMA table_info(pets)").all().map((row) => row.name));
     assert.deepEqual([...petColumns].sort(), ["created_at", "created_by_person_id", "id"]);
     for (const forbidden of ["business_id", "owner_id", "guardian_id", "passport_id", "consent_id"]) assert.equal(petColumns.has(forbidden), false);
   } finally {
@@ -404,9 +440,8 @@ test("migration-backed Customer/Pet writes survive database reopen", async () =>
     first.inspect.close();
 
     const reopened = new TestSql(databasePath);
-    reopened.close();
-    const database = new TestPostgres(reopened);
-    const application = new Be2Application(new PostgresBe1Repository(database), new PostgresBe2Repository(database));
+    const database = new TestD1(reopened);
+    const application = new Be2Application(new D1Be1Repository(database), new D1Be2Repository(database));
     const reopenedOwner = await actor(application);
     const durable = await application.getCustomer(reopenedOwner, WHISKER, customerResult.customer.id);
     assert.equal(durable.displayName, "ลูกค้าคงทน");

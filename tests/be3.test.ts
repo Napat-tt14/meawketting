@@ -2,22 +2,22 @@ import assert from "node:assert/strict";
 import type { AuthorizedMutation } from "../app/_backend/be1/repository";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { TestSql, TestPostgres, migrate } from "./postgresTestKit";
+import { TestSql, TestD1, migrate } from "./d1TestKit";
 import test from "node:test";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository.ts";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository.ts";
 import { Be1Error } from "../app/_backend/be1/errors.ts";
 import type { RequestMetadata } from "../app/_backend/be1/metadata.ts";
-import { PostgresBe2Repository } from "../app/_backend/be2/postgresRepository.ts";
+import { D1Be2Repository } from "../app/_backend/be2/d1Repository.ts";
 import { Be3Application } from "../app/_backend/be3/application.ts";
 import type { BookingAvailabilityInput, BookingConflictCode, BookingMutationResult, CreateBookingInput } from "../app/_backend/be3/contracts.ts";
-import { PostgresBe3Repository } from "../app/_backend/be3/postgresRepository.ts";
+import { D1Be3Repository } from "../app/_backend/be3/d1Repository.ts";
 import type { Be3Repository, BookingPersistenceWrite } from "../app/_backend/be3/repository.ts";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const be1Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be1-dev.sql"), "utf8");
-const be2Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be2-dev.sql"), "utf8");
-const be3Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be3-dev.sql"), "utf8");
-const be4Seed = readFileSync(resolve(projectRoot, "supabase", "seed-be4-dev.sql"), "utf8");
+const be1Seed = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be1-dev.sql"), "utf8");
+const be2Seed = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be2-dev.sql"), "utf8");
+const be3Seed = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be3-dev.sql"), "utf8");
+const be4Seed = readFileSync(resolve(projectRoot, "tests/fixtures/d1", "seed-be4-dev.sql"), "utf8");
 
 const OWNER = "prs_01k47meawketting000000001";
 const MANAGER = "prs_01k47meawketting000000002";
@@ -30,10 +30,10 @@ const ARI = "whisker-ari";
 const THONGLOR = "whisker-thonglor";
 const ONNUT = "partner-onnut";
 
-function applicationFor(database: TestPostgres, idNamespace = "main", bookingRepository?: Be3Repository) {
-  const authorizationRepository = new PostgresBe1Repository(database);
-  const customerPetRepository = new PostgresBe2Repository(database);
-  const durableBookingRepository = bookingRepository ?? new PostgresBe3Repository(database);
+function applicationFor(database: TestD1, idNamespace = "main", bookingRepository?: Be3Repository) {
+  const authorizationRepository = new D1Be1Repository(database);
+  const customerPetRepository = new D1Be2Repository(database);
+  const durableBookingRepository = bookingRepository ?? new D1Be3Repository(database);
   let timeSequence = 0;
   let idSequence = 0;
   const application = new Be3Application(authorizationRepository, customerPetRepository, durableBookingRepository, {
@@ -50,7 +50,7 @@ function fixture(file?: string) {
   inspect.exec(be2Seed);
   inspect.exec(be3Seed);
   inspect.exec(be4Seed);
-  const database = new TestPostgres(inspect);
+  const database = new TestD1(inspect);
   return { inspect, database, ...applicationFor(database) };
 }
 
@@ -222,7 +222,7 @@ test("appointment, date-range, and day aggregates persist with durable Pet and R
     ]);
     assert.equal(inspect.prepare("SELECT end_minute - start_minute AS duration FROM bookings WHERE id = ?").get(daycare.booking.id)?.duration, 1440);
     assert.equal(inspect.prepare("SELECT reservation_key FROM booking_resource_reservations WHERE booking_id = ? AND resource_id = ?").get(appointment.booking.id, "ari-groomer-pim")?.reservation_key, "interval");
-    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+    assert.deepEqual(inspect.prepare("PRAGMA foreign_key_check").all(), []);
   } finally {
     inspect.close();
   }
@@ -544,7 +544,7 @@ test("two stale-available competing creates commit one winner and return a deter
       INNER JOIN bookings booking ON booking.business_id = commit_row.business_id AND booking.branch_id = commit_row.branch_id AND booking.id = commit_row.booking_id
       WHERE booking.idempotency_key IN (?, ?)
     `).get(firstInput.idempotencyKey, secondInput.idempotencyKey)?.count, 1);
-    assert.deepEqual(inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+    assert.deepEqual(inspect.prepare("PRAGMA foreign_key_check").all(), []);
   } finally {
     inspect.close();
   }
@@ -616,8 +616,7 @@ test("Booking audit metadata is bounded and durable rows survive a database reop
   first.inspect.close();
 
   const reopened = new TestSql(databasePath);
-  reopened.close();
-  const database = new TestPostgres(reopened);
+  const database = new TestD1(reopened);
   const reopenedApplication = applicationFor(database, "reopen").application;
   const durable = await reopenedApplication.getBooking(await actor(reopenedApplication), WHISKER, ARI, bookingId);
   assert.equal(durable.notes, "PRIVATE NOTE THAT MUST NOT BE COPIED TO AUDIT");

@@ -1,4 +1,4 @@
-import { finishGoogleLogin } from "../../../../_backend/supabaseAuth";
+import { finishGoogleLogin } from "../../../../_backend/auth";
 
 export const dynamic = "force-dynamic";
 

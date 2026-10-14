@@ -1,0 +1,23 @@
+# D1 authentication and private media
+
+Provisioning status, 2026-10-13: the real APAC production D1 database and reviewed schema are applied/verified, with 70 STRICT domain tables, 133 indexes, 81 triggers, one view, one `0001_initial.sql` migration entry and zero foreign-key orphans. Source data/provider linkage transfer, OAuth/environment setup and deployment remain pending. The user explicitly declined enabling the R2 subscription. No R2 bucket was created; `MEDIA` is an implemented binding/API path only, and source media rows are zero. Media upload/read cannot work in production until a private bucket is provided under a later authorized setup decision.
+
+The Worker authenticates Google and LINE directly. Set `MEAWKETTING_AUTH_MODE=session`, `MEAWKETTING_PUBLIC_ORIGIN` to the site's HTTPS origin, and bind the production D1 database as `DB`. Store `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINE_LOGIN_CHANNEL_ID`, and `LINE_LOGIN_CHANNEL_SECRET` in the Worker environment; keep secrets out of browser bundles and Git.
+
+Configure this exact callback URL in both the Google OAuth web client and the LINE Login channel:
+
+`https://<site-host>/api/auth/google/callback`
+
+The existing callback path handles both providers using the consumed server-side OAuth state. Google uses `openid email profile`; LINE uses `openid profile`, so LINE registration does not require an email address. Both flows use an authorization code, state cookie, nonce, and S256 PKCE. Google ID tokens undergo RS256 signature verification with Google's fixed JWKS endpoint, plus issuer, audience, expiry, issue time and nonce checks. LINE ID tokens are verified server-side at LINE's verification endpoint and checked against the same login channel and nonce. Provider access and refresh tokens are never persisted.
+
+OAuth states expire after 10 minutes and can be consumed once. Application sessions use 256-bit random opaque tokens. Only SHA-256 token hashes are stored in `auth_sessions`; the browser receives an HttpOnly, Secure, SameSite=Lax, Path=/ cookie with a seven-day expiry. Login rotates the current browser session; logout revokes its database row. Unlinked, verified identities receive setup sessions with nullable Person linkage. Registration creates the Person, Business, Branch, Owner membership, hours, enabled modules, identity linkage, session linkage, receipt and audit in one guarded atomic D1 batch.
+
+Email/password login was removed by the user's migration decision. Preserve every existing Person and membership. Migrate Google/LINE links using their verified provider subjects from existing identity records; do not merge people based on email addresses or client profile claims. Existing email-only people need an explicit verified Google/LINE identity link before they can log in again. Existing Supabase session tokens are intentionally invalid after cutover.
+
+For local development only, `NODE_ENV=development` permits an HTTP callback on localhost, 127.0.0.1 or ::1 and uses host-only cookies without Secure. Register the actual local callback with each provider separately when testing real OAuth. Other HTTP hosts fail closed.
+
+The media API requires a private R2 bucket bound as `MEDIA`, with public bucket and `r2.dev` access disabled. Current subscription setup was declined, so that bucket/binding is not provisioned. `/api/media` validates membership and Branch permissions before issuing or reading an object. Uploads validate PNG/JPEG/WebP magic bytes, matching MIME, and a 10 MiB size limit. New keys use Business/Branch/Pet/object scopes. A failed D1 metadata batch deletes the uploaded R2 object. R2 and D1 do not share a transaction: a Worker crash between object upload and metadata commit can leave an unreferenced private object.
+
+GET `/api/media?id=<id>` returns `{ "url": "/api/media?id=<id>&raw=1" }`; requesting that URL rechecks the current session and permissions and streams the R2 object with private, no-store headers. This authenticated URL has no independent signed expiry. Supabase Storage files referenced by production metadata must be transferred directly to private R2 with target metadata pointing to the transferred keys before cutover; no public URLs or backup copies are needed.
+
+Local tests exercise SQLite identity/session constraints, real test-key RSA signatures, OAuth failure and replay cases, registration concurrency and rollback, and R2 authorization/type/size/compensation. Real Google/LINE consent, production callbacks, transferred R2 bytes and production account linkage still require provider and deployment verification. See the migration report for actual verification results; this document alone does not establish production readiness.

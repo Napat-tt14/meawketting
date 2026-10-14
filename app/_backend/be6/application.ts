@@ -7,11 +7,11 @@ import { deleteGuard, findReceipt } from "../shared/database";
 import { BackendConflict, conflict } from "../shared/errors";
 import { hash, opaqueId } from "../shared/validation";
 import type { Be6Operation, ConversationView, InboxDirectory } from "./contracts";
-import { PostgresBe6Repository } from "./postgresRepository";
+import { D1Be6Repository } from "./d1Repository";
 import { parseBe6Operation } from "./validation";
 
 export class Be6Application extends BusinessApplication {
-  constructor(auth: Be1Repository, private readonly inbox: PostgresBe6Repository, private readonly clock = () => new Date().toISOString()) { super(auth); }
+  constructor(auth: Be1Repository, private readonly inbox: D1Be6Repository, private readonly clock = () => new Date().toISOString()) { super(auth); }
   async executeBe6(actor: PersonView, raw: Be6Operation, metadata: RequestMetadata): Promise<ConversationView | InboxDirectory> {
     return this.executeAttempt(actor, raw, metadata, 0);
   }
@@ -43,7 +43,7 @@ export class Be6Application extends BusinessApplication {
           // Cursor advances only to messages actually present in each currently readable Branch.
           statements.push(db.prepare(`INSERT INTO conversation_reads(business_id,branch_id,conversation_id,person_id,through_sequence,read_at)
             SELECT m.business_id,m.branch_id,m.conversation_id,?,max(m.sequence),? FROM messages m WHERE m.business_id=? AND m.conversation_id=? AND m.sequence<=? AND ${repo.visibility("m")} GROUP BY m.business_id,m.branch_id,m.conversation_id
-            ON CONFLICT(business_id,branch_id,conversation_id,person_id) DO UPDATE SET through_sequence=greatest(conversation_reads.through_sequence,excluded.through_sequence),read_at=excluded.read_at`)
+            ON CONFLICT(business_id,branch_id,conversation_id,person_id) DO UPDATE SET through_sequence=max(conversation_reads.through_sequence,excluded.through_sequence),read_at=excluded.read_at`)
             .bind(actor.id, now, op.businessId, id, op.throughSequence, ...repo.bindings(context)));
         } else if (op.type === "approval.cancel") {
           const m = await repo.message(context, op.branchId, id, op.messageId); if (!m || m.kind !== "add-service-request") throw be1Error("NOT_FOUND");
@@ -51,7 +51,7 @@ export class Be6Application extends BusinessApplication {
           if (m.status !== "waiting") conflict("invalid-transition");
           const guard = opaqueId("approval");
           statements.push(db.prepare("UPDATE message_approvals SET status='cancelled',responded_at=?,revision=revision+1 WHERE business_id=? AND branch_id=? AND message_id=? AND revision=? AND status='waiting'").bind(now, op.businessId, op.branchId, m.id, op.expectedRevision),
-            db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(:previous_row_count::integer=1)::integer").bind(guard), deleteGuard(db, guard));
+            db.prepare("INSERT INTO backend_guards(id,allowed,version_ok) SELECT ?,1,(changes()=1)").bind(guard), deleteGuard(db, guard));
           statements.push(db.prepare("UPDATE message_outbox SET state='failed',failure_code='request-cancelled',updated_at=? WHERE business_id=? AND branch_id=? AND message_id=? AND state IN ('blocked','queued') AND attempts=0").bind(now, op.businessId, op.branchId, m.id));
         } else {
           if (op.context.customerId !== conversation.customer_id) throw be1Error("NOT_FOUND");
@@ -64,7 +64,7 @@ export class Be6Application extends BusinessApplication {
           statements.push(repo.contextStatement(op.businessId, op.branchId, id, value, now),
             db.prepare("INSERT INTO messages(id,business_id,branch_id,conversation_id,kind,direction,body,pet_id,booking_id,execution_id,actor_person_id,occurred_at,created_at) VALUES(?,?,?,?,?,'business',?,?,?,?,?,?,?)")
               .bind(messageId, op.businessId, op.branchId, id, op.type === "message.send" ? "text" : "add-service-request", body, value.petId, value.bookingId, value.executionId, actor.id, now, now));
-          if (op.type === "approval.request") statements.push(db.prepare("INSERT INTO message_approvals(message_id,business_id,branch_id,service_name,additional_price,additional_minutes,note) VALUES(?,?,?,?,?,?,?)").bind(messageId, op.businessId, op.branchId, op.serviceName, op.additionalPrice, op.additionalMinutes, op.note));
+          if (op.type === "approval.request") statements.push(db.prepare("INSERT INTO message_approvals(message_id,business_id,branch_id,service_name,additional_price,additional_minutes,note) VALUES(?,?,?,?,?,?,?)").bind(messageId, op.businessId, op.branchId, op.serviceName, op.additionalPrice * 100, op.additionalMinutes, op.note));
           statements.push(repo.outboxStatement(context, op.branchId, id, messageId));
         }
       }

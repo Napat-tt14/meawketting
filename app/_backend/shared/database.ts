@@ -5,16 +5,25 @@ import { opaqueId } from "./validation";
 
 export type MutationReceipt = { command: string; requestKey: string; requestHash: string; targetId: string };
 
-export function authorizationGuard(db: Database, context: AuthorizedMutation, branchId: string, token: string, ownerOnly = false) {
+export function authorizationGuard(db: Database, context: AuthorizedMutation, branchId: string, token: string, ownerOnly = false, allowInactiveOwner = false) {
   return db.prepare(`INSERT INTO backend_guards(id, allowed)
     SELECT ?, CAST(EXISTS(SELECT 1 FROM persons p JOIN business_memberships m ON m.person_id=p.id
       JOIN businesses b ON b.id=m.business_id JOIN branches br ON br.business_id=b.id
       WHERE p.id=? AND p.status='active' AND m.id=? AND m.business_id=? AND m.status='active'
-        AND b.status='active' AND br.id=? AND br.status='active'
+        AND b.status='active' AND br.id=? AND (br.status='active' OR (?=1 AND m.role='OWNER'))
         AND (?=0 OR m.role='OWNER')
         AND (m.role='OWNER' OR EXISTS(SELECT 1 FROM membership_branch_access a
           WHERE a.business_id=m.business_id AND a.membership_id=m.id AND a.branch_id=br.id AND a.status='active'))) AS integer)`)
-    .bind(token, context.actor.id, context.membership.id, context.membership.businessId, branchId, ownerOnly ? 1 : 0);
+    .bind(token, context.actor.id, context.membership.id, context.membership.businessId, branchId, allowInactiveOwner ? 1 : 0, ownerOnly ? 1 : 0);
+}
+
+export async function businessMutation(db: Database, context: AuthorizedMutation, statements: PreparedStatement[], ownerOnly = false) {
+  const token = opaqueId("businesswrite");
+  const guard = db.prepare(`INSERT INTO backend_guards(id,allowed)
+    SELECT ?,EXISTS(SELECT 1 FROM persons p JOIN business_memberships m ON m.person_id=p.id JOIN businesses b ON b.id=m.business_id
+      WHERE p.id=? AND p.status='active' AND m.id=? AND m.business_id=? AND m.status='active' AND b.status='active' AND (?=0 OR m.role='OWNER'))`)
+    .bind(token, context.actor.id, context.membership.id, context.membership.businessId, ownerOnly ? 1 : 0);
+  return (await batch(db, [guard, ...statements, deleteGuard(db, token)])).slice(1, -1);
 }
 
 export async function findReceipt(db: Database, businessId: string, command: string, requestKey: string) {
@@ -45,11 +54,9 @@ export async function batch(db: Database, statements: PreparedStatement[]) {
   } catch (error) {
     if (error instanceof Be1Error || error instanceof BackendConflict) throw error;
     const message = String(error);
-    const pg = error as { code?: string; table_name?: string };
-    if (pg.code === "23505") {
-      if (["business_intakes", "conversations", "charges", "charge_items"].includes(pg.table_name ?? "")) conflict("version-conflict");
-      if (["channel_webhook_events", "payment_webhook_events", "payments", "payment_attempts", "backend_mutations"].includes(pg.table_name ?? "")) conflict("idempotency");
-    }
+    if (/UNIQUE constraint failed: (branches|customers|customer_pet_relationships)\./i.test(message)) throw be1Error("CONFLICT", error);
+    if (/UNIQUE constraint failed: (business_intakes|conversations|charges|charge_items)\./i.test(message)) conflict("version-conflict");
+    if (/UNIQUE constraint failed: (channel_webhook_events|payment_webhook_events|payments|payment_attempts|backend_mutations)\./i.test(message)) conflict("idempotency");
     if (message.includes("ck_backend_authorization")) throw be1Error("FORBIDDEN");
     if (message.includes("ck_backend_version")) conflict("version-conflict");
     if (message.includes("BE6_SCOPE")) throw be1Error("FORBIDDEN");

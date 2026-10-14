@@ -1,96 +1,90 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { backendContext, withBackend } from "../app/_backend/runtime";
-import { connectPostgres } from "../app/_backend/postgres";
+import { tokenHash } from "../app/_backend/auth";
 import { registrationRequest } from "../app/_backend/businessRegistration";
-import { beginBusinessLogin } from "../app/_backend/supabaseAuth";
-import { seededDatabase, OWNER, WHISKER, ARI } from "./postgresFixtures";
+import { seededDatabase, OWNER, WHISKER, ARI } from "./d1Fixtures";
 import { Be1Application } from "../app/_backend/be1/application";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository";
 
-const uid = "22222222-2222-4222-8222-222222222222";
-const env = { MEAWKETTING_AUTH_MODE: "supabase", SUPABASE_URL: "https://auth.example.test", SUPABASE_PUBLISHABLE_KEY: "synthetic-key", MEAWKETTING_PUBLIC_ORIGIN: "https://shop.test" };
+const env = { MEAWKETTING_AUTH_MODE: "session", MEAWKETTING_PUBLIC_ORIGIN: "https://shop.test" };
 const input = { displayName: "Synthetic owner", businessName: "Synthetic shop", branchName: "Main", phone: "0812345678", email: "", modules: ["grooming", "hotel"], confirmed: true };
-function harness(t: TestContext) {
-  const db = seededDatabase();
-  let provider = "google";
-  let confirmed = true;
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: uid, app_metadata: { provider }, email_confirmed_at: confirmed ? "2026-10-02T00:00:00Z" : null, user_metadata: { role: "OWNER" }, aud: "authenticated", role: "authenticated" }));
-  const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
-  const cookie = `__Host-meawketting-auth=base64-${b64({ access_token: `${b64({alg:"HS256"})}.${b64({sub:uid,exp:Math.floor(Date.now()/1000)+3600})}.test`,refresh_token:"test",expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid} })}`;
+async function harness(t: TestContext, provider = "google") {
+  const db = seededDatabase(), uid = crypto.randomUUID(), token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"), now = new Date().toISOString();
+  t.after(() => db.close());
+  db.inspect.prepare("INSERT INTO auth_identities(id,provider,provider_subject,created_at,updated_at) VALUES(?,?,?,?,?)").run(uid, provider, crypto.randomUUID(), now, now);
+  db.inspect.prepare("INSERT INTO auth_sessions(id,identity_id,token_hash,expires_at,created_at,last_seen_at) VALUES(?,?,?,?,?,?)")
+    .run(crypto.randomUUID(), uid, await tokenHash(token), new Date(Date.now() + 3600000).toISOString(), now, now);
   const run = (body: unknown = input, method = "POST", origin = "https://shop.test", authenticated = true) => {
-    const request = new Request("https://shop.test/api/business/register", { method, headers: { origin, "content-type":"application/json", ...(authenticated ? {cookie} : {}) }, ...(method === "POST" ? {body:JSON.stringify(body)} : {}) });
-    return withBackend(request,env,async () => { backendContext().database = connectPostgres(process.env.MEAWKETTING_TEST_DATABASE_URL!,db.schema); return registrationRequest(request); });
+    const request = new Request("https://shop.test/api/business/register", { method, headers: { origin, "content-type": "application/json", ...(authenticated ? { cookie: `__Host-meawketting-session=${token}` } : {}) }, ...(method === "POST" ? { body: JSON.stringify(body) } : {}) });
+    return withBackend(request, env, async () => { backendContext().database = db; return registrationRequest(request); });
   };
-  return { db, run, line: () => { provider="custom:line"; }, email: (verified = true) => { provider="email"; confirmed=verified; } };
+  return { db, uid, run };
 }
-test("registration creates one atomic Owner workspace and concurrent identical retries reuse it", async t => {
-  const { db, run } = harness(t);
-  assert.deepEqual(await (await run(null,"GET")).json(), { authenticated:true, registered:false });
-  const responses = await Promise.all([run(),run(),run()]);
-  assert.deepEqual(responses.map(r=>r.status),[200,200,200]);
-  const results = await Promise.all(responses.map(r=>r.json()));
-  assert.deepEqual(results[0],results[1]); assert.deepEqual(results[1],results[2]);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n,1);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM audit_events WHERE action='business.register'").get()?.n,1);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM branch_operating_hours h JOIN business_registrations r ON r.branch_id=h.branch_id WHERE h.closed=1").get()?.n,7);
-  assert.equal((await run({...input,businessName:"Changed"})).status,409);
-  assert.equal(db.inspect.prepare("SELECT m.role FROM business_memberships m JOIN business_registrations r USING(business_id)").get()?.role,"OWNER");
-  const app = new Be1Application(new PostgresBe1Repository(db));
-  assert.deepEqual(await (await run(null,"GET")).json(), { authenticated:true, registered:true });
-  const personId = db.inspect.prepare("SELECT person_id FROM auth_person_links WHERE auth_user_id=?::uuid").get(uid)?.person_id as string;
-  const actor = await app.resolvePerson(personId);
-  const session = await app.resolveSession(actor);
-  assert.equal(session.workspaces.length,1);
-  assert.equal(session.workspaces[0].permittedBranches.length,1);
-  await assert.rejects(app.getBusiness(actor,WHISKER),{code:"FORBIDDEN"});
-  // Scoped lookup conceals foreign Branch existence.
-  await assert.rejects(app.getBranch(actor,session.workspaces[0].business.id,ARI),{code:"NOT_FOUND"});
+test("registration creates one atomic Owner workspace; concurrent retries reuse the same receipt", async t => {
+  const { db, uid, run } = await harness(t);
+  assert.deepEqual(await (await run(null, "GET")).json(), { authenticated: true, registered: false });
+  const responses = await Promise.all([run(), run(), run()]);
+  assert.deepEqual(responses.map(response => response.status), [200, 200, 200]);
+  const results = await Promise.all(responses.map(response => response.json()));
+  assert.deepEqual(results[0], results[1]); assert.deepEqual(results[1], results[2]);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 1);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM audit_events WHERE action='business.register'").get()?.n, 1);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM branch_operating_hours h JOIN business_registrations r ON r.branch_id=h.branch_id WHERE h.closed=1").get()?.n, 7);
+  assert.equal((await run({ ...input, businessName: "Changed" })).status, 409);
+  assert.equal(db.inspect.prepare("SELECT m.role FROM business_memberships m JOIN business_registrations r USING(business_id)").get()?.role, "OWNER");
+  const app = new Be1Application(new D1Be1Repository(db));
+  assert.deepEqual(await (await run(null, "GET")).json(), { authenticated: true, registered: true });
+  const personId = db.inspect.prepare("SELECT person_id FROM auth_identities WHERE id=?").get(uid)?.person_id as string;
+  assert.equal(db.inspect.prepare("SELECT person_id FROM auth_sessions WHERE identity_id=?").get(uid)?.person_id, personId);
+  const actor = await app.resolvePerson(personId), session = await app.resolveSession(actor);
+  assert.equal(session.workspaces.length, 1); assert.equal(session.workspaces[0].permittedBranches.length, 1);
+  await assert.rejects(app.getBusiness(actor, WHISKER), { code: "FORBIDDEN" });
+  await assert.rejects(app.getBranch(actor, session.workspaces[0].business.id, ARI), { code: "NOT_FOUND" });
   db.inspect.exec("UPDATE businesses SET status='inactive' WHERE id IN (SELECT business_id FROM business_registrations)");
-  assert.equal((await run()).status,403);
-  assert.equal((await run(null,"GET")).status,403);
+  assert.equal((await run()).status, 403); assert.equal((await run(null, "GET")).status, 403);
 });
-test("registration rejects missing auth, cross-origin, unconfirmed, forged authority, invalid contact and modules without writes", async t => {
-  const { db, run } = harness(t);
-  assert.equal((await run(input,"POST","https://shop.test",false)).status,401);
-  assert.equal((await run(input,"POST","https://evil.test")).status,403);
-  for (const body of [{...input,confirmed:false},{...input,role:"OWNER"},{...input,modules:[]},{...input,modules:["hotel","hotel"]},{...input,phone:"bad"},{...input,email:"bad"},{...input,businessName:""}]) assert.equal((await run(body)).status,400);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n,0);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n,6);
+test("registration rejects missing auth, cross-origin, forged authority, invalid contact and modules without writes", async t => {
+  const { db, run } = await harness(t);
+  assert.equal((await run(input, "POST", "https://shop.test", false)).status, 401);
+  assert.equal((await run(input, "POST", "https://evil.test")).status, 403);
+  for (const body of [{ ...input, confirmed: false }, { ...input, role: "OWNER" }, { ...input, modules: [] }, { ...input, modules: ["hotel", "hotel"] }, { ...input, phone: "bad" }, { ...input, email: "bad" }, { ...input, businessName: "" }]) assert.equal((await run(body)).status, 400);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 0);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n, 6);
 });
 test("LINE without email registers; already linked identities cannot self-provision another Owner", async t => {
-  const { db, run, line } = harness(t); line();
-  db.inspect.prepare("INSERT INTO auth_person_links(auth_user_id,person_id) VALUES(?::uuid,?)").run(uid,OWNER);
-  assert.equal((await run()).status,403);
-  db.inspect.exec("DELETE FROM auth_person_links");
-  assert.equal((await run()).status,200);
-  assert.equal(db.inspect.prepare("SELECT p.primary_email FROM persons p JOIN auth_person_links l ON l.person_id=p.id").get()?.primary_email,null);
-});
-test("registration failure rolls back Person, Business, membership and auth link together", async t => {
-  const { db, run } = harness(t);
-  db.inspect.exec("ALTER TABLE business_registrations ADD CONSTRAINT injected_failure CHECK(false) NOT VALID");
-  assert.equal((await run()).status,500);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n,6);
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM auth_person_links").get()?.n,0);
-});
-test("LINE uses Supabase custom provider with PKCE and the same server callback", async () => {
-  const request = new Request("https://shop.test/api/auth/line/start");
-  const response = await withBackend(request,env,()=>beginBusinessLogin("custom:line"));
-  const url = new URL(response.headers.get("location")!);
-  assert.equal(url.searchParams.get("provider"),"custom:line");
-  assert.equal(url.searchParams.get("code_challenge_method"),"s256");
-  assert.equal(url.searchParams.get("redirect_to"),"https://shop.test/api/auth/google/callback");
-});
-
-test("email accounts need verified email before setup and a completed workspace is durable", async t => {
-  const { db, run, email } = harness(t);
-  email(false);
-  assert.equal((await run(null, "GET")).status, 403);
+  const { db, uid, run } = await harness(t, "line");
+  db.inspect.prepare("UPDATE auth_identities SET person_id=? WHERE id=?").run(OWNER, uid);
+  db.inspect.prepare("UPDATE auth_sessions SET person_id=? WHERE identity_id=?").run(OWNER, uid);
   assert.equal((await run()).status, 403);
+  const fresh = await harness(t, "line");
+  assert.equal((await fresh.run()).status, 200);
+  assert.equal(fresh.db.inspect.prepare("SELECT p.primary_email FROM persons p JOIN auth_identities i ON i.person_id=p.id WHERE i.id=?").get(fresh.uid)?.primary_email, null);
+});
+test("registration failure rolls back Person, Business, membership, auth linkage and audit in one D1 batch", async t => {
+  const { db, uid, run } = await harness(t);
+  db.inspect.exec("CREATE TRIGGER injected_registration_failure BEFORE INSERT ON business_registrations BEGIN SELECT RAISE(ABORT,'injected failure'); END");
+  assert.equal((await run()).status, 500);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n, 6);
+  assert.equal(db.inspect.prepare("SELECT person_id FROM auth_identities WHERE id=?").get(uid)?.person_id, null);
+  assert.equal(db.inspect.prepare("SELECT count(*) n FROM audit_events WHERE action='business.register'").get()?.n, 0);
+});
+test("revoked setup sessions cannot create authority and provider subjects are unique", async t => {
+  const { db, uid, run } = await harness(t);
+  const now = new Date().toISOString();
+  db.inspect.prepare("UPDATE auth_sessions SET revoked_at=? WHERE identity_id=?").run(now, uid);
+  assert.equal((await run()).status, 401);
+  assert.throws(() => db.inspect.prepare("INSERT INTO auth_identities(id,provider,provider_subject,created_at,updated_at) SELECT ? ,provider,provider_subject,?,? FROM auth_identities WHERE id=?").run(crypto.randomUUID(), now, now, uid));
   assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 0);
-  email();
-  assert.deepEqual(await (await run(null, "GET")).json(), { authenticated: true, registered: false });
-  assert.equal((await run()).status, 200);
-  assert.deepEqual(await (await run(null, "GET")).json(), { authenticated: true, registered: true });
-  assert.equal(db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 1);
+  const racing = await harness(t), current = racing.db.inspect.prepare("SELECT id FROM auth_sessions WHERE identity_id=?").get(racing.uid)!.id;
+  racing.db.inspect.prepare(`INSERT INTO auth_sessions(id,identity_id,token_hash,expires_at,created_at,last_seen_at)
+    SELECT ?,identity_id,?,expires_at,created_at,last_seen_at FROM auth_sessions WHERE id=?`).run(crypto.randomUUID(), await tokenHash("another-live-session"), current);
+  const atomicBatch = racing.db.batch.bind(racing.db);
+  t.mock.method(racing.db, "batch", async (statements: Parameters<typeof racing.db.batch>[0]) => {
+    racing.db.inspect.prepare("UPDATE auth_sessions SET revoked_at=? WHERE id=?").run(new Date().toISOString(), current);
+    return atomicBatch(statements);
+  });
+  assert.equal((await racing.run()).status, 403);
+  assert.equal(racing.db.inspect.prepare("SELECT count(*) n FROM persons").get()?.n, 6);
+  assert.equal(racing.db.inspect.prepare("SELECT count(*) n FROM business_registrations").get()?.n, 0);
 });

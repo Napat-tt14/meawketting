@@ -1,27 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { TestSql, migrate } from "./postgresTestKit";
-import { PostgresBe1Repository } from "../app/_backend/be1/postgresRepository";
+import { TestSql, migrate } from "./d1TestKit";
+import { D1Be1Repository } from "../app/_backend/be1/d1Repository";
 import { Be1Error } from "../app/_backend/be1/errors";
-import { PostgresBe2Repository } from "../app/_backend/be2/postgresRepository";
+import { D1Be2Repository } from "../app/_backend/be2/d1Repository";
 import { Be3Application } from "../app/_backend/be3/application";
 import type { CreateBookingInput } from "../app/_backend/be3/contracts";
-import { PostgresBe3Repository } from "../app/_backend/be3/postgresRepository";
+import { D1Be3Repository } from "../app/_backend/be3/d1Repository";
 import { Be4Application } from "../app/_backend/be4/application";
 import { Be2Application } from "../app/_backend/be2/application";
 import { Be6Application } from "../app/_backend/be6/application";
-import { PostgresBe6Repository } from "../app/_backend/be6/postgresRepository";
+import { D1Be6Repository } from "../app/_backend/be6/d1Repository";
 import { Be8Application } from "../app/_backend/be8/application";
 import type { ExecutionChange, ExecutionView } from "../app/_backend/be4/contracts";
-import { PostgresBe4Repository } from "../app/_backend/be4/postgresRepository";
+import { D1Be4Repository } from "../app/_backend/be4/d1Repository";
 import { executionId } from "../app/_backend/be4/domain";
 import { BackendConflict } from "../app/_backend/shared/errors";
 import { businessRequest } from "../app/_backend/shared/http";
-import { ARI, INACTIVE, MANAGER, STAFF, metadata, ONNUT, OUTSIDER, OWNER, PAW, seededDatabase, THONGLOR, WHISKER } from "./postgresFixtures";
+import { ARI, INACTIVE, MANAGER, STAFF, metadata, ONNUT, OUTSIDER, OWNER, PAW, seededDatabase, THONGLOR, WHISKER } from "./d1Fixtures";
 
 async function fixture() {
-  const db = seededDatabase(), auth = new PostgresBe1Repository(db), identities = new PostgresBe2Repository(db), bookings = new PostgresBe3Repository(db), operations = new PostgresBe4Repository(db);
+  const db = seededDatabase(), auth = new D1Be1Repository(db), identities = new D1Be2Repository(db), bookings = new D1Be3Repository(db), operations = new D1Be4Repository(db);
   let tick = 0;
   const now = () => new Date(Date.parse("2026-08-20T04:00:00Z") + tick++ * 1000).toISOString();
   const app = new Be4Application(auth, identities, bookings, operations, now), planning = new Be3Application(auth, identities, bookings, { now });
@@ -44,7 +44,7 @@ const daycare = { businessId: PAW, branchId: ONNUT, serviceId: "onnut-daycare-fu
 
 test("Manager and Staff read granted operations without gaining another Branch or Business; Owner retains inactive access", async () => {
   const f = await fixture();
-  const auth = new PostgresBe1Repository(f.db), customers = new Be2Application(auth, new PostgresBe2Repository(f.db)), inbox = new Be6Application(auth, new PostgresBe6Repository(f.db)), reports = new Be8Application(auth, f.db);
+  const auth = new D1Be1Repository(f.db), customers = new Be2Application(auth, new D1Be2Repository(f.db)), inbox = new Be6Application(auth, new D1Be6Repository(f.db)), reports = new Be8Application(auth, f.db);
   for (const [person, branch, denied] of [[MANAGER, ARI, THONGLOR], [STAFF, THONGLOR, ARI]]) {
     const actor = await f.app.resolvePerson(person);
     const result = await f.app.executeBe4(actor, { type: "operations.list", businessId: WHISKER, branchId: branch }, metadata());
@@ -65,18 +65,18 @@ test("Manager and Staff read granted operations without gaining another Branch o
   await f.app.executeBe4(f.actor, { type: "operations.list", businessId: WHISKER, branchId: THONGLOR }, metadata());
 });
 
-test("PostgreSQL synthetic plans create per-Pet execution once, retain inactive references and never invent completion", (t) => {
+test("D1 synthetic plans create per-Pet execution once, retain inactive references and never invent completion", (t) => {
   const db = new TestSql(); t.after(() => db.close()); migrate(db);
-  for (const n of [1, 2, 3]) db.exec(readFileSync(`supabase/seed-be${n}-dev.sql`, "utf8"));
+  for (const n of [1, 2, 3]) db.exec(readFileSync(`tests/fixtures/d1/seed-be${n}-dev.sql`, "utf8"));
   const expected = db.prepare("SELECT count(*) n FROM booking_pets p JOIN bookings b ON b.business_id=p.business_id AND b.id=p.booking_id WHERE b.status<>'cancelled'").get()?.n;
-  db.exec(readFileSync("supabase/seed-execution-plans.sql", "utf8"));
+  db.exec(readFileSync("tests/fixtures/d1/seed-execution-plans.sql", "utf8"));
   assert.equal(db.prepare("SELECT count(*) n FROM service_executions").get()?.n, expected);
   assert.equal(db.prepare("SELECT count(*) n FROM service_executions WHERE status<>'booked'").get()?.n, 0);
   assert.equal(db.prepare("SELECT count(*) n FROM service_records").get()?.n, 0);
-  assert.equal(db.prepare("SELECT count(*) n FROM execution_events WHERE ((data_json)::jsonb->>'reason')='inactive-at-upgrade'").get()?.n, 2);
-  db.exec(readFileSync("supabase/seed-execution-plans.sql", "utf8"));
+  assert.equal(db.prepare("SELECT count(*) n FROM execution_events WHERE json_extract(data_json,'$.reason')='inactive-at-upgrade'").get()?.n, 2);
+  db.exec(readFileSync("tests/fixtures/d1/seed-execution-plans.sql", "utf8"));
   assert.equal(db.prepare("SELECT count(*) n FROM service_executions").get()?.n, expected);
-  assert.deepEqual(db.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 });
 
 test("two concurrent Hotel assignments cannot consume the same last room capacity", async (t) => {
@@ -132,7 +132,7 @@ test("multi-Pet Grooming shares a Booking reservation, completes each Pet indepe
   const records = await f.operations.records(WHISKER, ARI);
   assert.equal(records.length, 2); assert.equal(new Set(records.map((r) => r.petId)).size, 2);
   assert.equal((await f.bookings.getBooking(WHISKER, ARI, booking.id))?.status, "confirmed");
-  assert.deepEqual(f.db.inspect.prepare("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND NOT convalidated").all(), []);
+  assert.deepEqual(f.db.inspect.prepare("PRAGMA foreign_key_check").all(), []);
   assert.equal(f.db.inspect.prepare("SELECT count(*) AS n FROM backend_guards").get()?.n, 0);
 });
 
@@ -199,11 +199,11 @@ test("concurrent retries replay the same command; stale different writes cannot 
 
 test("Service Record failure rolls back completion, audit and idempotency; retry can succeed", async (t) => {
   const f = await fixture(); t.after(() => f.db.inspect.close()); const { executions } = await f.create(); const job = executions[0];
-  f.db.inspect.exec("CREATE FUNCTION test_storage_failure_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'simulated outage'; END $$; CREATE TRIGGER test_storage_failure BEFORE INSERT ON service_records FOR EACH ROW EXECUTE FUNCTION test_storage_failure_fn()");
+  f.db.inspect.exec("CREATE TRIGGER test_storage_failure BEFORE INSERT ON service_records BEGIN SELECT RAISE(ABORT,'simulated outage'); END");
   await assert.rejects(f.change(job, { type: "transition", status: "completed" }, "completion-retry"), code("PERSISTENCE_ERROR"));
   assert.equal((await f.operations.get(WHISKER, ARI, executionId(job)))?.record.status, "booked");
   assert.equal(f.db.inspect.prepare("SELECT count(*) AS n FROM backend_mutations").get()?.n, 0);
-  f.db.inspect.exec("DROP TRIGGER test_storage_failure ON service_records");
+  f.db.inspect.exec("DROP TRIGGER test_storage_failure");
   await f.change(job, { type: "transition", status: "completed" }, "completion-retry");
   assert.equal((await f.operations.records(WHISKER, ARI)).length, 1);
 });

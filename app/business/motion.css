@@ -10,7 +10,6 @@
   }
   .business-auth__story h2 { animation-delay: 40ms; }
   .business-auth__story > p { animation-delay: 80ms; }
-  .business-auth__confirmation,
   .business-auth__error {
     animation: business-welcome-enter 220ms var(--ease-premium) both;
   }

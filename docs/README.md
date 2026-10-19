@@ -53,6 +53,11 @@ Cloudflare Worker/API → Application/Domain → D1 Repository → Cloudflare D1
 
 BE1–BE8 migration code is IMPLEMENTED and TESTED LOCALLY with native SQLite semantics. The real production D1 schema is applied/verified through the Dashboard: 70 STRICT domain tables, 133 indexes, 81 triggers, one view and zero foreign-key orphans; `0001_initial.sql` is recorded once. Source data transfer, OAuth/environment setup, provider callbacks and deployed acceptance remain pending. The Wrangler credential still lacks D1 write permission. Earlier Supabase deployment/provider evidence is historical and does not prove the current D1 cutover. See [validation](./VALIDATION.md) for actual evidence.
 
-R2 subscription setup was declined. No private media bucket was created; the R2 binding and API are code-only until later authorized provisioning.
+R2 was enabled by the owner on 2026-10-15, and private Standard bucket `meawketting-private-media` was provisioned in Asia Pacific with Public Access disabled. Its configured `MEDIA` binding and API still require deployed acceptance.
 
 Business UI and LINE Seed Sans TH stay frozen. Consumer is PAUSED. /workfiledesign is untouched. Staging uses a separate Worker from the production domain.
+
+
+## Production update — 2026-10-15
+
+Production status — 2026-10-15: commit 18de0d9 was deployed successfully as Worker version 050df786-d4f7-445a-b4c7-1d29d5b4a9c7 (build a1114ee3-38f2-4c02-9334-49b08c0b89b8). The owner confirmed the Supabase source project was deleted and explicitly approved a fresh start on empty D1; source Person/Business preservation and transfer are superseded by that decision. No synthetic accounts or Businesses were inserted. Runtime bindings are native DB/D1, private MEDIA/R2 and API_RATE_LIMITER. Public landing/login/register pages respond 200. Google Login reaches the provider but is blocked by redirect_uri_mismatch until https://meawketting.com/api/auth/google/callback is registered on the existing OAuth client; real sign-in and first-Business creation are not yet verified. LINE Login is explicitly deferred by the owner.

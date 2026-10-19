@@ -106,8 +106,14 @@ export async function businessLoginRequest(request: Request, provider: Provider)
   }
 }
 async function providerJson(url: string, init?: RequestInit): Promise<Claims> {
-  const response = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw be1Error("UNAUTHENTICATED");
+  // Workers supports manual/follow only; non-2xx redirects are rejected below.
+  const response = await fetch(url, { ...init, redirect: "manual", signal: AbortSignal.timeout(10000) });
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { error?: unknown } | null;
+    const reason = ["invalid_client", "invalid_grant", "invalid_request", "unauthorized_client", "unsupported_grant_type"].find(code => code === failure?.error) ?? "provider-rejected";
+    console.warn(JSON.stringify({ event: "auth-provider-rejection", status: response.status, reason }));
+    throw be1Error("UNAUTHENTICATED");
+  }
   const value = await response.json();
   if (!value || typeof value !== "object" || Array.isArray(value)) throw be1Error("UNAUTHENTICATED");
   return value as Claims;
@@ -124,7 +130,7 @@ async function verifyGoogleToken(token: string, clientId: string, nonce: string)
   const header = JSON.parse(new TextDecoder().decode(decodePart(parts[0]))) as Claims;
   if (header.alg !== "RS256" || typeof header.kid !== "string") throw be1Error("UNAUTHENTICATED");
   if (!googleKeys || googleKeys.expires <= Date.now() || !googleKeys.keys.some(key => key.kid === header.kid)) {
-    const response = await fetch("https://www.googleapis.com/oauth2/v3/certs", { redirect: "error", signal: AbortSignal.timeout(10000) });
+    const response = await fetch("https://www.googleapis.com/oauth2/v3/certs", { redirect: "manual", signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw be1Error("UNAUTHENTICATED");
     const value = await response.json() as { keys?: SigningKey[] };
     if (!Array.isArray(value.keys)) throw be1Error("UNAUTHENTICATED");

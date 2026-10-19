@@ -1,44 +1,33 @@
-# Cloudflare D1 forward-only production runbook
+# Cloudflare D1 production runbook
 
-The working tree uses Cloudflare Worker/Vinext → `env.DB` → D1 only. Authentication is direct Google/LINE OAuth with hashed opaque D1 sessions. Email/password was removed by the owner. No PostgreSQL fallback, dual-write, rollback adapter or manual data backup exists.
+Production status — 2026-10-15: commit 18de0d9 was deployed successfully as Worker version 050df786-d4f7-445a-b4c7-1d29d5b4a9c7 (build a1114ee3-38f2-4c02-9334-49b08c0b89b8). The owner confirmed the Supabase source project was deleted and explicitly approved a fresh start on empty D1; source Person/Business preservation and transfer are superseded by that decision. No synthetic accounts or Businesses were inserted. Runtime bindings are native DB/D1, private MEDIA/R2 and API_RATE_LIMITER. Public landing/login/register pages respond 200. Google Login reaches the provider but is blocked by redirect_uri_mismatch until https://meawketting.com/api/auth/google/callback is registered on the existing OAuth client; real sign-in and first-Business creation are not yet verified. LINE Login is explicitly deferred by the owner.
 
-Production D1 `meawketting-production` was created in the existing account through Dashboard with Asia Pacific location hint. Its real ID is configured in `wrangler.d1.json`: `3e920509-817c-4d36-9243-7ad0afe4a874`. The reviewed schema was applied through the Dashboard on 2026-10-13 and verified remotely: 70 domain tables, all STRICT; 133 explicit indexes; 81 triggers; one view; zero foreign-key orphans. The Wrangler migration ledger records `0001_initial.sql` once. Production source records have not been transferred and the Worker has not been deployed. No commit, push or Worker deployment is authorized by this runbook.
+## Active resources
 
-Remote Persons, Bookings and Payments are still empty. Read-only source inspection found 37 application rows containing real identity, Business/Branch authority, service configuration and audit history; the reviewed transformation produces 38 D1 rows, including Google and LINE identities. Source Customer, Booking, Payment and media rows are zero. Preserve the existing authority/configuration records during cutover.
+- Worker: meawketting, https://meawketting.com; deployed through Dashboard Retry build from main commit 18de0d9.
+- DB: meawketting-production, ID 3e920509-817c-4d36-9243-7ad0afe4a874, APAC hint. Reviewed 0001_initial.sql has 70 STRICT domain tables, 133 explicit indexes, 81 triggers and one view.
+- MEDIA: private Standard R2 bucket meawketting-private-media, Asia Pacific, Public Access disabled.
+- API_RATE_LIMITER: 300 requests per 60 seconds. Existing generated asset/image bindings remain build-managed.
+- Runtime vars: MEAWKETTING_AUTH_MODE=session, MEAWKETTING_ENV=production, MEAWKETTING_FIXTURE_MODE=off, MEAWKETTING_PUBLIC_ORIGIN=https://meawketting.com.
 
-## Local verification
+## Complete Google acceptance
 
-Use Node 22.13+ and `npm ci`. Run `npm run test:backend`, `npm run test:production`, `npm run test:api:smoke`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, then `npm run test:frontend`. Run build and rendered HTML serially because both use `dist/`. SQL tests execute native SQLite, including real constraints and atomic transactions; they do not simulate PostgreSQL semantics. Wrangler/Miniflare platform checks must also pass before cutover.
+The existing Google OAuth client has GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET configured in the Worker. Register this exact Authorized redirect URI on that same Google Cloud OAuth web client:
 
-`npm run db:migrate` applies only local D1 migrations. `npm run db:seed:test` seeds only local D1 with synthetic fixtures; never import test seeds into the production database. Reviewed `migrations/d1/*.sql` is the schema source of truth. Drizzle generates review drafts in `migrations/generated`; those drafts do not contain the full guard/UTC checks and must not be applied as authoritative migrations.
+`https://meawketting.com/api/auth/google/callback`
 
-## Runtime configuration
+Then start a new login from /business/login. Real sign-in, opaque session issuance, first-workspace registration and Owner permissions remain unverified until that provider change is accepted. No client ID/secret rotation or new OAuth client is required to fix the observed redirect mismatch. LINE_LOGIN_CHANNEL_ID and LINE_LOGIN_CHANNEL_SECRET are not configured; the owner explicitly deferred LINE Login. When configured later, LINE uses the same callback route with provider identity held in consumed server state.
 
-- Binding `DB`: the actual production D1 above; runtime uses native binding methods, never public REST.
-- `MEAWKETTING_AUTH_MODE=session`, `MEAWKETTING_ENV=production`, `MEAWKETTING_FIXTURE_MODE=off`, `MEAWKETTING_PUBLIC_ORIGIN=https://meawketting.com`.
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINE_LOGIN_CHANNEL_ID`, `LINE_LOGIN_CHANNEL_SECRET`: server secrets, configured by the owner. Keep `MEAWKETTING_LINE_CREDENTIALS` for Messaging API channels and existing payment-provider credentials if applicable.
-- `API_RATE_LIMITER`: existing production rate-limit binding. Keep current image/assets bindings.
-- Private object storage code uses `MEDIA`. R2 subscription was explicitly declined on 2026-10-13; `meawketting-private-media` has **not** been created. Desired binding remains in configuration pending provisioning. Do not deploy with a nonexistent bucket. Current source media rows are zero; media API fails closed if the binding is unavailable. Enabling paid R2 requires a separate owner approval.
+## Data and release policy
 
-See [OAuth/session/media configuration](./D1-AUTH-MEDIA.md) for exact callbacks and private object rules. Google and LINE both return to the fixed `/api/auth/google/callback` route; state identifies the verified provider. All existing Person/provider-subject links must migrate before real sign-in. Never infer linkage from email. Login issues new sessions; previous provider sessions are not transferred.
+The owner deleted Supabase and approved starting again on empty D1. Do not run the historical source-transfer tool against another database or invent Person linkage from emails. No production test fixtures were seeded. Historical 2026-10-13 source counts and local test evidence are retained as audit records, not migrated or recoverable data. Runtime uses native D1 only, with no PostgreSQL fallback, dual-write or manual backup/restore implementation.
 
-Old relational runtime passwords, Hyperdrive binding, Supabase DB/Auth/Storage keys have no application callers. Operator-only source connection has been moved out of `.dev.vars` into ignored `.env.d1-transfer`; it must never be bound into a Worker or committed. A PostgreSQL source reader may exist only in the one-time transfer tool until the source has been verified and the tool removed.
+Deploy authorization applies to the reviewed retry. The agent did not commit or push local documentation changes. Future schema changes are reviewed forward migrations in migrations/d1; generated Drizzle drafts omit custom guards and are not authoritative.
 
-## Cutover gate and sequence
+## Verification
 
-1. Finish local correctness, build, lint, typechecks and rendering checks. Resolve any failure forward in D1.
-2. Confirm the already applied remote schema still matches the reviewed migration and the `0001_initial.sql` ledger entry. Recheck table/trigger/index inventory and `PRAGMA foreign_key_check`; no synthetic seeds. Add any later schema correction as a forward migration.
-3. Obtain explicit deployment authorization and agree a maintenance window. Freeze production writes and provider/outbox processing for the whole transfer; do not freeze a live app indefinitely while deployment remains unauthorized.
-4. Stream the frozen source into D1 in foreign-key order, preserving IDs, revisions, event sequence, receipts, audit, provider linkage and LINE dedup/outbox state. Convert only baht-valued estimates/additional price to integer satang; preserve existing `*_minor` and API JSON prices. No full dump or permanent transfer/backup file.
-5. Verify every table count/hash and foreign-key orphans; check financial totals by Business/Branch, bookings/reservations, customers/pets and LINE protection state. Source has real authority/configuration data even though it has no customer/payment rows. Do not infer an empty source from old historical documentation.
-6. Configure direct OAuth and required bindings, then deploy only after explicit owner instruction. Runtime is D1 only. Verify Google/LINE, Owner/Manager/Staff grants, Home, CRM, booking, operations, QR, Inbox, billing and reports on production.
-7. Open writes to D1 after smoke passes. If a failure occurs, keep maintenance and fix D1 forward. Do not switch relational datasource back.
-8. Delete one-time source tools/operator credentials/transfer artifacts after successful invariant verification and cutover. Keep the final migration report, migrations, tests and useful evidence.
+Existing local verification: backend 121, rendered HTML 99, client loading/refresh 44 and security 9 tests passed, plus TypeScript/build/lint and 41 local HTTP handler requests. These tests were not repeated for documentation-only changes.
 
-Wrangler's connected token currently lacks `d1:write`. Browser Dashboard was used to create D1 and apply/verify its schema as the owner requested. Creating persistent API credentials requires a separate action-time confirmation; none have been created. Source transfer, OAuth/environment configuration and production provider verification remain pending until the cutover gates are met. See the [one-time operator transfer instructions](../scripts/d1-transfer.md) for safe source inspection and the deliberate transfer prerequisites.
+Production deployment: build a1114ee3-38f2-4c02-9334-49b08c0b89b8, version 050df786-d4f7-445a-b4c7-1d29d5b4a9c7. Landing/login/register HTTP 200, guest account status 401, and unsupported GET /api/be1 405. Direct Google start successfully writes D1 OAuth state and reaches Google, but provider callback registration is still required. Production authenticated Business, payment, LINE and media behavior are not yet acceptance-tested. See work/d1-deployment-2026-10-15.md for actual evidence.
 
-## Performance and external retirement
-
-`Server-Timing` reports API wall duration, native binding elapsed duration, submitted statements, batch calls, metadata coverage and available read/write row counts. Pair response diagnostics with the operation name and HTTP status in request traces; never capture raw tokens or request bodies. `d1-reported` is the sum of metadata available from `all/run/batch`; native `first()` has no metadata. These are distinct measurements. Local probes do not prove production latency. Read replication is not enabled; primary reads retain immediate write visibility.
-
-After successful D1 cutover and provider verification, the owner can manually retire the former Supabase project/database, its old secrets and Hyperdrive configuration. Do not delete these external resources before the source data and provider subjects have been verified. Do not create restore or rollback implementation.
+Run future build and rendered HTML checks serially because both use dist/. Local DB migrate/seed scripts explicitly target local D1; never seed synthetic records into production.

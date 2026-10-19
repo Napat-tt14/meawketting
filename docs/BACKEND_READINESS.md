@@ -33,7 +33,7 @@ The development identity adapter remains explicitly local/test-only and fails cl
 
 ## Media
 
-R2 provisioning was explicitly declined. No bucket exists; the `MEDIA` binding/API is implemented and tested locally only, and cannot serve production media yet.
+The owner enabled R2 on 2026-10-15. Private Standard bucket `meawketting-private-media` is provisioned in Asia Pacific with Public Access disabled. Worker binding deployment and real media upload/read acceptance remain pending.
 
 Private R2 supports Business logo, Pet photo, Grooming before/after and Hotel/Daycare media without adding media UI. Authorized uploads validate size/MIME/magic bytes and use scoped keys; metadata lives in D1. Reads stream through the Worker after fresh authorization with private, no-store headers. They are authenticated URLs, not public or independently signed expiring links. Real R2 transfer and provider behavior remain acceptance checks.
 
@@ -41,4 +41,4 @@ Private R2 supports Business logo, Pet photo, Grooming before/after and Hotel/Da
 
 Business-first; Consumer PAUSED; Customer ≠ Guardian; LINE identity ≠ Pet authority; Business never owns Pet Passport; Booking ≠ execution; Charge ≠ Payment; completed ≠ paid. Reports/CRM have no writable source tables. Branch authorization remains server-side. LINE Seed Sans TH and Business UX/UI remain unchanged. /workfiledesign is protected.
 
-The production D1 schema has been applied and verified through the Dashboard: 70 STRICT domain tables, 133 indexes, 81 triggers, one view, one `0001_initial.sql` migration entry and zero foreign-key orphans. Source data transfer, OAuth/environment setup, provider callbacks and performance remain pending; Wrangler credentials still lack D1 write permission. R2 provisioning was declined and no bucket exists. No LINE Mini App runtime, payment gateway choice, deployment, commit or push was introduced.
+Production status — 2026-10-15: commit 18de0d9 was deployed successfully as Worker version 050df786-d4f7-445a-b4c7-1d29d5b4a9c7 (build a1114ee3-38f2-4c02-9334-49b08c0b89b8). The owner confirmed the Supabase source project was deleted and explicitly approved a fresh start on empty D1; source Person/Business preservation and transfer are superseded by that decision. No synthetic accounts or Businesses were inserted. Runtime bindings are native DB/D1, private MEDIA/R2 and API_RATE_LIMITER. Public landing/login/register pages respond 200. Google Login reaches the provider but is blocked by redirect_uri_mismatch until https://meawketting.com/api/auth/google/callback is registered on the existing OAuth client; real sign-in and first-Business creation are not yet verified. LINE Login is explicitly deferred by the owner.

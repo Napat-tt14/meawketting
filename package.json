@@ -23,7 +23,7 @@
     "typecheck:be7": "tsc -p tsconfig.be7.json --pretty false",
     "typecheck:be8": "tsc -p tsconfig.be8.json --pretty false",
     "test:frontend": "node --test tests/rendered-html.test.mjs && tsx --test tests/business-loading.test.ts tests/business-refresh.test.ts",
-    "test:backend": "tsx --test tests/be1.test.ts tests/be2.test.ts tests/be2-cache.test.ts tests/be3.test.ts tests/be4.test.ts tests/be5.test.ts tests/be6.test.ts tests/be7.test.ts tests/be8.test.ts tests/runtime.test.ts tests/auth.test.ts tests/migrations.test.ts tests/registration.test.ts tests/p2-optimization.test.ts tests/d1-races.test.ts tests/d1-performance.test.ts tests/d1-transfer.test.mjs tests/d1-platform.test.ts",
+    "test:backend": "tsx --test tests/be1.test.ts tests/be2.test.ts tests/be2-cache.test.ts tests/be3.test.ts tests/be4.test.ts tests/be5.test.ts tests/be6.test.ts tests/be7.test.ts tests/be8.test.ts tests/runtime.test.ts tests/auth.test.ts tests/auth-platform.test.mjs tests/migrations.test.ts tests/registration.test.ts tests/p2-optimization.test.ts tests/d1-races.test.ts tests/d1-performance.test.ts tests/d1-transfer.test.mjs tests/d1-platform.test.ts",
     "db:migrate": "wrangler d1 migrations apply DB --config wrangler.d1.json --local",
     "db:seed:test": "node scripts/d1-seed.mjs",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",

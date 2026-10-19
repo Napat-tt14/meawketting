@@ -88,7 +88,7 @@ test("Google verifies cryptographic signature, issuer, audience, expiry and nonc
   const jwk = { ...await crypto.subtle.exportKey("jwk", pair.publicKey), kid: crypto.randomUUID(), use: "sig" };
   let claims: Record<string, unknown> = {}, calls = 0, forge = false;
   t.mock.method(globalThis, "fetch", async (url: string | URL | Request, init?: RequestInit) => {
-    assert.equal(init?.redirect, "error"); calls++;
+    assert.equal(init?.redirect, "manual"); calls++;
     if (String(url).endsWith("/certs")) return Response.json({ keys: [jwk] }, { headers: { "cache-control": "max-age=300" } });
     assert.equal(String(url), "https://oauth2.googleapis.com/token");
     const body = init?.body as URLSearchParams; assert.equal(body.get("client_secret"), env.GOOGLE_CLIENT_SECRET); assert.equal(body.get("code_verifier")?.length, 43);
@@ -129,10 +129,25 @@ test("missing and foreign OAuth state never calls a provider", async t => {
   assert.equal(calls, 0);
 });
 
+test("provider failures log only allowlisted codes without provider payloads or credentials", async t => {
+  const { run } = harness(t), events: string[] = [];
+  t.mock.method(console, "warn", (event: string) => events.push(event));
+  for (const error of ["invalid_client", "private-provider-payload"]) {
+    t.mock.method(globalThis, "fetch", async () => Response.json({ error, error_description: "private-secret-token" }, { status: 400 }));
+    const start = await run(req("/api/auth/google/start"), () => beginBusinessLogin("google"));
+    const state = new URL(start.headers.get("location")!).searchParams.get("state");
+    const request = req(`/api/auth/google/callback?code=private-code&state=${state}`, start.headers.getSetCookie()[0].split(";")[0]);
+    assert.match((await run(request, () => finishGoogleLogin(request))).headers.get("location")!, /login\?error=try-again/);
+  }
+  const rejections = events.map(event => JSON.parse(event)).filter(event => event.event === "auth-provider-rejection");
+  assert.deepEqual(rejections.map(event => event.reason), ["invalid_client", "provider-rejected"]);
+  assert.doesNotMatch(events.join("\n"), /private|synthetic|client_secret|code=/);
+});
+
 test("LINE verifies provider tokens server-side, preserves linked Person, rotates session and denies revoked memberships", async t => {
   const { db, run } = harness(t), old = await session(db, OWNER, "line", "line-subject"); let nonce = "", verified = 0;
   t.mock.method(globalThis, "fetch", async (url: string | URL | Request, init?: RequestInit) => {
-    assert.equal(init?.redirect, "error");
+    assert.equal(init?.redirect, "manual");
     if (String(url).endsWith("/token")) return Response.json({ id_token: "synthetic-line-token" });
     assert.equal(String(url), "https://api.line.me/oauth2/v2.1/verify");
     assert.equal((init?.body as URLSearchParams).get("nonce"), nonce); assert.equal((init?.body as URLSearchParams).get("client_id"), env.LINE_LOGIN_CHANNEL_ID); verified++;

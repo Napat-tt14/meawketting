@@ -2,7 +2,7 @@
 
 EXTERNAL CONFIG REQUIRED / NOT YET DEPLOYED. Follow the [runbook](./PRODUCTION_RUNBOOK.md). The production D1 schema is applied/verified through the Dashboard: 70 STRICT domain tables, 133 indexes, 81 triggers, one view and zero foreign-key orphans; `0001_initial.sql` is recorded once. Wrangler credentials still lack D1 write permission; source transfer, OAuth/environment setup and deployed acceptance remain pending. No deployment is authorized by this checklist.
 
-The user declined enabling R2. No bucket was created; production private-media acceptance is blocked until a later authorized provisioning decision.
+The owner enabled R2 on 2026-10-15 and private bucket `meawketting-private-media` was created with Public Access disabled. Production private-media acceptance still requires the deployed Worker binding and authenticated upload/read checks.
 
 1. Recheck the applied APAC D1 schema/ledger and `DB` binding, then directly transfer existing records/provider linkage during the deliberate cutover window. Source media rows are currently zero; private media transfer requires later R2 provisioning if files appear. Preserve IDs and verify row counts, foreign keys, totals, receipts, histories and all domain invariants before acceptance. Never merge Persons by email or restore PostgreSQL.
 2. Verify direct Google/LINE consent/callback, state/nonce/PKCE failures, returning Person linkage, setup-only unlinked identities, expired/revoked sessions, rotation/logout and deliberate verified recovery for former email-only users.
@@ -14,3 +14,8 @@ The user declined enabling R2. No bucket was created; production private-media a
 8. Record LOCAL, REMOTE TEST and PRODUCTION performance separately. Complete the documented BE1/BE2 stale-form/retry follow-up before production. D1 platform Time Travel remains a platform facility; this migration adds no manual backup/export/restore workflow.
 
 Consumer remains PAUSED. The Guardian LINE Mini App and real payment/provider choice remain separate unimplemented/open scope.
+
+
+## Production update — 2026-10-15
+
+Production status — 2026-10-15: commit 18de0d9 was deployed successfully as Worker version 050df786-d4f7-445a-b4c7-1d29d5b4a9c7 (build a1114ee3-38f2-4c02-9334-49b08c0b89b8). The owner confirmed the Supabase source project was deleted and explicitly approved a fresh start on empty D1; source Person/Business preservation and transfer are superseded by that decision. No synthetic accounts or Businesses were inserted. Runtime bindings are native DB/D1, private MEDIA/R2 and API_RATE_LIMITER. Public landing/login/register pages respond 200. Google Login reaches the provider but is blocked by redirect_uri_mismatch until https://meawketting.com/api/auth/google/callback is registered on the existing OAuth client; real sign-in and first-Business creation are not yet verified. LINE Login is explicitly deferred by the owner.
